@@ -34,6 +34,7 @@ __all__ = [
     "new_project",
     "normalize_project",
     "project_summary",
+    "display_formula",
     "project_structures",
     "add_structure",
     "load_project",
@@ -188,18 +189,55 @@ def normalize_project(doc: Any, *, keep_id: bool = True, partial_ok: bool = True
     return out
 
 
+def display_formula(symbols: Iterable[str]) -> str:
+    """Formula as the web app's info card shows it: Hill order (C, H, then alphabetical)
+    when both carbon and hydrogen are present, otherwise cations first by Pauling
+    electronegativity (``SrTiO3``, ``NaCl``, ``SiC``, ``CaCO3``, ``C60``)."""
+    from .core.elements import electronegativity
+
+    counts: dict[str, int] = {}
+    for s in symbols:
+        k = str(s).strip()
+        counts[k] = counts.get(k, 0) + 1
+    if not counts:
+        return ""
+    if "C" in counts and "H" in counts:
+        order = ["C", "H"] + sorted(k for k in counts if k not in ("C", "H"))
+    else:
+        def key(sym: str) -> tuple[float, str]:
+            try:
+                en = electronegativity(sym)
+            except Exception:  # unknown symbol
+                en = None
+            return (en if en is not None else 2.0, sym)
+
+        order = sorted(counts, key=key)
+    return "".join(f"{k}{counts[k] if counts[k] != 1 else ''}" for k in order)
+
+
+def _symbols_of(entry: dict[str, Any]) -> list:
+    return (entry.get("structure") or {}).get("symbols") or []
+
+
 def project_summary(doc: dict[str, Any], size: int | None = None) -> dict[str, Any]:
     """Summary used by list endpoints: the project without ``structures``/``scene``
-    plus ``nStructures``, ``nAtoms`` (atoms in the active structure) and ``size`` (bytes)."""
+    plus ``nStructures``, ``nAtoms`` and ``formula`` (of the active structure), ``formulas``
+    and ``nAtomsTotal`` (over all structures, in project order) and ``size`` (bytes)."""
     summary = {k: v for k, v in doc.items() if k not in ("structures", "scene")}
-    structures = doc.get("structures") or []
+    structures = [s for s in (doc.get("structures") or []) if isinstance(s, dict)]
     summary["nStructures"] = len(structures)
     active = doc.get("activeStructure")
     entry = next((s for s in structures if s.get("id") == active), structures[0] if structures else None)
     n_atoms = 0
+    formula = ""
     if entry:
-        n_atoms = len((entry.get("structure") or {}).get("symbols") or [])
+        symbols = _symbols_of(entry)
+        n_atoms = len(symbols)
+        formula = display_formula(symbols)
     summary["nAtoms"] = n_atoms
+    summary["formula"] = formula
+    summary["formulas"] = [display_formula(_symbols_of(e)) for e in structures]
+    summary["nAtomsTotal"] = sum(len(_symbols_of(e)) for e in structures)
     if size is None:
         size = len(json.dumps(doc, separators=(",", ":"), ensure_ascii=False).encode("utf-8"))
     summary["size"] = int(size)

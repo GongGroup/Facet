@@ -26,6 +26,11 @@ What a plugin can do (see :class:`PluginContext`)::
         ctx.add_static("static")                    # served at /plugins/<name>/
         ctx.add_frontend_module("hello.js")         # dynamic-imported by the web UI
         ctx.add_preset("lighting", {"id": "sunset", "name": "Sunset", ...})
+        ctx.add_preset("look", {"id": "dusk", "name": "Dusk", "scene": {...}})
+
+Frontend URLs (``plugins[].frontend`` and ``static`` in ``/api/v1/info``) are relative
+(``plugins/<name>/hello.js``) so they resolve against the page and keep working when
+the app is served under a sub-path (``--root-path``).  See ``docs/PLUGINS.md``.
 """
 
 from __future__ import annotations
@@ -54,6 +59,7 @@ __all__ = [
     "PluginRecord",
     "PluginManager",
     "plugin_slug",
+    "plugin_template",
 ]
 
 log = logging.getLogger("atomscope.plugins")
@@ -61,7 +67,8 @@ log = logging.getLogger("atomscope.plugins")
 #: Entry-point group scanned for installed plugins.
 ENTRY_POINT_GROUP = "atomscope.plugins"
 
-#: ``add_preset`` kinds → key in ``/api/v1/info`` ``presets``.
+#: ``add_preset`` kinds → key in ``/api/v1/info`` ``presets``.  A "style" preset is a
+#: *look* in the web UI (a partial scene applied with one click), so ``look`` is an alias.
 PRESET_KINDS = {
     "lighting": "lighting",
     "colorscheme": "colorSchemes",
@@ -69,6 +76,8 @@ PRESET_KINDS = {
     "color_scheme": "colorSchemes",
     "style": "styles",
     "styles": "styles",
+    "look": "styles",
+    "looks": "styles",
 }
 
 
@@ -146,7 +155,7 @@ class PluginRecord:
             "status": self.status,
             "error": self.error,
             "frontend": list(self.frontend),
-            "static": f"/plugins/{self.slug}/" if self.static_dir else None,
+            "static": f"plugins/{self.slug}/" if self.static_dir else None,
             "readers": list(self.readers),
             "writers": list(self.writers),
             "builders": list(self.builders),
@@ -245,18 +254,22 @@ class PluginContext:
         self._record.routers.append((router, prefix.rstrip("/")))
 
     def add_static(self, directory: str | Path) -> str:
-        """Serve *directory* (relative to the plugin folder) at ``/plugins/<name>/``; returns that URL."""
+        """Serve *directory* (relative to the plugin folder) at ``/plugins/<name>/``.
+
+        Returns the URL relative to the app root (``plugins/<name>/``).
+        """
         d = self._resolve(directory)
         if not d.is_dir():
             raise ValueError(f"static directory {d} does not exist")
         self._record.static_dir = d
-        return f"/plugins/{self._record.slug}/"
+        return f"plugins/{self._record.slug}/"
 
     def add_frontend_module(self, relative_js_path: str) -> str:
         """Declare an ES module (path relative to the static dir) for the web UI to import.
 
         If no static directory was added yet, ``<plugin>/static`` is used.
-        Returns the module URL listed under ``plugins[].frontend`` in ``/api/v1/info``.
+        Returns the module URL listed under ``plugins[].frontend`` in ``/api/v1/info``:
+        relative to the app root (``plugins/<name>/<path>``), so it also works under a sub-path.
         """
         rel = Path(relative_js_path).as_posix().lstrip("/")
         if ".." in Path(rel).parts:
@@ -266,19 +279,21 @@ class PluginContext:
         assert self._record.static_dir is not None
         if not (self._record.static_dir / rel).is_file():
             self.log.warning("frontend module %s not found in %s", rel, self._record.static_dir)
-        url = f"/plugins/{self._record.slug}/{rel}"
+        url = f"plugins/{self._record.slug}/{rel}"
         self._record.frontend.append(url)
         return url
 
     def add_preset(self, kind: str, preset: dict[str, Any]) -> None:
-        """Add a UI preset; *kind* is ``lighting``, ``colorScheme`` or ``style``.
+        """Add a UI preset; *kind* is ``lighting``, ``colorScheme`` or ``look`` (alias ``style``).
 
         The preset dict needs an ``id``; ``name`` defaults to the id.  It is passed
-        to the frontend unchanged (plus ``plugin``).
+        to the frontend unchanged (plus ``plugin``).  Shapes (see ``docs/PLUGINS.md``):
+        lighting ``{id, name, key, fill, rim, hemi, ambient, env, extra}``; colorScheme
+        ``{id, name, colors: {El: "#hex"}, default}``; look ``{id, name, swatch, scene}``.
         """
         key = PRESET_KINDS.get(kind.replace("-", "_").lower()) or PRESET_KINDS.get(kind.lower())
         if key is None:
-            raise ValueError(f"unknown preset kind {kind!r}; use lighting, colorScheme or style")
+            raise ValueError(f"unknown preset kind {kind!r}; use lighting, colorScheme or look")
         if not isinstance(preset, dict) or not preset.get("id"):
             raise ValueError("preset must be a dict with an 'id'")
         item = dict(preset)
@@ -456,3 +471,73 @@ class PluginManager:
                     log.error("plugin %s: cannot include router: %s", r.name, exc)
             if r.static_dir is not None:
                 app.mount(f"/plugins/{r.slug}", StaticFiles(directory=str(r.static_dir)), name=f"plugin-{r.slug}")
+
+
+_TEMPLATE_PY = '''"""{title} — an AtomScope plugin.
+
+Load it with ``atomscope serve --plugins {parent}`` (or ``ATOMSCOPE_PLUGIN_DIRS``).
+See docs/PLUGINS.md for every extension point.
+"""
+
+from __future__ import annotations
+
+from atomscope import PluginContext, Structure
+
+PLUGIN = {{
+    "name": "{name}",
+    "version": "0.1.0",
+    "description": "{title}: describe what it adds.",
+}}
+
+
+def atom_count(structure: Structure, element: str = "") -> dict:
+    """Example analysis: number of atoms (optionally of one element)."""
+    symbols = list(structure.symbols)
+    n = sum(1 for s in symbols if s == element) if element else len(symbols)
+    return {{"atoms": n, "elements": sorted(set(symbols))}}
+
+
+def register(ctx: PluginContext) -> None:
+    """Called once when AtomScope loads the plugin."""
+    ctx.register_analysis("{slug}-count", atom_count, {{
+        "label": "Atom count ({name})",
+        "description": "Counts atoms; set an element to count only that one.",
+        "params": [{{"name": "element", "type": "string", "default": "", "label": "Element"}}],
+    }})
+    ctx.add_preset("look", {{
+        "id": "{slug}-look", "name": "{title} look", "swatch": "#2f6f8f",
+        "scene": {{"display": {{"background": {{"mode": "solid", "color1": "#10202a"}}}},
+                   "post": {{"outline": {{"enabled": True, "color": "#dff3ff"}}}}}},
+    }})
+    ctx.add_frontend_module("{slug}.js")
+'''
+
+_TEMPLATE_JS = '''// {title} — frontend part of the AtomScope plugin "{name}".
+// The web UI imports this module and calls the default export with the public API
+// (the same object as window.atomscope). See docs/PLUGINS.md.
+
+export default function activate(api) {{
+  api.registerCommand({{
+    id: "{slug}.hello",
+    title: "Say hello ({name})",
+    run: () => api.toast(`{title}: ${{api.structure ? api.structure.length + " atoms" : "no structure"}}`),
+  }});
+}}
+'''
+
+
+def plugin_template(name: str, parent: str = "<plugins folder>") -> dict[str, str]:
+    """Files of a minimal plugin called *name*: ``{"plugin.py": ..., "static/<slug>.js": ...}``.
+
+    *name* must be a plain identifier (letters, digits, ``_ . -``); *parent* is the plugin
+    directory named in the generated docstring.
+    """
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", name or ""):
+        raise ValueError(f"invalid plugin name {name!r}: use letters, digits, '_', '.' or '-'")
+    slug = plugin_slug(name)
+    title = " ".join(w.capitalize() for w in re.split(r"[-_.]+", name) if w) or "Plugin"
+    fields = {"name": name, "slug": slug, "title": title, "parent": parent}
+    return {
+        "plugin.py": _TEMPLATE_PY.format(**fields),
+        f"static/{slug}.js": _TEMPLATE_JS.format(**fields),
+    }

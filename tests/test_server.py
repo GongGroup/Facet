@@ -54,7 +54,7 @@ def test_meta_misc(local_client):
 def test_local_projects_crud(local_client):
     c = local_client
     me = c.get("/api/v1/auth/me").json()
-    assert me == {"user": {"id": "local", "username": "local", "created": None}, "mode": "local"}
+    assert me == {"user": {"id": "local", "username": "local", "created": None}, "mode": "local", "authRequired": False}
 
     cu = c.post("/api/v1/build/crystal", json={"prototype": "fcc", "elements": ["Cu"]}).json()["structure"]
     body = {"name": "Copper 铜", "tags": ["metal"], "structures": [{"name": "Cu", "structure": cu}],
@@ -131,7 +131,8 @@ def test_cloud_auth_and_isolation(cloud_client):
     tb = c.post("/api/v1/auth/login", json={"username": "bob", "password": "bobpass1"}).json()["token"]
     ha, hb = {"Authorization": f"Bearer {ta}"}, {"Authorization": f"Bearer {tb}"}
 
-    assert c.get("/api/v1/auth/me", headers=ha).json()["user"]["username"] == "alice"
+    me = c.get("/api/v1/auth/me", headers=ha).json()
+    assert me["user"]["username"] == "alice" and me["authRequired"] is True
     pa = c.post("/api/v1/projects", json={"name": "Alice's"}, headers=ha).json()["id"]
     pb = c.post("/api/v1/projects", json={"name": "Bob's"}, headers=hb).json()["id"]
     assert [p["id"] for p in c.get("/api/v1/projects", headers=ha).json()] == [pa]
@@ -285,3 +286,32 @@ def test_large_project_payload_gzip(local_client):
     assert got.headers.get("content-encoding") == "gzip"
     assert len(got.json()["structures"][0]["structure"]["symbols"]) == 4000
     json.dumps(got.json())
+
+
+def test_project_etag_if_match_and_conflict(local_client):
+    c = local_client
+    created = c.post("/api/v1/projects", json={"name": "Lock", "structures": [build.crystal("perovskite", "SrTiO3").to_dict()]})
+    pid, v1 = created.json()["id"], created.json()["updated"]
+    assert created.headers["etag"] == f'"{v1}"'
+    got = c.get(f"/api/v1/projects/{pid}")
+    assert got.headers["etag"] == f'"{v1}"' and got.headers["cache-control"] == "no-store"
+    summary = c.get("/api/v1/projects").json()[0]
+    assert summary["formula"] == "SrTiO3" and summary["nAtoms"] == 5
+
+    body = got.json()
+    r1 = c.put(f"/api/v1/projects/{pid}", json={**body, "name": "Tab A"}, headers={"If-Match": f'"{v1}"'})
+    assert r1.status_code == 200 and r1.headers["etag"] == f'"{r1.json()["updated"]}"'
+    r2 = c.put(f"/api/v1/projects/{pid}", json={**body, "name": "Tab B"}, headers={"If-Match": f'"{v1}"'})
+    assert r2.status_code == 409 and r2.json()["detail"] == "project was changed elsewhere"
+    assert r2.json()["updated"] == r1.json()["updated"]
+    # the same check through a body field (clients that cannot set headers)
+    r3 = c.put(f"/api/v1/projects/{pid}", json={**body, "name": "Tab C", "baseUpdated": v1})
+    assert r3.status_code == 409
+    assert c.get(f"/api/v1/projects/{pid}").json()["name"] == "Tab A"
+    # rename with the current version, then a plain PUT without If-Match (old clients) still wins
+    v2 = r1.json()["updated"]
+    ren = c.patch(f"/api/v1/projects/{pid}", json={"name": "Renamed"}, headers={"If-Match": f'W/"{v2}"'})
+    assert ren.status_code == 200 and ren.json()["name"] == "Renamed" and "baseUpdated" not in ren.json()
+    plain = c.put(f"/api/v1/projects/{pid}", json={**body, "name": "Plain"})
+    assert plain.status_code == 200 and plain.json()["name"] == "Plain"
+    assert c.put(f"/api/v1/projects/{pid}", json=body, headers={"If-Match": "*"}).status_code == 200

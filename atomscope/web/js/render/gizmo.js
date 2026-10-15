@@ -1,12 +1,21 @@
 /** Orientation gizmo drawn in a corner: x/y/z or a/b/c arrows that follow the camera. Click to align. */
 import * as THREE from '../../vendor/three/three.module.js';
 
-function labelSprite(text, color) {
+/** a, b, c (x, y, z) colours: the light-theme tones, or lighter ones that keep about 4.5:1 on dark backgrounds. */
+const AXIS_COLORS = ['#e5484d', '#30a46c', '#3e63dd'];
+const AXIS_COLORS_DARK = ['#ff6369', '#4cc38a', '#849dff'];
+export const axisColors = (dark = false) => (dark ? AXIS_COLORS_DARK : AXIS_COLORS);
+
+/** An axis letter with a halo that sets it off from any background (dark halo on dark scenes, light on light). */
+function labelSprite(text, color, dark = false) {
   const c = document.createElement('canvas');
   c.width = c.height = 64;
   const g = c.getContext('2d');
   g.font = '600 40px "IBM Plex Sans", system-ui, sans-serif';
   g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.lineWidth = 6; g.lineJoin = 'round';
+  g.strokeStyle = dark ? 'rgba(0, 0, 0, 0.55)' : 'rgba(255, 255, 255, 0.8)';
+  g.strokeText(text, 32, 34);
   g.fillStyle = color;
   g.fillText(text, 32, 34);
   const tex = new THREE.CanvasTexture(c);
@@ -30,13 +39,15 @@ export class AxisGizmo {
     this.setAxes([[1, 0, 0], [0, 1, 0], [0, 0, 1]], ['x', 'y', 'z']);
   }
 
-  setAxes(vectors, labels) {
-    const key = JSON.stringify([vectors.map((v) => v.map((x) => +x.toFixed(4))), labels]);
+  /** Axis arrows along `vectors`, named `labels`; {dark: true} uses the colours for a dark background. */
+  setAxes(vectors, labels, { dark = false } = {}) {
+    const key = JSON.stringify([vectors.map((v) => v.map((x) => +x.toFixed(4))), labels, !!dark]);
     if (key === this.mode) return;
     this.mode = key;
+    this._dispose();
     this.group.clear();
     this.axes = [];
-    const colors = ['#e5484d', '#30a46c', '#3e63dd'];
+    const colors = axisColors(dark);
     vectors.forEach((v, i) => {
       const dir = new THREE.Vector3(...v).normalize();
       const mat = new THREE.MeshStandardMaterial({ color: colors[i], roughness: 0.4, toneMapped: false });
@@ -46,7 +57,7 @@ export class AxisGizmo {
       const head = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.26, 16), mat);
       head.position.copy(dir).multiplyScalar(0.92);
       head.quaternion.copy(shaft.quaternion);
-      const lab = labelSprite(labels[i], colors[i]);
+      const lab = labelSprite(labels[i], colors[i], dark);
       lab.position.copy(dir).multiplyScalar(1.3);
       shaft.userData.axis = head.userData.axis = lab.userData.axis = { dir: dir.clone(), label: labels[i] };
       this.group.add(shaft, head, lab);
@@ -54,6 +65,15 @@ export class AxisGizmo {
     });
     const ball = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 12), new THREE.MeshStandardMaterial({ color: '#9aa1ab', toneMapped: false }));
     this.group.add(ball);
+  }
+
+  /** Free the GPU resources of the current arrows (they are rebuilt when the axes or the background change). */
+  _dispose() {
+    this.group.traverse((o) => {
+      o.geometry?.dispose?.();
+      o.material?.map?.dispose?.();
+      o.material?.dispose?.();
+    });
   }
 
   render(renderer, mainCamera, x, y) {

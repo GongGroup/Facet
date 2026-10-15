@@ -3,7 +3,76 @@
  * Positions are stored as a flat Float64Array (x0,y0,z0,x1,...) for speed.
  */
 import { element, normalizeSymbol, PAULING } from './elements.js';
-import { inv3, det3, cartToFrac, fracToCart, cellParams } from './util.js';
+import { inv3, det3, cartToFrac, fracToCart, cellParams, cross, norm, dot } from './util.js';
+
+/** Vacuum (Å) added around the atoms when a zero-length, non-periodic cell vector is filled in. */
+export const FILL_VACUUM = 10;
+
+/** Append a human-readable note to `info.warning` (shown when a file is loaded). */
+export function addWarning(info, msg) {
+  if (!msg) return info;
+  info.warning = info.warning ? `${info.warning}; ${msg}` : msg;
+  return info;
+}
+
+/**
+ * Repair a singular cell (zero volume) so geometry code does not fail — mirrors the Python
+ * `_fix_degenerate_cell`. A zero-length vector on a non-periodic axis (e.g. c = 0 in a slab with
+ * pbc T T F) becomes the unit normal of the other two × (extent of the atoms along it + 10 Å).
+ * A cell that is still singular is dropped (pbc all false).
+ * @returns {{cell: number[][]|null, pbc: boolean[], warning: string|null}}
+ */
+export function fixDegenerateCell(cell, pbc, positions = []) {
+  pbc = (pbc ?? [true, true, true]).map(Boolean);
+  if (!cell) return { cell, pbc, warning: null };
+  const c = cell.map((r) => [0, 1, 2].map((k) => Number(r?.[k])));
+  const finite = c.every((r) => r.every(Number.isFinite));
+  const len = c.map(norm);
+  const scale = finite ? Math.max(1, ...len) : 1;
+  const tiny = 1e-8 * scale;
+  if (finite && Math.min(...len) > tiny && Math.abs(det3(c)) > 1e-9 * len[0] * len[1] * len[2]) return { cell: c, pbc, warning: null };
+  if (!finite || !len.some((l) => l > tiny)) {
+    return { cell: null, pbc: [false, false, false], warning: pbc.some(Boolean) ? 'the unit cell was empty and has been removed' : null };
+  }
+  const extent = (d) => {
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i + 2 < positions.length; i += 3) {
+      const v = positions[i] * d[0] + positions[i + 1] * d[1] + positions[i + 2] * d[2];
+      if (Number.isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+    }
+    return hi >= lo ? hi - lo : 0;
+  };
+  const unit = (v) => { const n = norm(v); return v.map((x) => x / n); };
+  const nw = c.map((r) => r.slice());
+  const zero = [0, 1, 2].filter((k) => len[k] <= tiny);
+  let fixed = zero.length > 0 && !zero.some((k) => pbc[k]);
+  if (fixed) {
+    if (zero.length === 2) {           // one vector left: build two perpendicular helper axes
+      const keep = [0, 1, 2].find((k) => !zero.includes(k));
+      const u = unit(nw[keep]);
+      const axis = (k) => [0, 1, 2].map((j) => (j === k ? 1 : 0));
+      let p1 = axis((keep + 1) % 3);
+      p1 = p1.map((x, j) => x - dot(p1, u) * u[j]);
+      if (norm(p1) < 1e-6) { const e = axis((keep + 2) % 3); p1 = e.map((x, j) => x - u[(keep + 2) % 3] * u[j]); }
+      p1 = unit(p1);
+      nw[(keep + 1) % 3] = p1;
+      nw[(keep + 2) % 3] = cross(u, p1);
+    }
+    for (const k of zero) {
+      const n = cross(nw[(k + 1) % 3], nw[(k + 2) % 3]);   // cyclic order keeps the cell right-handed
+      if (norm(n) < 1e-12) { fixed = false; break; }
+      const d = unit(n);
+      nw[k] = d.map((x) => x * (extent(d) + FILL_VACUUM));
+    }
+    if (fixed && zero.length === 2) for (const k of zero) { const d = unit(nw[k]); nw[k] = d.map((x) => x * (extent(d) + FILL_VACUUM)); }
+  }
+  const nl = nw.map(norm);
+  if (fixed && Math.abs(det3(nw)) > 1e-9 * nl[0] * nl[1] * nl[2]) {
+    const axes = zero.map((k) => 'abc'[k]).join(' and ');
+    return { cell: nw, pbc, warning: `the zero-length cell ${zero.length > 1 ? `vectors ${axes} were` : `vector ${axes} was`} replaced by a vacuum gap around the atoms` };
+  }
+  return { cell: null, pbc: [false, false, false], warning: 'the unit cell has zero volume and was removed (structure treated as non-periodic)' };
+}
 
 export class Structure {
   constructor({ name = 'Untitled', symbols = [], positions = null, cell = null, pbc = null, frames = null, props = {}, info = {} } = {}) {
@@ -24,9 +93,18 @@ export class Structure {
 
   static fromJSON(o) {
     if (o instanceof Structure) return o;
+    const n = (o.symbols ?? []).length;
+    const positions = flatten(o.positions, n);
+    const info = { ...(o.info ?? {}) };
+    let cell = o.cell ?? null, pbc = o.pbc ?? null;
+    if (cell) {
+      const fix = fixDegenerateCell(cell, pbc ?? [true, true, true], positions);
+      if (fix.warning || fix.cell !== cell) ({ cell, pbc } = fix);
+      if (fix.warning) addWarning(info, fix.warning);
+    }
     const s = new Structure({
-      name: o.name ?? 'Untitled', symbols: o.symbols ?? [], positions: o.positions, cell: o.cell ?? null,
-      pbc: o.pbc ?? null, props: o.props ?? {}, info: o.info ?? {},
+      name: o.name ?? 'Untitled', symbols: o.symbols ?? [], positions, cell,
+      pbc, props: o.props ?? {}, info,
     });
     s.frames = (o.frames ?? []).map((f) => ({ positions: flatten(f.positions, s.symbols.length), cell: f.cell ?? null }));
     return s;

@@ -1,5 +1,5 @@
 # docker compose up -d
-# docker compose exec atomscope atomscope user create alice
+# docker compose exec atomscope atomscope user create alice     # accounts (registration is off)
 services:
   atomscope:
     build: .
@@ -7,15 +7,34 @@ services:
     restart: unless-stopped
     ports:
       - "8765:8765"
+      # Local mode has no login: publish it on this machine only, e.g.
+      # - "127.0.0.1:8765:8765"
     environment:
-      ATOMSCOPE_MODE: cloud                 # or "local" for a single-user server
-      ATOMSCOPE_ALLOW_REGISTRATION: "true"  # set to "false" and create accounts with `atomscope user create`
-      # ATOMSCOPE_SECRET: change-me         # optional; otherwise generated into /data/secret.key
+      ATOMSCOPE_MODE: cloud                  # or "local" for a single-user server (then also set ATOMSCOPE_TOKEN)
+      ATOMSCOPE_ALLOW_REGISTRATION: "false"  # "true" lets anyone who reaches the server sign up (5 per hour per address)
+      # ATOMSCOPE_TOKEN: <long random string>  # local mode: require this token (sign in as "local")
+      # ATOMSCOPE_TOKEN_TTL_DAYS: "30"       # cloud sign-ins expire after this many idle days (0 = never)
+      # ATOMSCOPE_SECRET: change-me          # optional; otherwise generated into /data/secret.key
       # ATOMSCOPE_CORS_ORIGINS: https://viewer.example.org
+      # ATOMSCOPE_ROOT_PATH: /atomscope      # when a reverse proxy serves the app under a sub-path
+      # ATOMSCOPE_FORWARDED_ALLOW_IPS: "172.28.0.0/16"   # behind a reverse-proxy container: trust X-Forwarded-For
+      #                                      # from the proxy's address or network (the subnet below), else rate
+      #                                      # limits treat every user as the proxy. Never "*": any client could
+      #                                      # then forge its address and dodge the sign-in limits.
+      # ATOMSCOPE_FRAME_ANCESTORS: "'self' https://wiki.example.org"   # allow embedding in other sites
       ATOMSCOPE_MAX_PROJECT_MB: "50"
+      ATOMSCOPE_MAX_ATOMS: "200000"          # largest structure the builder endpoints create
     volumes:
       - atomscope-data:/data
       - ./examples/plugins:/plugins:ro      # plugin directory (ATOMSCOPE_PLUGIN_DIRS=/plugins)
 
 volumes:
   atomscope-data:
+
+# With a proxy container on this network, give the network a fixed subnet for ATOMSCOPE_FORWARDED_ALLOW_IPS
+# (and publish the port only on 127.0.0.1, or not at all, so clients cannot bypass the proxy):
+# networks:
+#   default:
+#     ipam:
+#       config:
+#         - subnet: 172.28.0.0/16

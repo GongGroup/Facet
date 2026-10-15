@@ -22,10 +22,12 @@ __all__ = [
     "read_upload",
     "read_json_body",
     "is_multipart",
+    "body_limit",
     "MAX_ATOMS",
 ]
 
-#: Upper bound on atoms produced by builder/supercell endpoints.
+#: Hard upper bound on atoms produced by builder/supercell endpoints (``Settings.max_atoms``
+#: — ``ATOMSCOPE_MAX_ATOMS``, default 200 000 — is the limit actually applied).
 MAX_ATOMS = 1_000_000
 
 
@@ -64,11 +66,42 @@ async def read_upload(upload: UploadFile, settings: Settings) -> bytes:
     return data
 
 
+def body_limit(settings: Settings) -> int:
+    """Largest request body accepted (bytes)."""
+    limit = getattr(settings, "body_limit_bytes", None)
+    return int(limit) if limit else max(settings.max_upload_bytes, settings.max_project_bytes) + 64 * 1024
+
+
+def _too_large(limit: int) -> HTTPException:
+    return HTTPException(413, f"request body is larger than the limit of {limit / (1024 * 1024):.0f} MB")
+
+
 async def read_json_body(request: Request, settings: Settings) -> Any:
-    """Parse a JSON request body with a size limit and a helpful 400 on bad JSON."""
-    body = await request.body()
-    if len(body) > max(settings.max_upload_bytes, settings.max_project_bytes) + 1024:
-        raise HTTPException(413, "request body is too large")
+    """Parse a JSON request body with a size limit and a helpful 400 on bad JSON (415 unless JSON).
+
+    A declared ``Content-Length`` above the limit is rejected before anything is
+    read; otherwise the body is streamed and rejected as soon as it grows past it.
+    """
+    # only real JSON requests: a browser can send text/plain or form bodies to any site without a CORS
+    # preflight, so accepting them would let other web pages write here (CSRF)
+    ctype = request.headers.get("content-type", "").split(";")[0].strip().lower()
+    if ctype != "application/json" and not (ctype.startswith("application/") and ctype.endswith("+json")):
+        raise HTTPException(415, "send the request body as JSON with 'Content-Type: application/json' "
+                                 "(or a file as multipart/form-data)")
+    limit = body_limit(settings)
+    declared = request.headers.get("content-length")
+    if declared is not None:
+        try:
+            if int(declared) > limit:
+                raise _too_large(limit)
+        except ValueError as exc:
+            raise HTTPException(400, "invalid Content-Length header") from exc
+    buf = bytearray()
+    async for chunk in request.stream():
+        buf.extend(chunk)
+        if len(buf) > limit:
+            raise _too_large(limit)
+    body = bytes(buf)
     if not body:
         raise HTTPException(400, "request body is empty; expected JSON")
     try:

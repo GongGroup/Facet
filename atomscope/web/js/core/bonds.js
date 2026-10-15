@@ -40,11 +40,15 @@ export function findBonds(pos, symbols, opt = {}) {
     cut2[a * nk + b] = disabled.has(pairKey(uniq[a], uniq[b])) ? 0 : c * c;
   }
   const cell = Math.max(0.5, Math.min(maxL, tol * 2 * rmax));
+  // atoms with a non-finite coordinate (bad input) are left out instead of poisoning the grid
+  const ok = (i) => Number.isFinite(pos[3 * i]) && Number.isFinite(pos[3 * i + 1]) && Number.isFinite(pos[3 * i + 2]);
   let minx = Infinity, miny = Infinity, minz = Infinity;
-  for (let i = 0; i < n; i++) { minx = Math.min(minx, pos[3 * i]); miny = Math.min(miny, pos[3 * i + 1]); minz = Math.min(minz, pos[3 * i + 2]); }
+  for (let i = 0; i < n; i++) { if (!ok(i)) continue; minx = Math.min(minx, pos[3 * i]); miny = Math.min(miny, pos[3 * i + 1]); minz = Math.min(minz, pos[3 * i + 2]); }
   const grid = new Map();
   const ci = new Int32Array(3 * n);
+  const skip = new Uint8Array(n);
   for (let i = 0; i < n; i++) {
+    if (!ok(i)) { skip[i] = 1; continue; }
     const x = Math.floor((pos[3 * i] - minx) / cell), y = Math.floor((pos[3 * i + 1] - miny) / cell), z = Math.floor((pos[3 * i + 2] - minz) / cell);
     ci[3 * i] = x; ci[3 * i + 1] = y; ci[3 * i + 2] = z;
     const key = x + 4096 * (y + 4096 * z);
@@ -54,6 +58,7 @@ export function findBonds(pos, symbols, opt = {}) {
   }
   let pairs = new Uint32Array(Math.max(16, n * 8)), lengths = new Float32Array(Math.max(8, n * 4)), count = 0;
   for (let i = 0; i < n; i++) {
+    if (skip[i]) continue;
     const xi = pos[3 * i], yi = pos[3 * i + 1], zi = pos[3 * i + 2], ki = kind[i];
     for (let dz = -1; dz <= 1; dz++) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
       const arr = grid.get((ci[3 * i] + dx) + 4096 * ((ci[3 * i + 1] + dy) + 4096 * (ci[3 * i + 2] + dz)));
@@ -91,8 +96,10 @@ export function findPeriodicNeighbors(pos, symbols, cell, pbc = [true, true, tru
   const reach = margin.map((m, k) => (pbc[k] ? Math.min(4, Math.ceil(m)) : 0));
   // wrapped fractional coordinates + integer shifts
   const fw = new Float64Array(3 * n), shift = new Int32Array(3 * n);
+  const bad = new Uint8Array(n);
   for (let i = 0; i < n; i++) {
     const f = cartToFrac([pos[3 * i], pos[3 * i + 1], pos[3 * i + 2]], inv);
+    if (!f.every(Number.isFinite)) { bad[i] = 1; continue; }
     for (let k = 0; k < 3; k++) {
       const s = pbc[k] ? Math.floor(f[k]) : 0;
       shift[3 * i + k] = s; fw[3 * i + k] = f[k] - s;
@@ -101,9 +108,11 @@ export function findPeriodicNeighbors(pos, symbols, cell, pbc = [true, true, tru
   // candidate images
   const cand = []; // [atom, na, nb, nc, x, y, z]
   for (let i = 0; i < n; i++) {
+    if (bad[i]) continue;
     for (let a = -reach[0]; a <= reach[0]; a++) for (let b = -reach[1]; b <= reach[1]; b++) for (let c = -reach[2]; c <= reach[2]; c++) {
       const f0 = fw[3 * i] + a, f1 = fw[3 * i + 1] + b, f2 = fw[3 * i + 2] + c;
-      if (f0 < -margin[0] || f0 > 1 + margin[0] || f1 < -margin[1] || f1 > 1 + margin[1] || f2 < -margin[2] || f2 > 1 + margin[2]) continue;
+      // only periodic axes are bounded: atoms of a slab or wire may sit anywhere along a non-periodic axis
+      if ((pbc[0] && (f0 < -margin[0] || f0 > 1 + margin[0])) || (pbc[1] && (f1 < -margin[1] || f1 > 1 + margin[1])) || (pbc[2] && (f2 < -margin[2] || f2 > 1 + margin[2]))) continue;
       cand.push([i, a, b, c,
         f0 * cell[0][0] + f1 * cell[1][0] + f2 * cell[2][0],
         f0 * cell[0][1] + f1 * cell[1][1] + f2 * cell[2][1],

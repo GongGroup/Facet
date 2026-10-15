@@ -5,7 +5,9 @@
 //
 //   export default function activate(api) { ... }
 //
-// `api` provides:
+// `api` is window.atomscope: registerLook, registerStyle, registerMaterial, registerColorScheme,
+// registerLightingPreset, registerAnalysis, registerCommand, registerPanel, toast, … — see docs/PLUGINS.md.
+// This example uses:
 //   api.registerLightingPreset({ id, name, ... })
 //   api.registerColorScheme({ id, name, colorFor(symbol, index, ctx) })
 //   api.registerCommand({ id, title, run })

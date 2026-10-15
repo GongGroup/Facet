@@ -8,6 +8,14 @@ async function downloads() {
   try { downloadsCap = isArtifact() ? await window.claude.use('downloads') : null; } catch { downloadsCap = null; }
   return downloadsCap;
 }
+/** Look up (once) whether files can be saved here; resolves canDownload(). Call at start-up. */
+export const probeDownloads = () => downloads().then(canDownload);
+/**
+ * Whether saving/exporting files works here: always in a browser tab; in a claude.ai artifact only when the
+ * page was granted the `downloads` capability (false until probeDownloads() has resolved).
+ */
+export const canDownload = () => !isArtifact() || !!downloadsCap;
+export const NO_DOWNLOADS = 'Saving files is not available in this view: this copy of AtomScope was published without permission to download files.';
 
 /**
  * Offer a file to the user. Resolves true when saved (or handed to the browser), false if declined.
@@ -25,7 +33,7 @@ export async function saveFile(filename, data, mime = 'application/octet-stream'
       throw new Error(e?.message || 'The file could not be saved here.');
     }
   }
-  if (isArtifact()) throw new Error('Saving files is not available in this view. Open the app in a browser tab to download files.');
+  if (isArtifact()) throw new Error(NO_DOWNLOADS);
   const blob = data instanceof Blob ? data : new Blob([data], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -50,4 +58,5 @@ export function pickFiles({ accept = '', multiple = false } = {}) {
 
 export const readText = (file) => (file.text ? file.text() : new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsText(file); }));
 
-export const slug = (s) => String(s || 'untitled').trim().replace(/[^\w一-鿿.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'untitled';
+/** File-name-safe version of a name (shared with structure-file exports). */
+export { slug } from '../core/util.js';

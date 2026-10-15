@@ -1,14 +1,26 @@
 """Authentication: bearer-token dependency and the ``/api/v1/auth`` routes.
 
-* **local** mode — no authentication; every request acts as the implicit user
-  ``{"id": "local", "username": "local"}``.
+* **local** mode — no accounts; every request acts as the implicit user
+  ``{"id": "local", "username": "local"}``.  When ``ATOMSCOPE_TOKEN`` is set,
+  every API request (projects, build, io, analysis and plugin routes) must send
+  ``Authorization: Bearer <that token>``; only ``/info``, ``/health`` and
+  ``/auth/login``/``/auth/logout`` stay open (:func:`require_local_token`).  The
+  web app signs in with username ``local`` and the token as password.
 * **cloud** mode — project routes require ``Authorization: Bearer <token>``
   (or ``?access_token=`` for plain links such as downloads).  Tokens come from
   ``/auth/register`` or ``/auth/login`` and are revoked by ``/auth/logout``.
+
+Failed logins (10 per 5 minutes) and registrations (5 per hour) are rate-limited
+per client address.  In local mode with ``ATOMSCOPE_TOKEN`` a wrong bearer token
+counts as a failed login too (the token *is* the password), so it cannot be
+guessed through other API routes either.  Behind a reverse proxy, set
+``ATOMSCOPE_FORWARDED_ALLOW_IPS`` so the client address is the real client's.
 """
 
 from __future__ import annotations
 
+import hmac
+import os
 import threading
 import time
 from collections import defaultdict, deque
@@ -20,7 +32,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from ..storage.sqlite import SQLiteStore, UserExists
 from .models import AuthResponse, Credentials, MeResponse, OkResponse
 
-__all__ = ["LOCAL_USER", "router", "current_user", "bearer_token"]
+__all__ = ["LOCAL_USER", "PUBLIC_API_PATHS", "router", "current_user", "bearer_token", "require_local_token"]
 
 LOCAL_USER: dict[str, Any] = {"id": "local", "username": "local", "created": None}
 
@@ -56,7 +68,45 @@ class _RateLimiter:
             self._events.pop(key, None)
 
 
-_limiter = _RateLimiter()
+_limiter = _RateLimiter()  # kept for compatibility; each app gets its own limiters (see _limits)
+
+#: Self-registrations allowed per client address and hour.
+REGISTER_LIMIT = (5, 3600.0)
+
+
+def _limits(request: Request) -> dict[str, _RateLimiter]:
+    """Per-app rate limiters (so separate apps, e.g. in tests, do not share state)."""
+    state = request.app.state
+    limits = getattr(state, "rate_limits", None)
+    if limits is None:
+        limits = {"login": _RateLimiter(), "register": _RateLimiter(*REGISTER_LIMIT)}
+        state.rate_limits = limits
+    return limits
+
+
+def _trusts_any_proxy(request: Request) -> bool:
+    """True when X-Forwarded-For is trusted from anyone (``*``; uvicorn's own FORWARDED_ALLOW_IPS when ours is unset)."""
+    value = getattr(request.app.state.settings, "forwarded_allow_ips", None)
+    if value is None:
+        value = os.environ.get("FORWARDED_ALLOW_IPS")
+    return value is not None and value.strip() == "*"
+
+
+def _client_key(request: Request) -> str:
+    host = request.client.host if request.client else "unknown"
+    if _trusts_any_proxy(request):
+        # With "*" uvicorn reports the LEFTMOST X-Forwarded-For entry, which the client writes itself (nginx's
+        # $proxy_add_x_forwarded_for appends to what the client sent), so it could pick a new key per request.
+        # Count by the entry the nearest proxy added instead.
+        hops = [h.strip() for v in request.headers.getlist("x-forwarded-for") for h in v.split(",") if h.strip()]
+        if hops:
+            host = hops[-1]
+    return host
+
+
+def _local_token(request: Request) -> str | None:
+    settings = request.app.state.settings
+    return getattr(settings, "token", None) if settings.mode == "local" else None
 
 
 def _users(request: Request) -> SQLiteStore:
@@ -73,14 +123,63 @@ def bearer_token(request: Request, creds: HTTPAuthorizationCredentials | None) -
     return request.query_params.get("access_token") or None
 
 
+#: API routes that stay open in local mode with ``ATOMSCOPE_TOKEN``: capabilities, liveness and signing in.
+PUBLIC_API_PATHS = frozenset({"/api/v1/info", "/api/v1/health", "/api/v1/auth/login", "/api/v1/auth/logout"})
+
+_AUTH_REQUIRED = "authentication required: send 'Authorization: Bearer <token>'"
+
+
+def _token_ok(token: str | None, required: str) -> bool:
+    return bool(token) and hmac.compare_digest(token.encode("utf-8"), required.encode("utf-8"))
+
+
+def _check_local_token(request: Request, token: str | None, required: str) -> None:
+    """Accept the local-mode token, else answer 401 — or 429 while this client is locked out after
+    too many failed sign-ins or wrong tokens (shared with ``/auth/login``, so guessing is just as slow)."""
+    limiter, key = _limits(request)["login"], _client_key(request)
+    if limiter.blocked(key):
+        raise HTTPException(429, "too many failed sign-in attempts; try again in a few minutes",
+                            headers={"Retry-After": str(int(limiter.window))})
+    if _token_ok(token, required):
+        return
+    if token:  # a wrong guess (no token at all is just a signed-out request)
+        limiter.fail(key)
+    raise HTTPException(401, _AUTH_REQUIRED, headers={"WWW-Authenticate": "Bearer"})
+
+
+def require_local_token(request: Request) -> None:
+    """App-wide dependency: in local mode with ``ATOMSCOPE_TOKEN`` set, every API route
+    except :data:`PUBLIC_API_PATHS` answers 401 without that token.  Plugin routes are
+    covered too; static files (the web UI, plugin scripts) are not API routes.
+
+    The header is read directly (not through ``HTTPBearer``) so the OpenAPI schema
+    of the public routes stays unchanged.
+    """
+    required = _local_token(request)
+    if not required:
+        return
+    # the matched URL path without a sub-path prefix (root_path); route objects of included
+    # routers do not carry the /api/v1 prefix in every FastAPI version, the URL always does
+    path, root = request.scope.get("path", ""), request.scope.get("root_path") or ""
+    if root and path.startswith(root + "/"):
+        path = path[len(root):]
+    if path in PUBLIC_API_PATHS:
+        return
+    scheme, _, value = request.headers.get("authorization", "").partition(" ")
+    token = value.strip() if scheme.lower() == "bearer" else ""
+    _check_local_token(request, token or request.query_params.get("access_token"), required)
+
+
 def current_user(request: Request, creds: HTTPAuthorizationCredentials | None = Depends(_bearer)) -> dict[str, Any]:
     """Dependency resolving the acting user (401 in cloud mode without a valid token)."""
     if request.app.state.settings.mode == "local":
+        required = _local_token(request)
+        if required:
+            _check_local_token(request, bearer_token(request, creds), required)
         return LOCAL_USER
     token = bearer_token(request, creds)
     if not token:
-        raise HTTPException(401, "authentication required: send 'Authorization: Bearer <token>'",
-                            headers={"WWW-Authenticate": "Bearer"})
+        raise HTTPException(401, _AUTH_REQUIRED, headers={"WWW-Authenticate": "Bearer"})
     user = request.app.state.users.user_for_token(token)
     if user is None:
         raise HTTPException(401, "invalid or expired token", headers={"WWW-Authenticate": "Bearer"})
@@ -92,10 +191,15 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register", response_model=AuthResponse, status_code=201, summary="Create an account (cloud mode)")
 def register(body: Credentials, request: Request) -> dict[str, Any]:
-    """Register a new user and return an API token. Disabled when registration is off."""
+    """Register a new user and return an API token. Disabled when registration is off;
+    limited to 5 attempts per hour and client address."""
     users = _users(request)
     if not request.app.state.settings.allow_registration:
         raise HTTPException(403, "registration is disabled on this server; ask an administrator for an account")
+    limiter, key = _limits(request)["register"], _client_key(request)
+    if limiter.blocked(key):
+        raise HTTPException(429, "too many new accounts from this address; try again later")
+    limiter.fail(key)  # every attempt counts
     try:
         user = users.create_user(body.username, body.password)
     except UserExists as exc:
@@ -107,16 +211,30 @@ def register(body: Credentials, request: Request) -> dict[str, Any]:
 
 @router.post("/login", response_model=AuthResponse, summary="Log in and obtain a token")
 def login(body: Credentials, request: Request) -> dict[str, Any]:
-    """Exchange username/password for an API token."""
-    users = _users(request)
-    key = request.client.host if request.client else "unknown"
-    if _limiter.blocked(key):
+    """Exchange username/password for an API token.
+
+    In local mode with ``ATOMSCOPE_TOKEN`` set, sign in with username ``local``
+    and the token as password; the token itself is returned.
+    """
+    limiter, key = _limits(request)["login"], _client_key(request)
+    required = _local_token(request)
+    if required is None:
+        users = _users(request)
+    if limiter.blocked(key):
         raise HTTPException(429, "too many failed login attempts; try again in a few minutes")
+    if required is not None:
+        ok = body.username.strip().lower() == "local" and hmac.compare_digest(
+            body.password.encode("utf-8"), required.encode("utf-8"))
+        if not ok:
+            limiter.fail(key)
+            raise HTTPException(401, "invalid username or password")
+        limiter.reset(key)
+        return {"token": required, "user": LOCAL_USER}
     user = users.authenticate(body.username, body.password)
     if user is None:
-        _limiter.fail(key)
+        limiter.fail(key)
         raise HTTPException(401, "invalid username or password")
-    _limiter.reset(key)
+    limiter.reset(key)
     return {"token": users.create_token(user["id"]), "user": user}
 
 
@@ -134,5 +252,7 @@ def logout(request: Request, creds: HTTPAuthorizationCredentials | None = Depend
 
 @router.get("/me", response_model=MeResponse, summary="Current user")
 def me(request: Request, user: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
-    """The acting user and server mode (local mode needs no token)."""
-    return {"user": user, "mode": request.app.state.settings.mode}
+    """The acting user, server mode and whether this server requires signing in
+    (cloud mode, or local mode with ``ATOMSCOPE_TOKEN``)."""
+    settings = request.app.state.settings
+    return {"user": user, "mode": settings.mode, "authRequired": settings.mode == "cloud" or bool(_local_token(request))}

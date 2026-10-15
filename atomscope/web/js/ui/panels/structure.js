@@ -1,17 +1,88 @@
-/** Structure panel: identity, cell, composition, structures in the project, selection editing, measurements, tools. */
+/** Structure panel: identity, cell, composition, structures in the project, selection editing, measurements, analyses, tools. */
 import { h, ic, btn, field } from '../dom.js';
 import { toast, promptDialog, confirmDialog } from '../overlays.js';
 import { element, normalizeSymbol } from '../../core/elements.js';
 import { elementColorHex } from '../../render/colors.js';
-import { formulaHTML, registerLeftPanel } from '../shell.js';
-import { rdf, coordinationStats } from '../../core/analysis.js';
-import { lineChart } from '../chart.js';
-import { disabledPairsFor } from '../../render/display.js';
+import { formulaHTML, formulaEl, registerLeftPanel } from '../shell.js';
+import { analyses, runKey, structureKey, defaultParams } from '../../core/analyses.js';
+import { paramForm, renderResult, analysisContext } from '../paramform.js';
 
-const rdfState = { pair: '', rmax: 8, result: null, key: null };
+/** Analysis results by runKey (structure version, params, scene deps): re-renders never recompute. */
+const results = new Map();
+/** Parameter values per analysis id, kept while the panel re-renders. */
+const formState = new Map();
+const remember = (k, v) => { results.delete(k); results.set(k, v); while (results.size > 60) results.delete(results.keys().next().value); };
+
+/** One card per registered analysis: parameters, Run (or automatic), cached result. */
+function analysisCard(app, s, a, shell, skey) {
+  const ctx = analysisContext(app, s);
+  const auto = typeof a.auto === 'function' ? !!a.auto(s) : !!a.auto;
+  const hasParams = (a.params ?? []).length > 0;
+  const form = hasParams ? paramForm(a.params, { values: formState.get(a.id) ?? {}, structure: s, onChange: (v) => { formState.set(a.id, { ...v }); draw(); } }) : null;
+  const params = () => ({ ...defaultParams(a.params, s), ...(form?.values ?? {}) });
+  const out = h('div.an-out', { 'aria-live': 'polite' });
+  // skey: the structure key of this render (computed once per panel); later draws read it afresh
+  const draw = (sk) => {
+    const r = results.get(runKey(app, a, params(), sk));
+    out.replaceChildren();
+    if (!r) return;
+    if (r.status === 'running') out.append(h('p.hint.an-running', 'Running…'));
+    else if (r.status === 'error') out.append(h('p.err-text', r.error));
+    else {
+      try { if (a.render) a.render(r.result, out, ctx); else renderResult(r.result, out); }
+      catch (e) { out.replaceChildren(h('p.err-text', `Could not show the result: ${e.message}`)); }
+    }
+  };
+  const run = async (sk = structureKey(app)) => {
+    const bad = form?.validate();
+    if (bad) { out.replaceChildren(h('p.err-text', bad)); return; }
+    const k = runKey(app, a, params(), sk);
+    if (results.get(k)?.status === 'running') return;
+    remember(k, { status: 'running' });
+    draw(sk);
+    try { remember(k, { status: 'done', result: await analyses.run(a.id, s, params(), ctx) }); }
+    catch (e) { remember(k, { status: 'error', error: e?.message ?? String(e) }); }
+    if (out.isConnected) draw();
+    else if (shell?.leftId === 'structure' && app.structure === s) shell.renderDrawer();
+  };
+  const runBtn = !auto || hasParams ? btn(auto ? 'Update' : 'Run', { cls: 'small', icon: 'play', tip: a.description || `Run ${a.name}`, on: () => run() }) : null;
+  const from = sourceLabel(a);
+  const card = h('div.an-card', { dataset: { analysis: a.id } },
+    h('div.an-head', h('b', a.name ?? a.id), runBtn),
+    from || a.description ? h('p.hint', from ? h('span.an-src', from) : null, a.description ?? '') : null,
+    form?.el ?? null, out);
+  if (auto && !results.has(runKey(app, a, params(), skey))) run(skey);
+  else draw(skey);
+  return card;
+}
+
+/** Three numbers for a key–value row; a narrow panel wraps between them, never inside one. */
+const triple = (v, digits) => h('dd.kv-triple', ...v.flatMap((x, i) => [i ? ', ' : null, h('span', x.toFixed(digits))]).filter((x) => x != null));
+
+/** Where an analysis comes from, for its card ('hello plugin · runs on the server'); null for built-in ones. */
+function sourceLabel(a) {
+  if (!a.source || a.source === 'built-in') return null;
+  const who = a.source === 'plugin' || a.source === 'server' ? a.plugin : a.source;   // 'plugin' is the registry default
+  const name = who ? (/plugin$/i.test(who) ? who : `${who} plugin`) : a.server ? 'Server plugin' : 'Plugin';
+  return a.server ? `${name} · runs on the server` : name;
+}
 
 registerLeftPanel({
-  id: 'structure', title: 'Structure', icon: 'atom', tip: 'Composition, cell, selection, measurements', kbd: null,
+  id: 'structure', title: 'Structure', icon: 'atom', tip: 'Composition, cell, selection, measurements, analyses', kbd: null,
+  /** App events after which the shell may re-render this panel … */
+  refreshOn: ['project', 'structure', 'selection', 'measure', 'scene', 'registry'],
+  /** … and only when this changes (cheap; everything the panel shows depends on it). */
+  signature(app) {
+    const s = app.structure, p = app.project, sc = app.scene;
+    const ms = app.viewer?.measurements ?? [];
+    return JSON.stringify([
+      p.activeStructure, p.structures.map((e) => `${e.id}:${e.name}:${e.structure.length}:${e.structure.nFrames}`), s ? structureKey(app) : null, s?.name,
+      s?.info?.spacegroup, s?.info?.note,
+      app.selection.join(','), ms.map((m) => `${m.id}:${m.valid && Number.isFinite(m.value) ? m.value.toFixed(4) : '-'}`),
+      sc?.style?.colorScheme, sc?.style?.monoColor, sc?.style?.colorOverrides, sc?.display?.bonds, sc?.display?.supercell,
+      analyses.list().map((a) => a.id),
+    ]);
+  },
   render(app, el, shell) {
     const s = app.structure;
     const p = app.project;
@@ -21,7 +92,7 @@ registerLeftPanel({
       for (const e of p.structures) {
         const active = e.id === p.activeStructure;
         const row = h('div.proj-item', { role: 'button', tabindex: 0, 'aria-current': String(active), style: { gridTemplateColumns: '1fr auto auto' } },
-          h('span.meta', h('b', e.name), h('small', `${e.structure.formula()} · ${e.structure.length} atoms${e.structure.nFrames > 1 ? ` · ${e.structure.nFrames} frames` : ''}`)),
+          h('span.meta', h('b', e.name), h('small', formulaEl(e.structure.formula()), ` · ${e.structure.length.toLocaleString()} atoms${e.structure.nFrames > 1 ? ` · ${e.structure.nFrames} frames` : ''}`)),
           btn('', { icon: 'edit', cls: 'ghost icon small', tip: 'Rename', on: async (ev) => { ev.stopPropagation(); const n = await promptDialog({ title: 'Rename structure', label: 'Name', value: e.name, confirm: 'Rename' }); if (n) app.renameStructure(e.id, n); } }),
           btn('', { icon: 'trash', cls: 'ghost icon small', tip: 'Remove from project', on: async (ev) => { ev.stopPropagation(); const ok = await confirmDialog({ title: `Remove “${e.name}”?`, message: 'The structure is removed from this project. You can undo this.', confirm: 'Remove', danger: true }); if (ok) app.removeStructure(e.id); } }));
         row.addEventListener('click', () => { if (!active) app.setActiveStructure(e.id); });
@@ -39,8 +110,8 @@ registerLeftPanel({
         h('dt', 'Atoms'), h('dd', s.length.toLocaleString()),
         s.nFrames > 1 ? [h('dt', 'Frames'), h('dd', s.nFrames)] : null,
         s.info.spacegroup ? [h('dt', 'Space group'), h('dd', s.info.spacegroup)] : null,
-        cp ? [h('dt', 'a, b, c'), h('dd', `${cp.a.toFixed(4)}, ${cp.b.toFixed(4)}, ${cp.c.toFixed(4)} Å`), h('dt', 'α, β, γ'), h('dd', `${cp.alpha.toFixed(2)}°, ${cp.beta.toFixed(2)}°, ${cp.gamma.toFixed(2)}°`),
-          h('dt', 'Volume'), h('dd', `${s.volume().toFixed(3)} Å³`), h('dt', 'Density'), h('dd', `${s.density().toFixed(4)} g/cm³`), h('dt', 'Periodic'), h('dd', s.pbc.map((b) => (b ? 'T' : 'F')).join(' '))] : [h('dt', 'Cell'), h('dd', 'none (cluster / molecule)')],
+        cp ? [h('dt', 'a, b, c (Å)'), triple([cp.a, cp.b, cp.c], 3), h('dt', 'α, β, γ (°)'), triple([cp.alpha, cp.beta, cp.gamma], 2),
+          h('dt', 'Volume'), h('dd', `${s.volume().toFixed(3)} Å³`), h('dt', 'Density'), h('dd', `${s.density().toFixed(2)} g/cm³`), h('dt', 'Periodic'), h('dd', s.pbc.map((b) => (b ? 'T' : 'F')).join(' '))] : [h('dt', 'Cell'), h('dd', 'none (cluster / molecule)')],
         s.info.note ? [h('dt', 'Note'), h('dd', { style: { fontFamily: 'var(--font-ui)', textAlign: 'left' } }, s.info.note)] : null,
       ));
     el.append(sum);
@@ -82,43 +153,19 @@ registerLeftPanel({
     else {
       const m = app.viewer.model;
       for (const x of ms) {
-        const label = x.valid ? x.idx.map((i) => `${m.symbols[i]}${m.src[i]}`).join('–') : '(not in view)';
-        mSec.append(h('div.row', { style: { fontSize: '12.5px' } }, h('span', { style: { minWidth: '62px', color: 'var(--muted)' } }, x.type), h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' } }, label),
-          h('b.num', { style: { fontWeight: 500 } }, x.valid ? (x.type === 'distance' ? `${x.value.toFixed(3)} Å` : `${x.value.toFixed(2)}°`) : '—'),
+        const label = x.valid && Number.isFinite(x.value) ? x.idx.map((i) => `${m.symbols[i]}${m.src[i]}`).join('–') : '(not in view)';
+        mSec.append(h('div.row', { style: { fontSize: '12.5px' } }, h('span', { style: { minWidth: '62px', color: 'var(--muted)' } }, x.type[0].toUpperCase() + x.type.slice(1)), h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' } }, label),
+          h('b.num', { style: { fontWeight: 500 } }, x.valid && Number.isFinite(x.value) ? (x.type === 'distance' ? `${x.value.toFixed(3)} Å` : `${x.value.toFixed(2)}°`) : '—'),
           btn('', { icon: 'x', cls: 'ghost icon small', tip: 'Remove', on: () => { app.viewer.removeMeasurement(x.id); app.emit('measure'); } })));
       }
     }
     el.append(mSec);
 
-    // analysis
-    const an = h('div.section', h('h3', 'Analysis'));
-    const bondOpt = { tolerance: app.scene.display.bonds.tolerance ?? 1.15, disabledPairs: disabledPairsFor(s.elements(), app.scene.display.bonds) };
-    if (s.length <= 5000) {
-      const stats = coordinationStats(s, bondOpt);
-      an.append(h('div.sub-h', 'Coordination (bonds per atom)'), h('dl.kv', ...stats.flatMap((x) => [h('dt', `${x.element} ×${x.count}`), h('dd', x.min === x.max ? `${x.min}` : `${x.mean.toFixed(2)} (${x.min}–${x.max})`)])));
-    }
-    const els = s.elements().sort();
-    const pairOpts = [['', 'All pairs'], ...els.flatMap((a, i) => els.slice(i).map((b) => [`${a}-${b}`, `${a}–${b}`]))];
-    const pairSel = h('select.field', { 'aria-label': 'Element pair', style: { flex: 1 } }, ...pairOpts.map(([v, l]) => h('option', { value: v, selected: v === rdfState.pair }, l)));
-    const rmaxIn = h('input.field.num', { type: 'number', min: 2, max: 20, step: 0.5, value: rdfState.rmax, 'aria-label': 'r max (Å)', style: { width: '64px' } });
-    const out = h('div');
-    const key = `${app.project.activeStructure}:${s.length}:${s.frame}`;
-    const draw = () => {
-      const r = rdfState.result;
-      if (!r || rdfState.key !== key) { out.replaceChildren(); return; }
-      let peak = 0;
-      r.g.forEach((v, i) => { if (v > r.g[peak]) peak = i; });
-      out.replaceChildren(lineChart({ x: r.r, y: r.g, xLabel: 'r (Å)', yLabel: 'g(r)', fmtX: (v) => (+v).toFixed(2), fmtY: (v) => (+v).toFixed(2) }),
-        h('p.hint', `Highest peak at ${r.r[peak].toFixed(2)} Å${r.periodic ? '' : ' · cluster: normalised pair-distance histogram'}${r.sampled ? ' · sampled for speed' : ''}`));
-    };
-    an.append(h('div.sub-h', 'Radial distribution g(r)'), h('div.row', pairSel, h('label.row', { style: { gap: '4px', fontSize: '12px', color: 'var(--muted)' } }, 'r max', rmaxIn),
-      btn('Compute', { cls: 'small', on: () => {
-        rdfState.pair = pairSel.value; rdfState.rmax = Math.max(2, Math.min(20, +rmaxIn.value || 8));
-        rdfState.result = rdf(s, { rmax: rdfState.rmax, pair: rdfState.pair ? rdfState.pair.split('-') : null });
-        rdfState.key = key; draw();
-      } })), out);
-    draw();
-    el.append(an);
+    // analyses (built-in, JS plugins, server plugins)
+    const skey = structureKey(app);
+    const list = analyses.list().sort((a, b) => (a.source === 'built-in' ? 0 : 1) - (b.source === 'built-in' ? 0 : 1));
+    el.append(h('div.section', h('h3', h('span.grow', 'Analyses'), h('span.muted', { style: { textTransform: 'none', letterSpacing: 0 } }, String(list.length))),
+      ...list.map((a) => analysisCard(app, s, a, shell, skey))));
 
     // tools
     const tools = h('div.section', h('h3', 'Tools'));
@@ -126,7 +173,14 @@ registerLeftPanel({
     if (s.periodic) {
       row.append(btn('Wrap into cell', { cls: 'small', tip: 'Move every atom into the unit cell (edits the structure)', on: () => { const c = s.clone(); c.wrap(); c.name = s.name; app.replaceActiveStructure(c); toast('Atoms wrapped into the cell'); } }));
       const N = app.scene.display.supercell;
-      if (N.some((v) => v > 1)) row.append(btn(`Make ${N.join('×')} supercell real`, { cls: 'small', tip: 'Turn the displayed repeat into an actual supercell you can edit and export', on: () => { const c = s.repeat(...N); app.replaceActiveStructure(c, { resetCamera: false }); app.set('display.supercell', [1, 1, 1]); toast(`Built ${c.length}-atom supercell`); } }));
+      if (N.some((v) => v > 1)) {
+        row.append(btn(`Make ${N.join('×')} supercell real`, { cls: 'small', tip: 'Turn the displayed repeat into an actual supercell you can edit and export', on: () => {
+          let c;
+          const bake = () => { c = s.repeat(...N); app.replaceActiveStructure(c, { resetCamera: false, label: 'Make supercell' }); app.set('display.supercell', [1, 1, 1]); };
+          try { if (app.transaction) app.transaction('Make supercell', bake); else bake(); toast(`Built ${c.length}-atom supercell`); }
+          catch (e) { toast(e.message, { type: 'error' }); }
+        } }));
+      }
     }
     row.append(btn('Duplicate', { cls: 'small', tip: 'Add a copy of this structure to the project', on: () => { const c = s.clone(); c.name = `${s.name} (copy)`; app.addStructure(c); } }));
     tools.append(row);

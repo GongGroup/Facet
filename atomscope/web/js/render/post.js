@@ -2,11 +2,16 @@
  * Post-processing pipeline: ambient occlusion (GTAO), ink outlines (depth + normal edge detection),
  * depth of field, bloom, tone mapping (OutputPass) and vignette. When every effect is off the
  * viewer renders directly for maximum speed.
+ *
+ * Transparent renders (background mode 'transparent' or a transparent export, see setTransparent):
+ * bloom and depth of field write opaque pixels, so the scene alpha is saved before them and restored
+ * at the end (glow keeps a matching partial alpha).
  */
 import * as THREE from '../../vendor/three/three.module.js';
 import { EffectComposer } from '../../vendor/three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from '../../vendor/three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from '../../vendor/three/addons/postprocessing/ShaderPass.js';
+import { Pass, FullScreenQuad } from '../../vendor/three/addons/postprocessing/Pass.js';
 import { OutputPass } from '../../vendor/three/addons/postprocessing/OutputPass.js';
 import { GTAOPass } from '../../vendor/three/addons/postprocessing/GTAOPass.js';
 import { UnrealBloomPass } from '../../vendor/three/addons/postprocessing/UnrealBloomPass.js';
@@ -68,6 +73,68 @@ const InkShader = {
     }`,
 };
 
+const QUAD_VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }';
+
+/** Copies the current alpha channel into its own target (no swap), for RestoreAlphaShader. */
+class SaveAlphaPass extends Pass {
+  constructor() {
+    super();
+    this.needsSwap = false;
+    this.target = new THREE.WebGLRenderTarget(1, 1);
+    this.quad = new FullScreenQuad(new THREE.ShaderMaterial({
+      uniforms: { tDiffuse: { value: null } }, vertexShader: QUAD_VS,
+      fragmentShader: 'uniform sampler2D tDiffuse; varying vec2 vUv; void main(){ gl_FragColor = vec4(texture2D(tDiffuse, vUv).a); }',
+    }));
+  }
+  setSize(w, h) { this.target.setSize(w, h); }
+  render(renderer, writeBuffer, readBuffer) {
+    this.quad.material.uniforms.tDiffuse.value = readBuffer.texture;
+    renderer.setRenderTarget(this.target);
+    renderer.clear();
+    this.quad.render(renderer);
+  }
+  dispose() { this.target.dispose(); this.quad.material.dispose(); this.quad.dispose(); }
+}
+
+/** Puts the saved alpha back; glow over transparent pixels becomes partially opaque (premultiplied, rgb ≤ a). */
+const RestoreAlphaShader = {
+  uniforms: { tDiffuse: { value: null }, tAlpha: { value: null } },
+  vertexShader: QUAD_VS,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform sampler2D tAlpha; varying vec2 vUv;
+    void main() {
+      vec4 c = texture2D(tDiffuse, vUv);
+      float a0 = texture2D(tAlpha, vUv).r;
+      vec3 rgb = max(c.rgb, vec3(0.0));
+      // the faint tail of wide bloom mips would otherwise tint the whole frame: fade it out
+      float glow = max(rgb.r, max(rgb.g, rgb.b));
+      float a = clamp(max(a0, (glow - 0.05) / 0.95), 0.0, 1.0);
+      gl_FragColor = vec4(min(rgb, vec3(a)), a);
+    }`,
+};
+
+/**
+ * GTAO blend without negative values: ao^intensity (the stock mix() went negative above 1 → bright fringes after
+ * tone mapping). A five-tap rotated blur of about 1.3 px takes out the per-pixel grain the denoiser leaves in
+ * contact creases and along silhouettes, which otherwise reads as dotted speckle where spheres touch.
+ */
+const AO_BLEND_FS = `
+  uniform float intensity; uniform sampler2D tDiffuse; varying vec2 vUv;
+  void main() {
+    vec2 px = 1.0 / vec2(textureSize(tDiffuse, 0));
+    vec4 texel = texture2D(tDiffuse, vUv);
+    vec3 s = texel.rgb;
+    s += texture2D(tDiffuse, vUv + px * vec2( 1.2,  0.4)).rgb;
+    s += texture2D(tDiffuse, vUv + px * vec2(-1.2, -0.4)).rgb;
+    s += texture2D(tDiffuse, vUv + px * vec2( 0.4, -1.2)).rgb;
+    s += texture2D(tDiffuse, vUv + px * vec2(-0.4,  1.2)).rgb;
+    vec3 ao = clamp(s * 0.2, 0.0, 1.0);
+    gl_FragColor = vec4(pow(ao, vec3(max(intensity, 0.0))), texel.a);
+  }`;
+
+/** Largest AO radius (Å) the slider can reach in practice; beyond it GTAO halos and banding appear. */
+export const AO_MAX_RADIUS = 1.6;
+
 export class PostPipeline {
   constructor(renderer, scene, camera) {
     this.renderer = renderer;
@@ -79,9 +146,53 @@ export class PostPipeline {
     this.normalMaterial = new THREE.MeshNormalMaterial();
     this.normalTarget = null;
     this.active = false;
+    this.transparent = false;
+    this.bloomScale = 1;
   }
 
-  setCamera(camera) { this.camera = camera; if (this.settings) this.configure(this.settings, true); }
+  /** The frame is composited over something (transparent background or export): keep alpha through bloom / DOF. */
+  setTransparent(on) {
+    this.transparent = !!on;
+    const need = this.transparent && !!(this.bloom || this.bokeh);
+    if (this.saveAlpha) this.saveAlpha.enabled = need;
+    if (this.restoreAlpha) this.restoreAlpha.enabled = need;
+  }
+
+  /** Bloom spread multiplier (the viewer lowers it when the model fills the frame). */
+  setBloomScale(k) {
+    this.bloomScale = k;
+    if (this.bloom && this.settings?.bloom) this.bloom.radius = (this.settings.bloom.radius ?? 0.4) * k;
+  }
+
+  /**
+   * Point the existing passes at another camera (perspective ⇄ orthographic) instead of rebuilding
+   * them: only a few defines change, and three keeps both shader variants of a material compiled, so
+   * switching back and forth (axis views) costs no rebuild and, after the first switch, no recompile.
+   */
+  setCamera(camera) {
+    this.camera = camera;
+    if (!this.composer) return;
+    const persp = camera.isPerspectiveCamera ? 1 : 0;
+    const define = (mat, key, on) => {
+      if (!mat) return;
+      const cur = mat.defines?.[key];
+      if (on === null) { if (cur === undefined) return; delete mat.defines[key]; }
+      else if (cur === on) return;
+      else (mat.defines ??= {})[key] = on;
+      mat.needsUpdate = true;
+    };
+    if (this.renderPass) this.renderPass.camera = camera;
+    if (this.gtao) {
+      this.gtao.camera = camera;   // near/far and matrices are read from it on every render
+      define(this.gtao.gtaoMaterial, 'PERSPECTIVE_CAMERA', persp);
+      define(this.gtao.depthRenderMaterial, 'PERSPECTIVE_CAMERA', persp);
+    }
+    if (this.bokeh) {
+      this.bokeh.camera = camera;
+      define(this.bokeh.materialBokeh, 'PERSPECTIVE_CAMERA', persp);
+    }
+    if (this.ink) define(this.ink.material, 'ORTHO', persp ? null : 1);
+  }
 
   setSize(w, h) {
     this.size.set(w, h);
@@ -92,19 +203,22 @@ export class PostPipeline {
     }
     if (this.normalTarget) this.normalTarget.setSize(Math.floor(w * pr), Math.floor(h * pr));
     if (this.ink) this.ink.uniforms.resolution.value.set(w * pr, h * pr);
+    if (this.bokeh) this.bokeh.uniforms.aspect.value = w / Math.max(1, h);
   }
 
   dispose() {
     this.composer?.dispose?.();
     this.composer?.renderTarget1?.dispose(); this.composer?.renderTarget2?.dispose();
-    this.gtao?.dispose?.(); this.bloom?.dispose?.();
+    this.gtao?.dispose?.(); this.bloom?.dispose?.(); this.saveAlpha?.dispose();
     this.normalTarget?.dispose();
-    this.composer = null; this.gtao = this.bloom = this.ink = this.bokeh = this.vignette = null; this.normalTarget = null;
+    this.composer = null; this.renderPass = this.gtao = this.bloom = this.ink = this.bokeh = this.vignette = null; this.normalTarget = null;
+    this.saveAlpha = this.restoreAlpha = null; this._aoState = null;
   }
 
   /** (Re)build passes. Cheap uniform changes are applied in place when the pass set is unchanged. */
   configure(post, force = false) {
-    const sig = JSON.stringify([!!post.ao?.enabled, !!post.outline?.enabled, !!post.bloom?.enabled, !!post.dof?.enabled, !!post.vignette?.enabled, this.camera.isOrthographicCamera]);
+    // the camera type is not part of the pass set: setCamera() retargets the passes in place
+    const sig = JSON.stringify([!!post.ao?.enabled, !!post.outline?.enabled, !!post.bloom?.enabled, !!post.dof?.enabled, !!post.vignette?.enabled]);
     this.settings = post;
     const any = post.ao?.enabled || post.outline?.enabled || post.bloom?.enabled || post.dof?.enabled || post.vignette?.enabled;
     this.active = !!any;
@@ -125,7 +239,8 @@ export class PostPipeline {
     this.composer = new EffectComposer(renderer, target);
     this.composer.setPixelRatio(pr);
     this.composer.setSize(w, h);
-    this.composer.addPass(new RenderPass(scene, camera));
+    this.renderPass = new RenderPass(scene, camera);
+    this.composer.addPass(this.renderPass);
     if (post.ao?.enabled) {
       this.gtao = new GTAOPass(scene, camera, w * pr, h * pr);
       this.gtao.output = GTAOPass.OUTPUT.Default;
@@ -137,6 +252,8 @@ export class PostPipeline {
         this.scene.traverse((o) => { if (skipInAuxPass(o)) o.visible = false; });
       };
       this.gtao.restoreVisibility = () => { origRestore(); this.scene.background = this._bg; };
+      this.gtao.blendMaterial.fragmentShader = AO_BLEND_FS;
+      this.gtao.blendMaterial.needsUpdate = true;
       this.composer.addPass(this.gtao);
     }
     if (post.outline?.enabled) {
@@ -150,8 +267,15 @@ export class PostPipeline {
       this.ink.uniforms.resolution.value.set(w * pr, h * pr);
       this.composer.addPass(this.ink);
     }
+    if (post.dof?.enabled || post.bloom?.enabled) {
+      this.saveAlpha = new SaveAlphaPass();
+      this.composer.addPass(this.saveAlpha);
+    }
     if (post.dof?.enabled) {
       this.bokeh = new BokehPass(scene, camera, { focus: 10, aperture: 0.002, maxblur: 0.008 });
+      // the stock pass assumes a perspective camera and reads camera.aspect, which an orthographic one lacks
+      this.bokeh.materialBokeh.defines.PERSPECTIVE_CAMERA = camera.isPerspectiveCamera ? 1 : 0;
+      this.bokeh.uniforms.aspect.value = w / h;
       const bokehRender = this.bokeh.render.bind(this.bokeh);
       this.bokeh.render = (...args) => hideDuring(this.scene, () => bokehRender(...args));
       this.composer.addPass(this.bokeh);
@@ -165,14 +289,25 @@ export class PostPipeline {
       this.vignette = new ShaderPass(VignetteShader);
       this.composer.addPass(this.vignette);
     }
+    if (this.saveAlpha) {
+      this.restoreAlpha = new ShaderPass(RestoreAlphaShader);
+      this.restoreAlpha.uniforms.tAlpha.value = this.saveAlpha.target.texture;
+      this.composer.addPass(this.restoreAlpha);
+    }
+    this.setTransparent(this.transparent);
   }
 
   _update(post) {
     if (this.gtao) {
-      const r = post.ao.radius ?? 0.6;
-      this.gtao.updateGtaoMaterial({ radius: r, distanceExponent: 1.4, thickness: r * 1.5, scale: 1, samples: post.ao.samples ?? 16, distanceFallOff: 1, screenSpaceRadius: false });
-      this.gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
-      this.gtao.blendIntensity = post.ao.intensity ?? 1;
+      // radius in Å, kept in an artefact-free range; thickness / fall-off / denoising follow it
+      const r = Math.min(AO_MAX_RADIUS, Math.max(0.05, +(post.ao.radius ?? 0.6) || 0.6));
+      const fallOff = Math.min(1, 0.4 + 0.4 * r);
+      const g = { radius: r, distanceExponent: 1.4, thickness: Math.min(r, 1), scale: 1, samples: post.ao.samples ?? 16, screenSpaceRadius: false };
+      if (this._aoState?.fallOff !== fallOff) g.distanceFallOff = fallOff;   // this one forces a shader refresh
+      this.gtao.updateGtaoMaterial(g);
+      this.gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6 + 4 * r, rings: 2, samples: r > 1 ? 24 : 16 });
+      this.gtao.blendIntensity = Math.max(0, post.ao.intensity ?? 1);
+      this._aoState = { fallOff };
     }
     if (this.ink) {
       const o = post.outline;
@@ -184,7 +319,7 @@ export class PostPipeline {
     }
     if (this.bloom) {
       this.bloom.strength = post.bloom.strength ?? 0.6;
-      this.bloom.radius = post.bloom.radius ?? 0.4;
+      this.bloom.radius = (post.bloom.radius ?? 0.4) * this.bloomScale;
       this.bloom.threshold = post.bloom.threshold ?? 0.8;
     }
     if (this.bokeh) {

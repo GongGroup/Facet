@@ -10,7 +10,8 @@ Tables::
   salt; PBKDF2-SHA256 is used where scrypt is unavailable.  Both are verified.
 * API tokens are random 256-bit strings; only an HMAC-SHA256 of each token
   (keyed with the server secret) is stored, so a leaked database does not leak
-  usable tokens.
+  usable tokens.  Tokens unused for ``token_ttl_days`` stop working (0 = never);
+  ``last_used`` is written at most once a minute per token.
 * One connection guarded by a lock makes the store safe to share between
   threads (FastAPI runs sync endpoints in a thread pool).
 """
@@ -24,6 +25,7 @@ import re
 import secrets
 import sqlite3
 import threading
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +36,22 @@ __all__ = ["SQLiteStore", "UserExists", "hash_password", "verify_password"]
 
 _USERNAME_RE = re.compile(r"^[\w.@\-]{2,64}$", re.UNICODE)
 MIN_PASSWORD_LENGTH = 6
+#: Default sign-in lifetime without use (days).
+DEFAULT_TOKEN_TTL_DAYS = 30.0
+_TOUCH_SECONDS = 60.0
+
+
+def _iso(t: datetime) -> str:
+    return t.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def _parse_iso(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
 
 
 class UserExists(ValueError):
@@ -102,8 +120,9 @@ class SQLiteStore(ProjectStore):
     """Multi-user project store plus user/token management backed by SQLite."""
 
     def __init__(self, path: str | Path, max_project_bytes: int = DEFAULT_MAX_PROJECT_BYTES,
-                 secret: str | None = None) -> None:
+                 secret: str | None = None, token_ttl_days: float = DEFAULT_TOKEN_TTL_DAYS) -> None:
         super().__init__(max_project_bytes)
+        self.token_ttl_days = float(token_ttl_days or 0)
         self.path = str(path)
         if self.path != ":memory:":
             Path(self.path).expanduser().parent.mkdir(parents=True, exist_ok=True)
@@ -192,31 +211,71 @@ class SQLiteStore(ProjectStore):
             return hmac.new(self._secret, token.encode("utf-8"), hashlib.sha256).hexdigest()
         return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
+    def _expiry_cutoff(self) -> str | None:
+        """ISO time before which an unused token has expired (``None`` = never expires)."""
+        if self.token_ttl_days <= 0:
+            return None
+        return _iso(datetime.now(timezone.utc) - timedelta(days=self.token_ttl_days))
+
     def create_token(self, user_id: str) -> str:
         """Issue a new API token for *user_id* (returned once; only its hash is stored)."""
         token = "ats_" + secrets.token_urlsafe(32)
         ts = now_iso()
-        self._x("INSERT INTO tokens(token, user_id, created, last_used) VALUES (?,?,?,?)",
-                (self._token_key(token), user_id, ts, ts))
+        with self._lock:
+            cutoff = self._expiry_cutoff()
+            if cutoff:  # housekeeping: forget expired sign-ins
+                self._conn.execute("DELETE FROM tokens WHERE COALESCE(last_used, created) < ?", (cutoff,))
+            self._conn.execute("INSERT INTO tokens(token, user_id, created, last_used) VALUES (?,?,?,?)",
+                               (self._token_key(token), user_id, ts, ts))
         return token
 
     def user_for_token(self, token: str) -> dict[str, Any] | None:
-        """Resolve a bearer token to its user (updates ``last_used``)."""
+        """Resolve a bearer token to its user; ``None`` when unknown or expired.
+
+        ``last_used`` is refreshed at most once a minute, so busy clients do not
+        turn every request into a database write.
+        """
         if not token:
             return None
         key = self._token_key(token)
-        rows = self._q("SELECT u.* FROM tokens t JOIN users u ON u.id = t.user_id WHERE t.token=?", (key,))
+        rows = self._q("SELECT u.*, t.created AS t_created, t.last_used AS t_last_used "
+                       "FROM tokens t JOIN users u ON u.id = t.user_id WHERE t.token=?", (key,))
         if not rows:
             return None
-        self._x("UPDATE tokens SET last_used=? WHERE token=?", (now_iso(), key))
-        return self._user_json(rows[0])
+        row = rows[0]
+        last = row["t_last_used"] or row["t_created"]
+        cutoff = self._expiry_cutoff()
+        if cutoff and (not last or str(last) < cutoff):
+            self._x("DELETE FROM tokens WHERE token=?", (key,))
+            return None
+        now = datetime.now(timezone.utc)
+        seen = _parse_iso(last)
+        if seen is None or (now - seen).total_seconds() >= _TOUCH_SECONDS:
+            self._x("UPDATE tokens SET last_used=? WHERE token=?", (_iso(now), key))
+        return self._user_json(row)
 
     def revoke_token(self, token: str) -> bool:
         return bool(self._x("DELETE FROM tokens WHERE token=?", (self._token_key(token),)))
 
     # -------------------------------------------------------------- projects
     def _list_summaries(self, owner: str) -> list[dict[str, Any]]:
-        return [json.loads(r["summary_json"]) for r in self._q("SELECT summary_json FROM projects WHERE owner=?", (owner,))]
+        out = []
+        for r in self._q("SELECT id, summary_json FROM projects WHERE owner=?", (owner,)):
+            summary = json.loads(r["summary_json"])
+            if "formula" not in summary or "formulas" not in summary:  # saved by an older version: backfill once
+                summary = self._refresh_summary(owner, r["id"]) or summary
+            out.append(summary)
+        return out
+
+    def _refresh_summary(self, owner: str, pid: str) -> dict[str, Any] | None:
+        rows = self._q("SELECT doc_json FROM projects WHERE id=? AND owner=?", (pid, owner))
+        if not rows:
+            return None
+        text = rows[0]["doc_json"]
+        summary = project_summary(json.loads(text), len(text.encode("utf-8")))
+        self._x("UPDATE projects SET summary_json=? WHERE id=? AND owner=?",
+                (json.dumps(summary, ensure_ascii=False), pid, owner))
+        return summary
 
     def _load(self, owner: str, pid: str) -> dict[str, Any] | None:
         if not is_project_id(pid):

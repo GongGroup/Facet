@@ -71,19 +71,26 @@ export function cartToFrac(p, inv) {
   ];
 }
 
+/** Debounced call with flush() (run now, returns fn's result), cancel() and pending(). */
 export function debounce(fn, ms) {
-  let t;
-  const f = (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
-  f.flush = (...args) => { clearTimeout(t); fn(...args); };
-  f.cancel = () => clearTimeout(t);
+  let t = null;
+  const f = (...args) => { clearTimeout(t); t = setTimeout(() => { t = null; fn(...args); }, ms); };
+  f.flush = (...args) => { clearTimeout(t); t = null; return fn(...args); };
+  f.cancel = () => { clearTimeout(t); t = null; };
+  f.pending = () => t != null;
   return f;
 }
+
+/** Keys that must never be merged or set from untrusted data (prototype pollution). */
+export const UNSAFE = new Set(['__proto__', 'constructor', 'prototype']);
 
 export function deepMerge(target, src) {
   if (!src || typeof src !== 'object') return target;
   for (const [k, v] of Object.entries(src)) {
-    if (v && typeof v === 'object' && !Array.isArray(v) && typeof target[k] === 'object' && target[k] && !Array.isArray(target[k])) {
-      deepMerge(target[k], v);
+    if (UNSAFE.has(k)) continue;
+    const t = Object.hasOwn(target, k) ? target[k] : undefined;
+    if (v && typeof v === 'object' && !Array.isArray(v) && t && typeof t === 'object' && !Array.isArray(t)) {
+      deepMerge(t, v);
     } else {
       target[k] = Array.isArray(v) ? v.slice() : (v && typeof v === 'object' ? deepMerge({}, v) : v);
     }
@@ -94,14 +101,17 @@ export function deepMerge(target, src) {
 export const deepClone = (o) => (o == null ? o : JSON.parse(JSON.stringify(o)));
 
 export function getPath(obj, path) {
-  return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
+  const keys = String(path).split('.');
+  if (keys.some((k) => UNSAFE.has(k))) return undefined;
+  return keys.reduce((o, k) => (o == null ? undefined : o[k]), obj);
 }
 
 export function setPath(obj, path, value) {
-  const keys = path.split('.');
+  const keys = String(path).split('.');
+  if (keys.some((k) => UNSAFE.has(k))) return;
   let o = obj;
   for (let i = 0; i < keys.length - 1; i++) {
-    if (o[keys[i]] == null || typeof o[keys[i]] !== 'object') o[keys[i]] = {};
+    if (!Object.hasOwn(o, keys[i]) || o[keys[i]] == null || typeof o[keys[i]] !== 'object') o[keys[i]] = {};
     o = o[keys[i]];
   }
   o[keys.at(-1)] = value;
@@ -133,3 +143,6 @@ export function formatBytes(n) {
 export function escapeHTML(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
+
+/** File-name-safe version of a name (NFKC turns subscript digits such as Au₅₅ into Au55). */
+export const slug = (s) => String(s || 'untitled').normalize('NFKC').trim().replace(/[^\w一-鿿.-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '').slice(0, 60).replace(/[-.]+$/, '') || 'untitled';

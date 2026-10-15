@@ -89,6 +89,63 @@ def _as_pbc(pbc: Any, has_cell: bool) -> list[bool]:
     return vals
 
 
+#: Vacuum (Å) added around the atoms when a missing non-periodic cell axis is filled in.
+_FILL_VACUUM = 10.0
+
+
+def _fix_degenerate_cell(cell: np.ndarray | None, pbc: list[bool],
+                         positions: np.ndarray) -> tuple[np.ndarray | None, list[bool], str | None]:
+    """Repair a singular cell (zero volume) so geometry code does not fail.
+
+    A zero-length axis that is not periodic (e.g. ``c = 0`` in a 2D slab with
+    ``pbc = T,T,F``) is replaced by the unit normal of the other two axes times
+    (extent of the atoms along it + 10 Å).  A cell that is still singular is
+    dropped (``pbc`` all false).  Returns ``(cell, pbc, warning_or_None)``.
+    """
+    if cell is None:
+        return cell, pbc, None
+    lengths = np.linalg.norm(cell, axis=1)
+    scale = max(float(lengths.max()), 1.0)
+    det = float(np.linalg.det(cell))
+    if np.all(np.isfinite(cell)) and lengths.min() > 1e-8 * scale and abs(det) > 1e-9 * float(np.prod(lengths)):
+        return cell, pbc, None
+    if not np.any(lengths > 1e-8 * scale) or not np.all(np.isfinite(cell)):
+        warn = "the unit cell was empty and has been removed" if any(pbc) else None
+        return None, [False, False, False], warn
+    new = cell.copy()
+    zero = [k for k in range(3) if lengths[k] <= 1e-8 * scale]
+    fixed = bool(zero) and not any(pbc[k] for k in zero)
+    if fixed:
+        if len(zero) == 2:  # one lattice vector left: build two perpendicular axes
+            keep = next(k for k in range(3) if k not in zero)
+            u = new[keep] / lengths[keep]
+            p1 = np.eye(3)[(keep + 1) % 3]  # prefer the Cartesian axis the missing vector is named after
+            p1 = p1 - (p1 @ u) * u
+            if np.linalg.norm(p1) < 1e-6:
+                p1 = np.eye(3)[(keep + 2) % 3] - u[(keep + 2) % 3] * u
+            p1 /= np.linalg.norm(p1)
+            new[(keep + 1) % 3] = p1
+            new[(keep + 2) % 3] = np.cross(u, p1)
+        for k in zero:
+            n = np.cross(new[(k + 1) % 3], new[(k + 2) % 3])  # cyclic order keeps the cell right-handed
+            nn = np.linalg.norm(n)
+            if nn < 1e-12:
+                fixed = False
+                break
+            n /= nn
+            extent = float(np.ptp(positions @ n)) if len(positions) else 0.0
+            new[k] = n * (extent + _FILL_VACUUM)
+        if fixed and len(zero) == 2:
+            for k in zero:  # rescale the helper axes built above to the atoms' extent
+                d = new[k] / np.linalg.norm(new[k])
+                new[k] = d * ((float(np.ptp(positions @ d)) if len(positions) else 0.0) + _FILL_VACUUM)
+    if fixed and abs(float(np.linalg.det(new))) > 1e-9 * float(np.prod(np.linalg.norm(new, axis=1))):
+        axes = " and ".join("abc"[k] for k in zero)
+        verb = "vectors " + axes + " were" if len(zero) > 1 else "vector " + axes + " was"
+        return new, pbc, f"the zero-length cell {verb} replaced by a vacuum gap around the atoms"
+    return None, [False, False, False], "the unit cell has zero volume and was removed (structure treated as non-periodic)"
+
+
 def _as_positions(positions: Any, n: int | None = None) -> np.ndarray:
     if positions is None:
         arr = np.zeros((0, 3))
@@ -146,6 +203,7 @@ class Structure:
         self.positions: np.ndarray = _as_positions(positions, len(self.symbols))
         self.cell: np.ndarray | None = _as_cell(cell)
         self.pbc: list[bool] = _as_pbc(pbc, self.cell is not None)
+        self.cell, self.pbc, cell_warning = _fix_degenerate_cell(self.cell, self.pbc, self.positions)
         self.frames: list[dict[str, Any]] = []
         for fr in frames or []:
             self.frames.append(self._make_frame(fr))
@@ -154,6 +212,12 @@ class Structure:
             self.set_prop(key, val)
         self.info: dict[str, Any] = dict(info or {})
         self.name: str = str(name or "")
+        if cell_warning:
+            warnings = self.info.get("warnings")
+            warnings = list(warnings) if isinstance(warnings, list) else []
+            if cell_warning not in warnings:
+                warnings.append(cell_warning)
+            self.info["warnings"] = warnings
 
     # ------------------------------------------------------------------ basics
     def _make_frame(self, frame: dict[str, Any]) -> dict[str, Any]:

@@ -28,6 +28,7 @@ import shutil
 import tempfile
 import threading
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -57,6 +58,16 @@ def _atomic_write(path: Path, data: bytes) -> None:
             pass
         raise
 
+
+
+def _timestamp(value: Any) -> float:
+    """Seconds of an ISO-8601 ``updated`` value; missing or unreadable values count as oldest."""
+    if not isinstance(value, str) or not value:
+        return float("-inf")
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+    except (ValueError, OverflowError, OSError):
+        return float("-inf")
 
 class LocalFileStore(ProjectStore):
     """Projects as folders on disk; the ``owner`` argument is ignored (single user)."""
@@ -110,10 +121,8 @@ class LocalFileStore(ProjectStore):
         self._import_dropped()
         index: dict[str, Path] = {}
         seen: set[Path] = set()
-        dirs = [d for d in self.root.iterdir() if d.is_dir() and not d.name.startswith(".")]
-        # Older folders keep their id when two folders claim the same one.
-        dirs.sort(key=lambda d: (d / self.PROJECT_FILE).stat().st_mtime_ns if (d / self.PROJECT_FILE).exists() else 0)
-        for d in dirs:
+        found: list[tuple[Path, dict[str, Any], int]] = []  # (folder, summary, project.json mtime)
+        for d in (d for d in self.root.iterdir() if d.is_dir() and not d.name.startswith(".")):
             pf = d / self.PROJECT_FILE
             if not pf.is_file():
                 continue
@@ -132,11 +141,34 @@ class LocalFileStore(ProjectStore):
                         st = pf.stat()
                     summary = project_summary(doc)
                     self._cache[d] = (st.st_mtime_ns, st.st_size, summary)
-                pid = summary["id"]
+                found.append((d, summary, st.st_mtime_ns))
+            except Exception as exc:
+                log.warning("skipping unreadable project folder %s: %s", d, exc)
+
+        # When two folders claim one id (a folder copied by hand), the original keeps it: the folder this
+        # store already knew under that id, else the one saved last (the store only saves an id to the folder
+        # it indexed, so a hand-made copy is never newer), else the one named "<name>-<id>" as created here,
+        # else the older file.
+        prev = self._index
+
+        def rank(item: tuple[Path, dict[str, Any], int]) -> tuple[int, float, int, int, int, str]:
+            d, summary, mtime = item
+            pid = summary["id"]
+            exact = f"{slugify(summary.get('name') or 'project')}-{pid}"
+            canonical = 0 if d.name in (exact, pid) else 1 if d.name.endswith(f"-{pid}") else 2
+            # copies made by file managers keep timestamps and add text ("Copy of …", " (1)"), so on a full tie
+            # the shortest folder name is the original
+            return (0 if prev.get(pid) == d else 1, -_timestamp(summary.get("updated")), canonical, mtime, len(d.name), d.name)
+
+        for d, summary, _ in sorted(found, key=rank):
+            pid = summary["id"]
+            try:
                 if pid in index:
+                    pf = d / self.PROJECT_FILE
                     doc = normalize_project(json.loads(pf.read_text(encoding="utf-8")))
                     doc["id"] = new_project_id()
-                    log.warning("project folder %s duplicates id %s; assigned %s", d.name, pid, doc["id"])
+                    log.warning("project folder %s duplicates id %s (kept by %s); assigned %s",
+                                d.name, pid, index[pid].name, doc["id"])
                     self._write_doc(d, doc)
                     st = pf.stat()
                     summary = project_summary(doc)

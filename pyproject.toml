@@ -22,7 +22,7 @@ classifiers = [
 # Runtime dependencies are intentionally minimal.
 dependencies = [
     "fastapi>=0.110",
-    "uvicorn>=0.27",
+    "uvicorn>=0.31",   # CIDR networks in --forwarded-allow-ips
     "numpy>=1.24",
     "python-multipart>=0.0.9",
 ]

@@ -10,6 +10,11 @@
     bonds = c.bonds(s)
     for summary in c.projects():
         print(summary["id"], summary["name"])
+    c.convert("in.cif", "poscar", "out.vasp")        # server-side conversion (plugin formats too)
+    c.analysis("hello-com", s)                       # a plugin analysis → its JSON result
+
+Every REST endpoint except authentication internals has a method here (the test suite checks
+this), so scripts never need to build URLs by hand.
 
 Errors raise :class:`ClientError` carrying the HTTP status and the server's
 ``detail`` message.
@@ -121,7 +126,16 @@ class Client:
         return self.request("GET", "/health")
 
     def info(self) -> dict[str, Any]:
+        """Server capabilities: version, mode, formats, prototypes, plugins, presets, custom builders/analyses."""
         return self.request("GET", "/info")
+
+    def elements(self) -> list[dict[str, Any]]:
+        """Periodic-table data for Z 1–103: ``[{symbol, name, mass, covalentRadius, vdwRadius, ...}]``."""
+        return self.request("GET", "/elements")["elements"]
+
+    def plugins(self) -> list[dict[str, Any]]:
+        """Discovered plugins with their status (``loaded`` / ``error``), formats, builders, analyses and routes."""
+        return self.request("GET", "/plugins")["plugins"]
 
     # ------------------------------------------------------------------ auth
     def register(self, username: str, password: str) -> dict[str, Any]:
@@ -225,6 +239,23 @@ class Client:
         """Server-side export; returns the file text."""
         return self.request("POST", "/io/export", {"structure": _struct_dict(structure), "format": format})["text"]
 
+    def convert(self, path: str | os.PathLike, to: str, output: str | os.PathLike | None = None,
+                from_format: str | None = None, index: int | str | None = None) -> str:
+        """Upload a file and convert it on the server to the *to* format (any server writer,
+        plugin formats included). Returns the converted text; also writes it to *output* when given."""
+        p = Path(path)
+        fields: dict[str, str] = {"to": to}
+        if from_format:
+            fields["from"] = from_format
+        if index is not None:
+            fields["index"] = str(index)
+        body, ctype = self._multipart(fields, {"file": (p.name, p.read_bytes())})
+        raw = self.request("POST", "/io/convert", data=body, headers={"Content-Type": ctype}, raw=True)
+        text = raw.decode("utf-8")
+        if output is not None:
+            Path(output).write_text(text, encoding="utf-8")
+        return text
+
     # ----------------------------------------------------------------- build
     def build_crystal(self, prototype: str, elements: Iterable[str] | str | None = None, a: float | None = None,
                       c: float | None = None, supercell: Iterable[int] | None = None, **params: Any) -> Structure:
@@ -247,7 +278,20 @@ class Client:
     def molecule(self, name: str) -> Structure:
         return Structure.from_dict(self.request("GET", f"/build/molecule/{urllib.parse.quote(name)}")["structure"])
 
+    def prototypes(self) -> dict[str, Any]:
+        """Builder metadata: ``{"prototypes": {id: {...}}, "clusters": {kind: {...}}}``."""
+        return self.request("GET", "/build/prototypes")
+
+    def molecules(self) -> list[dict[str, Any]]:
+        """Built-in molecules: ``[{name, label, formula, natoms, aliases, description}]`` (see :meth:`molecule`)."""
+        return self.request("GET", "/build/molecules")["molecules"]
+
+    def custom_builders(self) -> list[dict[str, Any]]:
+        """Plugin builders: ``[{name, plugin, label, description, params}]``."""
+        return self.request("GET", "/build/custom")["builders"]
+
     def build_custom(self, name: str, **params: Any) -> Structure:
+        """Run a plugin builder with keyword parameters."""
         return Structure.from_dict(self.request("POST", f"/build/custom/{urllib.parse.quote(name)}", params)["structure"])
 
     # -------------------------------------------------------------- analysis
@@ -260,5 +304,25 @@ class Client:
     def summary(self, structure: Structure | dict[str, Any]) -> dict[str, Any]:
         return self.request("POST", "/analysis/summary", {"structure": _struct_dict(structure)})["summary"]
 
-    def rdf(self, structure: Structure | dict[str, Any], rmax: float = 8.0, nbins: int = 160) -> dict[str, Any]:
-        return self.request("POST", "/analysis/rdf", {"structure": _struct_dict(structure), "rmax": rmax, "nbins": nbins})
+    def rdf(self, structure: Structure | dict[str, Any], rmax: float = 8.0, nbins: int = 160,
+            elements: Iterable[str] | None = None) -> dict[str, Any]:
+        """``{"r": [...], "g": [...], ...}``; *elements* = ``("A", "B")`` restricts to one pair."""
+        body: dict[str, Any] = {"structure": _struct_dict(structure), "rmax": rmax, "nbins": nbins}
+        if elements is not None:
+            body["elements"] = list(elements)
+        return self.request("POST", "/analysis/rdf", body)
+
+    def coordination(self, structure: Structure | dict[str, Any], scale: float = 1.15, cutoff: float | None = None,
+                     pbc: bool = True) -> dict[str, Any]:
+        """``{"coordination": [cn per atom], "average": float, "byElement": {El: mean}}``."""
+        body = {"structure": _struct_dict(structure), "scale": scale, "cutoff": cutoff, "pbc": pbc}
+        return self.request("POST", "/analysis/coordination", body)
+
+    def custom_analyses(self) -> list[dict[str, Any]]:
+        """Plugin analyses: ``[{name, plugin, label, description, params}]``."""
+        return self.request("GET", "/analysis/custom")["analyses"]
+
+    def analysis(self, name: str, structure: Structure | dict[str, Any], **params: Any) -> Any:
+        """Run the plugin analysis *name* on *structure*; returns its JSON result."""
+        body = {"structure": _struct_dict(structure), "params": params}
+        return self.request("POST", f"/analysis/custom/{urllib.parse.quote(name)}", body)["result"]

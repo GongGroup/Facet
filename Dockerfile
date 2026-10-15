@@ -1,6 +1,10 @@
 # AtomScope server image (cloud mode by default).
 #   docker build -t atomscope .
 #   docker run -p 8765:8765 -v atomscope-data:/data atomscope
+# Local mode with a folder of this machine (runs as you, published on this machine only):
+#   mkdir -p atomscope-data
+#   docker run -p 127.0.0.1:8765:8765 --user "$(id -u):$(id -g)" -v "$PWD/atomscope-data:/data" \
+#     -e ATOMSCOPE_MODE=local -e ATOMSCOPE_TOKEN=<long random string> atomscope
 FROM python:3.13-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

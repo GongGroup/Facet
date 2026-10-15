@@ -1,7 +1,9 @@
 /**
  * Colour schemes. A scheme maps an atom to a CSS/hex colour:
- *   colorSchemes.register({ id, name, description, colorFor(symbol, index, ctx) })
- * ctx = { model, settings, cn (coordination numbers), zMin, zMax, n, prop }
+ *   colorSchemes.register({ id, name, description, group?: 'Element'|'Per atom', colorFor(symbol, index, ctx),
+ *                           legend?(ctx) => { colormap, min, max, label } })
+ * ctx = { model, settings, cn (coordination numbers), zMin, zMax, n, nSrc, prop, propName, propMin, propMax }
+ * computeColors() returns the colours with a `legend` property describing them (see below).
  */
 import { element } from '../core/elements.js';
 
@@ -78,11 +80,20 @@ colorSchemes.register({
   colorFor: (s) => { const [h, sat, l] = rgbToHsl(hexToRgb(element(s).jmol)); return rgbToHex(hslToRgb([h, sat * 0.45, 0.32 + l * 0.42])); },
 });
 colorSchemes.register({ id: 'mono', name: 'Single colour', description: 'Every atom in one colour (set below)', colorFor: (s, i, ctx) => ctx.settings.monoColor ?? '#c9ced6' });
-colorSchemes.register({ id: 'index', group: 'Per atom', name: 'Index (turbo)', description: 'Rainbow by atom index — handy for tracking order', colorFor: (s, i, ctx) => rgbToHex(turbo(ctx.n > 1 ? ctx.srcIndex(i) / (ctx.nSrc - 1) : 0.5)) });
-colorSchemes.register({ id: 'height', group: 'Per atom', name: 'Height (viridis)', description: 'Colour by position along the screen-independent z axis', colorFor: (s, i, ctx) => rgbToHex(viridis((ctx.z(i) - ctx.zMin) / Math.max(1e-6, ctx.zMax - ctx.zMin))) });
+colorSchemes.register({
+  id: 'index', group: 'Per atom', name: 'Index (turbo)', description: 'Rainbow by atom index — handy for tracking order',
+  colorFor: (s, i, ctx) => rgbToHex(turbo(ctx.nSrc > 1 ? ctx.srcIndex(i) / (ctx.nSrc - 1) : 0.5)),
+  legend: (ctx) => ({ colormap: 'turbo', min: 0, max: Math.max(0, ctx.nSrc - 1), label: 'Atom index', integer: true }),
+});
+colorSchemes.register({
+  id: 'height', group: 'Per atom', name: 'Height (viridis)', description: 'Colour by position along the screen-independent z axis',
+  colorFor: (s, i, ctx) => rgbToHex(viridis((ctx.z(i) - ctx.zMin) / Math.max(1e-6, ctx.zMax - ctx.zMin))),
+  legend: (ctx) => ({ colormap: 'viridis', min: ctx.zMin, max: ctx.zMax, label: 'Height z (Å)' }),
+});
 colorSchemes.register({
   id: 'coordination', group: 'Per atom', name: 'Coordination number', description: 'Colour by number of bonds (CN)',
-  colorFor: (s, i, ctx) => { const cn = ctx.cn[i]; return rgbToHex(turbo(Math.min(1, cn / 12))); },
+  colorFor: (s, i, ctx) => { const cn = ctx.cn?.[i] ?? 0; return rgbToHex(turbo(Math.min(1, cn / 12))); },
+  legend: () => ({ colormap: 'turbo', min: 0, max: 12, label: 'Coordination number', integer: true }),
 });
 colorSchemes.register({
   id: 'property', group: 'Per atom', name: 'Property (coolwarm)', description: 'Colour by a numeric per-atom property from the file (charges, forces…)',
@@ -93,21 +104,38 @@ colorSchemes.register({
     const span = Math.max(Math.abs(ctx.propMin), Math.abs(ctx.propMax)) || 1;
     return rgbToHex(coolwarm(0.5 + v / span / 2));
   },
+  legend: (ctx) => {
+    if (!ctx.prop) return null;
+    const span = Math.max(Math.abs(ctx.propMin), Math.abs(ctx.propMax)) || 1;
+    return { colormap: 'coolwarm', min: -span, max: span, label: ctx.propName ?? 'Property' };
+  },
 });
+
+function finiteRange(arr) {
+  let lo = Infinity, hi = -Infinity;
+  for (const v of arr ?? []) if (typeof v === 'number' && Number.isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; }
+  return Number.isFinite(lo) ? [lo, hi] : [0, 0];
+}
 
 /**
  * Compute linear-space colours (Float32Array 3n, sRGB → linear) for every displayed atom.
+ * The array carries a `legend` property:
+ *   per-atom schemes → { kind: 'gradient', scheme, colormap, min, max, label, integer?, zMin, zMax, propMin, propMax }
+ *   element schemes  → { kind: 'elements', scheme, items: [{ symbol, color }] }
  */
 export function computeColors(model, structure, styleSettings, cn) {
   const scheme = registry.get(styleSettings.colorScheme) ?? registry.get('jmol');
   const n = model.n;
   let zMin = Infinity, zMax = -Infinity;
   for (let i = 0; i < n; i++) { const z = model.positions[3 * i + 2]; if (z < zMin) zMin = z; if (z > zMax) zMax = z; }
-  const propName = styleSettings.property ?? Object.keys(structure?.props ?? {}).find((k) => typeof structure.props[k]?.[0] === 'number');
-  const prop = propName ? structure.props[propName] : null;
+  if (!n) zMin = zMax = 0;
+  const props = structure?.props ?? {};
+  const propName = styleSettings.property ?? Object.keys(props).find((k) => Array.isArray(props[k]) && typeof props[k][0] === 'number');
+  const prop = propName && Array.isArray(props[propName]) ? props[propName] : null;
+  const [propMin, propMax] = finiteRange(prop);
   const ctx = {
-    model, settings: styleSettings, cn, n, nSrc: structure?.length ?? n, zMin, zMax, prop,
-    propMin: prop ? Math.min(...prop) : 0, propMax: prop ? Math.max(...prop) : 0,
+    model, settings: styleSettings, cn, n, nSrc: structure?.length ?? n, zMin, zMax, prop, propName: prop ? propName : null,
+    propMin, propMax,
     srcIndex: (i) => model.src[i], z: (i) => model.positions[3 * i + 2],
   };
   const overrides = styleSettings.colorOverrides ?? {};
@@ -123,7 +151,17 @@ export function computeColors(model, structure, styleSettings, cn) {
     }
     const rgb = hexToRgb(hex);
     out[3 * i] = srgbToLinear(rgb[0]); out[3 * i + 1] = srgbToLinear(rgb[1]); out[3 * i + 2] = srgbToLinear(rgb[2]);
+    if (!perAtom && !cache.has(sym)) cache.set(sym, hex);
   }
+  let legend = null;
+  if (perAtom) {
+    let info = null;
+    try { info = scheme.legend?.(ctx) ?? null; } catch { info = null; }
+    if (info) legend = { kind: 'gradient', scheme: scheme.id, colormap: info.colormap ?? 'viridis', min: info.min ?? 0, max: info.max ?? 1, label: info.label ?? scheme.name, integer: !!info.integer, zMin, zMax, propMin, propMax };
+  } else {
+    legend = { kind: 'elements', scheme: scheme.id, items: [...cache].map(([symbol, color]) => ({ symbol, color })) };
+  }
+  out.legend = legend;
   return out;
 }
 

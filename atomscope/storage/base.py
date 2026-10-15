@@ -10,10 +10,13 @@ from __future__ import annotations
 
 import copy
 import json
+import re
+import threading
 from abc import ABC, abstractmethod
 from typing import Any
 
 from ..project import (
+    ProjectError,
     ProjectNotFound,
     ProjectTooLarge,
     ProjectValidationError,
@@ -25,6 +28,7 @@ from ..project import (
 
 __all__ = [
     "ProjectStore",
+    "ProjectConflict",
     "ProjectNotFound",
     "ProjectTooLarge",
     "ProjectValidationError",
@@ -39,6 +43,20 @@ DEFAULT_MAX_PROJECT_BYTES = 50 * 1024 * 1024
 #: Keys clients may not change through ``patch``.
 _IMMUTABLE = {"id", "created", "schema"}
 
+#: Client-side bookkeeping keys that are never stored.
+_TRANSIENT = ("baseUpdated", "location")
+
+
+class ProjectConflict(ProjectError):
+    """The project changed since the client loaded it (optimistic locking).
+
+    ``current`` holds the stored ``updated`` timestamp so callers can report it.
+    """
+
+    def __init__(self, message: str = "project was changed elsewhere", current: str | None = None) -> None:
+        super().__init__(message)
+        self.current = current
+
 
 def encode_project(doc: dict[str, Any]) -> bytes:
     """Compact UTF-8 JSON encoding used for storage and size accounting."""
@@ -46,13 +64,23 @@ def encode_project(doc: dict[str, Any]) -> bytes:
 
 
 def matches_query(summary: dict[str, Any], q: str | None) -> bool:
-    """Case-insensitive search over project name and tags."""
-    if not q:
+    """Case-insensitive search over project name, formula, description and tags
+    (the same fields as the web app's ``matchesQuery``)."""
+    needle = (q or "").strip().lower()
+    if not needle:
         return True
-    needle = q.strip().lower()
-    if needle in str(summary.get("name", "")).lower():
+    formulas = [str(f or "").lower() for f in (summary.get("formula"), *(summary.get("formulas") or []))]
+    # "nacl" also finds Na4Cl4: a query without digits is compared with the formulas' element letters too
+    if not any(ch.isdigit() for ch in needle) and any(needle in re.sub(r"\d+", "", f) for f in formulas):
         return True
-    return any(needle in str(t).lower() for t in summary.get("tags") or [])
+    fields = [summary.get("name"), *formulas, summary.get("description"), *(summary.get("tags") or [])]
+    return any(needle in str(v if v is not None else "").lower() for v in fields)
+
+
+def _strip_transient(doc: dict[str, Any]) -> dict[str, Any]:
+    for key in _TRANSIENT:
+        doc.pop(key, None)
+    return doc
 
 
 class ProjectStore(ABC):
@@ -64,6 +92,8 @@ class ProjectStore(ABC):
 
     def __init__(self, max_project_bytes: int = DEFAULT_MAX_PROJECT_BYTES) -> None:
         self.max_project_bytes = int(max_project_bytes)
+        # Serialises check-and-write in update(); subclasses may replace it with their own RLock.
+        self._lock = threading.RLock()
 
     # ----------------------------------------------------------- primitives
     @abstractmethod
@@ -122,7 +152,7 @@ class ProjectStore(ABC):
         otherwise a new one is assigned.  ``created``/``updated`` are filled in
         when missing.
         """
-        doc = normalize_project(copy.deepcopy(project))
+        doc = _strip_transient(normalize_project(copy.deepcopy(project)))
         pid = doc.get("id")
         if not is_project_id(pid) or self._load(owner, pid) is not None or self._exists_anywhere(pid):
             pid = self._fresh_id(owner)
@@ -134,28 +164,50 @@ class ProjectStore(ABC):
         self._save(owner, doc, self._encode_checked(doc), True)
         return doc
 
-    def update(self, owner: str, pid: str, project: dict[str, Any]) -> dict[str, Any]:
-        """Replace a project entirely (``id``/``created`` kept, ``updated`` bumped)."""
-        old = self.get(owner, pid)
-        doc = normalize_project(copy.deepcopy(project))
-        doc["id"] = pid
-        doc["created"] = old.get("created") or now_iso()
-        doc["updated"] = now_iso()
-        doc = self._order(doc)
-        self._save(owner, doc, self._encode_checked(doc), False)
-        return doc
+    def update(self, owner: str, pid: str, project: dict[str, Any],
+               expected_updated: str | None = None) -> dict[str, Any]:
+        """Replace a project entirely (``id``/``created`` kept, ``updated`` bumped).
 
-    def patch(self, owner: str, pid: str, partial: dict[str, Any]) -> dict[str, Any]:
+        With *expected_updated* (the ``updated`` value the client loaded) the write
+        only happens when the stored project still has that value; otherwise
+        :class:`ProjectConflict` is raised.
+        """
+        with self._lock:
+            old = self.get(owner, pid)
+            self._check_version(old, expected_updated)
+            doc = _strip_transient(normalize_project(copy.deepcopy(project)))
+            doc["id"] = pid
+            doc["created"] = old.get("created") or now_iso()
+            ts = now_iso()
+            if ts <= str(old.get("updated") or ""):
+                ts = _bump(str(old["updated"]))  # keep versions strictly increasing within one millisecond
+            doc["updated"] = ts
+            doc = self._order(doc)
+            self._save(owner, doc, self._encode_checked(doc), False)
+            return doc
+
+    def patch(self, owner: str, pid: str, partial: dict[str, Any],
+              expected_updated: str | None = None) -> dict[str, Any]:
         """Merge top-level keys of *partial* into the project (``updated`` bumped)."""
         if not isinstance(partial, dict):
             raise ProjectValidationError("patch body must be a JSON object")
-        old = self.get(owner, pid)
-        merged = dict(old)
-        for k, v in partial.items():
-            if k in _IMMUTABLE:
-                continue
-            merged[k] = v
-        return self.update(owner, pid, merged)
+        with self._lock:
+            old = self.get(owner, pid)
+            self._check_version(old, expected_updated)
+            merged = dict(old)
+            for k, v in partial.items():
+                if k in _IMMUTABLE or k in _TRANSIENT:
+                    continue
+                merged[k] = v
+            return self.update(owner, pid, merged)
+
+    @staticmethod
+    def _check_version(old: dict[str, Any], expected_updated: str | None) -> None:
+        if expected_updated is None or expected_updated == "*":
+            return
+        current = str(old.get("updated") or "")
+        if str(expected_updated) != current:
+            raise ProjectConflict("project was changed elsewhere", current=current or None)
 
     def delete(self, owner: str, pid: str) -> None:
         """Delete a project; raises :class:`ProjectNotFound`."""
@@ -183,3 +235,14 @@ class ProjectStore(ABC):
         out.update({k: v for k, v in doc.items() if k not in head and k not in tail})
         out.update({k: doc[k] for k in tail if k in doc})
         return out
+
+
+def _bump(ts: str) -> str:
+    """``ts`` plus one millisecond (ISO ``...SS.mmmZ`` as produced by :func:`now_iso`)."""
+    from datetime import datetime, timedelta, timezone
+
+    try:
+        t = datetime.fromisoformat(ts.replace("Z", "+00:00")) + timedelta(milliseconds=1)
+        return t.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    except ValueError:
+        return now_iso()

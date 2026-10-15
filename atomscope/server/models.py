@@ -149,7 +149,7 @@ class CrystalRequest(BaseModel):
     prototype: str = Field(..., description="sc, bcc, fcc, hcp, diamond, zincblende, wurtzite, rocksalt, cscl, "
                                             "fluorite, perovskite, rutile, graphene, mos2, graphite")
     elements: Optional[Union[list[str], str]] = Field(None, description="Elements in role order; defaults per prototype.")
-    a: Optional[float] = Field(None, gt=0, description="Lattice constant a (Å).")
+    a: Optional[float] = Field(None, ge=1.0, description="Lattice constant a (Å, at least 1).")
     c: Optional[float] = Field(None, gt=0, description="Lattice constant c (Å) for hexagonal/tetragonal/2D cells.")
     supercell: Optional[list[int]] = Field(None, min_length=3, max_length=3, description="Repeat [nx, ny, nz].")
     params: dict[str, Any] = Field(default_factory=dict, description="Extra prototype parameters: u, thickness, vacuum.")
@@ -161,8 +161,9 @@ class ClusterRequest(BaseModel):
 
     kind: str = Field(..., description="icosahedron, cuboctahedron, decahedron, octahedron, tetrahedron, sphere, fullerene")
     element: Optional[str] = Field(None, description="Element symbol (default per kind).")
-    size: Optional[float] = Field(None, description="Shells / atoms per edge / radius in Å, depending on kind.")
-    a: Optional[float] = Field(None, gt=0, description="fcc lattice constant (Å); nearest-neighbour = a/√2.")
+    size: Optional[float] = Field(None, description="Shells / atoms per edge / radius in Å, depending on kind "
+                                                   "(range: sizeMin..sizeMax of the kind in /api/v1/info).")
+    a: Optional[float] = Field(None, ge=1.0, description="fcc lattice constant (Å, at least 1); nearest-neighbour = a/√2.")
     params: dict[str, Any] = Field(default_factory=dict, description="Extra parameters: ino (decahedron), truncate (octahedron).")
 
 
@@ -226,6 +227,8 @@ class AuthResponse(BaseModel):
 class MeResponse(BaseModel):
     user: UserOut
     mode: str
+    #: True when the server needs a sign-in (cloud mode, or local mode with ATOMSCOPE_TOKEN).
+    authRequired: bool = False
 
 
 class HealthResponse(BaseModel):

@@ -34,7 +34,7 @@ from ..core.elements import covalent_radius, normalize_symbol
 from ..core.structure import Structure
 from .crystal import _REF_A
 
-__all__ = ["CLUSTERS", "cluster", "nearest_neighbor_distance", "c60_positions"]
+__all__ = ["CLUSTERS", "cluster", "cluster_kind", "estimate_cluster_atoms", "nearest_neighbor_distance", "c60_positions"]
 
 _PHI = (1.0 + math.sqrt(5.0)) / 2.0
 
@@ -205,18 +205,53 @@ def c60_positions(bond_56: float = 1.455, bond_66: float = 1.391) -> np.ndarray:
     return np.array(pts)
 
 
+_ALIASES = {"ico": "icosahedron", "mackay": "icosahedron", "cubo": "cuboctahedron", "deca": "decahedron",
+            "ino": "decahedron", "octa": "octahedron", "tetra": "tetrahedron", "c60": "fullerene",
+            "buckyball": "fullerene"}
+
+
+def cluster_kind(kind: str) -> str:
+    """Canonical cluster kind for *kind* or an alias (``ico``, ``c60`` ...); raises ``ValueError``."""
+    k = str(kind).strip().lower()
+    k = _ALIASES.get(k, k)
+    if k not in CLUSTERS:
+        raise ValueError(f"unknown cluster kind {kind!r}; available: {', '.join(CLUSTERS)}")
+    return k
+
+
+def estimate_cluster_atoms(kind: str, size: float | None = None, element: str | None = None,
+                           a: float | None = None, **kw: Any) -> int:
+    """Upper estimate of the atoms :func:`cluster` would create, without building it.
+
+    Polyhedra use their magic-number formulas; the sphere uses its volume times the
+    fcc density ``4 / a³``.  Used by the server to refuse requests that are too big.
+    """
+    k = cluster_kind(kind)
+    meta = CLUSTERS[k]
+    if k == "fullerene":
+        return 60
+    size = meta["defaultSize"] if size is None else size
+    if k == "sphere":
+        elem = normalize_symbol(element) if element else meta["defaultElement"]
+        _, a_fcc = nearest_neighbor_distance(elem, a)
+        r = max(float(size), 0.0)
+        return int(math.ceil(4.0 / 3.0 * math.pi * r ** 3 * 4.0 / a_fcc ** 3)) + 1
+    n = max(int(size), 1)
+    if k in ("icosahedron", "cuboctahedron"):
+        return (10 * n ** 3 - 15 * n ** 2 + 11 * n - 3) // 3
+    if k == "octahedron":
+        return (2 * n ** 3 + n) // 3
+    if k == "tetrahedron":
+        return n * (n + 1) * (n + 2) // 6
+    return (5 * n ** 3 + n) // 6  # decahedron
+
+
 def cluster(kind: str, element: str | None = None, size: float = 3, a: float | None = None, **kw: Any) -> Structure:
     """Build a cluster/nanoparticle (see module docstring for *kind* and *size*).
 
     Extra keyword parameters: ``ino`` (decahedron), ``truncate`` (octahedron).
     """
-    k = kind.strip().lower()
-    aliases = {"ico": "icosahedron", "mackay": "icosahedron", "cubo": "cuboctahedron", "deca": "decahedron",
-               "ino": "decahedron", "octa": "octahedron", "tetra": "tetrahedron", "c60": "fullerene",
-               "buckyball": "fullerene"}
-    k = aliases.get(k, k)
-    if k not in CLUSTERS:
-        raise ValueError(f"unknown cluster kind {kind!r}; available: {', '.join(CLUSTERS)}")
+    k = cluster_kind(kind)
     meta = CLUSTERS[k]
     elem = normalize_symbol(element) if element else meta["defaultElement"]
     info: dict[str, Any] = {"source": f"builder:cluster:{k}", "cluster": k}

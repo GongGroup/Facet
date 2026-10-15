@@ -21,7 +21,7 @@ def test_example_plugin_via_api(plugin_client):
     info = c.get("/api/v1/info").json()
     hello = next(p for p in info["plugins"] if p["name"] == "hello")
     assert hello["status"] == "loaded" and hello["version"] == "1.0.0"
-    assert hello["frontend"] == ["/plugins/hello/hello.js"]
+    assert hello["frontend"] == ["plugins/hello/hello.js"]  # relative: works under a sub-path
     assert any(b["name"] == "hello-chain" for b in info["customBuilders"])
     assert any(a["name"] == "hello-com" for a in info["customAnalyses"])
     assert [p["id"] for p in info["presets"]["lighting"]] == ["hello-sunset"]
@@ -105,3 +105,41 @@ def test_load_example_directly():
     (rec,) = mgr.records
     assert rec.status == "loaded" and rec.static_dir is not None and rec.static_dir.name == "static"
     assert set(rec.readers) == {"hello"} and set(rec.builders) == {"hello-chain"}
+
+
+def test_frontend_urls_are_relative_and_look_alias(tmp_path):
+    mgr = PluginManager([EXAMPLE_PLUGINS], use_entry_points=False).load_all()
+    (rec,) = mgr.records
+    assert rec.frontend == ["plugins/hello/hello.js"]
+    assert rec.to_json()["static"] == "plugins/hello/"
+    d = tmp_path / "p"
+    d.mkdir()
+    (d / "looky.py").write_text(textwrap.dedent("""
+        def register(ctx):
+            ctx.add_preset("look", {"id": "dusk", "scene": {"post": {"bloom": {"enabled": True}}}})
+            ctx.add_preset("looks", {"id": "dawn", "scene": {}})
+    """))
+    presets = PluginManager([d], use_entry_points=False).load_all().presets()
+    assert [p["id"] for p in presets["styles"]] == ["dusk", "dawn"]
+    assert presets["styles"][0]["plugin"] == "looky"
+
+
+def test_load_plugins_helper():
+    import atomscope as ats
+
+    mgr = ats.load_plugins([EXAMPLE_PLUGINS], entry_points=False)
+    s = mgr.builders["hello-chain"].func(n=3)
+    assert len(s) == 3
+    assert "centerOfMass" in mgr.analyses["hello-com"].func(s)
+    assert ats.parse_text(HELLO_FILE, format="hello").formula == "Cu2"
+
+
+def test_plugin_template_names():
+    import pytest
+
+    from atomscope.plugins import plugin_template
+
+    files = plugin_template("my_plugin")
+    assert set(files) == {"plugin.py", "static/my_plugin.js"}
+    with pytest.raises(ValueError):
+        plugin_template("../evil")

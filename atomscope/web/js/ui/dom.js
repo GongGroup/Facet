@@ -38,10 +38,13 @@ export function btn(label, { icon: ico, cls = '', tip, kbd, on, pressed, title, 
 let _id = 0;
 const nid = (p) => `${p}-${++_id}`;
 
-export function slider({ label, value, min, max, step = 0.01, fmt = (v) => (+v).toFixed(2), onInput, tip, id }) {
+/** Stable identity of a control across re-renders (the shell restores focus by it). */
+const keyOf = (key, label) => (key ?? (typeof label === 'string' ? label : null));
+
+export function slider({ label, value, min, max, step = 0.01, fmt = (v) => (+v).toFixed(2), onInput, tip, id, key }) {
   const iid = id ?? nid('rng');
   const out = h('output', { for: iid }, fmt(value));
-  const input = h('input', { type: 'range', id: iid, min, max, step, value });
+  const input = h('input', { type: 'range', id: iid, min, max, step, value, 'data-key': keyOf(key, label) });
   input.addEventListener('input', () => { out.textContent = fmt(+input.value); onInput(+input.value); });
   const lab = h('label', { for: iid }, label);
   if (tip) lab.dataset.tip = tip;
@@ -50,22 +53,23 @@ export function slider({ label, value, min, max, step = 0.01, fmt = (v) => (+v).
   return el;
 }
 
-export function toggle({ label, sub, checked, onChange, tip, id }) {
+export function toggle({ label, sub, checked, onChange, tip, id, key }) {
   const iid = id ?? nid('tg');
-  const input = h('input', { type: 'checkbox', id: iid, checked: !!checked, role: 'switch' });
+  const input = h('input', { type: 'checkbox', id: iid, checked: !!checked, role: 'switch', 'data-key': keyOf(key, label) });
   input.addEventListener('change', () => onChange(input.checked));
   const t = h('label.t', { for: iid }, h('b', label), sub ? h('small', sub) : null);
   if (tip) t.dataset.tip = tip;
   return h('div.toggle-row', t, h('span.switch', input, h('span')));
 }
 
-export function seg(options, value, onChange, { label, iconsOnly } = {}) {
+export function seg(options, value, onChange, { label, iconsOnly, key } = {}) {
   const wrap = h('div.seg', { role: 'group', 'aria-label': label ?? null });
+  const base = keyOf(key, label) ?? 'seg';
   const btns = options.map((o) => {
     const opt = typeof o === 'string' ? { value: o, label: o } : o;
-    const b = h('button', { type: 'button', 'aria-pressed': String(opt.value === value), 'aria-label': opt.label });
+    const b = h('button', { type: 'button', 'aria-pressed': String(opt.value === value), 'aria-label': opt.label, 'data-key': `${base}:${opt.value}` });
     if (opt.icon) b.append(ic(opt.icon, 'sm'));
-    if (!iconsOnly) b.append(opt.label);
+    if (!iconsOnly) b.append(h('span', opt.label));   // (a span, so a label too long for its segment ends in …)
     if (opt.tip) b.dataset.tip = opt.tip;
     b.addEventListener('click', () => { btns.forEach((x) => x.setAttribute('aria-pressed', String(x === b))); onChange(opt.value); });
     return b;
@@ -74,8 +78,8 @@ export function seg(options, value, onChange, { label, iconsOnly } = {}) {
   return wrap;
 }
 
-export function select({ options, value, onChange, id, label }) {
-  const s = h('select.field', { id: id ?? nid('sel'), 'aria-label': label ?? null });
+export function select({ options, value, onChange, id, label, key }) {
+  const s = h('select.field', { id: id ?? nid('sel'), 'aria-label': label ?? null, 'data-key': keyOf(key, label) });
   for (const o of options) {
     if (o.group) {
       const g = h('optgroup', { label: o.group });
@@ -87,8 +91,8 @@ export function select({ options, value, onChange, id, label }) {
   return s;
 }
 
-export function colorInput(value, onChange, label = 'Colour') {
-  const c = h('input', { type: 'color', value: toHex6(value), 'aria-label': label });
+export function colorInput(value, onChange, label = 'Colour', key) {
+  const c = h('input', { type: 'color', value: toHex6(value), 'aria-label': label, 'data-key': keyOf(key, label) });
   c.addEventListener('input', () => onChange(c.value));
   return c;
 }

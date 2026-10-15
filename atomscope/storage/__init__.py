@@ -10,6 +10,9 @@ Both implement :class:`ProjectStore`::
     store.create(owner, project)         -> project
     store.update(owner, pid, project)    -> project          (full replace)
     store.patch(owner, pid, partial)     -> project          (merge top-level keys)
+
+``update``/``patch`` accept ``expected_updated=`` and raise :class:`ProjectConflict` when the
+stored project changed since then (optimistic locking).
     store.delete(owner, pid)
     store.duplicate(owner, pid)          -> project
 """
@@ -18,6 +21,7 @@ from __future__ import annotations
 
 from .base import (
     DEFAULT_MAX_PROJECT_BYTES,
+    ProjectConflict,
     ProjectNotFound,
     ProjectStore,
     ProjectTooLarge,
@@ -31,6 +35,7 @@ __all__ = [
     "LocalFileStore",
     "SQLiteStore",
     "ProjectNotFound",
+    "ProjectConflict",
     "ProjectTooLarge",
     "ProjectValidationError",
     "UserExists",

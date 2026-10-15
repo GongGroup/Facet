@@ -10,9 +10,23 @@ Environment variable            Meaning                                Default
 ``ATOMSCOPE_MODE``              ``local`` or ``cloud``                 ``local``
 ``ATOMSCOPE_DATA_DIR``          data directory (alias ATOMSCOPE_DATA)  ``~/.atomscope``
 ``ATOMSCOPE_PLUGIN_DIRS``       plugin dirs (``os.pathsep`` or ``,``)  —
-``ATOMSCOPE_ALLOW_REGISTRATION`` allow self-registration (cloud)       ``true``
+``ATOMSCOPE_ALLOW_REGISTRATION`` allow self-registration (cloud)       ``true`` on loopback,
+                                                                       ``false`` otherwise
 ``ATOMSCOPE_SECRET``            server secret (token hashing)          generated, saved
+``ATOMSCOPE_TOKEN``             local mode: require this bearer token  — (no login)
+``ATOMSCOPE_TOKEN_TTL_DAYS``    cloud sign-ins expire after N idle     ``30`` (0 = never)
+                                days
+``ATOMSCOPE_MAX_ATOMS``         atom limit of builder endpoints        ``200000``
+``ATOMSCOPE_FRAME_ANCESTORS``   CSP frame-ancestors (allow embedding)  — (same origin)
+``ATOMSCOPE_ROOT_PATH``         URL prefix behind a reverse proxy      — (e.g. ``/atomscope``)
+``ATOMSCOPE_FORWARDED_ALLOW_IPS`` reverse-proxy addresses or CIDR        — (127.0.0.1 only)
+                                networks whose X-Forwarded-For/-Proto
+                                are trusted (comma-separated; avoid
+                                ``*``: clients could forge addresses)
 ``ATOMSCOPE_CORS_ORIGINS``      comma-separated allowed origins        — (same origin)
+``ATOMSCOPE_ALLOWED_HOSTS``     extra host names a token-less local    — (localhost names)
+                                server on 127.0.0.1 answers to (``*``
+                                = any; guards against DNS rebinding)
 ``ATOMSCOPE_MAX_PROJECT_MB``    max project size                       ``50``
 ``ATOMSCOPE_MAX_UPLOAD_MB``     max upload size                        ``100``
 ``ATOMSCOPE_WEB_DIR``           alternative frontend directory         package ``web/``
@@ -29,12 +43,14 @@ from dataclasses import dataclass, field, fields, replace
 from pathlib import Path
 from typing import Any, Mapping
 
-__all__ = ["Settings", "MODES", "DEFAULT_PORT", "DEFAULT_DATA_DIR", "PACKAGE_WEB_DIR"]
+__all__ = ["Settings", "MODES", "DEFAULT_PORT", "DEFAULT_DATA_DIR", "PACKAGE_WEB_DIR", "DEFAULT_MAX_ATOMS",
+           "is_loopback_host"]
 
 MODES = ("local", "cloud")
 DEFAULT_PORT = 8765
 DEFAULT_DATA_DIR = Path("~/.atomscope")
 PACKAGE_WEB_DIR = Path(__file__).resolve().parent / "web"
+DEFAULT_MAX_ATOMS = 200_000
 
 _TRUE = {"1", "true", "yes", "on", "y", "t"}
 _FALSE = {"0", "false", "no", "off", "n", "f"}
@@ -53,6 +69,12 @@ def _list(v: str) -> list[str]:
     return [p.strip() for p in re.split(rf"[,{re.escape(os.pathsep)}]", v) if p.strip()]
 
 
+def is_loopback_host(host: str | None) -> bool:
+    """True when *host* only accepts connections from this machine (127.x, ::1, localhost)."""
+    h = str(host or "").strip().strip("[]").lower()
+    return h == "localhost" or h == "::1" or h.startswith("127.")
+
+
 @dataclass
 class Settings:
     """Runtime configuration of the AtomScope server."""
@@ -62,7 +84,8 @@ class Settings:
     mode: str = "local"
     data_dir: Path = field(default_factory=lambda: DEFAULT_DATA_DIR.expanduser())
     plugin_dirs: list[Path] = field(default_factory=list)
-    allow_registration: bool = True
+    #: ``None`` = automatic: allowed on a loopback host, disabled when the server is reachable from the network.
+    allow_registration: bool | None = None
     secret: str | None = None
     cors_origins: list[str] = field(default_factory=list)
     max_project_mb: float = 50.0
@@ -70,6 +93,25 @@ class Settings:
     web_dir: Path | None = None
     entry_point_plugins: bool = True
     log_level: str = "info"
+    #: Local mode: when set, every API request needs ``Authorization: Bearer <token>``.
+    token: str | None = None
+    #: Cloud mode: sign-in tokens unused for this many days stop working (0 = never).
+    token_ttl_days: float = 30.0
+    #: Upper bound on atoms produced by builder endpoints.
+    max_atoms: int = DEFAULT_MAX_ATOMS
+    #: CSP ``frame-ancestors`` value (e.g. ``'self' https://lab.example.org``); unset = same-origin framing only.
+    frame_ancestors: str | None = None
+    #: URL prefix when served behind a reverse proxy under a sub-path (e.g. ``/atomscope``).
+    root_path: str = ""
+    #: Addresses or networks (CIDR) of reverse proxies whose ``X-Forwarded-For``/``-Proto`` headers are trusted
+    #: (comma-separated). Unset = uvicorn's default (``FORWARDED_ALLOW_IPS`` or 127.0.0.1). Behind a proxy on another
+    #: host or container, set it so rate limits apply per real client instead of to everyone at once. ``*`` (any)
+    #: lets a client that reaches the port directly forge its address; name the proxy instead.
+    forwarded_allow_ips: str | None = None
+    #: Local mode without a token on a loopback address answers only to localhost names (against DNS
+    #: rebinding); these host names are accepted too (``*`` = any).
+    allowed_hosts: list[str] = field(default_factory=list)
+    _registration_auto: bool = field(default=False, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         self.data_dir = Path(self.data_dir).expanduser()
@@ -78,6 +120,18 @@ class Settings:
             self.web_dir = Path(self.web_dir).expanduser()
         self.mode = str(self.mode).lower()
         self.port = int(self.port)
+        if self.allow_registration is None:
+            self._registration_auto = True
+            self.allow_registration = is_loopback_host(self.host)
+        self.allow_registration = bool(self.allow_registration)
+        self.token = (str(self.token).strip() or None) if self.token is not None else None
+        self.max_atoms = int(self.max_atoms)
+        self.token_ttl_days = float(self.token_ttl_days)
+        rp = str(self.root_path or "").strip().rstrip("/")
+        self.root_path = ("/" + rp.lstrip("/")) if rp else ""
+        if self.forwarded_allow_ips is not None:
+            # comma-separated only (IPv6 addresses contain ':')
+            self.forwarded_allow_ips = ",".join(p.strip() for p in str(self.forwarded_allow_ips).split(",") if p.strip()) or None
         self.validate()
 
     # ------------------------------------------------------------ factory
@@ -118,7 +172,21 @@ class Settings:
             kw["web_dir"] = Path(v)
         if (v := get("ATOMSCOPE_LOG_LEVEL")) is not None:
             kw["log_level"] = v.lower()
-        names = {f.name for f in fields(cls)}
+        if (v := get("ATOMSCOPE_TOKEN")) is not None:
+            kw["token"] = v
+        if (v := get("ATOMSCOPE_TOKEN_TTL_DAYS")) is not None:
+            kw["token_ttl_days"] = float(v)
+        if (v := get("ATOMSCOPE_MAX_ATOMS")) is not None:
+            kw["max_atoms"] = int(v)
+        if (v := get("ATOMSCOPE_FRAME_ANCESTORS")) is not None:
+            kw["frame_ancestors"] = v
+        if (v := get("ATOMSCOPE_ROOT_PATH")) is not None:
+            kw["root_path"] = v
+        if (v := get("ATOMSCOPE_FORWARDED_ALLOW_IPS")) is not None:
+            kw["forwarded_allow_ips"] = v
+        if (v := get("ATOMSCOPE_ALLOWED_HOSTS")) is not None:
+            kw["allowed_hosts"] = [h.strip() for h in v.split(",") if h.strip()]
+        names = {f.name for f in fields(cls) if f.init}
         for key, val in overrides.items():
             if key not in names:
                 raise TypeError(f"unknown setting {key!r}")
@@ -127,7 +195,9 @@ class Settings:
         return cls(**kw)
 
     def with_(self, **changes: Any) -> "Settings":
-        """Return a copy with *changes* applied."""
+        """Return a copy with *changes* applied (automatic registration follows a changed host)."""
+        if self._registration_auto and "allow_registration" not in changes:
+            changes["allow_registration"] = None
         return replace(self, **changes)
 
     # ----------------------------------------------------------- derived
@@ -138,6 +208,10 @@ class Settings:
             raise ValueError("port must be between 0 and 65535")
         if self.max_project_mb <= 0 or self.max_upload_mb <= 0:
             raise ValueError("size limits must be positive")
+        if self.max_atoms < 1:
+            raise ValueError("max_atoms must be positive")
+        if self.token_ttl_days < 0:
+            raise ValueError("token_ttl_days must be >= 0 (0 = tokens never expire)")
 
     @property
     def projects_dir(self) -> Path:
@@ -156,6 +230,16 @@ class Settings:
     @property
     def max_upload_bytes(self) -> int:
         return int(self.max_upload_mb * 1024 * 1024)
+
+    @property
+    def body_limit_bytes(self) -> int:
+        """Largest accepted request body (project or upload plus multipart overhead)."""
+        return max(self.max_upload_bytes, self.max_project_bytes) + 64 * 1024
+
+    @property
+    def is_public(self) -> bool:
+        """True when the server is bound to a non-loopback address (reachable from the network)."""
+        return not is_loopback_host(self.host)
 
     @property
     def resolved_web_dir(self) -> Path:

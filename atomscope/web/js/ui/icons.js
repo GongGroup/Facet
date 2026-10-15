@@ -58,6 +58,17 @@ const P = {
   grid: '<path d="M4 4h16v16H4zM4 12h16M12 4v16"/>',
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
   plug: '<path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/>',
+  'panel-right': '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16M18 8.5h-1M18 11.5h-1"/>',
+  'panel-left': '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M6 8.5h1M6 11.5h1"/>',
+  axes: '<path d="M5 19V5M5 19h14M5 19l9-9"/><path d="m3 7 2-2 2 2M17 17l2 2-2 2M11 10h3v3"/>',
+  minimize: '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>',
+  clipboard: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/>',
+  crosshair: '<circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/>',
+  hand: '<path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V11M11 10.5V4.5a1.5 1.5 0 0 1 3 0v6M14 10.5V6a1.5 1.5 0 0 1 3 0v8a7 7 0 0 1-7 7h-.5a6 6 0 0 1-4.6-2.2L3.6 15.5a1.5 1.5 0 0 1 2.3-1.9L8 16"/>',
+  'zoom-in': '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5M8 11h6M11 8v6"/>',
+  'zoom-out': '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5M8 11h6"/>',
+  neighbors: '<circle cx="12" cy="12" r="2.5"/><circle cx="5" cy="6" r="1.8"/><circle cx="19" cy="6" r="1.8"/><circle cx="12" cy="20.5" r="1.8"/><path d="m10.2 10.3-3.7-3M13.8 10.3l3.7-3M12 14.5v4.2"/>',
+  swap: '<path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5"/>',
 };
 
 export function icon(name, cls = '') {

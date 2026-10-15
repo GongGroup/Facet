@@ -2,8 +2,20 @@
  * Viewer — owns the WebGL renderer, cameras, controls, light rig, post-processing and the drawn
  * representation of one Structure. Driven entirely by a `scene` settings object (see settings.js).
  *
- * Events: 'hover' {index, x, y} | 'atomclick' {index, shiftKey, x, y} | 'frame' i | 'render' | 'measure' list
- *         'camera' | 'model' model | 'error' err
+ * Events:
+ *   'hover'       {index, x, y}                       pointer over a displayed atom (index −1: none)
+ *   'atomclick'   {index, shiftKey, x, y}             click without drag (index −1: empty space)
+ *   'atomcontext' {index, x, y, clientX, clientY}     right-click without drag (index −1: empty space);
+ *                                                     x/y are relative to the viewport element
+ *   'boxselect'   {indices, add}                      Shift+drag (add) or Alt+drag (replace) rectangle with
+ *                                                     tool 'select'; indices are unique source (structure) indices
+ *   'frame' i | 'play' bool | 'selection' srcIndices | 'render' | 'measure' list | 'camera' | 'model' model | 'error' err
+ *
+ * Keyboard, while the canvas has focus: arrows orbit by 10°, Shift+arrows pan, +/− zoom; those keys
+ * do not reach the global shortcuts (plain ←/→ are left to frame stepping on trajectories).
+ * `tool` is the app's active tool ('select' | 'measure' | …); box selection runs only with 'select'.
+ * The app keeps it current by setting `toolProvider = () => app.tool` (or by assigning `tool`).
+ * `helpers` = the building blocks styles receive as ctx.helpers (buildAtoms, buildBonds, …).
  */
 import * as THREE from '../../vendor/three/three.module.js';
 import { OrbitControls } from '../../vendor/three/addons/controls/OrbitControls.js';
@@ -16,16 +28,57 @@ import { mergeGeometries } from '../../vendor/three/addons/utils/BufferGeometryU
 import { Emitter } from '../core/events.js';
 import { element } from '../core/elements.js';
 import { buildDisplayModel, modelBounds, keyOf } from './display.js';
-import { styles, atomRadius, segmentsFor, autoPolyhedraCenters } from './styles.js';
+import { styles, atomRadius, segmentsFor, autoPolyhedraCenters, buildAtoms, buildBonds, buildLines, buildPolyhedra, writeAtomMatrices, writeBondMatrices } from './styles.js';
 import { computeColors } from './colors.js';
-import { createMaterial, materials } from './materials.js';
+import { createMaterial, updateMaterial, isSeeThrough, materials } from './materials.js';
 import { LightRig } from './lighting.js';
 import { PostPipeline } from './post.js';
 import { makeBackground } from './background.js';
-import { AxisGizmo } from './gizmo.js';
+import { AxisGizmo, axisColors } from './gizmo.js';
 import { makeScene } from './settings.js';
+import { drawLegends } from './legend.js';
 
 const sig = (o) => JSON.stringify(o ?? null);
+const DEG = Math.PI / 180;
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const cssVar = (name, fallback) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+const KEY_ORBIT = 10, KEY_PAN = 40, KEY_ZOOM = 1.2;
+/** Above this many drawn atoms the cell letters clear the atoms' bounding box instead of each atom. */
+const LETTER_DISC_LIMIT = 20000;
+
+/**
+ * Selection / hover halo: a Fresnel rim on the back faces of a slightly larger sphere, so the atom
+ * keeps its own colour and only its outline lights up in the accent colour.
+ */
+function rimMaterial(strength) {
+  return new THREE.ShaderMaterial({
+    uniforms: { color: { value: new THREE.Color('#e8a33d') }, strength: { value: strength } },
+    vertexShader: `
+      varying vec3 vN; varying vec3 vV;
+      void main() {
+        vec4 mv = vec4(position, 1.0);
+        vec3 n = normal;
+        #ifdef USE_INSTANCING
+          mv = instanceMatrix * mv;
+          n = mat3(instanceMatrix) * n;
+        #endif
+        mv = modelViewMatrix * mv;
+        vN = normalize(normalMatrix * n);
+        vV = isOrthographic ? vec3(0.0, 0.0, 1.0) : normalize(-mv.xyz);
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      uniform vec3 color; uniform float strength;
+      varying vec3 vN; varying vec3 vV;
+      void main() {
+        float d = abs(dot(normalize(vN), normalize(vV)));
+        float a = pow(1.0 - d, 2.0) * smoothstep(0.0, 0.18, d) * strength;
+        gl_FragColor = vec4(color, clamp(a, 0.0, 1.0));
+        #include <colorspace_fragment>
+      }`,
+    transparent: true, depthWrite: false, side: THREE.BackSide, toneMapped: false,
+  });
+}
 
 export class Viewer extends Emitter {
   constructor(container) {
@@ -35,9 +88,12 @@ export class Viewer extends Emitter {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
-    this.renderer.domElement.className = 'viewer-canvas';
-    this.renderer.domElement.setAttribute('aria-label', '3D structure view');
-    container.appendChild(this.renderer.domElement);
+    const el = this.renderer.domElement;
+    el.className = 'viewer-canvas';
+    el.tabIndex = 0;
+    el.setAttribute('role', 'application');
+    el.setAttribute('aria-label', '3D structure view. Arrow keys rotate, +/- zoom, Shift+arrows pan');
+    container.appendChild(el);
     this.overlay = document.createElement('canvas');
     this.overlay.className = 'viewer-overlay';
     container.appendChild(this.overlay);
@@ -52,8 +108,8 @@ export class Viewer extends Emitter {
     this.lights = new LightRig(this.renderer, this.scene3);
     this.post = new PostPipeline(this.renderer, this.scene3, this.camera);
     this.gizmo = new AxisGizmo();
-    this.floor = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShadowMaterial({ opacity: 0.22 }));
-    this.floor.rotation.x = -Math.PI / 2;
+    // contact-shadow floor; oriented to the view "up" in _updateFloor
+    this.floor = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShadowMaterial({ opacity: 0.22, side: THREE.DoubleSide }));
     this.floor.receiveShadow = true;
     this.floor.visible = false;
     this.floor.userData.noInk = true;
@@ -64,9 +120,9 @@ export class Viewer extends Emitter {
     this.model = null;
     this.rep = null;
     this.cellObj = null;
-    this.halo = null;
-    this.hoverHalo = null;
     this.measureObj = null;
+    this.atomMaterial = null;
+    this.bondMaterial = null;
     this.selection = new Set();
     this.hoverIndex = -1;
     this.measurements = [];
@@ -76,12 +132,24 @@ export class Viewer extends Emitter {
     this._sigs = {};
     this._dirty = true;
     this._camAnim = null;
+    this._trash = [];
+    this._tempOrtho = false;
+    this._viewUp = null;
     this.width = 1; this.height = 1;
+    /** Space (CSS px) that fitting keeps clear on each side, e.g. for floating toolbars: {x, y}. */
+    this.fitMargins = { x: 0, y: 0 };
     this.resolution = new THREE.Vector2(1, 1);
-    this.tool = 'rotate';
+    this._tool = 'select';
+    this.toolProvider = null;
+    this.helpers = { buildAtoms, buildBonds, buildLines, buildPolyhedra, atomRadius, segmentsFor };
+
+    // shared halo resources: one geometry, one material and one growable instanced mesh per kind
+    this._haloGeo = new THREE.SphereGeometry(1, 32, 20);
+    this._halo = { select: this._makeHalo(rimMaterial(2.0)), hover: this._makeHalo(rimMaterial(0.9)) };
 
     this._setupControls('orbit');
     this._setupPointer();
+    this._setupKeys();
     this._ro = new ResizeObserver(() => this.resize());
     this._ro.observe(container);
     this.resize();
@@ -89,8 +157,15 @@ export class Viewer extends Emitter {
     this._frameAcc = 0;
     this._loop = this._loop.bind(this);
     requestAnimationFrame(this._loop);
-    this.renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); this.emit('error', new Error('The graphics context was lost. Reload the page to continue.')); });
+    el.addEventListener('webglcontextlost', (e) => { e.preventDefault(); this.emit('error', new Error('The graphics context was lost. Reload the page to continue.')); });
   }
+
+  /** The active tool: from `toolProvider()` when the app set one, otherwise the value last assigned. */
+  get tool() {
+    const t = typeof this.toolProvider === 'function' ? this.toolProvider() : null;
+    return t || this._tool;
+  }
+  set tool(t) { this._tool = t || 'select'; }
 
   // ------------------------------------------------------------------ setup
   _setupControls(kind) {
@@ -108,8 +183,24 @@ export class Viewer extends Emitter {
     }
     this.controls.target.copy(target);
     this.controlsKind = kind;
+    this._syncControlsUp();
     this.controls.addEventListener('change', () => { this._dirty = true; this.emit('camera'); });
-    this.controls.addEventListener('start', () => { this._camAnim = null; });
+    this.controls.addEventListener('start', () => {
+      this._camAnim = null;
+      // an axis view's temporary orthographic camera lasts until the next free rotation
+      const st = this.controls.state;
+      if (this._tempOrtho && (st === 0 || st === 3)) this._leaveTempOrtho();
+    });
+  }
+
+  /** OrbitControls orbits around the "up" it saw when created; keep it in step with camera.up. */
+  _syncControlsUp() {
+    const c = this.controls;
+    if (!c?._quat || !c._quatInverse) return;
+    const up = this.camera.up.clone();
+    if (up.lengthSq() < 1e-10) return;
+    c._quat.setFromUnitVectors(up.normalize(), new THREE.Vector3(0, 1, 0));
+    c._quatInverse.copy(c._quat).invert();
   }
 
   _setupPointer() {
@@ -121,8 +212,10 @@ export class Viewer extends Emitter {
       const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
       const dt = performance.now() - down.t;
       if (moved < 5 && dt < 500 && down.b === 0) this._click(e);
+      else if (moved < 5 && down.b === 2) this._context(e);
       down = null;
     });
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
     el.addEventListener('pointermove', (e) => {
       lastMove = e;
       if (e.buttons) { if (this.hoverIndex !== -1) this._setHover(-1, e); return; }
@@ -133,13 +226,37 @@ export class Viewer extends Emitter {
       const i = this.pickAtom(e.clientX, e.clientY);
       if (i >= 0) this.focusAtom(i); else this.fitView(true);
     });
+    // box selection: a capture listener on the container runs before the camera controls see the press
+    this.container.addEventListener('pointerdown', (e) => this._boxStart(e), true);
+  }
+
+  _setupKeys() {
+    this.renderer.domElement.addEventListener('keydown', (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || !this.structure) return;
+      const k = e.key;
+      const trajectory = (this.structure?.nFrames ?? 1) > 1;
+      let done = true;
+      if (k === 'ArrowLeft' || k === 'ArrowRight') {
+        const sgn = k === 'ArrowLeft' ? 1 : -1;
+        if (e.shiftKey) this.panBy(-sgn * KEY_PAN, 0);
+        else if (trajectory) done = false;          // ←/→ step frames on trajectories
+        else this.orbitBy(sgn * KEY_ORBIT, 0);
+      } else if (k === 'ArrowUp' || k === 'ArrowDown') {
+        const sgn = k === 'ArrowUp' ? 1 : -1;
+        if (e.shiftKey) this.panBy(0, -sgn * KEY_PAN);
+        else this.orbitBy(0, -sgn * KEY_ORBIT);
+      } else if (k === '+' || k === '=') this.zoomBy(KEY_ZOOM);
+      else if (k === '-' || k === '_') this.zoomBy(1 / KEY_ZOOM);
+      else done = false;
+      if (done) { e.preventDefault(); e.stopPropagation(); }
+    });
   }
 
   _setHover(i, e) {
     if (i === this.hoverIndex && i === -1) return;
     const changed = i !== this.hoverIndex;
     this.hoverIndex = i;
-    if (changed) { this._updateHalos(); this._dirty = true; }
+    if (changed) { this._writeHalos(); this._dirty = true; }
     const r = this.container.getBoundingClientRect();
     this.emit('hover', { index: i, x: e.clientX - r.left, y: e.clientY - r.top });
   }
@@ -156,12 +273,78 @@ export class Viewer extends Emitter {
     this.emit('atomclick', { index: i, shiftKey: e.shiftKey || e.metaKey || e.ctrlKey, x: e.clientX - r.left, y: e.clientY - r.top });
   }
 
+  _context(e) {
+    const r = this.container.getBoundingClientRect();
+    const index = this.pickAtom(e.clientX, e.clientY);
+    this.emit('atomcontext', { index, x: e.clientX - r.left, y: e.clientY - r.top, clientX: e.clientX, clientY: e.clientY });
+  }
+
+  /** Shift+drag (add) or Alt+drag (replace) draws a selection rectangle; a press without drag is a click. */
+  _boxStart(e) {
+    const el = this.renderer.domElement;
+    if (e.target !== el || e.button !== 0 || !(e.shiftKey || e.altKey) || this.tool !== 'select' || !this.model?.n) return;
+    e.stopPropagation(); e.preventDefault();
+    el.focus?.({ preventScroll: true });
+    const host = this.container.getBoundingClientRect();
+    const x0 = e.clientX, y0 = e.clientY, add = e.shiftKey;
+    const box = document.createElement('div');
+    box.className = 'viewer-boxselect';
+    box.setAttribute('aria-hidden', 'true');
+    Object.assign(box.style, {   // its look comes from .viewer-boxselect in app.css
+      position: 'absolute', left: `${x0 - host.left}px`, top: `${y0 - host.top}px`, width: '0px', height: '0px', zIndex: 6, pointerEvents: 'none',
+    });
+    const enabled = this.controls.enabled;
+    this.controls.enabled = false;
+    try { this.container.setPointerCapture?.(e.pointerId); } catch { /* not capturable */ }
+    let shown = false;
+    const move = (ev) => {
+      if (!shown && Math.hypot(ev.clientX - x0, ev.clientY - y0) >= 5) { this.container.appendChild(box); shown = true; }
+      const l = Math.min(x0, ev.clientX) - host.left, t = Math.min(y0, ev.clientY) - host.top;
+      Object.assign(box.style, { left: `${l}px`, top: `${t}px`, width: `${Math.abs(ev.clientX - x0)}px`, height: `${Math.abs(ev.clientY - y0)}px` });
+    };
+    const end = (ev, cancelled = false) => {
+      removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', cancel); removeEventListener('keydown', key, true);
+      try { this.container.releasePointerCapture?.(e.pointerId); } catch { /* already released */ }
+      box.remove();
+      this.controls.enabled = enabled;
+      if (cancelled) return;
+      if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 5) { this._click(ev); return; }
+      this.emit('boxselect', { indices: this.atomsInRect(x0, y0, ev.clientX, ev.clientY), add });
+    };
+    const up = (ev) => end(ev);
+    const cancel = (ev) => end(ev, true);
+    const key = (ev) => { if (ev.key === 'Escape') { ev.stopPropagation(); ev.preventDefault(); end(ev, true); } };
+    addEventListener('pointermove', move); addEventListener('pointerup', up); addEventListener('pointercancel', cancel); addEventListener('keydown', key, true);
+  }
+
+  /** Unique source indices of the displayed atoms whose centres project inside a client-space rectangle. */
+  atomsInRect(x0, y0, x1, y1) {
+    const m = this.model;
+    if (!m?.n) return [];
+    const r = this.renderer.domElement.getBoundingClientRect();
+    const nx = (x) => ((x - r.left) / r.width) * 2 - 1, ny = (y) => -((y - r.top) / r.height) * 2 + 1;
+    const xa = Math.min(nx(x0), nx(x1)), xb = Math.max(nx(x0), nx(x1)), ya = Math.min(ny(y0), ny(y1)), yb = Math.max(ny(y0), ny(y1));
+    this.camera.updateMatrixWorld();
+    const e = new THREE.Matrix4().multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse).elements;
+    const p = m.positions, out = new Set();
+    for (let i = 0; i < m.n; i++) {
+      const x = p[3 * i], y = p[3 * i + 1], z = p[3 * i + 2];
+      const w = e[3] * x + e[7] * y + e[11] * z + e[15];
+      if (w <= 0) continue;
+      const cx = (e[0] * x + e[4] * y + e[8] * z + e[12]) / w, cy = (e[1] * x + e[5] * y + e[9] * z + e[13]) / w, cz = (e[2] * x + e[6] * y + e[10] * z + e[14]) / w;
+      if (cz < -1 || cz > 1) continue;
+      if (cx >= xa && cx <= xb && cy >= ya && cy <= yb) out.add(m.src[i]);
+    }
+    return [...out].sort((a, b) => a - b);
+  }
+
   // ------------------------------------------------------------------ public API
   setStructure(structure, { resetCamera = true } = {}) {
     this.structure = structure;
     this._sigs = {};
     if (resetCamera) { this.measurements = []; this.selection.clear(); }
-    this.applySettings(this.settings, { force: true });
+    this._noRefit = resetCamera;
+    try { this.applySettings(this.settings, { force: true }); } finally { this._noRefit = false; }
     if (resetCamera) this.resetView(false);
     this.emit('model', this.model);
   }
@@ -172,10 +355,13 @@ export class Viewer extends Emitter {
     const st = settings.style, d = settings.display;
     const S = {
       camera: sig([d.projection, d.fov, d.controls]),
-      model: sig([d.supercell, d.wrap, d.boundaryAtoms, d.completeBonds, d.bonds, d.hiddenElements, styles.get(st.rep)?.wantsImages ? st.polyhedra?.centers : null, this.structure?.frame]),
+      model: sig([d.supercell, d.wrap, d.boundaryAtoms, d.completeBonds, d.bonds, d.hiddenElements, styles.get(st.rep)?.wantsImages ? st.polyhedra?.centers : null]),
+      frame: sig(this.structure?.frame),
       colors: sig([st.colorScheme, st.monoColor, st.colorOverrides, st.property]),
-      geom: sig([st.rep, st.radiusSource, st.atomScale, st.bondRadius, st.bondColor, st.bondUniformColor, st.lineWidth, st.quality, st.polyhedra, d.bonds?.show]),
-      material: sig([st.material, st.roughness, st.metalness, st.opacity]),
+      geom: sig([st.rep, st.radiusSource, st.bondRadius, st.bondColor, st.bondUniformColor, st.lineWidth, st.quality, st.polyhedra, d.bonds?.show]),
+      radii: sig([st.atomScale, st.radiusOverrides]),
+      material: sig([st.material, st.bondMaterial]),
+      matParams: sig([st.roughness, st.metalness, st.opacity]),
       lights: sig(settings.lighting),
       post: sig(settings.post),
       bg: sig([d.background, settings.post?.fog]),
@@ -184,15 +370,24 @@ export class Viewer extends Emitter {
     const ch = (k) => force || S[k] !== this._sigs[k];
     if (ch('camera')) this._applyCamera(d);
     if (this.structure) {
-      const modelChanged = ch('model');
+      const prev = this.model ? { model: this.model, radii: this.radii } : null;
+      const modelChanged = ch('model') || ch('frame');
+      const rebuild = modelChanged || ch('colors') || ch('geom') || ch('material');
       if (modelChanged) this._buildModel();
       if (modelChanged || ch('colors')) this._computeColors();
-      if (modelChanged || ch('colors') || ch('geom') || ch('material')) this._buildRep();
+      if (rebuild) this._buildRep();
+      else {
+        if (ch('radii') && !this._updateRadii()) this._buildRep();
+        if (ch('matParams')) this._updateMaterialParams();
+      }
       if (modelChanged || ch('cell')) this._buildCell();
       if (modelChanged) this._buildMeasurements();
+      // grow the view when the drawing no longer fits (not for plain trajectory frames or new structures)
+      const frameOnly = !force && ch('frame') && !ch('model') && !ch('geom') && !ch('radii');
+      if (!this._noRefit && !frameOnly && (modelChanged || ch('geom') || ch('radii'))) this._maybeRefit(prev);
     }
-    if (ch('lights')) { this.lights.apply(settings.lighting); this._updateFloor(); }
-    if (ch('post') || ch('camera')) this.post.configure(settings.post, ch('camera'));
+    if (ch('lights')) { this.lights.apply(settings.lighting); this._applyShadows(); this._updateFloor(); }
+    if (ch('post') || ch('camera')) this.post.configure(settings.post, false);
     if (ch('bg')) this._applyBackground();
     this._sigs = S;
     this._dirty = true;
@@ -209,14 +404,14 @@ export class Viewer extends Emitter {
 
   play(on = !this.playing) { this.playing = on && (this.structure?.nFrames ?? 1) > 1; this.emit('play', this.playing); }
 
-  setSelection(srcIndices) { this.selection = new Set(srcIndices); this._updateHalos(); this._dirty = true; this.emit('selection', [...this.selection]); }
+  setSelection(srcIndices) { this.selection = new Set(srcIndices); this._writeHalos(); this._dirty = true; this.emit('selection', [...this.selection]); }
 
   // ------------------------------------------------------------------ building
   _buildModel() {
     const s = this.structure, st = this.settings.style, d = this.settings.display;
     const style = styles.get(st.rep) ?? styles.get('ballstick');
     let model = buildDisplayModel(s, d, {});
-    if (style.wantsImages && s.periodic && !d.completeBonds) {
+    if (style.wantsImages && model.periodic && !d.completeBonds) {
       const centers = st.polyhedra?.centers === 'auto' || !st.polyhedra?.centers ? autoPolyhedraCenters(model) : st.polyhedra.centers;
       if (centers.length) model = buildDisplayModel(s, d, { imageCenters: new Set(centers) });
     }
@@ -228,6 +423,9 @@ export class Viewer extends Emitter {
     this.bounds = { center: new THREE.Vector3(...b.center), radius: b.radius, min: b.min, max: b.max };
     this.lights.setBounds(this.bounds.center, this.bounds.radius);
     this._updateFloor();
+    const cut = model.truncated ? sig([model.requestedSupercell, model.supercell, s.length]) : null;
+    if (cut && cut !== this._cutWarned) this.emit('error', new Error(`Showing a ${model.supercell.join('×')} supercell instead of ${model.requestedSupercell.join('×')} to stay under 2 million drawn atoms.`));
+    this._cutWarned = cut;
     this.emit('model', model);
   }
 
@@ -241,14 +439,19 @@ export class Viewer extends Emitter {
     obj?.parent?.remove(obj);
   }
 
-  _buildRep() {
-    this._disposeObject(this.rep);
-    this._disposeObject(this.halo); this.halo = null;
-    this._disposeObject(this.hoverHalo); this.hoverHalo = null;
-    this.atomMaterial?.dispose();
-    const st = this.settings.style, d = this.settings.display;
-    const style = styles.get(st.rep) ?? styles.get('ballstick');
-    const m = this.model;
+  /** Dispose replaced objects / materials after the next frame, so shader programs they share with their replacements stay compiled. */
+  _flushTrash() {
+    const t = this._trash;
+    if (!t.length) return;
+    this._trash = [];
+    for (const x of t) {
+      if (x.isMaterial) { if (x !== this.atomMaterial && x !== this.bondMaterial) x.dispose(); }
+      else this._disposeObject(x);
+    }
+  }
+
+  _computeRadii() {
+    const st = this.settings.style, m = this.model;
     const radii = new Float32Array(m.n);
     const rcache = new Map();
     for (let i = 0; i < m.n; i++) {
@@ -256,61 +459,200 @@ export class Viewer extends Emitter {
       if (!rcache.has(s)) rcache.set(s, atomRadius(s, st));
       radii[i] = rcache.get(s);
     }
-    this.radii = radii;
     let rmax = 0;
     for (const r of rcache.values()) rmax = Math.max(rmax, r);
+    this.radii = radii;
     this.maxRadius = rmax;
-    const matDef = materials.get(st.material);
-    this.atomMaterial = createMaterial(st.material, { roughness: st.roughness ?? undefined, metalness: st.metalness ?? undefined, opacity: st.opacity });
+  }
+
+  _matParams() {
+    const st = this.settings.style;
+    return { roughness: st.roughness ?? undefined, metalness: st.metalness ?? undefined, opacity: st.opacity };
+  }
+
+  /** Bonds under see-through atoms (glass, x-ray) get their own opaque material unless style.bondMaterial says otherwise. */
+  _makeBondMaterial(atomMat, params) {
+    const pref = this.settings.style.bondMaterial ?? 'auto';
+    this._bondAuto = false;
+    if (pref === 'same') return atomMat;
+    if (pref !== 'auto' && materials.get(pref)) return pref === atomMat.userData.preset ? atomMat : createMaterial(pref, params);
+    if (!isSeeThrough(atomMat)) return atomMat;
+    this._bondAuto = true;
+    return createMaterial('standard', { roughness: params.roughness, metalness: params.metalness, opacity: 1 });
+  }
+
+  _buildRep() {
+    const st = this.settings.style, d = this.settings.display;
+    const style = styles.get(st.rep) ?? styles.get('ballstick');
+    const m = this.model;
+    this._computeRadii();
+    const oldRep = this.rep, oldAtom = this.atomMaterial, oldBond = this.bondMaterial;
+    const params = this._matParams();
+    // new materials first; the old ones are disposed after the next frame (keeps shader programs alive)
+    const atomMaterial = createMaterial(st.material, params);
+    const bondMaterial = this._makeBondMaterial(atomMaterial, params);
     const ctx = {
-      model: m, colors: this.colors, radii, settings: st, atomMaterial: this.atomMaterial, bondMaterial: this.atomMaterial,
+      model: m, colors: this.colors, radii: this.radii, settings: st, atomMaterial, bondMaterial,
       segments: segmentsFor(m.n, st.quality), showBonds: d.bonds?.show !== false && style.bonds, resolution: this.resolution, THREE,
+      helpers: this.helpers,
     };
+    let rep;
     try {
-      this.rep = style.build(ctx);
+      rep = style.build(ctx);
+      if (!rep?.isObject3D) throw new Error('build() did not return a THREE.Object3D');
     } catch (err) {
       console.error(err);
       this.emit('error', new Error(`The "${style.name}" style failed to draw: ${err.message}`));
-      this.rep = new THREE.Group();
+      rep = new THREE.Group();
     }
-    this.rep.traverse((o) => { if (o.material === this.atomMaterial) o.userData.sharedMaterial = true; if (matDef?.transparent) { o.castShadow = false; } });
-    this.root.add(this.rep);
-    this._updateHalos();
+    const noShadow = !!materials.get(st.material)?.transparent;
+    rep.traverse((o) => {
+      if (o.material === atomMaterial || o.material === bondMaterial) o.userData.sharedMaterial = true;
+      if (noShadow && o.material === atomMaterial) o.castShadow = false;
+    });
+    this.atomMaterial = atomMaterial;
+    this.bondMaterial = bondMaterial;
+    this.rep = rep;
+    this.root.add(rep);
+    if (oldRep) { oldRep.parent?.remove(oldRep); this._trash.push(oldRep); }
+    if (oldAtom) this._trash.push(oldAtom);
+    if (oldBond && oldBond !== oldAtom) this._trash.push(oldBond);
+    this._writeHalos();
+    this._updateFloor();
     this._dirty = true;
   }
 
-  _haloMesh(indices, opacity, color, grow) {
-    const geo = new THREE.SphereGeometry(1, 24, 16);
-    const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, toneMapped: false });
-    const mesh = new THREE.InstancedMesh(geo, mat, Math.max(1, indices.length));
-    mesh.count = indices.length;
-    const mtx = new THREE.Matrix4(), p = this.model.positions;
-    indices.forEach((i, k) => {
-      const r = Math.max(this.radii[i], 0.18) * grow + 0.1;
-      mtx.makeScale(r, r, r).setPosition(p[3 * i], p[3 * i + 1], p[3 * i + 2]);
-      mesh.setMatrixAt(k, mtx);
-    });
-    mesh.instanceMatrix.needsUpdate = true;
+  /** atomScale / radiusOverrides changed: rewrite instance matrices in place when the style allows it. */
+  _updateRadii() {
+    const st = this.settings.style, m = this.model;
+    const style = styles.get(st.rep);
+    if (!style?.inPlaceRadii || !this.rep || !m) return false;
+    const meshes = [];
+    this.rep.traverse((o) => { if (o.isInstancedMesh && (o.userData.role === 'atoms' || o.userData.role === 'bonds')) meshes.push(o); });
+    if (meshes.some((o) => o.userData.role === 'atoms' && o.count !== m.n)) return false;
+    if (meshes.some((o) => o.userData.role === 'bonds' && o.userData.bondRadius === undefined)) return false;
+    this._computeRadii();
+    const ctx = { model: m, colors: null, radii: this.radii, settings: st };
+    for (const o of meshes) {
+      if (o.userData.role === 'atoms') writeAtomMatrices(o, m, this.radii);
+      else if (st.bondColor !== 'uniform') writeBondMatrices(o, ctx, o.userData.bondRadius);
+    }
+    this._writeHalos();
+    this._updateFloor();
+    this._dirty = true;
+    return true;
+  }
+
+  /** roughness / metalness / opacity changed: update the materials in place (no shader rebuild). */
+  _updateMaterialParams() {
+    if (!this.atomMaterial || !this.rep) return;
+    const params = this._matParams();
+    let ok = updateMaterial(this.atomMaterial, params);
+    if (ok && this.bondMaterial && this.bondMaterial !== this.atomMaterial) {
+      ok = updateMaterial(this.bondMaterial, this._bondAuto ? { roughness: params.roughness, metalness: params.metalness, opacity: 1 } : params);
+    }
+    if (!ok) { this._buildRep(); return; }
+    this._dirty = true;
+  }
+
+  /** Refit (animated) when the drawing used to fit the view and no longer does, e.g. ball & stick → space-filling. */
+  _maybeRefit(prev) {
+    if (!prev?.model || !this.model || this._camAnim || !this._hasView) return;
+    if (prev.model === this.model && prev.radii === this.radii) return;
+    const before = this._ndcExtent(prev.model, prev.radii), after = this._ndcExtent(this.model, this.radii);
+    if (before <= 1 && after > 1 && after > before + 1e-3) this.fitView(true);
+  }
+
+  /** Largest |NDC| reached by the model's atoms (sphere radii included); > 1 means something is cut off. */
+  _ndcExtent(model, radii) {
+    if (!model?.n || model.n > 200000) return 0;
+    const cam = this.camera;
+    cam.updateMatrixWorld();
+    const e = cam.matrixWorldInverse.elements, p = model.positions;
+    const persp = cam.isPerspectiveCamera;
+    const tanH = Math.tan(((cam.fov ?? 30) * DEG) / 2), aspect = this.width / this.height;
+    const halfH = persp ? 0 : (cam.top - cam.bottom) / 2 / (cam.zoom || 1), halfW = persp ? 0 : (cam.right - cam.left) / 2 / (cam.zoom || 1);
+    let ext = 0;
+    for (let i = 0; i < model.n; i++) {
+      const x = p[3 * i], y = p[3 * i + 1], z = p[3 * i + 2];
+      const vx = e[0] * x + e[4] * y + e[8] * z + e[12], vy = e[1] * x + e[5] * y + e[9] * z + e[13], vz = e[2] * x + e[6] * y + e[10] * z + e[14];
+      const r = radii?.[i] ?? 0;
+      if (persp) {
+        const depth = -vz;
+        if (depth <= r) return Infinity;
+        const hy = depth * tanH, hx = hy * aspect;
+        ext = Math.max(ext, (Math.abs(vx) + r) / hx, (Math.abs(vy) + r) / hy);
+      } else ext = Math.max(ext, (Math.abs(vx) + r) / halfW, (Math.abs(vy) + r) / halfH);
+    }
+    return ext;
+  }
+
+  _makeHalo(material) {
+    const mesh = new THREE.InstancedMesh(this._haloGeo, material, 16);
+    mesh.count = 1;
+    mesh.setMatrixAt(0, new THREE.Matrix4().makeScale(0, 0, 0));   // keeps the program compiled while idle
+    mesh.frustumCulled = false;
     mesh.userData.noInk = true;
+    mesh.userData.sharedMaterial = true;
     mesh.renderOrder = 10;
-    mesh.computeBoundingSphere();
+    mesh.name = 'halo';
+    this.root.add(mesh);
     return mesh;
   }
 
+  _writeHalo(kind, indices, grow) {
+    let mesh = this._halo[kind];
+    if (indices.length > mesh.instanceMatrix.count) {
+      const next = new THREE.InstancedMesh(this._haloGeo, mesh.material, Math.max(indices.length, mesh.instanceMatrix.count * 2));
+      Object.assign(next, { frustumCulled: false, renderOrder: mesh.renderOrder, name: mesh.name });
+      Object.assign(next.userData, mesh.userData);
+      this.root.remove(mesh);
+      mesh.dispose();
+      this.root.add(next);
+      this._halo[kind] = mesh = next;
+    }
+    const mtx = new THREE.Matrix4(), p = this.model?.positions;
+    if (!indices.length || !p) { mesh.count = 1; mesh.setMatrixAt(0, mtx.makeScale(0, 0, 0)); }
+    else {
+      mesh.count = indices.length;
+      indices.forEach((i, k) => {
+        const r = Math.max(this.radii?.[i] ?? 0.3, 0.18) * grow + 0.05;
+        mtx.makeScale(r, r, r).setPosition(p[3 * i], p[3 * i + 1], p[3 * i + 2]);
+        mesh.setMatrixAt(k, mtx);
+      });
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  /** Rewrite selection and hover halos (no new materials or geometry). */
+  _writeHalos() {
+    if (!this._halo) return;
+    const m = this.model;
+    const sel = [];
+    if (m && this.selection.size) for (let i = 0; i < m.n; i++) if (this.selection.has(m.src[i])) sel.push(i);
+    this._writeHalo('select', sel, 1.25);
+    const h = this.hoverIndex;
+    this._writeHalo('hover', m && h >= 0 && h < m.n ? [h] : [], 1.32);
+    this._dirty = true;
+  }
+
+  /** Re-read theme colours (accent, fonts) and refresh the halos; the shell calls this on theme changes. */
   _updateHalos() {
-    if (!this.model) return;
-    this._disposeObject(this.halo); this.halo = null;
-    this._disposeObject(this.hoverHalo); this.hoverHalo = null;
-    const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#e8a33d';
-    if (this.selection.size) {
-      const idx = [];
-      for (let i = 0; i < this.model.n; i++) if (this.selection.has(this.model.src[i])) idx.push(i);
-      if (idx.length) { this.halo = this._haloMesh(idx, 0.42, accent, 1.12); this.root.add(this.halo); }
+    this._css = null;
+    const accent = this._cssTheme().accent;
+    for (const k of Object.keys(this._halo ?? {})) this._halo[k].material.uniforms.color.value.set(accent);
+    this._writeHalos();
+  }
+
+  _cssTheme() {
+    if (!this._css) {
+      this._css = {
+        accent: cssVar('--accent', '#e8a33d'), accentStrong: cssVar('--accent-strong', '#c27c12'),
+        font: cssVar('--font-ui', 'system-ui, sans-serif'),
+      };
+      for (const k of Object.keys(this._halo ?? {})) this._halo[k].material.uniforms.color.value.set(this._css.accent);
     }
-    if (this.hoverIndex >= 0 && this.hoverIndex < this.model.n) {
-      this.hoverHalo = this._haloMesh([this.hoverIndex], 0.25, accent, 1.18);
-      this.root.add(this.hoverHalo);
-    }
+    return this._css;
   }
 
   _buildCell() {
@@ -326,8 +668,10 @@ export class Viewer extends Emitter {
         [[0, 1, 0], [0, 1, 1]], [[0, 0, 1], [1, 0, 1]], [[0, 0, 1], [0, 1, 1]], [[1, 1, 0], [1, 1, 1]], [[1, 0, 1], [1, 1, 1]], [[0, 1, 1], [1, 1, 1]]];
       for (const [u, v] of E) seg.push(...P(...u), ...P(...v));
     };
-    if (c.which === 'grid') { for (let a = 0; a < N[0]; a++) for (let b = 0; b < N[1]; b++) for (let cc = 0; cc < N[2]; cc++) box([a, b, cc], [1, 1, 1]); }
-    else if (c.which === 'supercell') box([0, 0, 0], N);
+    // a cell grid of more than a few thousand boxes is unreadable (and slow): draw the outline instead
+    const which = c.which === 'grid' && N[0] * N[1] * N[2] > 4096 ? 'supercell' : c.which;
+    if (which === 'grid') { for (let a = 0; a < N[0]; a++) for (let b = 0; b < N[1]; b++) for (let cc = 0; cc < N[2]; cc++) box([a, b, cc], [1, 1, 1]); }
+    else if (which === 'supercell') box([0, 0, 0], N);
     else box([0, 0, 0], [1, 1, 1]);
     const g = new LineSegmentsGeometry();
     g.setPositions(new Float32Array(seg));
@@ -339,49 +683,81 @@ export class Viewer extends Emitter {
   }
 
   _applyBackground() {
-    const bg = makeBackground(this.settings.display.background);
+    const bgs = this.settings.display.background;
+    const bg = makeBackground(bgs);
     this.scene3.background = bg.background;
     this.renderer.setClearColor(bg.fogColor, bg.alpha);
     this._fogColor = bg.fogColor;
     const fog = this.settings.post?.fog;
     this.scene3.fog = fog?.enabled ? new THREE.Fog(bg.fogColor, 1, 100) : null;
     this.overlayDark = luminance(bg.fogColor) < 0.4;
+    this.post.setTransparent(bg.alpha < 1);
+  }
+
+  /** The floor's "up": the c axis of periodic structures, otherwise the up of the last reset view (+Y by default). */
+  _floorUp() {
+    const cell = this.model?.periodic ? this.model.cell : null;
+    if (cell) {
+      const c = new THREE.Vector3(...cell[2]);
+      if (c.lengthSq() > 1e-8) return c.normalize();
+    }
+    return (this._viewUp?.lengthSq() > 1e-8 ? this._viewUp.clone() : new THREE.Vector3(0, 1, 0)).normalize();
   }
 
   _updateFloor() {
+    this._fitShadowCamera();
     const sh = this.settings.lighting?.shadows;
-    this.floor.visible = !!(sh?.enabled && sh?.floor && this.model);
-    if (!this.model) return;
+    this.floor.visible = !!(sh?.enabled && sh?.floor && this.model?.n);
+    if (!this.model?.n) return;
+    const up = this._floorUp();
+    const p = this.model.positions, radii = this.radii?.length === this.model.n ? this.radii : null;
+    let lo = Infinity, loCentre = Infinity;
+    for (let i = 0; i < this.model.n; i++) {
+      const h = p[3 * i] * up.x + p[3 * i + 1] * up.y + p[3 * i + 2] * up.z;
+      loCentre = Math.min(loCentre, h);
+      lo = Math.min(lo, h - (radii ? radii[i] : 0));
+    }
+    // just under the lowest atom surface (and never closer than 0.8 Å below the lowest centre)
+    const level = Math.min(loCentre - 0.8, lo - 0.3);
+    const c = this.bounds.center;
     const r = this.bounds.radius;
+    this.floor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), up);
+    this.floor.position.copy(c).addScaledVector(up, level - c.dot(up));
     this.floor.scale.set(r * 12, r * 12, 1);
-    this.floor.position.set(this.bounds.center.x, (this.bounds.min?.[1] ?? -r) - 0.8, this.bounds.center.z);
+    this.floor.updateMatrixWorld();
+    this._dirty = true;
   }
 
-  _applyCamera(d) {
-    const want = d.projection === 'orthographic' ? this.ortho : this.persp;
-    this.persp.fov = d.fov ?? 30;
-    if (want !== this.camera) {
-      want.position.copy(this.camera.position);
-      want.quaternion.copy(this.camera.quaternion);
-      want.up.copy(this.camera.up);
-      if (want.isOrthographicCamera) {
-        const dist = this.camera.position.distanceTo(this.controls.target);
-        const h = dist * Math.tan((this.persp.fov * Math.PI) / 360);
-        want.zoom = 1;
-        this._orthoHalf = h;
-      } else if (this.camera.isOrthographicCamera) {
-        const h = this._orthoHalf / this.camera.zoom;
-        const dist = h / Math.tan((this.persp.fov * Math.PI) / 360);
-        const dir = new THREE.Vector3().subVectors(this.camera.position, this.controls.target).normalize();
-        want.position.copy(this.controls.target).addScaledVector(dir, dist);
-      }
-      this.camera = want;
-      this.post.camera = want;
-      this._setupControls(d.controls ?? 'orbit');
-    } else if ((d.controls ?? 'orbit') !== this.controlsKind) {
-      this._setupControls(d.controls ?? 'orbit');
+  /** Shadow camera tight around the model (sharper shadow map); depth range long enough to reach the floor. */
+  _fitShadowCamera() {
+    const cam = this.lights.key?.shadow?.camera;
+    if (!cam) return;
+    const r = this.bounds.radius, R = r + (this.maxRadius ?? 1) + 1;
+    const D = (this.lights.radius ?? r) * 4;   // LightRig keeps its lights 4 radii from the centre
+    Object.assign(cam, { left: -R, right: R, top: R, bottom: -R, near: Math.max(0.05, D - R - 1), far: D + R * 4 + 2 });
+    cam.updateProjectionMatrix();
+    this._applyShadows();
+  }
+
+  /** Soft shadows (softness > 1.5) use variance shadow maps blurred over a world-space width; PCF otherwise. */
+  _applyShadows() {
+    const sh = this.settings.lighting?.shadows ?? {};
+    const softness = sh.softness ?? 3;
+    const type = softness > 1.5 ? THREE.VSMShadowMap : THREE.PCFShadowMap;
+    const sm = this.renderer.shadowMap;
+    if (sm.type !== type) {
+      sm.type = type;
+      // the shadow-map type is part of every lit shader; three does not notice the change on its own
+      if (sh.enabled) this.scene3.traverse((o) => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { m.needsUpdate = true; }); });
     }
-    this.resize();
+    const shadow = this.lights.key?.shadow;
+    if (!shadow) return;
+    if (type === THREE.VSMShadowMap) {
+      const cam = shadow.camera;
+      const texel = (cam.right - cam.left) / (shadow.mapSize.x || 2048);
+      shadow.radius = clamp((softness * 0.05) / Math.max(texel, 1e-4), 1, 24);
+      shadow.blurSamples = 16;
+    } else shadow.radius = softness;
   }
 
   _buildMeasurements() {
@@ -390,16 +766,18 @@ export class Viewer extends Emitter {
     const m = this.model;
     const pts = [];
     for (const ms of this.measurements) {
-      ms.idx = ms.keys.map((k) => m.keys.get(k) ?? -1);
-      ms.valid = ms.idx.every((i) => i >= 0);
-      if (!ms.valid) continue;
+      ms.idx = (Array.isArray(ms.keys) ? ms.keys : []).map((k) => m.keys.get(k) ?? -1);
+      // an unknown type or a wrong number of atoms (a hand-edited or newer file) is kept but never drawn
+      ms.valid = measureArity(ms.type) === ms.idx.length && ms.idx.every((i) => i >= 0);
+      if (!ms.valid) { ms.value = undefined; continue; }
       const P = ms.idx.map((i) => new THREE.Vector3(m.positions[3 * i], m.positions[3 * i + 1], m.positions[3 * i + 2]));
-      ms.value = measureValue(ms.type, P);
+      try { ms.value = measureValue(ms.type, P); } catch { ms.value = NaN; }
+      if (!Number.isFinite(ms.value)) { ms.valid = false; ms.value = undefined; continue; }
       for (let k = 0; k + 1 < P.length; k++) pts.push(P[k], P[k + 1]);
     }
     if (pts.length) {
       const g = new THREE.BufferGeometry().setFromPoints(pts);
-      const mat = new THREE.LineDashedMaterial({ color: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#e8a33d', dashSize: 0.18, gapSize: 0.12, depthTest: false, transparent: true, toneMapped: false });
+      const mat = new THREE.LineDashedMaterial({ color: this._cssTheme().accent, dashSize: 0.18, gapSize: 0.12, depthTest: false, transparent: true, toneMapped: false });
       this.measureObj = new THREE.LineSegments(g, mat);
       this.measureObj.computeLineDistances();
       this.measureObj.renderOrder = 20;
@@ -409,20 +787,77 @@ export class Viewer extends Emitter {
     this._dirty = true;
   }
 
+  /** Measure between drawn atoms: type 'distance' | 'angle' | 'dihedral' with 2 | 3 | 4 display indices. Returns the entry. */
   addMeasurement(type, displayIndices) {
-    const keys = displayIndices.map((i) => keyOf(this.model, i));
-    this.measurements.push({ id: Math.random().toString(36).slice(2, 8), type, keys });
+    const n = measureArity(type);
+    if (!n) throw new Error(`Unknown measurement “${typeof type === 'string' ? type : typeof type}”: use distance, angle or dihedral.`);
+    if (!this.model) throw new Error('Load a structure first.');
+    const idx = Array.isArray(displayIndices) ? displayIndices : [];
+    if (idx.length !== n) throw new Error(`${type === 'angle' ? 'An' : 'A'} ${type} needs ${n} atoms (got ${idx.length}).`);
+    const bad = idx.find((i) => !Number.isInteger(i) || i < 0 || i >= this.model.n);
+    if (bad !== undefined) throw new Error(`No drawn atom with index ${bad} (0–${this.model.n - 1}).`);
+    const ms = { id: Math.random().toString(36).slice(2, 8), type, keys: idx.map((i) => keyOf(this.model, i)) };
+    this.measurements.push(ms);
     this._buildMeasurements();
+    return ms;
   }
 
   removeMeasurement(id) { this.measurements = this.measurements.filter((m) => m.id !== id); this._buildMeasurements(); }
   clearMeasurements() { this.measurements = []; this._buildMeasurements(); }
 
   // ------------------------------------------------------------------ camera
-  defaultView() {
+  _applyCamera(d) {
+    this.persp.fov = d.fov ?? 30;
+    if (d.projection === 'orthographic') this._tempOrtho = false;
+    const kind = d.controls ?? 'orbit';
+    if (kind !== this.controlsKind) this._setupControls(kind);
+    this._useCamera(d.projection === 'orthographic' || this._tempOrtho);
+    this.resize();
+  }
+
+  /** Switch between the perspective and orthographic camera, keeping position, target and framing. */
+  _useCamera(ortho) {
+    const want = ortho ? this.ortho : this.persp;
+    if (want === this.camera) return false;
+    const fovH = Math.tan((this.persp.fov * DEG) / 2);
+    want.position.copy(this.camera.position);
+    want.quaternion.copy(this.camera.quaternion);
+    want.up.copy(this.camera.up);
+    if (want.isOrthographicCamera) {
+      this._orthoHalf = this.camera.position.distanceTo(this.controls.target) * fovH;
+      want.zoom = 1;
+    } else {
+      const h = (this._orthoHalf ?? 10) / (this.camera.zoom || 1);
+      const dir = new THREE.Vector3().subVectors(this.camera.position, this.controls.target).normalize();
+      want.position.copy(this.controls.target).addScaledVector(dir, h / fovH);
+    }
+    this.camera = want;
+    this.controls.object = want;
+    this._syncControlsUp();
+    this._updateOrtho();
+    this.post.setCamera(want);
+    this.controls.update?.();
+    this._dirty = true;
+    return true;
+  }
+
+  /** Back from an axis view's temporary orthographic camera to the scene's projection. */
+  _leaveTempOrtho() {
+    if (!this._tempOrtho) return;
+    this._tempOrtho = false;
+    this._useCamera(this.settings.display.projection === 'orthographic');
+  }
+
+  _cell() {
+    if (this.model) return this.model.cell ?? null;
     const s = this.structure;
-    if (s?.periodic) {
-      const [A, , C] = s.cell.map((v) => new THREE.Vector3(...v).normalize());
+    return s?.cell && s.cell.every((v) => Math.hypot(...v) > 1e-6) ? s.cell : null;
+  }
+
+  defaultView() {
+    const s = this.structure, cell = this._cell();
+    if (s?.periodic && cell && (this.model?.periodic ?? true)) {
+      const [A, , C] = cell.map((v) => new THREE.Vector3(...v).normalize());
       const twoD = s.pbc[2] === false;
       const up = C.clone();
       const w0 = A.clone().addScaledVector(up, -A.dot(up)).normalize();
@@ -433,18 +868,54 @@ export class Viewer extends Emitter {
     return { dir: new THREE.Vector3(0.45, 0.38, 1).normalize(), up: new THREE.Vector3(0, 1, 0) };
   }
 
+  /** View size left for the model once the fit margins are taken off (never under half the view). */
+  _fitArea(w = this.width, h = this.height) {
+    const { x = 0, y = 0 } = this.fitMargins ?? {};
+    return [Math.max(w * 0.5, w - 2 * x), Math.max(h * 0.5, h - 2 * y)];
+  }
+  /** Perspective camera distance per unit of radius that fits a sphere into a w × h view. */
+  _fitFactor(w = this.width, h = this.height) {
+    const [ew, eh] = this._fitArea(w, h);
+    const t = Math.tan((this.persp.fov * DEG) / 2);
+    return Math.max(1 / Math.sin(Math.atan((t * eh) / h)), 1 / Math.sin(Math.atan((t * ew) / h)));
+  }
+  /** Orthographic half-height per unit of radius that fits a sphere into a w × h view. */
+  _orthoFactor(w = this.width, h = this.height) {
+    const [ew, eh] = this._fitArea(w, h);
+    return Math.max(h / eh, h / ew);
+  }
+
   _fitDistance(radius) {
     radius += this.maxRadius ?? 0;
-    const fov = (this.persp.fov * Math.PI) / 180;
-    const aspect = this.width / this.height;
-    const fitH = radius / Math.sin(fov / 2);
-    const fitW = radius / Math.sin(Math.atan(Math.tan(fov / 2) * aspect));
-    return Math.max(fitH, fitW) * 1.02;
+    return radius * this._fitFactor() * 1.02;
+  }
+
+  /**
+   * After the view changed size, zoom so it shows what it showed before: a view that gets narrower
+   * (a panel opened, the window shrank) zooms out instead of cutting the model off at the sides.
+   */
+  _keepFraming(w0, h0) {
+    if (!this._hasView) return;
+    if (this.camera.isOrthographicCamera) {
+      const k = this._orthoFactor() / this._orthoFactor(w0, h0);
+      if (Number.isFinite(k) && Math.abs(k - 1) > 1e-6) this._orthoHalf = (this._orthoHalf ?? 10) * k;
+      return;
+    }
+    const k = this._fitFactor() / this._fitFactor(w0, h0);
+    if (!Number.isFinite(k) || Math.abs(k - 1) < 1e-6) return;
+    const t = this.controls.target;
+    this.camera.position.sub(t).multiplyScalar(k).add(t);
+    const a = this._camAnim;
+    if (a) { a.p0.sub(a.c0).multiplyScalar(k).add(a.c0); a.p1.sub(a.c1).multiplyScalar(k).add(a.c1); }
+    this.controls.update?.();
   }
 
   resetView(animate = true) {
+    this._leaveTempOrtho();
     const v = this.defaultView();
+    this._viewUp = v.up.clone();
     this.setViewDirection(v.dir.toArray(), v.up.toArray(), animate, true);
+    this._updateFloor();
   }
 
   fitView(animate = true) {
@@ -456,16 +927,18 @@ export class Viewer extends Emitter {
   setViewDirection(dir, up = null, animate = true, refit = false) {
     const target = refit ? this.bounds.center.clone() : this.controls.target.clone();
     const d = new THREE.Vector3(...dir).normalize();
+    if (d.lengthSq() < 0.5) return;
     let u = up ? new THREE.Vector3(...up).normalize() : this.camera.up.clone();
-    if (Math.abs(u.dot(d)) > 0.98) u = Math.abs(d.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
+    if (u.lengthSq() < 0.5 || Math.abs(u.dot(d)) > 0.98) u = Math.abs(d.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
     u.addScaledVector(d, -u.dot(d)).normalize();
     const dist = refit || !this._hasView ? this._fitDistance(this.bounds.radius) : this.camera.position.distanceTo(this.controls.target);
     const pos = target.clone().addScaledVector(d, dist);
-    if (this.camera.isOrthographicCamera && refit) { this._orthoHalf = (this.bounds.radius + (this.maxRadius ?? 0)) * 1.05 * Math.max(1, this.height / this.width); this.camera.zoom = 1; this._updateOrtho(); }
+    if (this.camera.isOrthographicCamera && refit) { this._orthoHalf = (this.bounds.radius + (this.maxRadius ?? 0)) * 1.05 * this._orthoFactor(); this.camera.zoom = 1; this._updateOrtho(); }
     this._hasView = true;
     if (!animate) {
+      this._camAnim = null;
       this.camera.position.copy(pos); this.camera.up.copy(u); this.controls.target.copy(target);
-      this.camera.lookAt(target); this.controls.update(); this._dirty = true; return;
+      this.camera.lookAt(target); this._syncControlsUp(); this.controls.update(); this._dirty = true; this.emit('camera'); return;
     }
     this._camAnim = {
       t0: performance.now(), dur: 420,
@@ -473,21 +946,30 @@ export class Viewer extends Emitter {
     };
   }
 
+  /**
+   * Look along a cell axis (a/b/c) or a Cartesian axis (x/y/z), optionally negated ('-a').
+   * With display.orthoAxisViews the view uses an orthographic camera (atom columns line up) until the
+   * next free rotation.
+   */
   setView(axis) {
-    const s = this.structure;
+    const cell = this._cell();
     const cart = { x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] };
     let dir, up;
-    const neg = axis.startsWith('-');
-    const ax = axis.replace('-', '');
-    if ('abc'.includes(ax) && s?.cell) {
-      const vec = s.cell['abc'.indexOf(ax)];
-      dir = vec;
-      up = ax === 'c' ? s.cell[1] : s.cell[2];
+    const neg = String(axis).startsWith('-');
+    const ax = String(axis).replace('-', '');
+    if ('abc'.includes(ax) && ax.length === 1 && cell) {
+      dir = cell['abc'.indexOf(ax)];
+      up = ax === 'c' ? cell[1] : cell[2];
     } else {
       dir = cart[ax] ?? [0, 0, 1];
       up = ax === 'z' ? [0, 1, 0] : [0, 0, 1];
     }
     if (neg) dir = dir.map((v) => -v);
+    const d = this.settings.display;
+    if (d.orthoAxisViews !== false && !d.turntable && d.projection !== 'orthographic') {
+      this._tempOrtho = true;
+      this._useCamera(true);
+    }
     this.setViewDirection(dir, up, true, true);
   }
 
@@ -498,20 +980,87 @@ export class Viewer extends Emitter {
   }
 
   zoomBy(f) {
+    if (!(f > 0)) return;
     if (this.camera.isOrthographicCamera) { this.camera.zoom *= f; this.camera.updateProjectionMatrix(); }
     else { const t = this.controls.target; this.camera.position.sub(t).multiplyScalar(1 / f).add(t); }
+    if (this._camAnim) this._camAnim.p1.sub(this._camAnim.c1).multiplyScalar(this.camera.isOrthographicCamera ? 1 : 1 / f).add(this._camAnim.c1);
+    this.controls.update?.();
     this._dirty = true;
+    this.emit('camera');
   }
 
+  /**
+   * Orbit around the target: dAz° to the camera's right (the model turns left), dEl° upwards. Steps
+   * accumulate while a previous one is still animating; elevation stops 5° short of the poles.
+   */
+  orbitBy(dAz = 0, dEl = 0, { animate = true } = {}) {
+    if (!dAz && !dEl) return;
+    this._leaveTempOrtho();
+    const a = this._camAnim;
+    const target = (a ? a.c1 : this.controls.target).clone();
+    const from = (a ? a.p1 : this.camera.position).clone();
+    const up = (a ? a.u1 : this.camera.up).clone().normalize();
+    const off = from.sub(target);
+    if (dAz) off.applyAxisAngle(up, dAz * DEG);
+    if (dEl) {
+      const theta = Math.acos(clamp(off.dot(up) / (off.length() || 1), -1, 1));
+      const next = clamp(theta - dEl * DEG, 5 * DEG, 175 * DEG);
+      const right = new THREE.Vector3().crossVectors(up, off);
+      if (right.lengthSq() > 1e-12) off.applyAxisAngle(right.normalize(), next - theta);
+    }
+    const p1 = target.clone().add(off);
+    if (!animate) {
+      this._camAnim = null;
+      this.camera.position.copy(p1); this.camera.up.copy(up); this.controls.target.copy(target); this.camera.lookAt(target);
+      this.controls.update?.(); this._dirty = true; this.emit('camera'); return;
+    }
+    this._camAnim = { t0: performance.now(), dur: 160, p0: this.camera.position.clone(), p1, u0: this.camera.up.clone(), u1: up, c0: this.controls.target.clone(), c1: target };
+  }
+
+  /** Move the model on screen by (dx, dy) CSS pixels (+x right, +y down). */
+  panBy(dx = 0, dy = 0) {
+    if (!dx && !dy) return;
+    const cam = this.camera;
+    cam.updateMatrixWorld();
+    const perPx = cam.isOrthographicCamera
+      ? (cam.top - cam.bottom) / (cam.zoom || 1) / this.height
+      : (2 * cam.position.distanceTo(this.controls.target) * Math.tan((cam.fov * DEG) / 2)) / this.height;
+    const right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0);
+    const upv = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1);
+    const delta = right.multiplyScalar(-dx * perPx).addScaledVector(upv, dy * perPx);
+    cam.position.add(delta); this.controls.target.add(delta);
+    const a = this._camAnim;
+    if (a) { a.p0.add(delta); a.p1.add(delta); a.c0.add(delta); a.c1.add(delta); }
+    this.controls.update?.();
+    this._dirty = true;
+    this.emit('camera');
+  }
+
+  /**
+   * Position, up, target and zoom of the scene's camera. During an axis view's temporary orthographic
+   * camera the state is converted to the equivalent perspective framing (zoom 1), because the scene
+   * (and so a reopened project) still uses the perspective camera.
+   */
   getCameraState() {
-    return { position: this.camera.position.toArray(), up: this.camera.up.toArray(), target: this.controls.target.toArray(), zoom: this.camera.zoom ?? 1 };
+    const cam = this.camera, target = this.controls.target;
+    if (this._tempOrtho && cam.isOrthographicCamera) {
+      const half = (this._orthoHalf ?? 10) / (cam.zoom || 1);
+      const dist = half / Math.tan((this.persp.fov * DEG) / 2);
+      const dir = new THREE.Vector3().subVectors(cam.position, target);
+      if (dir.lengthSq() < 1e-12) dir.set(0, 0, 1);
+      const pos = target.clone().addScaledVector(dir.normalize(), dist);
+      return { position: pos.toArray(), up: cam.up.toArray(), target: target.toArray(), zoom: 1 };
+    }
+    return { position: cam.position.toArray(), up: cam.up.toArray(), target: target.toArray(), zoom: cam.zoom ?? 1 };
   }
 
   setCameraState(c) {
     if (!c?.position) return;
+    this._leaveTempOrtho();   // a saved state describes the scene's own projection
+    this._camAnim = null;
     this.camera.position.fromArray(c.position); this.camera.up.fromArray(c.up ?? [0, 1, 0]); this.controls.target.fromArray(c.target ?? [0, 0, 0]);
     if (c.zoom && this.camera.isOrthographicCamera) { this.camera.zoom = c.zoom; this.camera.updateProjectionMatrix(); }
-    this.camera.lookAt(this.controls.target); this.controls.update(); this._hasView = true; this._dirty = true;
+    this.camera.lookAt(this.controls.target); this._syncControlsUp(); this.controls.update(); this._hasView = true; this._dirty = true;
   }
 
   _updateOrtho() {
@@ -525,6 +1074,11 @@ export class Viewer extends Emitter {
     const r = this.container.getBoundingClientRect();
     const w = Math.max(2, Math.floor(r.width)), h = Math.max(2, Math.floor(r.height));
     this.width = w; this.height = h;
+    if (w > 16 && h > 16) {   // (a hidden or collapsed view keeps the framing of its last real size)
+      const f = this._frameSize;
+      if (f && (f[0] !== w || f[1] !== h)) this._keepFraming(f[0], f[1]);
+      this._frameSize = [w, h];
+    }
     this.renderer.setSize(w, h, false);
     const pr = this.renderer.getPixelRatio();
     this.overlay.width = w * pr; this.overlay.height = h * pr;
@@ -583,7 +1137,8 @@ export class Viewer extends Emitter {
     let moving = false;
     if (this._camAnim) {
       const a = this._camAnim;
-      let t = Math.min(1, (now - a.t0) / a.dur);
+      // performance.now(), not the frame timestamp: that can predate an animation started in between frames
+      const t = clamp((performance.now() - a.t0) / a.dur, 0, 1);
       const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
       // interpolate around the target to keep distance smooth
       const c = a.c0.clone().lerp(a.c1, e);
@@ -593,10 +1148,12 @@ export class Viewer extends Emitter {
       if (dir.lengthSq() < 1e-8) dir.copy(d1).normalize();
       dir.normalize();
       this.camera.position.copy(c).addScaledVector(dir, len);
-      this.camera.up.copy(a.u0.clone().lerp(a.u1, e).normalize());
+      const up = a.u0.clone().lerp(a.u1, e);
+      this.camera.up.copy(up.lengthSq() > 1e-8 ? up.normalize() : a.u1);
       this.controls.target.copy(c);
       this.camera.lookAt(c);
-      if (t >= 1) this._camAnim = null;
+      this._syncControlsUp();
+      if (t >= 1) { this._camAnim = null; this.emit('camera'); }
       moving = true;
     }
     if (this.settings.display.turntable && !this._camAnim) {
@@ -630,24 +1187,41 @@ export class Viewer extends Emitter {
       this.scene3.fog.color.copy(this._fogColor);
     }
     this.post.setFocus(this.camera.position.distanceTo(this.controls.target));
+    // a model that fills the frame would turn wide bloom into a full-screen haze: tighten the spread
+    if (this.post.bloom) {
+      const cover = (this.bounds.radius + (this.maxRadius ?? 0)) / Math.max(1e-6, this._viewHalfHeight());
+      this.post.setBloomScale(cover > 0.45 ? Math.max(0.2, 0.45 / cover) : 1);
+    }
+  }
+
+  /** Half the visible height (Å) at the target distance. */
+  _viewHalfHeight() {
+    const cam = this.camera;
+    if (cam.isOrthographicCamera) return (cam.top - cam.bottom) / 2 / (cam.zoom || 1);
+    return cam.position.distanceTo(this.controls.target) * Math.tan((cam.fov * DEG) / 2);
   }
 
   render({ gizmo = true, overlay = true } = {}) {
     this._updateClipping();
     this.lights.update(this.camera);
+    const live = !!this.model;
+    for (const k in this._halo) this._halo[k].visible = live;
+    if (!live) this.floor.visible = false;
     try {
       if (this.post.active) this.post.render();
       else { this.renderer.setRenderTarget(null); this.renderer.render(this.scene3, this.camera); }
       if (gizmo && this.settings.display.axes) {
-        const s = this.structure;
-        if (s?.cell) this.gizmo.setAxes(s.cell, ['a', 'b', 'c']); else this.gizmo.setAxes([[1, 0, 0], [0, 1, 0], [0, 0, 1]], ['x', 'y', 'z']);
+        const cell = this._cell();
+        const dark = { dark: !!this.overlayDark };
+        if (cell) this.gizmo.setAxes(cell, ['a', 'b', 'c'], dark); else this.gizmo.setAxes([[1, 0, 0], [0, 1, 0], [0, 0, 1]], ['x', 'y', 'z'], dark);
         this.gizmo.render(this.renderer, this.camera, 8, 8);
       }
     } catch (err) {
       console.error(err);
     }
+    this._flushTrash();
     if (overlay) this.drawOverlay(this.overlay.getContext('2d'), this.renderer.getPixelRatio());
-    this._dirty = false;
+    this._dirty = !overlay;   // a frame drawn for an export left the overlay canvas on the previous model
     this.emit('render');
   }
 
@@ -656,60 +1230,285 @@ export class Viewer extends Emitter {
     return [(v.x + 1) / 2 * w, (1 - v.y) / 2 * h, v.z];
   }
 
-  /** Labels, measurement values and cell axis letters on a 2D canvas. */
-  drawOverlay(g, scale = 1, w = this.width * scale, h = this.height * scale) {
+  /** Overlay pixels per Å at the target depth (exact for the orthographic camera). */
+  pixelsPerAngstrom(h = this.height) {
+    return h / 2 / Math.max(1e-6, this._viewHalfHeight());
+  }
+
+  /**
+   * Labels, measurement values, cell axis letters, colour legend and scale bar on a 2D canvas.
+   * opt.export: drawing into an image export (no status bar to keep clear of).
+   */
+  drawOverlay(g, scale = 1, w = this.width * scale, h = this.height * scale, opt = {}) {
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, g.canvas.width, g.canvas.height);
     const m = this.model;
     if (!m) return;
     const d = this.settings.display;
     const dark = this.overlayDark;
+    const css = this._cssTheme();
     const fg = dark ? '#f1f3f5' : '#14171b', halo = dark ? 'rgba(10,12,15,.85)' : 'rgba(255,255,255,.9)';
-    const fontFam = getComputedStyle(document.documentElement).getPropertyValue('--font-ui').trim() || 'system-ui, sans-serif';
+    const fontFam = css.font;
     const text = (t, x, y, size, color = fg, weight = 500) => {
       g.font = `${weight} ${size * scale}px ${fontFam}`;
       g.lineWidth = 3 * scale; g.strokeStyle = halo; g.lineJoin = 'round';
       g.strokeText(t, x, y); g.fillStyle = color; g.fillText(t, x, y);
     };
+    this.camera.updateMatrixWorld();
     g.textAlign = 'center'; g.textBaseline = 'middle';
-    if (d.labels && d.labels !== 'none') {
-      const limit = 600;
-      const showAll = m.n <= limit;
-      for (let i = 0; i < m.n; i++) {
-        if (!showAll && !this.selection.has(m.src[i])) continue;
-        const [x, y, z] = this.project(m.positions[3 * i], m.positions[3 * i + 1], m.positions[3 * i + 2], w, h);
-        if (z > 1 || z < -1) continue;
-        const t = d.labels === 'element' ? m.symbols[i] : d.labels === 'index' ? String(m.src[i]) : `${m.symbols[i]}${m.src[i]}`;
-        text(t, x, y, d.labelSize ?? 12, fg, 600);
-      }
-    }
-    if (d.cell?.show && d.cell?.labels && m.cell) {
-      const [A, B, C] = m.cell;
-      const o = this.project(0, 0, 0, w, h);
-      text('O', o[0] - 10 * scale, o[1] + 10 * scale, 12, fg, 600);
-      [[A, 'a', '#e5484d'], [B, 'b', '#30a46c'], [C, 'c', '#3e63dd']].forEach(([v, l, col]) => {
-        const p = this.project(v[0] * 1.06, v[1] * 1.06, v[2] * 1.06, w, h);
-        text(l, p[0], p[1], 14, col, 700);
-      });
-    }
-    const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent-strong').trim() || '#c27c12';
+    // cell letters reserve their spots first, so atom labels skip them instead of stacking on them
+    const occ = this._occupancy(w, h, scale);
+    if (d.cell?.show && d.cell?.labels && m.cell) this._drawCellLetters(g, scale, w, h, text, fg, occ, opt);
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    if (d.labels && d.labels !== 'none') this._drawLabels(g, scale, w, h, fg, halo, fontFam, occ);
+    g.globalAlpha = 1;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    const accent = css.accentStrong;
     for (const ms of this.measurements) {
-      if (!ms.valid) continue;
+      if (!ms.valid || !Number.isFinite(ms.value)) continue;
       const P = ms.idx.map((i) => this.project(m.positions[3 * i], m.positions[3 * i + 1], m.positions[3 * i + 2], w, h));
       const mid = ms.type === 'distance' ? [(P[0][0] + P[1][0]) / 2, (P[0][1] + P[1][1]) / 2] : P[ms.type === 'angle' ? 1 : 1].slice(0, 2);
       const label = ms.type === 'distance' ? `${ms.value.toFixed(3)} Å` : `${ms.value.toFixed(1)}°`;
       text(label, mid[0], mid[1] - 12 * scale, 12.5, accent, 700);
     }
+    const mode = d.legend === true ? 'always' : d.legend === false ? 'none' : (d.legend ?? 'auto');
+    const info = this.colors?.legend;
+    const legend = info && mode !== 'none' && (info.kind === 'gradient' || mode === 'always') ? info : null;
+    const ppa = d.scaleBar ? this.pixelsPerAngstrom(h) : null;
+    if (legend || ppa) {
+      const traj = !opt.export && (this.structure?.nFrames ?? 1) > 1;
+      drawLegends(g, { legend, pxPerAngstrom: ppa, width: w, height: h, scale, dark, font: fontFam, right: opt.export ? 16 : 14, bottom: opt.export ? 16 : (traj ? 96 : 38) });
+    }
+  }
+
+  /**
+   * Atom labels: only atoms whose centre is not covered by a nearer atom, nearest first, skipping any
+   * label that would overlap one already placed (coarse occupancy grid); farther labels fade.
+   */
+  _drawLabels(g, scale, w, h, fg, halo, fontFam, occ = this._occupancy(w, h, scale)) {
+    const m = this.model, d = this.settings.display, cam = this.camera;
+    const showAll = m.n <= 600;
+    const vp = new THREE.Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse).elements;
+    const vw = cam.matrixWorldInverse.elements;
+    const persp = cam.isPerspectiveCamera;
+    const tanH = Math.tan(((cam.fov ?? 30) * DEG) / 2);
+    const orthoHalf = persp ? 0 : (cam.top - cam.bottom) / 2 / (cam.zoom || 1);
+    const p = m.positions, cand = [];
+    for (let i = 0; i < m.n; i++) {
+      if (!showAll && !this.selection.has(m.src[i])) continue;
+      const x = p[3 * i], y = p[3 * i + 1], z = p[3 * i + 2];
+      const cw = vp[3] * x + vp[7] * y + vp[11] * z + vp[15];
+      if (cw <= 0) continue;
+      const nz = (vp[2] * x + vp[6] * y + vp[10] * z + vp[14]) / cw;
+      if (nz < -1 || nz > 1) continue;
+      const sx = ((vp[0] * x + vp[4] * y + vp[8] * z + vp[12]) / cw + 1) / 2 * w;
+      const sy = (1 - (vp[1] * x + vp[5] * y + vp[9] * z + vp[13]) / cw) / 2 * h;
+      const depth = -(vw[2] * x + vw[6] * y + vw[10] * z + vw[14]);
+      const unit = persp ? h / 2 / Math.max(1e-6, depth * tanH) : h / 2 / Math.max(1e-6, orthoHalf);
+      cand.push({ i, sx, sy, depth, r: (this.radii?.[i] ?? 0.3) * unit });
+    }
+    if (!cand.length) return;
+    cand.sort((a, b) => a.depth - b.depth);
+    const dmin = cand[0].depth, dspan = Math.max(1e-6, cand[cand.length - 1].depth - dmin);
+    // nearer atoms' discs by screen cell (occlusion) and placed label boxes (overlap)
+    const C = 32 * scale, cols = Math.max(1, Math.ceil(w / C)), rows = Math.max(1, Math.ceil(h / C));
+    const discs = new Map();
+    const size = (d.labelSize ?? 12) * scale;
+    g.font = `600 ${size}px ${fontFam}`;
+    g.lineWidth = 3 * scale; g.strokeStyle = halo; g.lineJoin = 'round'; g.fillStyle = fg;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (const c of cand) {
+      const ci = Math.floor(c.sx / C), cj = Math.floor(c.sy / C);
+      let hidden = false;
+      const list = ci >= 0 && ci < cols && cj >= 0 && cj < rows ? discs.get(cj * cols + ci) : null;
+      if (list) for (const q of list) if ((q.x - c.sx) ** 2 + (q.y - c.sy) ** 2 < (q.r * 0.92) ** 2) { hidden = true; break; }
+      // register this atom's disc (it hides atoms further back), clipped to a sane footprint
+      const rr = Math.min(c.r, 8 * C);
+      const i0 = Math.max(0, Math.floor((c.sx - rr) / C)), i1 = Math.min(cols - 1, Math.floor((c.sx + rr) / C));
+      const j0 = Math.max(0, Math.floor((c.sy - rr) / C)), j1 = Math.min(rows - 1, Math.floor((c.sy + rr) / C));
+      for (let jj = j0; jj <= j1; jj++) for (let ii = i0; ii <= i1; ii++) {
+        const k = jj * cols + ii;
+        let arr = discs.get(k);
+        if (!arr) discs.set(k, arr = []);
+        arr.push({ x: c.sx, y: c.sy, r: c.r });
+      }
+      if (hidden) continue;
+      const t = d.labels === 'element' ? m.symbols[c.i] : d.labels === 'index' ? String(m.src[c.i]) : `${m.symbols[c.i]}${m.src[c.i]}`;
+      const tw = g.measureText(t).width + 4 * scale, th = size + 2 * scale;
+      const box = [c.sx - tw / 2, c.sy - th / 2, c.sx + tw / 2, c.sy + th / 2];
+      if (!occ.free(...box)) continue;
+      occ.mark(...box);
+      g.globalAlpha = 1 - 0.5 * ((c.depth - dmin) / dspan);
+      g.strokeText(t, c.sx, c.sy); g.fillText(t, c.sx, c.sy);
+    }
+    g.globalAlpha = 1;
+  }
+
+  /** Coarse occupancy grid over the overlay (6 px cells): placed letters and labels reserve their boxes. */
+  _occupancy(w, h, scale) {
+    const L = 6 * scale, cols = Math.max(1, Math.ceil(w / L)), rows = Math.max(1, Math.ceil(h / L));
+    const used = new Uint8Array(cols * rows);
+    const span = (x0, y0, x1, y1) => [Math.max(0, Math.floor(x0 / L)), Math.min(cols - 1, Math.floor(x1 / L)), Math.max(0, Math.floor(y0 / L)), Math.min(rows - 1, Math.floor(y1 / L))];
+    return {
+      free(x0, y0, x1, y1) {
+        const [a0, a1, b0, b1] = span(x0, y0, x1, y1);
+        for (let j = b0; j <= b1; j++) for (let i = a0; i <= a1; i++) if (used[j * cols + i]) return false;
+        return true;
+      },
+      mark(x0, y0, x1, y1) {
+        const [a0, a1, b0, b1] = span(x0, y0, x1, y1);
+        for (let j = b0; j <= b1; j++) for (let i = a0; i <= a1; i++) used[j * cols + i] = 1;
+      },
+    };
+  }
+
+  /**
+   * Screen discs [x, y, r, …] (overlay pixels) of the drawn atoms in front of the camera. Large models
+   * return null plus `pad`: callers then use the projected bounding box, grown by the largest atom.
+   */
+  _screenDiscs(w, h) {
+    const m = this.model, cam = this.camera;
+    const vp = new THREE.Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse).elements;
+    const vw = cam.matrixWorldInverse.elements;
+    const persp = cam.isPerspectiveCamera;
+    const tanH = Math.tan(((cam.fov ?? 30) * DEG) / 2);
+    const orthoUnit = persp ? 0 : h / 2 / Math.max(1e-6, (cam.top - cam.bottom) / 2 / (cam.zoom || 1));
+    const unitAt = (depth) => (persp ? h / 2 / Math.max(1e-6, depth * tanH) : orthoUnit);
+    const proj = (x, y, z) => {
+      const cw = vp[3] * x + vp[7] * y + vp[11] * z + vp[15];
+      if (cw <= 0) return null;
+      return [((vp[0] * x + vp[4] * y + vp[8] * z + vp[12]) / cw + 1) / 2 * w, (1 - (vp[1] * x + vp[5] * y + vp[9] * z + vp[13]) / cw) / 2 * h, -(vw[2] * x + vw[6] * y + vw[10] * z + vw[14])];
+    };
+    if (m.n > LETTER_DISC_LIMIT) {
+      // the 8 corners of the atoms' bounding box; `pad` covers the largest atom at the nearest corner
+      const b = this.bounds, pts = [];
+      let pad = 0;
+      if (b.min && b.max) for (const x of [b.min[0], b.max[0]]) for (const y of [b.min[1], b.max[1]]) for (const z of [b.min[2], b.max[2]]) {
+        const q = proj(x, y, z);
+        if (!q) continue;
+        pts.push([q[0], q[1]]);
+        pad = Math.max(pad, (this.maxRadius ?? 0) * unitAt(q[2]));
+      }
+      return { discs: null, hullPts: pts, pad };
+    }
+    // runs on every frame while letters are shown: plain arithmetic, no per-atom allocations
+    const p = m.positions, radii = this.radii, out = new Float32Array(3 * m.n);
+    let k = 0;
+    for (let i = 0; i < m.n; i++) {
+      const x = p[3 * i], y = p[3 * i + 1], z = p[3 * i + 2];
+      const cw = vp[3] * x + vp[7] * y + vp[11] * z + vp[15];
+      const depth = -(vw[2] * x + vw[6] * y + vw[10] * z + vw[14]);
+      if (cw <= 0 || depth <= 0) continue;
+      out[k++] = ((vp[0] * x + vp[4] * y + vp[8] * z + vp[12]) / cw + 1) / 2 * w;
+      out[k++] = (1 - (vp[1] * x + vp[5] * y + vp[9] * z + vp[13]) / cw) / 2 * h;
+      out[k++] = (radii?.[i] ?? 0.3) * unitAt(depth);
+    }
+    return { discs: out.subarray(0, k), hullPts: [], pad: 0 };
+  }
+
+  /**
+   * O, a, b, c at the ends of the displayed (super)cell edges. Each letter sits on the ray from the view
+   * centre through its edge end, just outside both the cell outline and every atom disc on that ray, so
+   * it never lands on an atom or its label. A letter that would hit another one (or the axis gizmo, or
+   * the canvas edge) turns around the centre in small steps; one far from its edge end gets a faint
+   * leader. The letters' boxes are reserved in `occ` before the atom labels are placed.
+   */
+  _drawCellLetters(g, scale, w, h, text, fg, occ, opt = {}) {
+    const m = this.model, c = this.settings.display.cell;
+    const [A, B, C] = m.cell;
+    const N = c.which === 'supercell' || c.which === 'grid' ? m.supercell : [1, 1, 1];
+    const P = (a, b, cc) => this.project(a * A[0] + b * B[0] + cc * C[0], a * A[1] + b * B[1] + cc * C[1], a * A[2] + b * B[2] + cc * C[2], w, h);
+    const corners = [];
+    for (const a of [0, N[0]]) for (const b of [0, N[1]]) for (const cc of [0, N[2]]) corners.push(P(a, b, cc));
+    if (corners.some((q) => q[2] < -1 || q[2] > 1)) return;
+    const shape = this._screenDiscs(w, h);
+    const hull = convexHull(corners.map((q) => [q[0], q[1]]).concat(shape.hullPts));
+    const D = shape.discs, nd = D ? D.length / 3 : 0;
+    const ctr = this.project(this.bounds.center.x, this.bounds.center.y, this.bounds.center.z, w, h);
+    const rho = 8 * scale, gap = 4 * scale, clear = rho + gap;   // letter half-size and clearance
+    // distance from the centre along (ux, uy) at which a letter clears the outline and every atom
+    const clearAt = (ux, uy) => {
+      let t = (hull.length > 2 ? rayExit(hull, ctr[0], ctr[1], ux, uy) ?? 0 : 0) + shape.pad + clear;
+      for (let k = 0; k < nd; k++) {
+        const dx = D[3 * k] - ctr[0], dy = D[3 * k + 1] - ctr[1], R = D[3 * k + 2] + clear;
+        const tca = dx * ux + dy * uy, d2 = dx * dx + dy * dy - tca * tca;
+        if (d2 >= R * R) continue;
+        const far = tca + Math.sqrt(R * R - d2);
+        if (far > t) t = far;
+      }
+      return t;
+    };
+    // radius of the largest atom drawn over a screen point (the corner atom a leader starts outside of)
+    const coverAt = (x, y) => {
+      let r = 0;
+      for (let k = 0; k < nd; k++) {
+        const dx = D[3 * k] - x, dy = D[3 * k + 1] - y, R = D[3 * k + 2];
+        if (dx * dx + dy * dy < R * R) r = Math.max(r, R - Math.hypot(dx, dy));
+      }
+      return r;
+    };
+    const gz = this.gizmo.size * scale;
+    const gizmo = this.settings.display.axes && (opt.export ? opt.gizmo : true) ? [8 * scale, h - 8 * scale - gz, 8 * scale + gz, h - 8 * scale] : null;
+    const placed = [];
+    const ok = (x, y) => {
+      if (x < rho || y < rho || x > w - rho || y > h - rho) return false;
+      if (gizmo && x + rho > gizmo[0] && x - rho < gizmo[2] && y + rho > gizmo[1] && y - rho < gizmo[3]) return false;
+      return placed.every((p) => Math.hypot(p[0] - x, p[1] - y) >= 2 * rho + 2 * scale);
+    };
+    const STEPS = [0, 15, -15, 30, -30, 45, -45, 60, -60, 90, -90];
+    const place = (q, fallbackDir) => {
+      let ux = q[0] - ctr[0], uy = q[1] - ctr[1];
+      if (Math.hypot(ux, uy) < 1e-3) [ux, uy] = fallbackDir;
+      const base = Math.atan2(uy, ux);
+      let first = null;
+      for (const deg of STEPS) {
+        const ang = base + deg * DEG, vx = Math.cos(ang), vy = Math.sin(ang);
+        const t = clearAt(vx, vy), x = ctr[0] + vx * t, y = ctr[1] + vy * t;
+        first ??= [x, y];
+        if (ok(x, y)) return [x, y];
+      }
+      // no free spot on the canvas: keep the letter on screen next to its edge end (if that is visible)
+      if (q[0] < 0 || q[1] < 0 || q[0] > w || q[1] > h) return null;
+      return [clamp(first[0], rho, w - rho), clamp(first[1], rho, h - rho)];
+    };
+    const draw = (q, spot, label, size, color, weight, leaderColor) => {
+      const [x, y] = spot;
+      const dist = Math.hypot(x - q[0], y - q[1]);
+      const r0 = coverAt(q[0], q[1]);
+      if (leaderColor && dist > r0 + clear + 10 * scale) {
+        // faint leader from the edge end (outside its corner atom) to the letter
+        const vx = (x - q[0]) / dist, vy = (y - q[1]) / dist;
+        g.save();
+        g.strokeStyle = leaderColor; g.globalAlpha = 0.45; g.lineWidth = 1 * scale; g.setLineDash([3 * scale, 3 * scale]);
+        g.beginPath(); g.moveTo(q[0] + vx * r0, q[1] + vy * r0); g.lineTo(x - vx * rho, y - vy * rho); g.stroke();
+        g.restore();
+      }
+      text(label, x, y, size, color, weight);
+      placed.push([x, y]);
+      occ.mark(x - rho, y - rho, x + rho, y + rho);
+    };
+    const O = P(0, 0, 0);
+    const o = place(O, [-1, 1]);
+    if (o) draw(O, o, 'O', 12, fg, 600, fg);
+    const [ca, cb, cc] = axisColors(this.overlayDark);
+    [[[N[0], 0, 0], 'a', ca], [[0, N[1], 0], 'b', cb], [[0, 0, N[2]], 'c', cc]].forEach(([idx, l, col]) => {
+      const q = P(...idx);
+      const spot = place(q, [q[0] - O[0], q[1] - O[1]]);
+      if (spot) draw(q, spot, l, 14, col, 700, col);
+    });
   }
 
   // ------------------------------------------------------------------ export
-  /** High-resolution PNG. Returns a Blob. */
+  /**
+   * High-resolution PNG. Returns a Blob. With `transparent` the background is left out (bloom and
+   * depth of field keep the alpha). Labels, legend and scale bar are drawn in at the same scale.
+   */
   async screenshot({ scale = 2, transparent = false, gizmo = false, maxSize = 8192 } = {}) {
     const pr0 = this.renderer.getPixelRatio();
     const w0 = this.width, h0 = this.height;
     scale = Math.min(scale, maxSize / Math.max(w0, h0));
     const W = Math.round(w0 * scale), H = Math.round(h0 * scale);
-    const bg = this.scene3.background, clearA = this.renderer.getClearAlpha();
+    const bg = this.scene3.background, clearA = this.renderer.getClearAlpha(), postT = this.post.transparent;
     this.renderer.setPixelRatio(1);
     this.renderer.setSize(W, H, false);
     this.post.setSize(W, H);
@@ -718,7 +1517,7 @@ export class Viewer extends Emitter {
     const ink = this.post.ink;
     const inkT = ink?.uniforms.thickness.value;
     if (ink) ink.uniforms.thickness.value = inkT * scale;
-    if (transparent) { this.scene3.background = null; this.renderer.setClearAlpha(0); }
+    if (transparent) { this.scene3.background = null; this.renderer.setClearAlpha(0); this.post.setTransparent(true); }
     const out = document.createElement('canvas');
     out.width = W; out.height = H;
     const g = out.getContext('2d');
@@ -726,10 +1525,10 @@ export class Viewer extends Emitter {
       this.render({ gizmo, overlay: false });
       g.drawImage(this.renderer.domElement, 0, 0);
       const ov = document.createElement('canvas'); ov.width = W; ov.height = H;
-      this.drawOverlay(ov.getContext('2d'), scale, W, H);
+      this.drawOverlay(ov.getContext('2d'), scale, W, H, { export: true, gizmo });
       g.drawImage(ov, 0, 0);
     } finally {
-      this.scene3.background = bg; this.renderer.setClearAlpha(clearA);
+      this.scene3.background = bg; this.renderer.setClearAlpha(clearA); this.post.setTransparent(postT);
       if (ink) ink.uniforms.thickness.value = inkT;
       lineMats.forEach(([mat, lw]) => { mat.linewidth = lw; });
       this.renderer.setPixelRatio(pr0);
@@ -740,7 +1539,7 @@ export class Viewer extends Emitter {
   }
 
   /** Small JPEG data URL for project thumbnails. */
-  thumbnail(w = 320, h = 200) {
+  thumbnail(w = 320, h = 200, quality = 0.82) {
     const c = document.createElement('canvas');
     c.width = w; c.height = h;
     this.render({ gizmo: false, overlay: false });
@@ -750,7 +1549,8 @@ export class Viewer extends Emitter {
     g.fillStyle = '#fff';
     g.fillRect(0, 0, w, h);
     g.drawImage(src, (w - src.width * s) / 2, (h - src.height * s) / 2, src.width * s, src.height * s);
-    return c.toDataURL('image/jpeg', 0.82);
+    this.render();   // draw the normal view (gizmo, labels, cell letters) again now, so view and overlay never disagree
+    return c.toDataURL('image/jpeg', quality);
   }
 
   /**
@@ -826,13 +1626,50 @@ export class Viewer extends Emitter {
     this._ro.disconnect();
     this.controls.dispose();
     this.post.dispose();
+    this._flushTrash();
+    this._haloGeo.dispose();
+    for (const k in this._halo) this._halo[k].material.dispose();
     this.renderer.dispose();
   }
 }
 
 function luminance(c) { return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b; }
 
+/** 2D convex hull (monotone chain), counter-clockwise in screen coordinates. */
+function convexHull(pts) {
+  const P = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (P.length < 3) return P;
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lower = [], upper = [];
+  for (const p of P) { while (lower.length >= 2 && cross(lower.at(-2), lower.at(-1), p) <= 0) lower.pop(); lower.push(p); }
+  for (let i = P.length - 1; i >= 0; i--) { const p = P[i]; while (upper.length >= 2 && cross(upper.at(-2), upper.at(-1), p) <= 0) upper.pop(); upper.push(p); }
+  return lower.slice(0, -1).concat(upper.slice(0, -1));
+}
+
+/** Distance along the ray (ox, oy) + t·(ux, uy) to where it leaves the convex polygon (origin inside). */
+function rayExit(hull, ox, oy, ux, uy) {
+  let best = null;
+  for (let i = 0; i < hull.length; i++) {
+    const a = hull[i], b = hull[(i + 1) % hull.length];
+    const ex = b[0] - a[0], ey = b[1] - a[1];
+    const den = ux * ey - uy * ex;
+    if (Math.abs(den) < 1e-9) continue;
+    const t = ((a[0] - ox) * ey - (a[1] - oy) * ex) / den;
+    const s = ((a[0] - ox) * uy - (a[1] - oy) * ux) / den;
+    if (t >= 0 && s >= -1e-6 && s <= 1 + 1e-6 && (best === null || t > best)) best = t;
+  }
+  return best;
+}
+
+/** Number of atoms each measurement type takes. */
+// Null prototype: names inherited from Object.prototype ('toString', '__proto__', …) are not measurement types.
+export const MEASURE_ARITY = Object.freeze(Object.assign(Object.create(null), { distance: 2, angle: 3, dihedral: 4 }));
+/** Arity of a measurement type; undefined for anything that is not exactly one of the type names (arrays, objects, symbols…). */
+export const measureArity = (type) => (typeof type === 'string' ? MEASURE_ARITY[type] : undefined);
+
+/** Distance (Å) or angle / dihedral (°) of points P; NaN for an unknown type or the wrong number of points. */
 export function measureValue(type, P) {
+  if (measureArity(type) !== P?.length) return NaN;
   if (type === 'distance') return P[0].distanceTo(P[1]);
   if (type === 'angle') {
     const a = P[0].clone().sub(P[1]), b = P[2].clone().sub(P[1]);

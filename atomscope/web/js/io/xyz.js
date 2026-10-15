@@ -1,5 +1,7 @@
 /** XYZ / extended XYZ (multi-frame) reader and writer. */
-import { Structure } from '../core/structure.js';
+import { Structure, fixDegenerateCell, addWarning } from '../core/structure.js';
+import { normalizeSymbol } from '../core/elements.js';
+import { num } from './index.js';
 
 /** Parse `key=value key="quoted value"` pairs from an extXYZ comment line. */
 export function parseKeyValues(line) {
@@ -34,40 +36,60 @@ export function readXYZ(text, filename = '') {
     if (!Number.isFinite(n) || n < 0) throw new Error(`XYZ: expected an atom count on line ${l + 1}, found "${lines[l].trim().slice(0, 40)}"`);
     const comment = lines[l + 1] ?? '';
     const kv = parseKeyValues(comment);
-    let cols = kv.Properties ? parseProperties(kv.Properties) : null;
-    const spCol = cols?.find((c) => c.name === 'species' || c.name === 'element' || c.name === 'symbols');
-    const posCol = cols?.find((c) => c.name === 'pos' || c.name === 'positions');
-    const extra = cols?.filter((c) => c !== spCol && c !== posCol && c.n === 1 && (c.type === 'R' || c.type === 'I')) ?? [];
+    const cols = kv.Properties ? parseProperties(kv.Properties) : null;
+    const spCol = cols?.find((c) => /^(species|element|symbols)$/i.test(c.name));
+    const zCol = spCol ? null : cols?.find((c) => c.name === 'Z' || c.name === 'numbers');
+    const posCol = cols?.find((c) => /^(pos|positions)$/i.test(c.name));
+    if (cols && !posCol) throw new Error(`XYZ: line ${l + 2}: Properties must include pos:R:3`);
+    if (cols && !spCol && !zCol) throw new Error(`XYZ: line ${l + 2}: Properties must include species:S:1 (or Z:I:1)`);
+    const extra = cols?.filter((c) => c !== spCol && c !== zCol && c !== posCol && c.n === 1 && (c.type === 'R' || c.type === 'I')) ?? [];
+    const sc = spCol ? spCol.start : zCol ? zCol.start : 0, pc = posCol ? posCol.start : 1;
+    const need = cols ? Math.max(sc + 1, pc + 3, ...extra.map((c) => c.start + 1)) : 4;
     const symbols = [], pos = new Float64Array(3 * n), props = Object.fromEntries(extra.map((c) => [c.name, []]));
     for (let i = 0; i < n; i++) {
+      const ln = l + 3 + i;              // 1-based line number of this atom
       const raw = lines[l + 2 + i];
-      if (raw == null) throw new Error(`XYZ: file ended early — expected ${n} atoms in frame ${frames.length + 1}`);
+      // a missing or blank line (or the next frame's atom count) means the frame stopped short
+      if (raw == null || !raw.trim() || /^\s*\d+\s*$/.test(raw)) {
+        throw new Error(`XYZ: file ended early at line ${ln} (frame ${frames.length + 1} declares ${n} atoms, found ${i})`);
+      }
       const t = raw.trim().split(/\s+/);
-      const sc = spCol ? spCol.start : 0, pc = posCol ? posCol.start : 1;
-      symbols.push(t[sc]);
-      pos[3 * i] = +t[pc]; pos[3 * i + 1] = +t[pc + 1]; pos[3 * i + 2] = +t[pc + 2];
-      for (const c of extra) props[c.name].push(+t[c.start]);
+      if (t.length < need) throw new Error(`XYZ: line ${ln}: expected ${cols ? `${need} columns` : 'an element and three coordinates'}, found "${raw.trim().slice(0, 48)}"`);
+      symbols.push(zCol ? normalizeSymbol(String(num(t[sc], 'XYZ', ln) | 0)) : t[sc]);
+      pos[3 * i] = num(t[pc], 'XYZ', ln); pos[3 * i + 1] = num(t[pc + 1], 'XYZ', ln); pos[3 * i + 2] = num(t[pc + 2], 'XYZ', ln);
+      for (const c of extra) props[c.name].push(num(t[c.start], 'XYZ', ln));
     }
     let cell = null, pbc = null;
-    if (kv.Lattice) {
-      const v = kv.Lattice.trim().split(/[\s,]+/).map(Number);
-      if (v.length === 9 && v.every(Number.isFinite)) cell = [v.slice(0, 3), v.slice(3, 6), v.slice(6, 9)];
+    if (kv.Lattice != null) {
+      const v = kv.Lattice.trim().split(/[\s,]+/).filter(Boolean);
+      if (v.length !== 9) throw new Error(`XYZ: line ${l + 2}: Lattice needs 9 numbers, found ${v.length}`);
+      const m = v.map((x) => num(x, 'XYZ', l + 2));
+      cell = [m.slice(0, 3), m.slice(3, 6), m.slice(6, 9)];
     }
-    if (kv.pbc) pbc = kv.pbc.trim().split(/\s+/).map((x) => /^[tT1]/.test(x));
+    if (kv.pbc) {
+      const t = kv.pbc.trim().split(/[\s,]+/).filter(Boolean).map((x) => /^(t|true|1)$/i.test(x));
+      pbc = t.length === 3 ? t : [t[0] ?? false, t[0] ?? false, t[0] ?? false];
+    }
     const name = kv.Lattice || kv.Properties ? (kv.name ?? kv.config_type ?? null) : comment.trim() || null;
     frames.push({ symbols, pos, cell, pbc, props, name, comment });
     l += 2 + n;
   }
   if (!frames.length) throw new Error('XYZ: no frames found');
   const f0 = frames[0];
+  const info = { source: 'xyz' };
+  const fix = fixDegenerateCell(f0.cell, f0.pbc ?? (f0.cell ? [true, true, true] : [false, false, false]), f0.pos);
+  addWarning(info, fix.warning);
   const s = new Structure({
     name: f0.name || filename.replace(/\.[^.]+$/, '') || 'XYZ structure', symbols: f0.symbols, positions: f0.pos,
-    cell: f0.cell, pbc: f0.pbc ?? (f0.cell ? [true, true, true] : [false, false, false]), props: f0.props,
-    info: { source: 'xyz' },
+    cell: fix.cell, pbc: fix.pbc, props: f0.props, info,
   });
   const same = frames.every((f) => f.symbols.length === f0.symbols.length);
-  if (same) s.frames = frames.slice(1).map((f) => ({ positions: f.pos, cell: f.cell }));
-  else s.info.warning = 'Frames have different atom counts; only the first frame was loaded.';
+  if (same) {
+    s.frames = frames.slice(1).map((f) => {
+      const c = f.cell && fix.cell ? fixDegenerateCell(f.cell, fix.pbc, f.pos).cell : null;
+      return { positions: f.pos, cell: c };
+    });
+  } else addWarning(s.info, 'Frames have different atom counts; only the first frame was loaded.');
   return s;
 }
 

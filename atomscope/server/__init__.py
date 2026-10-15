@@ -15,30 +15,76 @@ import webbrowser
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
-from ..config import Settings
+from ..config import Settings, is_loopback_host
 from ..core.structure import Structure
 from .app import API_PREFIX, create_app
 from .netutil import browser_url, display_urls
 
-__all__ = ["create_app", "serve", "view", "API_PREFIX", "print_banner", "BackgroundServer"]
+__all__ = ["create_app", "serve", "view", "API_PREFIX", "print_banner", "security_warnings", "BackgroundServer"]
 
 log = logging.getLogger("atomscope.server")
 
 
+_PLACEHOLDER_TOKENS = {"change-me", "changeme", "change_me", "secret", "password", "token", "atomscope", "admin",
+                       "test", "1234", "12345", "123456", "12345678", "letmein", "qwerty"}
+
+
+def weak_token(token: str) -> bool:
+    """True for an ``ATOMSCOPE_TOKEN`` that is short (< 16 characters) or a well-known placeholder."""
+    t = str(token or "").strip()
+    return len(t) < 16 or t.lower() in _PLACEHOLDER_TOKENS
+
+
+def security_warnings(settings: Settings) -> list[str]:
+    """Warnings about risky network settings (empty when the configuration is safe)."""
+    out: list[str] = []
+    public = not is_loopback_host(settings.host)
+    if settings.mode == "local" and public and not getattr(settings, "token", None):
+        url = (display_urls(settings.host, settings.port) or [browser_url(settings.host, settings.port)])[-1]
+        out.append(f"local mode has no login — anyone who can reach {url}/ can read, change and delete your "
+                   "projects. Use --mode cloud, or set ATOMSCOPE_TOKEN to require a token.")
+    token = getattr(settings, "token", None)
+    if settings.mode == "local" and token and weak_token(token):
+        out.append("ATOMSCOPE_TOKEN is short or a well-known placeholder, so it is easy to guess. Use a long random "
+                   "value, e.g. the output of: python -c \"import secrets; print(secrets.token_urlsafe(32))\"")
+    if settings.mode == "cloud" and public and settings.allow_registration:
+        out.append("anyone who can reach this server can create an account. Set ATOMSCOPE_ALLOW_REGISTRATION=false "
+                   "(or --no-registration) and create accounts with `atomscope user create NAME`.")
+    if (getattr(settings, "forwarded_allow_ips", None) or "").strip() == "*":
+        out.append("ATOMSCOPE_FORWARDED_ALLOW_IPS='*' trusts X-Forwarded-For from anyone who can reach this port, so a "
+                   "client connecting directly can choose the address the sign-in rate limits count. Give the reverse "
+                   "proxy's address or network instead (e.g. 172.28.0.0/16).")
+    return out
+
+
 def print_banner(settings: Settings, plugin_records: Sequence[Any] = ()) -> None:
-    """Print where the server is reachable and how it is configured."""
+    """Print where the server is reachable and how it is configured (plus security warnings)."""
     from .._version import __version__
 
+    root = getattr(settings, "root_path", "") or ""
     lines = [f"AtomScope {__version__} — {settings.mode} mode"]
     for i, url in enumerate(display_urls(settings.host, settings.port)):
-        lines.append(f"  {'Open' if i == 0 else 'LAN '}:  {url}/")
-    lines.append(f"  API  :  {browser_url(settings.host, settings.port)}{API_PREFIX}   docs: /docs")
+        lines.append(f"  {'Open' if i == 0 else 'LAN '}:  {url}{root}/")
+    lines.append(f"  API  :  {browser_url(settings.host, settings.port)}{root}{API_PREFIX}   docs: {root}/docs")
     lines.append(f"  Data :  {settings.data_dir}")
+    if root:
+        lines.append(f"  Path :  served under {root}/ (behind a reverse proxy)")
     if settings.mode == "cloud":
         lines.append(f"  Accounts: registration {'enabled' if settings.allow_registration else 'disabled'}")
+        if not settings.allow_registration:
+            lines.append("            create accounts with:  atomscope user create NAME"
+                         + (f" --data {settings.data_dir}" if str(settings.data_dir) else ""))
+    elif getattr(settings, "token", None):
+        lines.append("  Access:  token required (sign in with user 'local' and the ATOMSCOPE_TOKEN value)")
     for r in plugin_records:
         status = "ok" if r.status == "loaded" else f"ERROR: {r.error}"
         lines.append(f"  Plugin {r.name} {r.version}: {status}")
+    warnings = security_warnings(settings)
+    if warnings:
+        bar = "!" * 78
+        lines.append(bar)
+        lines.extend(f"  WARNING: {w}" for w in warnings)
+        lines.append(bar)
     print("\n".join(lines), flush=True)
 
 
@@ -50,12 +96,15 @@ def serve(
     plugin_dirs: Iterable[str | Path] | None = None,
     open_browser: bool = False,
     settings: Settings | None = None,
+    root_path: str | None = None,
     **overrides: Any,
 ) -> None:
     """Run the server in the foreground (blocking) with uvicorn.
 
     Arguments override ``ATOMSCOPE_*`` environment variables; pass a complete
-    :class:`Settings` via *settings* to bypass the environment.
+    :class:`Settings` via *settings* to bypass the environment.  *root_path*
+    (``ATOMSCOPE_ROOT_PATH``) is the URL prefix when a reverse proxy serves the
+    app under a sub-path such as ``/atomscope``.
     """
     import uvicorn
 
@@ -63,13 +112,20 @@ def serve(
         settings = Settings.from_env(host=host, port=port, mode=mode,
                                      data_dir=Path(data_dir) if data_dir else None,
                                      plugin_dirs=[Path(p) for p in plugin_dirs] if plugin_dirs else None,
-                                     **overrides)
+                                     root_path=root_path, **overrides)
+    elif root_path is not None:
+        settings = settings.with_(root_path=root_path)
     app = create_app(settings)
     print_banner(settings, app.state.plugins.records)
     if open_browser:
-        url = browser_url(settings.host, settings.port) + "/"
+        url = browser_url(settings.host, settings.port) + (getattr(settings, "root_path", "") or "") + "/"
         threading.Timer(1.0, lambda: webbrowser.open(url)).start()
-    uvicorn.run(app, host=settings.host, port=settings.port, log_level=settings.log_level)
+    proxy: dict[str, Any] = {}
+    if getattr(settings, "forwarded_allow_ips", None):
+        # trust X-Forwarded-For/-Proto from the reverse proxy, so request.client is the real client
+        proxy = {"proxy_headers": True, "forwarded_allow_ips": settings.forwarded_allow_ips}
+    uvicorn.run(app, host=settings.host, port=settings.port, log_level=settings.log_level,
+                root_path=getattr(settings, "root_path", "") or "", **proxy)
 
 
 class BackgroundServer:

@@ -13,19 +13,24 @@ Python API overview::
 
     client = ats.Client("http://127.0.0.1:8765")   # REST client (stdlib only)
 
+    plugins = ats.load_plugins(["./plugins"])      # plugin formats now work in read/write
+    s = plugins.builders["hello-chain"].func(n=12)
+    plugins.analyses["hello-com"].func(s)
+
 Server-side pieces (FastAPI, uvicorn) are imported lazily, so ``import atomscope``
 stays light for scripting.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Iterable
 
 from . import analysis, build, io
 from ._version import __version__
 from .core.structure import Structure
 from .io import detect_format, formats, parse_text, read, to_text, write
-from .plugins import PluginContext
+from .plugins import PluginContext, PluginManager
 from .project import (
     add_structure,
     load_project,
@@ -62,6 +67,8 @@ __all__ = [
     "serve",
     "view",
     "PluginContext",
+    "PluginManager",
+    "load_plugins",
 ]
 
 
@@ -71,6 +78,17 @@ def __getattr__(name: str) -> Any:
 
         return Client
     raise AttributeError(f"module 'atomscope' has no attribute {name!r}")
+
+
+def load_plugins(dirs: Iterable[str | Path] = (), entry_points: bool = True) -> PluginManager:
+    """Load plugins from *dirs* (and installed entry points) into this Python session.
+
+    Their file readers and writers join :func:`read` / :func:`write`; builders and analyses
+    are available on the returned manager (``.builders[name].func(**params)``,
+    ``.analyses[name].func(structure, **params)``).  Failed plugins are listed in
+    ``manager.records`` with ``status == "error"`` instead of raising.
+    """
+    return PluginManager([Path(d) for d in dirs], use_entry_points=entry_points).load_all()
 
 
 def serve(*args: Any, **kwargs: Any) -> None:

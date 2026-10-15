@@ -9,13 +9,106 @@ import pytest
 from atomscope import Client, build
 from atomscope.client import ClientError
 from atomscope.config import Settings
-from atomscope.server import BackgroundServer
+from atomscope.server import BackgroundServer, create_app
+
+from .conftest import EXAMPLE_PLUGINS
+
+#: (method, path) of every REST route → the Client method that calls it.
+ROUTE_METHODS = {
+    ("GET", "/api/v1/health"): "health",
+    ("GET", "/api/v1/info"): "info",
+    ("GET", "/api/v1/elements"): "elements",
+    ("GET", "/api/v1/projects"): "projects",
+    ("POST", "/api/v1/projects"): "create_project",
+    ("POST", "/api/v1/projects/import"): "import_project",
+    ("GET", "/api/v1/projects/{pid}"): "get_project",
+    ("PUT", "/api/v1/projects/{pid}"): "update_project",
+    ("PATCH", "/api/v1/projects/{pid}"): "patch_project",
+    ("DELETE", "/api/v1/projects/{pid}"): "delete_project",
+    ("POST", "/api/v1/projects/{pid}/duplicate"): "duplicate_project",
+    ("GET", "/api/v1/projects/{pid}/download"): "download_project",
+    ("GET", "/api/v1/formats"): "formats",
+    ("POST", "/api/v1/io/parse"): "upload_structure",
+    ("POST", "/api/v1/io/export"): "export_structure",
+    ("POST", "/api/v1/io/convert"): "convert",
+    ("GET", "/api/v1/build/prototypes"): "prototypes",
+    ("POST", "/api/v1/build/crystal"): "build_crystal",
+    ("POST", "/api/v1/build/cluster"): "build_cluster",
+    ("POST", "/api/v1/build/supercell"): "supercell",
+    ("GET", "/api/v1/build/molecules"): "molecules",
+    ("GET", "/api/v1/build/molecule/{name}"): "molecule",
+    ("GET", "/api/v1/build/custom"): "custom_builders",
+    ("POST", "/api/v1/build/custom/{name}"): "build_custom",
+    ("POST", "/api/v1/analysis/bonds"): "bonds",
+    ("POST", "/api/v1/analysis/summary"): "summary",
+    ("POST", "/api/v1/analysis/coordination"): "coordination",
+    ("POST", "/api/v1/analysis/rdf"): "rdf",
+    ("GET", "/api/v1/analysis/custom"): "custom_analyses",
+    ("POST", "/api/v1/analysis/custom/{name}"): "analysis",
+    ("GET", "/api/v1/plugins"): "plugins",
+}
+#: Routes without a dedicated method on purpose (auth has register/login/logout/me; docs are HTML).
+NO_METHOD_PREFIXES = ("/api/v1/auth/", "/api/v1/ext/", "/docs", "/redoc", "/openapi.json")
 
 
 def _free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         return s.getsockname()[1]
+
+
+def _api_routes(routes, prefix=""):
+    """(method, path) of every API route, also through routers included lazily (newer FastAPI)."""
+    for r in routes:
+        inner = getattr(r, "original_router", None)
+        if inner is not None:
+            ctx = getattr(r, "include_context", None)
+            yield from _api_routes(inner.routes, prefix + (getattr(ctx, "prefix", "") or ""))
+        elif getattr(r, "methods", None) and getattr(r, "path", None) is not None:
+            for m in r.methods - {"HEAD", "OPTIONS"}:
+                yield m, prefix + r.path
+
+
+def test_every_route_has_a_client_method(tmp_path):
+    app = create_app(Settings(data_dir=tmp_path / "d", plugin_dirs=[EXAMPLE_PLUGINS], entry_point_plugins=False))
+    routes = set(_api_routes(app.routes))
+    assert ("GET", "/api/v1/health") in routes and len(routes) > 25
+    missing = sorted(f"{m} {p}" for m, p in routes if not p.startswith(NO_METHOD_PREFIXES) and (m, p) not in ROUTE_METHODS)
+    assert not missing, f"add Client methods (and ROUTE_METHODS entries) for: {missing}"
+    for name in ROUTE_METHODS.values():
+        assert callable(getattr(Client, name, None)), name
+    stale = sorted(f"{m} {p}" for m, p in ROUTE_METHODS if (m, p) not in routes)
+    assert not stale, f"ROUTE_METHODS lists routes the server no longer has: {stale}"
+
+
+@pytest.fixture(scope="module")
+def plugin_server(tmp_path_factory):
+    srv = BackgroundServer(Settings(port=_free_port(), data_dir=tmp_path_factory.mktemp("psrv"),
+                                    plugin_dirs=[EXAMPLE_PLUGINS], entry_point_plugins=False)).start()
+    yield srv
+    srv.stop()
+
+
+def test_client_plugins_and_discovery(plugin_server, tmp_path, data_dir):
+    c = Client(plugin_server.url)
+    s = c.build_custom("hello-chain", n=4, element="Cu")
+    res = c.analysis("hello-com", s)
+    assert abs(res["centerOfMass"][0] - 3.9) < 1e-6 and res["totalMass"] > 0
+    assert [a["name"] for a in c.custom_analyses()] == ["hello-com"]
+    assert [b["name"] for b in c.custom_builders()] == ["hello-chain"]
+    assert c.plugins()[0]["name"] == "hello" and c.plugins()[0]["status"] == "loaded"
+    assert "fcc" in c.prototypes()["prototypes"] and "icosahedron" in c.prototypes()["clusters"]
+    assert any(m["name"] == "water" for m in c.molecules())
+    assert any(e["symbol"] == "Fe" for e in c.elements())
+    cn = c.coordination(build.crystal("fcc", "Cu", a=3.61))
+    assert cn["average"] == 12.0 and cn["byElement"] == {"Cu": 12.0}
+    out = tmp_path / "nacl.hello"
+    text = c.convert(data_dir / "NaCl.cif", "hello", out)
+    assert text.startswith("HELLO") and out.read_text() == text
+    assert len(c.rdf(s, rmax=5, nbins=10, elements=["Cu", "Cu"])["g"]) == 10
+    with pytest.raises(ClientError) as exc:
+        c.analysis("missing", s)
+    assert exc.value.status == 404
 
 
 @pytest.fixture(scope="module")

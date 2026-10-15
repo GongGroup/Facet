@@ -31,7 +31,7 @@ def server_info(request: Request) -> dict[str, Any]:
         "name": "AtomScope",
         "version": __version__,
         "mode": settings.mode,
-        "authRequired": cloud,
+        "authRequired": cloud or bool(getattr(settings, "token", None)),
         "allowRegistration": bool(cloud and settings.allow_registration),
         "formats": formats(),
         "prototypes": PROTOTYPES,
@@ -44,7 +44,11 @@ def server_info(request: Request) -> dict[str, Any]:
         "presets": plugins.presets(),
         "customBuilders": [b.to_json() for b in plugins.builders.values()],
         "customAnalyses": [a.to_json() for a in plugins.analyses.values()],
-        "limits": {"maxProjectMB": settings.max_project_mb, "maxUploadMB": settings.max_upload_mb},
+        "limits": {
+            "maxProjectMB": settings.max_project_mb,
+            "maxUploadMB": settings.max_upload_mb,
+            "maxAtoms": getattr(settings, "max_atoms", None),
+        },
         "endpoints": {"elements": "/api/v1/elements", "docs": "/docs", "openapi": "/openapi.json"},
     }
 

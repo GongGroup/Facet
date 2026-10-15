@@ -1,8 +1,11 @@
 /**
  * Representations ("drawing styles"). A style turns a display model into Three.js objects.
- *   styles.register({ id, name, description, icon, defaults, bonds: bool, build(ctx) => THREE.Object3D })
+ *   styles.register({ id, name, description, icon, defaults, bonds: bool, inPlaceRadii?: bool, build(ctx) => THREE.Object3D })
  * ctx = { model, colors (Float32Array linear), radii (Float32Array), settings (style settings),
- *         atomMaterial, bondMaterial, segments, THREE }
+ *         atomMaterial, bondMaterial, segments, showBonds, resolution, THREE,
+ *         helpers: { buildAtoms, buildBonds, buildLines, buildPolyhedra, atomRadius, segmentsFor } }
+ * `inPlaceRadii: true` promises that only meshes built by helpers.buildAtoms / buildBonds depend on the
+ * radii, so the viewer may rewrite their instance matrices instead of rebuilding when atom sizes change.
  */
 import * as THREE from '../../vendor/three/three.module.js';
 import { ConvexGeometry } from '../../vendor/three/addons/geometries/ConvexGeometry.js';
@@ -19,9 +22,16 @@ export const styles = {
   list: () => [...registry.values()],
 };
 
+/**
+ * Drawn radius of an element. `settings.radiusOverrides[symbol]` (Å) replaces the table value and is
+ * scaled by atomScale exactly like it.
+ */
 export function atomRadius(sym, settings) {
-  const e = element(sym);
   const scale = settings.atomScale ?? 1;
+  const o = settings.radiusOverrides?.[sym];
+  const uniform = settings.radiusSource === 'uniform';
+  if (typeof o === 'number' && Number.isFinite(o) && o > 0) return o * (uniform ? Math.max(1, scale) : scale);
+  const e = element(sym);
   switch (settings.radiusSource) {
     case 'vdw': return e.rvdw * scale;
     case 'covalent': return e.rcov * scale;
@@ -38,19 +48,25 @@ export function segmentsFor(n, quality = 'auto') {
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _p = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0), _d = new THREE.Vector3(), _c = new THREE.Color();
 
-export function buildAtoms({ model, colors, radii, atomMaterial, segments }) {
-  const geo = new THREE.SphereGeometry(1, segments[0], segments[1]);
-  const mesh = new THREE.InstancedMesh(geo, atomMaterial, Math.max(1, model.n));
-  mesh.count = model.n;
+/** (Re)write the instance matrices of an atoms mesh from positions and radii. */
+export function writeAtomMatrices(mesh, model, radii) {
   const p = model.positions;
   for (let i = 0; i < model.n; i++) {
     const r = radii[i];
     _m.makeScale(r, r, r).setPosition(p[3 * i], p[3 * i + 1], p[3 * i + 2]);
     mesh.setMatrixAt(i, _m);
-    mesh.setColorAt(i, _c.setRGB(colors[3 * i], colors[3 * i + 1], colors[3 * i + 2]));
   }
-  if (!model.n) mesh.count = 0;
   mesh.instanceMatrix.needsUpdate = true;
+  mesh.boundingSphere = null;
+}
+
+export function buildAtoms({ model, colors, radii, atomMaterial, segments }) {
+  const geo = new THREE.SphereGeometry(1, segments[0], segments[1]);
+  const mesh = new THREE.InstancedMesh(geo, atomMaterial, Math.max(1, model.n));
+  mesh.count = model.n;
+  writeAtomMatrices(mesh, model, radii);
+  for (let i = 0; i < model.n; i++) mesh.setColorAt(i, _c.setRGB(colors[3 * i], colors[3 * i + 1], colors[3 * i + 2]));
+  if (!model.n) mesh.count = 0;
   if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   mesh.castShadow = mesh.receiveShadow = true;
   mesh.name = 'atoms';
@@ -59,27 +75,29 @@ export function buildAtoms({ model, colors, radii, atomMaterial, segments }) {
   return mesh;
 }
 
-/** Cylinders split in two halves, each coloured like its atom (or one uniform colour). */
-export function buildBonds({ model, colors, radii, bondMaterial, settings, segments }, bondRadius) {
+/**
+ * (Re)write bond cylinder matrices (and colours unless `colors` is null). Split bonds put the colour
+ * boundary where the two spheres would meet, so both halves stay visible.
+ */
+export function writeBondMatrices(mesh, { model, colors, radii, settings }, bondRadius) {
   const b = model.bonds;
   const split = settings.bondColor !== 'uniform';
   const uni = new THREE.Color(settings.bondUniformColor ?? '#9aa1ab').convertSRGBToLinear();
-  const geo = new THREE.CylinderGeometry(1, 1, 1, segments[2], 1, true);
-  const count = b.count * (split ? 2 : 1);
-  const mesh = new THREE.InstancedMesh(geo, bondMaterial, Math.max(1, count));
-  mesh.count = count;
   const p = model.positions;
   let k = 0;
   const place = (ax, ay, az, bx, by, bz, color) => {
     _d.set(bx - ax, by - ay, bz - az);
     const len = _d.length();
-    if (len < 1e-6) { _m.makeScale(0, 0, 0); mesh.setMatrixAt(k, _m); mesh.setColorAt(k++, color); return; }
-    _q.setFromUnitVectors(_up, _d.multiplyScalar(1 / len));
-    _p.set((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2);
-    _s.set(bondRadius, len, bondRadius);
-    _m.compose(_p, _q, _s);
+    if (len < 1e-6) _m.makeScale(0, 0, 0);
+    else {
+      _q.setFromUnitVectors(_up, _d.multiplyScalar(1 / len));
+      _p.set((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2);
+      _s.set(bondRadius, len, bondRadius);
+      _m.compose(_p, _q, _s);
+    }
     mesh.setMatrixAt(k, _m);
-    mesh.setColorAt(k++, color);
+    if (colors) mesh.setColorAt(k, color);
+    k++;
   };
   for (let t = 0; t < b.count; t++) {
     const i = b.pairs[2 * t], j = b.pairs[2 * t + 1];
@@ -89,15 +107,28 @@ export function buildBonds({ model, colors, radii, bondMaterial, settings, segme
       const ri = radii?.[i] ?? 0, rj = radii?.[j] ?? 0, len = Math.hypot(bx - ax, by - ay, bz - az) || 1;
       const f = Math.min(0.85, Math.max(0.15, 0.5 + (ri - rj) / (2 * len)));
       const mx = ax + (bx - ax) * f, my = ay + (by - ay) * f, mz = az + (bz - az) * f;
-      place(ax, ay, az, mx, my, mz, _c.setRGB(colors[3 * i], colors[3 * i + 1], colors[3 * i + 2]));
-      place(mx, my, mz, bx, by, bz, _c.setRGB(colors[3 * j], colors[3 * j + 1], colors[3 * j + 2]));
+      place(ax, ay, az, mx, my, mz, colors && _c.setRGB(colors[3 * i], colors[3 * i + 1], colors[3 * i + 2]));
+      place(mx, my, mz, bx, by, bz, colors && _c.setRGB(colors[3 * j], colors[3 * j + 1], colors[3 * j + 2]));
     } else place(ax, ay, az, bx, by, bz, uni);
   }
   mesh.instanceMatrix.needsUpdate = true;
-  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  if (colors && mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  mesh.boundingSphere = null;
+}
+
+/** Cylinders split in two halves, each coloured like its atom (or one uniform colour). */
+export function buildBonds(ctx, bondRadius) {
+  const { model, bondMaterial, settings, segments } = ctx;
+  const split = settings.bondColor !== 'uniform';
+  const geo = new THREE.CylinderGeometry(1, 1, 1, segments[2], 1, true);
+  const count = model.bonds.count * (split ? 2 : 1);
+  const mesh = new THREE.InstancedMesh(geo, bondMaterial, Math.max(1, count));
+  mesh.count = count;
+  writeBondMatrices(mesh, ctx, bondRadius);
   mesh.castShadow = mesh.receiveShadow = true;
   mesh.name = 'bonds';
   mesh.userData.role = 'bonds';
+  mesh.userData.bondRadius = bondRadius;
   if (!count) mesh.visible = false;
   return mesh;
 }
@@ -200,7 +231,7 @@ export function buildPolyhedra({ model, colors, settings }) {
 const ICON = (body) => `<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6">${body}</svg>`;
 
 styles.register({
-  id: 'ballstick', name: 'Ball & stick', description: 'Atoms as spheres joined by cylinders', bonds: true,
+  id: 'ballstick', inPlaceRadii: true, name: 'Ball & stick', description: 'Atoms as spheres joined by cylinders', bonds: true,
   icon: ICON('<line x1="9" y1="21" x2="22" y2="10" stroke-width="3"/><circle cx="9" cy="21" r="5.5" fill="currentColor" fill-opacity=".25"/><circle cx="22.5" cy="9.5" r="4.5" fill="currentColor" fill-opacity=".25"/>'),
   defaults: { radiusSource: 'atomic', atomScale: 0.42, bondRadius: 0.13 },
   build(ctx) {
@@ -211,19 +242,19 @@ styles.register({
   },
 });
 styles.register({
-  id: 'spacefill', name: 'Space-filling', description: 'Van der Waals spheres (CPK model)', bonds: false,
+  id: 'spacefill', inPlaceRadii: true, name: 'Space-filling', description: 'Van der Waals spheres (CPK model)', bonds: false,
   icon: ICON('<circle cx="12" cy="17" r="8" fill="currentColor" fill-opacity=".25"/><circle cx="21" cy="13" r="7" fill="currentColor" fill-opacity=".25"/>'),
   defaults: { radiusSource: 'vdw', atomScale: 1 },
   build: (ctx) => { const g = new THREE.Group(); g.add(buildAtoms(ctx)); return g; },
 });
 styles.register({
-  id: 'spheres', name: 'Atomic spheres', description: 'Touching atomic-radius spheres — ideal for metals and close packing', bonds: false,
+  id: 'spheres', inPlaceRadii: true, name: 'Atomic spheres', description: 'Touching atomic-radius spheres — ideal for metals and close packing', bonds: false,
   icon: ICON('<circle cx="10" cy="12" r="5.5" fill="currentColor" fill-opacity=".25"/><circle cx="21" cy="12" r="5.5" fill="currentColor" fill-opacity=".25"/><circle cx="15.5" cy="21.5" r="5.5" fill="currentColor" fill-opacity=".25"/>'),
   defaults: { radiusSource: 'atomic', atomScale: 1 },
   build: (ctx) => { const g = new THREE.Group(); g.add(buildAtoms(ctx)); return g; },
 });
 styles.register({
-  id: 'licorice', name: 'Licorice', description: 'Uniform rounded sticks', bonds: true,
+  id: 'licorice', inPlaceRadii: true, name: 'Licorice', description: 'Uniform rounded sticks', bonds: true,
   icon: ICON('<path d="M7 23 L16 12 L25 18" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" stroke-opacity=".5"/>'),
   defaults: { radiusSource: 'uniform', atomScale: 1, bondRadius: 0.2 },
   build(ctx) {
@@ -235,7 +266,7 @@ styles.register({
   },
 });
 styles.register({
-  id: 'wireframe', name: 'Wireframe', description: 'Bonds as lines; fast for very large systems', bonds: true, lines: true,
+  id: 'wireframe', inPlaceRadii: true, name: 'Wireframe', description: 'Bonds as lines; fast for very large systems', bonds: true, lines: true,
   icon: ICON('<path d="M6 22 L13 10 L20 18 L27 8"/><circle cx="6" cy="22" r="1.4" fill="currentColor"/><circle cx="13" cy="10" r="1.4" fill="currentColor"/><circle cx="20" cy="18" r="1.4" fill="currentColor"/><circle cx="27" cy="8" r="1.4" fill="currentColor"/>'),
   defaults: { radiusSource: 'covalent', atomScale: 0.12, lineWidth: 2.5 },
   build(ctx) {
@@ -247,7 +278,7 @@ styles.register({
   },
 });
 styles.register({
-  id: 'polyhedra', name: 'Polyhedral', description: 'Coordination polyhedra around cations, VESTA style', bonds: true, wantsImages: true,
+  id: 'polyhedra', inPlaceRadii: true, name: 'Polyhedral', description: 'Coordination polyhedra around cations, VESTA style', bonds: true, wantsImages: true,
   icon: ICON('<path d="M16 4 L27 12 L23 26 L9 26 L5 12 Z" fill="currentColor" fill-opacity=".22"/><path d="M16 4 L16 17 L27 12 M16 17 L9 26 M16 17 L23 26 M16 17 L5 12" stroke-opacity=".55"/>'),
   defaults: { radiusSource: 'atomic', atomScale: 0.3, bondRadius: 0.09 },
   build(ctx) {
