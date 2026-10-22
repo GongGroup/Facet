@@ -6,10 +6,10 @@ import textwrap
 
 from fastapi.testclient import TestClient
 
-from atomscope import io as ats_io
-from atomscope.config import Settings
-from atomscope.plugins import PluginManager
-from atomscope.server import create_app
+from crystallume import io as cl_io
+from crystallume.config import Settings
+from crystallume.plugins import PluginManager
+from crystallume.server import create_app
 
 from .conftest import EXAMPLE_PLUGINS
 
@@ -81,7 +81,7 @@ def test_broken_plugins_are_reported_not_fatal(tmp_path):
     mgr = PluginManager([d], use_entry_points=False).load_all()
     by_name = {r.name: r for r in mgr.records}
     assert by_name["raiser"].status == "error" and "boom" in by_name["raiser"].error
-    assert "rollbackfmt" not in {r.name for r in ats_io.readers()}  # rolled back
+    assert "rollbackfmt" not in {r.name for r in cl_io.readers()}  # rolled back
     assert by_name["syntax_error"].status == "error"
     assert by_name["noreg"].status == "error"
     assert by_name["good"].status == "loaded" and by_name["good"].description == "A good plugin."
@@ -125,21 +125,59 @@ def test_frontend_urls_are_relative_and_look_alias(tmp_path):
 
 
 def test_load_plugins_helper():
-    import atomscope as ats
+    import crystallume as cl
 
-    mgr = ats.load_plugins([EXAMPLE_PLUGINS], entry_points=False)
+    mgr = cl.load_plugins([EXAMPLE_PLUGINS], entry_points=False)
     s = mgr.builders["hello-chain"].func(n=3)
     assert len(s) == 3
     assert "centerOfMass" in mgr.analyses["hello-com"].func(s)
-    assert ats.parse_text(HELLO_FILE, format="hello").formula == "Cu2"
+    assert cl.parse_text(HELLO_FILE, format="hello").formula == "Cu2"
 
 
 def test_plugin_template_names():
     import pytest
 
-    from atomscope.plugins import plugin_template
+    from crystallume.plugins import plugin_template
 
     files = plugin_template("my_plugin")
     assert set(files) == {"plugin.py", "static/my_plugin.js"}
     with pytest.raises(ValueError):
         plugin_template("../evil")
+
+
+def test_former_package_name_imports():
+    """Plugins and scripts written for AtomScope import ``atomscope``: it is the crystallume package."""
+    import importlib
+    import warnings
+
+    import crystallume
+    import crystallume.core.structure
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        atomscope = importlib.import_module("atomscope")
+        legacy_structure = importlib.import_module("atomscope.core.structure")
+    assert atomscope is crystallume and legacy_structure is crystallume.core.structure
+    assert crystallume.core.structure.__spec__.name == "crystallume.core.structure"
+    from atomscope import PluginContext, Structure  # noqa: F401  (the old plugin template's import)
+    assert Structure is crystallume.Structure
+
+
+def test_entry_point_in_both_groups_loads_once(tmp_path, monkeypatch):
+    import sys
+
+    site = tmp_path / "site"
+    (site / "dualplug").mkdir(parents=True)
+    (site / "dualplug" / "__init__.py").write_text("PLUGIN = {'name': 'dualplug'}\ndef register(ctx):\n    pass\n")
+    dist = site / "dualplug-0.1.dist-info"
+    dist.mkdir()
+    (dist / "METADATA").write_text("Metadata-Version: 2.1\nName: dualplug\nVersion: 0.1\n")
+    (dist / "entry_points.txt").write_text("[crystallume.plugins]\ndualplug = dualplug\n\n"
+                                           "[atomscope.plugins]\ndualplug = dualplug\n")
+    monkeypatch.syspath_prepend(str(site))
+    try:
+        mgr = PluginManager([], use_entry_points=True).load_all()
+        recs = [r for r in mgr.records if r.name == "dualplug"]
+        assert [r.status for r in recs] == ["loaded"]
+    finally:
+        sys.modules.pop("dualplug", None)

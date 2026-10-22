@@ -1,1 +1,1 @@
-"""AtomScope test-suite."""
+"""Crystallume test-suite."""

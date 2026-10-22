@@ -11,13 +11,13 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from atomscope import build
-from atomscope.build.cluster import CLUSTERS, cluster, estimate_cluster_atoms
-from atomscope.config import Settings
-from atomscope.core.structure import Structure
-from atomscope.project import display_formula
-from atomscope.server import create_app, print_banner, security_warnings
-from atomscope.server.deps import read_json_body
+from crystallume import build
+from crystallume.build.cluster import CLUSTERS, cluster, estimate_cluster_atoms
+from crystallume.config import Settings
+from crystallume.core.structure import Structure
+from crystallume.project import display_formula
+from crystallume.server import create_app, print_banner, security_warnings
+from crystallume.server.deps import read_json_body
 
 
 def _client(tmp_path, **kw):
@@ -122,9 +122,9 @@ def test_registration_defaults_follow_host(monkeypatch):
     assert Settings(mode="cloud", host="0.0.0.0").allow_registration is False
     assert Settings(mode="cloud", host="0.0.0.0", allow_registration=True).allow_registration is True
     assert Settings(mode="cloud").with_(host="0.0.0.0").allow_registration is False
-    env = {"ATOMSCOPE_HOST": "0.0.0.0", "ATOMSCOPE_ALLOW_REGISTRATION": "true"}
+    env = {"CRYSTALLUME_HOST": "0.0.0.0", "CRYSTALLUME_ALLOW_REGISTRATION": "true"}
     assert Settings.from_env(env).allow_registration is True
-    assert Settings.from_env({"ATOMSCOPE_HOST": "0.0.0.0"}).allow_registration is False
+    assert Settings.from_env({"CRYSTALLUME_HOST": "0.0.0.0"}).allow_registration is False
 
 
 def test_expired_token_is_rejected(tmp_path):
@@ -158,7 +158,7 @@ def test_local_mode_token(tmp_path):
 
 
 def test_local_token_guards_every_api_route(tmp_path):
-    """With ATOMSCOPE_TOKEN, compute and plugin routes need the token too; only info/health/login stay open."""
+    """With CRYSTALLUME_TOKEN, compute and plugin routes need the token too; only info/health/login stay open."""
     from pathlib import Path
 
     plugins = Path(__file__).resolve().parents[1] / "examples" / "plugins"
@@ -190,17 +190,17 @@ def test_local_token_guards_every_api_route(tmp_path):
         assert info["authRequired"] is True and info["limits"]["maxAtoms"] > 0
         # the public routes keep a schema without a security requirement
         assert "security" not in c.get("/openapi.json").json()["paths"]["/api/v1/info"]["get"]
-    with _client(tmp_path, token="tok123", root_path="/atomscope") as c:  # behind a reverse proxy sub-path
-        assert c.get("/atomscope/api/v1/info").status_code == 200
+    with _client(tmp_path, token="tok123", root_path="/crystallume") as c:  # behind a reverse proxy sub-path
+        assert c.get("/crystallume/api/v1/info").status_code == 200
         assert c.get("/api/v1/health").status_code == 200  # prefix stripped by the proxy
-        assert c.get("/atomscope/api/v1/elements").status_code == 401
-        assert c.get("/atomscope/api/v1/elements", headers={"Authorization": "Bearer tok123"}).status_code == 200
+        assert c.get("/crystallume/api/v1/elements").status_code == 401
+        assert c.get("/crystallume/api/v1/elements", headers={"Authorization": "Bearer tok123"}).status_code == 200
 
 
 def test_network_warnings(capsys):
     assert security_warnings(Settings(mode="local")) == []
     warn = security_warnings(Settings(mode="local", host="0.0.0.0"))
-    assert len(warn) == 1 and "local mode has no login" in warn[0] and "ATOMSCOPE_TOKEN" in warn[0]
+    assert len(warn) == 1 and "local mode has no login" in warn[0] and "CRYSTALLUME_TOKEN" in warn[0]
     assert security_warnings(Settings(mode="local", host="0.0.0.0", token="x7Gq2-long-random-token-value")) == []
     weak = security_warnings(Settings(mode="local", host="0.0.0.0", token="change-me"))
     assert len(weak) == 1 and "easy to guess" in weak[0]
@@ -208,14 +208,14 @@ def test_network_warnings(capsys):
     assert security_warnings(Settings(mode="cloud", host="0.0.0.0", allow_registration=True))
     print_banner(Settings(mode="cloud", host="0.0.0.0"))
     out = capsys.readouterr().out
-    assert "registration disabled" in out and "atomscope user create" in out
+    assert "registration disabled" in out and "crystallume user create" in out
 
 
 # ------------------------------------------------------------------ headers & sub-path
 def test_security_headers_and_cache_policy(tmp_path):
     web = tmp_path / "web"
     (web / "vendor" / "three").mkdir(parents=True)
-    (web / "index.html").write_text("<!doctype html><title>AtomScope</title>")
+    (web / "index.html").write_text("<!doctype html><title>Crystallume</title>")
     (web / "vendor" / "three" / "three.module.js").write_text("export {}")
     with _client(tmp_path, web_dir=web) as c:
         r = c.get("/")
@@ -236,15 +236,15 @@ def test_security_headers_and_cache_policy(tmp_path):
 def test_root_path(tmp_path):
     web = tmp_path / "web"
     web.mkdir()
-    (web / "index.html").write_text("<!doctype html><title>AtomScope UI</title>")
-    with _client(tmp_path, web_dir=web, root_path="/atomscope/") as c:
-        assert c.app.state.settings.root_path == "/atomscope"
-        assert c.get("/atomscope/api/v1/info").json()["name"] == "AtomScope"  # prefix passed through
-        assert c.get("/api/v1/info").json()["name"] == "AtomScope"  # prefix stripped by a proxy
-        assert "AtomScope UI" in c.get("/atomscope/").text
-        r = c.get("/atomscope", follow_redirects=False)
-        assert r.status_code == 307 and r.headers["location"] == "/atomscope/"
-        assert c.get("/atomscope/api/v1/nope").status_code == 404
+    (web / "index.html").write_text("<!doctype html><title>Crystallume UI</title>")
+    with _client(tmp_path, web_dir=web, root_path="/crystallume/") as c:
+        assert c.app.state.settings.root_path == "/crystallume"
+        assert c.get("/crystallume/api/v1/info").json()["name"] == "Crystallume"  # prefix passed through
+        assert c.get("/api/v1/info").json()["name"] == "Crystallume"  # prefix stripped by a proxy
+        assert "Crystallume UI" in c.get("/crystallume/").text
+        r = c.get("/crystallume", follow_redirects=False)
+        assert r.status_code == 307 and r.headers["location"] == "/crystallume/"
+        assert c.get("/crystallume/api/v1/nope").status_code == 404
 
 
 # ------------------------------------------------------------------ singular cells
@@ -335,16 +335,16 @@ def test_other_sites_cannot_write(tmp_path):
         # DNS rebinding: a token-less local server on 127.0.0.1 only answers to localhost names
         assert c.get("/api/v1/projects", headers={"Host": "attacker.example:8765"}).status_code == 400
         assert c.get("/api/v1/projects", headers={"Host": "localhost:8765"}).status_code == 200
-    with _client(tmp_path, cors_origins=["https://lab.example"], allowed_hosts=["atomscope.lan"]) as c:
+    with _client(tmp_path, cors_origins=["https://lab.example"], allowed_hosts=["crystallume.lan"]) as c:
         r = c.post("/api/v1/projects", json={"name": "ok"}, headers={"Origin": "https://lab.example", "Sec-Fetch-Site": "cross-site"})
         assert r.status_code == 201
-        assert c.get("/api/v1/health", headers={"Host": "atomscope.lan:8765"}).status_code == 200
+        assert c.get("/api/v1/health", headers={"Host": "crystallume.lan:8765"}).status_code == 200
     with _client(tmp_path, token="s3cret-token-1234567890") as c:   # a token protects it: any host name
         assert c.get("/api/v1/health", headers={"Host": "lab.example.org"}).status_code == 200
 
 
 def test_forwarded_allow_ips_setting():
-    assert Settings.from_env({"ATOMSCOPE_FORWARDED_ALLOW_IPS": " 10.0.0.2, ::1 "}).forwarded_allow_ips == "10.0.0.2,::1"
+    assert Settings.from_env({"CRYSTALLUME_FORWARDED_ALLOW_IPS": " 10.0.0.2, ::1 "}).forwarded_allow_ips == "10.0.0.2,::1"
     assert Settings().forwarded_allow_ips is None
 
 

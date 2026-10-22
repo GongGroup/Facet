@@ -1,27 +1,27 @@
-# Extending AtomScope
+# Extending Crystallume
 
-AtomScope is built from registries: file formats, builders, representations ("drawing styles"),
+Crystallume is built from registries: file formats, builders, representations ("drawing styles"),
 materials, colour schemes, lighting presets, environment maps, looks, samples, analyses, storage
 backends, panels and commands. Plugins add entries to them. There are two kinds, and one plugin
 can be both:
 
 | Kind | Runs in | Adds | Loaded from |
 |---|---|---|---|
-| **Python plugin** | the AtomScope server and the CLI | file readers/writers, structure builders, analyses, REST routes, UI presets, static files | `--plugins DIR`, `ATOMSCOPE_PLUGIN_DIRS`, entry points |
-| **JavaScript plugin** | the browser | everything in the web UI (all registries below) | a Python plugin's `add_frontend_module`, `plugins.json`, `?plugin=`, `atomscope.plugins.load()` |
+| **Python plugin** | the Crystallume server and the CLI | file readers/writers, structure builders, analyses, REST routes, UI presets, static files | `--plugins DIR`, `CRYSTALLUME_PLUGIN_DIRS`, entry points |
+| **JavaScript plugin** | the browser | everything in the web UI (all registries below) | a Python plugin's `add_frontend_module`, `plugins.json`, `?plugin=`, `crystallume.plugins.load()` |
 
 Quick start:
 
 ```bash
-atomscope plugins new my-plugin --dir ./plugins     # plugin.py + static/my-plugin.js
-atomscope plugins --plugins ./plugins               # it loads? (status ok / ERROR)
-atomscope serve --plugins ./plugins                 # open http://127.0.0.1:8765
-atomscope analyze my-plugin-count POSCAR --plugins ./plugins
+crystallume plugins new my-plugin --dir ./plugins     # plugin.py + static/my-plugin.js
+crystallume plugins --plugins ./plugins               # it loads? (status ok / ERROR)
+crystallume serve --plugins ./plugins                 # open http://127.0.0.1:8765
+crystallume analyze my-plugin-count POSCAR --plugins ./plugins
 ```
 
 In the web UI, **Help › Scripting & API** shows a live reference of every registry entry, command,
 scene path and event (click to copy a call), plus the status of each plugin. In the browser console,
-`atomscope.help()` prints the same as tables.
+`crystallume.help()` prints the same as tables.
 
 ---
 
@@ -31,7 +31,7 @@ A plugin is a module with a `register(ctx)` function and an optional `PLUGIN` di
 
 ```python
 # plugins/my_plugin/plugin.py
-from atomscope import PluginContext, Structure
+from crystallume import PluginContext, Structure
 
 PLUGIN = {"name": "my-plugin", "version": "0.1.0", "description": "What it adds."}
 
@@ -46,19 +46,21 @@ def register(ctx: PluginContext) -> None:
 
 1. **Discovery.** Every sub-folder of a plugin directory that contains `plugin.py`, and every
    top-level `*.py` file (names starting with `_` or `.` are skipped). Installed packages can
-   advertise `[project.entry-points."atomscope.plugins"] name = "package.module"` (a module or a
-   `register` function).
+   advertise `[project.entry-points."crystallume.plugins"] name = "package.module"` (a module or a
+   `register` function). The former group `atomscope.plugins` is still discovered (an entry point listed
+   in both groups by the same package loads once), and `import atomscope` / `from atomscope import ...`
+   in older plugins gives the matching `crystallume` module.
 2. **Registration.** `register(ctx)` is called once. Readers and writers go into the global
-   `atomscope.io` registry; builders, analyses, routes, presets and frontend modules are recorded on
+   `crystallume.io` registry; builders, analyses, routes, presets and frontend modules are recorded on
    the plugin.
 3. **Failure.** If import or `register` raises, the plugin is listed with `status: "error"` and the
-   error message (`atomscope plugins`, `GET /api/v1/plugins`, the web UI shows one notice at start-up);
+   error message (`crystallume plugins`, `GET /api/v1/plugins`, the web UI shows one notice at start-up);
    its readers/writers are rolled back. A broken plugin never stops the server.
 4. **Use.** The server exposes builders at `POST /api/v1/build/custom/{name}`, analyses at
    `POST /api/v1/analysis/custom/{name}`, formats through `/api/v1/io/*`, routers under
    `/api/v1/ext`, static files at `/plugins/<name>/`. `/api/v1/info` lists everything for the UI.
    The CLI loads the same plugins for `convert`, `info`, `formats`, `build` and `analyze`
-   (`--plugins DIR`, else `ATOMSCOPE_PLUGIN_DIRS`). In Python: `atomscope.load_plugins(["./plugins"])`.
+   (`--plugins DIR`, else `CRYSTALLUME_PLUGIN_DIRS`). In Python: `crystallume.load_plugins(["./plugins"])`.
 
 ### `PluginContext`
 
@@ -135,9 +137,9 @@ export default async function activate(api) {      // `activate` may also be a n
    the frontend modules of server plugins (`/api/v1/info` → `plugins[].frontend`); every entry of
    `plugins.json` next to `index.html`; and, in static mode only (no server, not embedded as an
    artifact), each same-origin `?plugin=<url>` in the address. Later, any script can call
-   `await atomscope.plugins.load(url, { name })`.
+   `await crystallume.plugins.load(url, { name })`.
 2. **Activation.** The module is imported (relative URLs resolve against the page) and its default
-   export (or `activate`) is called with the API object (`window.atomscope`). It may be `async`.
+   export (or `activate`) is called with the API object (`window.crystallume`). It may be `async`.
    Each URL loads once; loading it again returns the same result.
 3. **Registration.** Every `api.register*` call validates the entry (missing required fields throw,
    e.g. `samples.register: missing build()`), warns in the console when it replaces an entry with the
@@ -146,7 +148,7 @@ export default async function activate(api) {      // `activate` may also be a n
    entry again. Removing an entry that replaced another (for example a built-in look) brings the
    replaced entry back. Entries registered during activation are tagged with `plugin: <name>`.
 4. **Failure.** If import or `activate` throws, the registrations it made are undone, the plugin is
-   listed with `status: 'error'` in `atomscope.plugins.list()` and Help › Scripting & API › Server,
+   listed with `status: 'error'` in `crystallume.plugins.list()` and Help › Scripting & API › Server,
    and a single notice is shown at start-up.
 
 ### `plugins.json`
@@ -210,7 +212,9 @@ analyses appear here automatically (they run on the server); built-ins are `coor
 
 ---
 
-## 4. The JavaScript API (`window.atomscope`)
+## 4. The JavaScript API (`window.crystallume`)
+
+`window.atomscope` (the former name) is an alias of the same object.
 
 | Member | Description |
 |---|---|
@@ -228,13 +232,13 @@ analyses appear here automatically (they run on the server); built-ins are `coor
 | `measure(type, displayIndices)`, `frame(i)`, `play(on)` | measurements and trajectories |
 | `screenshot({scale, transparent}) → Blob`, `exportText(format) → string \| Promise`, `exportGLB()`, `save(provider)` | output |
 | `projects.providers()`, `projects.list(provider)`, `projects.open(provider, id)` | storage |
-| `sceneScript()` | the current scene as `atomscope.patch({...})` + `setCamera(...)` (palette: *Copy current scene as script*) |
+| `sceneScript()` | the current scene as `crystallume.patch({...})` + `setCamera(...)` (palette: *Copy current scene as script*) |
 | `on(event, fn) → off()`, `toast(msg, {type})`, `command(id, ...args)` | events, notices, commands (`command` throws an Error saying why when the command's `when` guard says it cannot run now, e.g. “Load a structure first.”) |
 | `registry.*`, `registerFormat`, `registerStyle`, `registerMaterial`, `registerColorScheme`, `registerLightingPreset`, `registerEnvironmentMap`, `registerLook`, `registerSample`, `registerAnalysis`, `registerCommand`, `registerStorage`, `registerPanel`, `registerInspectorTab` | §3 |
 | `plugins.load(url, {name})`, `plugins.list()` | plugin loading and status (`active` / `error`, server plugins included) |
 | `reference()`, `help(topic?)` | everything above as data / console tables (`help('looks')`, `help('scene')`, `help('events')`) |
 
-### Events (`atomscope.on(name, fn)`)
+### Events (`crystallume.on(name, fn)`)
 
 | Event | Source | Payload | When |
 |---|---|---|---|
@@ -265,7 +269,7 @@ analyses appear here automatically (they run on the server); built-ins are `coor
 | `render` | viewer | — | a frame was rendered |
 | `error` | viewer | `Error` | drawing failed or the WebGL context was lost |
 
-`atomscope.registry.storage` (the storage manager) has its own `change` event (`registry.storage.on('change', fn)`),
+`crystallume.registry.storage` (the storage manager) has its own `change` event (`registry.storage.on('change', fn)`),
 emitted when a storage provider is added or removed.
 
 Display indices (viewer events, `measure`) refer to drawn atoms, which include periodic images;
@@ -275,7 +279,7 @@ Display indices (viewer events, `measure`) refer to drawn atoms, which include p
 
 ## 5. Scene settings
 
-`atomscope.set('post.ao.intensity', 1.4)` changes one value; `atomscope.patch({...})` deep-merges a
+`crystallume.set('post.ao.intensity', 1.4)` changes one value; `crystallume.patch({...})` deep-merges a
 partial scene; looks are partial scenes. Ranges are those of the UI controls (values outside are
 accepted but may look odd). Colours are `#rrggbb`. Angles are degrees, lengths Å.
 
@@ -374,64 +378,68 @@ accepted but may look odd). Colours are `#rrggbb`. Angles are degrees, lengths �
 | `display.scaleBar` | boolean | false | length scale bar in the view and in exports |
 | `camera` | object \| null | null | `{position, up, target, zoom}` (set with `setCamera`) |
 
-`atomscope.help('scene')` prints the current list with defaults and current values.
+`crystallume.help('scene')` prints the current list with defaults and current values.
 
 ---
 
 ## 6. Embedding (`postMessage`)
 
 ```html
-<iframe id="viewer" src="https://your-host/atomscope/"></iframe>
+<iframe id="viewer" src="https://your-host/crystallume/"></iframe>
 <script>
   const viewer = document.getElementById('viewer').contentWindow;
   addEventListener('message', (e) => {
-    if (e.data?.type === 'atomscope:ready') viewer.postMessage({ type: 'atomscope:load', text: cif, name: 'NaCl.cif' }, '*');
-    if (e.data?.type === 'atomscope:event') console.log(e.data.name, e.data.detail);
+    if (e.data?.type === 'crystallume:ready') viewer.postMessage({ type: 'crystallume:load', text: cif, name: 'NaCl.cif' }, '*');
+    if (e.data?.type === 'crystallume:event') console.log(e.data.name, e.data.detail);
   });
 </script>
 ```
 
 The frame accepts messages from its parent window only and replies to the sender's origin with the
 same `type` and `id`. To embed on another site, start the server with
-`ATOMSCOPE_FRAME_ANCESTORS="'self' https://your-site"`.
+`CRYSTALLUME_FRAME_ANCESTORS="'self' https://your-site"`.
 
 | Message | Reply |
 |---|---|
-| `{type: 'atomscope:load', text \| structure, format?, name?, look?, newProject?}` — opens in a fresh project unless `newProject: false` | `{ok: true}` |
-| `{type: 'atomscope:look', id}` / `{type: 'atomscope:set', path, value}` / `{type: 'atomscope:view', axis}` | `{ok: true}` |
-| `{type: 'atomscope:screenshot', scale?, transparent?, id}` | `{dataURL}` |
-| `{type: 'atomscope:call', method, args: [...], id}` | `{result}` or `{error}` |
-| `{type: 'atomscope:get', what: 'scene' \| 'summary' \| 'selection' \| 'camera', id}` | `{result}` |
-| `{type: 'atomscope:subscribe', events: ['selection', ...]}` / `'atomscope:unsubscribe'` | `{ok, events}`, then `{type: 'atomscope:event', name, detail}` per event |
+| `{type: 'crystallume:load', text \| structure, format?, name?, look?, newProject?}` — opens in a fresh project unless `newProject: false` | `{ok: true}` |
+| `{type: 'crystallume:look', id}` / `{type: 'crystallume:set', path, value}` / `{type: 'crystallume:view', axis}` | `{ok: true}` |
+| `{type: 'crystallume:screenshot', scale?, transparent?, id}` | `{dataURL}` |
+| `{type: 'crystallume:call', method, args: [...], id}` | `{result}` or `{error}` |
+| `{type: 'crystallume:get', what: 'scene' \| 'summary' \| 'selection' \| 'camera', id}` | `{result}` |
+| `{type: 'crystallume:subscribe', events: ['selection', ...]}` / `'crystallume:unsubscribe'` | `{ok, events}`, then `{type: 'crystallume:event', name, detail}` per event |
 
-`atomscope:call` methods: `setRepresentation`, `setLighting`, `applyLook`, `patch`, `set`, `sample`,
+`crystallume:call` methods: `setRepresentation`, `setLighting`, `applyLook`, `patch`, `set`, `sample`,
 `setCamera`, `getCamera`, `fit`, `resetView`, `select`, `frame`, `command`, `exportText`. Scene paths
 or keys containing `__proto__`, `constructor` or `prototype` are refused. Event details are plain
 data: `selection` → indices, `structure` → summary, `camera` → camera state (at most every 100 ms),
-`scene`/`project`/`model`/`render` → `null` (ask with `atomscope:get`). Once it has started and shows its
-first structure, the frame posts `{type: 'atomscope:ready', version}`; a load sent then stays on screen.
+`scene`/`project`/`model`/`render` → `null` (ask with `crystallume:get`). Once it has started and shows its
+first structure, the frame posts `{type: 'crystallume:ready', version}`; a load sent then stays on screen.
+
+Pages written for the former name keep working: `'atomscope:*'` messages are accepted (replies repeat
+that `type`), the frame also posts `{type: 'atomscope:ready', version}`, and a parent that subscribed
+with `'atomscope:subscribe'` receives its events as `{type: 'atomscope:event', name, detail}`.
 
 ---
 
 ## 7. Python client and CLI
 
-`atomscope.Client` has a method for every REST endpoint (the test suite checks this):
+`crystallume.Client` has a method for every REST endpoint (the test suite checks this):
 `health`, `info`, `elements`, `plugins`, project CRUD, `formats`, `upload_structure`, `parse_text`,
 `export_structure`, `convert`, `prototypes`, `molecules`, `build_crystal`, `build_cluster`,
 `supercell`, `molecule`, `custom_builders`, `build_custom`, `bonds`, `summary`, `coordination`, `rdf`,
 `custom_analyses`, `analysis`. The interactive OpenAPI docs are at `/docs` on a running server.
 
 ```bash
-atomscope convert t.hello out.xyz --plugins ./plugins
-atomscope build custom hello-chain --param n=12 --param element=Ag -o chain.xyz --plugins ./plugins
-atomscope analyze hello-com chain.xyz --plugins ./plugins       # also: summary, coordination, rdf
-atomscope formats --plugins ./plugins
-atomscope plugins new my-plugin --dir ./plugins
+crystallume convert t.hello out.xyz --plugins ./plugins
+crystallume build custom hello-chain --param n=12 --param element=Ag -o chain.xyz --plugins ./plugins
+crystallume analyze hello-com chain.xyz --plugins ./plugins       # also: summary, coordination, rdf
+crystallume formats --plugins ./plugins
+crystallume plugins new my-plugin --dir ./plugins
 ```
 
 On these commands `--plugins` takes one directory per flag and may stand anywhere on the line; repeat
 it (`--plugins ./a --plugins ./b`) or join directories with the path separator (`./a:./b`, `;` on
-Windows) to load several. Without it, `ATOMSCOPE_PLUGIN_DIRS` is used.
+Windows) to load several. Without it, `CRYSTALLUME_PLUGIN_DIRS` is used.
 
 The example plugin in `examples/plugins/hello_plugin` uses every Python extension point and ships
 a frontend module (`static/hello.js`).

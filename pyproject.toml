@@ -3,13 +3,13 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "atomscope"
+name = "crystallume"
 version = "0.1.0"
 description = "Visualise and manage atoms, clusters and crystals in the browser — local app or multi-user server."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "AtomScope developers" }]
+authors = [{ name = "Crystallume developers" }]
 keywords = ["chemistry", "materials", "crystal", "visualization", "molecules", "cif", "poscar", "xyz"]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -31,25 +31,26 @@ dependencies = [
 test = ["pytest>=7", "httpx>=0.27"]
 
 [project.scripts]
-atomscope = "atomscope.cli:main"
+crystallume = "crystallume.cli:main"
 
 # Plugins: third-party packages register themselves under the entry-point group
-# "atomscope.plugins", pointing at a module that defines `register(ctx)`:
+# "crystallume.plugins", pointing at a module that defines `register(ctx)`:
 #
-#   [project.entry-points."atomscope.plugins"]
-#   myplugin = "my_package.atomscope_plugin"
+#   [project.entry-points."crystallume.plugins"]
+#   myplugin = "my_package.crystallume_plugin"
 #
-# AtomScope itself ships no entry-point plugins.
+# Crystallume itself ships no entry-point plugins.
 
 [tool.setuptools]
 include-package-data = true
 
 [tool.setuptools.packages.find]
-include = ["atomscope*"]
+# atomscope: the package's former name, a thin alias of crystallume for code written before the rename
+include = ["crystallume*", "atomscope"]
 namespaces = false
 
 [tool.setuptools.package-data]
-atomscope = ["web/**/*", "data/*.json", "py.typed"]
+crystallume = ["web/**/*", "data/*.json", "py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

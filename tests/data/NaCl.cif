@@ -1,5 +1,5 @@
 #------------------------------------------------------------------------------
-# Rock salt, NaCl.  Test fixture for AtomScope (symmetry expansion from 2 sites).
+# Rock salt, NaCl.  Test fixture for Crystallume (symmetry expansion from 2 sites).
 #------------------------------------------------------------------------------
 data_NaCl
 _chemical_name_mineral                 'Halite'

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from atomscope import build
+from crystallume import build
 
 POSCAR_TEXT = """Si8 diamond
 5.431
@@ -29,7 +29,7 @@ def test_health_and_info(local_client):
     r = local_client.get("/api/v1/health")
     assert r.status_code == 200 and r.json() == {"status": "ok", "version": "0.1.0"}
     info = local_client.get("/api/v1/info").json()
-    assert info["name"] == "AtomScope" and info["mode"] == "local"
+    assert info["name"] == "Crystallume" and info["mode"] == "local"
     assert info["authRequired"] is False and info["allowRegistration"] is False
     readers = {f["name"] for f in info["formats"]["readers"]}
     writers = {f["name"] for f in info["formats"]["writers"]}
@@ -47,7 +47,7 @@ def test_meta_misc(local_client):
     assert local_client.get("/openapi.json").status_code == 200
     assert local_client.get("/docs").status_code == 200
     page = local_client.get("/")
-    assert page.status_code == 200 and "AtomScope" in page.text  # placeholder without frontend
+    assert page.status_code == 200 and "Crystallume" in page.text  # placeholder without frontend
     assert local_client.get("/api/v1/does-not-exist").status_code == 404
 
 
@@ -86,10 +86,10 @@ def test_local_projects_crud(local_client):
     dl = c.get(f"/api/v1/projects/{pid}/download")
     assert dl.status_code == 200
     assert "attachment" in dl.headers["content-disposition"]
-    assert ".atomscope.json" in dl.headers["content-disposition"]
+    assert ".crystallume.json" in dl.headers["content-disposition"]
     assert dl.json()["id"] == pid
 
-    imp = c.post("/api/v1/projects/import", files={"file": ("x.atomscope.json", dl.content, "application/json")})
+    imp = c.post("/api/v1/projects/import", files={"file": ("x.crystallume.json", dl.content, "application/json")})
     assert imp.status_code == 201 and imp.json()["id"] != pid and imp.json()["name"] == "Copper 铜"
     imp2 = c.post("/api/v1/projects/import", files={"file": ("POSCAR", POSCAR_TEXT.encode())})
     assert imp2.status_code == 201 and imp2.json()["structures"][0]["structure"]["symbols"] == ["Si"] * 8
@@ -152,8 +152,8 @@ def test_cloud_auth_and_isolation(cloud_client):
 def test_cloud_registration_disabled(tmp_path):
     from fastapi.testclient import TestClient
 
-    from atomscope.config import Settings
-    from atomscope.server import create_app
+    from crystallume.config import Settings
+    from crystallume.server import create_app
 
     s = Settings(mode="cloud", data_dir=tmp_path, allow_registration=False, entry_point_plugins=False)
     with TestClient(create_app(s)) as c:
@@ -250,18 +250,18 @@ def test_analysis_endpoints(local_client):
 def test_frontend_served_with_spa_fallback(tmp_path):
     from fastapi.testclient import TestClient
 
-    from atomscope.config import Settings
-    from atomscope.server import create_app
+    from crystallume.config import Settings
+    from crystallume.server import create_app
 
     web = tmp_path / "web"
     (web / "assets").mkdir(parents=True)
-    (web / "index.html").write_text("<!doctype html><title>AtomScope UI</title>")
+    (web / "index.html").write_text("<!doctype html><title>Crystallume UI</title>")
     (web / "assets" / "app.js").write_text("console.log('hi')")
     s = Settings(data_dir=tmp_path / "d", web_dir=web, entry_point_plugins=False)
     with TestClient(create_app(s)) as c:
-        assert "AtomScope UI" in c.get("/").text
+        assert "Crystallume UI" in c.get("/").text
         assert c.get("/assets/app.js").text == "console.log('hi')"
-        assert "AtomScope UI" in c.get("/projects/some-route").text  # SPA fallback
+        assert "Crystallume UI" in c.get("/projects/some-route").text  # SPA fallback
         assert c.get("/assets/missing.js").status_code == 404
         assert c.get("/api/v1/health").json()["status"] == "ok"
 
@@ -269,8 +269,8 @@ def test_frontend_served_with_spa_fallback(tmp_path):
 def test_cors(tmp_path):
     from fastapi.testclient import TestClient
 
-    from atomscope.config import Settings
-    from atomscope.server import create_app
+    from crystallume.config import Settings
+    from crystallume.server import create_app
 
     s = Settings(data_dir=tmp_path, cors_origins=["http://localhost:5173"], entry_point_plugins=False)
     with TestClient(create_app(s)) as c:

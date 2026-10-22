@@ -8,9 +8,9 @@ import time
 
 import pytest
 
-import atomscope as ats
-from atomscope import build
-from atomscope.storage import (
+import crystallume as cl
+from crystallume import build
+from crystallume.storage import (
     LocalFileStore,
     ProjectNotFound,
     ProjectTooLarge,
@@ -39,7 +39,7 @@ def _crud(store, owner="u1"):
     doc = store.create(owner, _project())
     pid = doc["id"]
     assert pid.startswith("p_") and len(pid) == 12
-    assert doc["created"] and doc["updated"] and doc["schema"] == "atomscope.project/1"
+    assert doc["created"] and doc["updated"] and doc["schema"] == "crystallume.project/1"
     assert doc["scene"] == {"style": {"atomScale": 0.4}, "camera": {"zoom": 2}}  # opaque round trip
 
     summaries = store.list(owner)
@@ -91,14 +91,14 @@ def test_local_store_files_and_import(tmp_path):
     doc = store.create("local", _project("Files"))
     folder = store.folder_of(doc["id"])
     xyz = folder / "structures" / "s_1.xyz"
-    assert xyz.is_file() and ats.read(xyz).formula == "SrTiO3"
+    assert xyz.is_file() and cl.read(xyz).formula == "SrTiO3"
 
     # Rename via update -> folder follows the name
     store.patch("local", doc["id"], {"name": "New name"})
     assert store.folder_of(doc["id"]).name == f"new-name-{doc['id']}"
 
     # Drop a project JSON and a bare structure JSON into the root -> imported
-    dropped = ats.new_project("Dropped", [build.molecule("water")])
+    dropped = cl.new_project("Dropped", [build.molecule("water")])
     (root / "dropped.json").write_text(json.dumps(dropped))
     (root / "si.json").write_text(json.dumps(build.crystal("diamond", "Si").to_dict()))
     names = {p["name"] for p in store.list("local")}
@@ -123,7 +123,7 @@ def test_local_store_copied_folder_never_takes_the_id(tmp_path):
 
     root = tmp_path / "projects"
     store = LocalFileStore(root)
-    doc = store.create("local", ats.new_project("Study", [build.molecule("water")]))
+    doc = store.create("local", cl.new_project("Study", [build.molecule("water")]))
     pid, original = doc["id"], store.folder_of(doc["id"])
     # copied while the project stays open, which then saves again (the original becomes the newer folder)
     shutil.copytree(original, root / "backup copy")
@@ -149,7 +149,7 @@ def test_local_store_copy_then_save_keeps_id_on_latest_work(tmp_path, case):
 
     root = tmp_path / "projects"
     store = LocalFileStore(root)
-    pid = store.create("local", ats.new_project("Study", [build.molecule("water")]))["id"]
+    pid = store.create("local", cl.new_project("Study", [build.molecule("water")]))["id"]
     original = store.folder_of(pid)
     if case == "renamed-original":   # renamed by hand (no "-<id>" suffix), then copied
         original = original.rename(root / "My Study")
@@ -226,7 +226,7 @@ def test_sqlite_users_and_tokens(tmp_path):
 # ---------------------------------------------------------------- optimistic locking & summaries
 @pytest.mark.parametrize("kind", ["local", "sqlite"])
 def test_update_conflicts_and_formula(tmp_path, kind):
-    from atomscope.storage.base import ProjectConflict
+    from crystallume.storage.base import ProjectConflict
 
     store = LocalFileStore(tmp_path / "p") if kind == "local" else SQLiteStore(tmp_path / "db.sqlite", secret="x")
     doc = store.create("u", {**_project(), "baseUpdated": "junk", "location": {"provider": "server"}})
@@ -320,7 +320,7 @@ def test_search_fields_match_web_app(tmp_path, kind):
 def test_copied_folder_with_same_timestamps_keeps_original_id(tmp_path):
     """A folder copied while the server was stopped ('Copy of …', timestamps preserved) gets the new id."""
     import shutil
-    from atomscope.storage.local import LocalFileStore
+    from crystallume.storage.local import LocalFileStore
 
     store = LocalFileStore(tmp_path)
     doc = store.create("local", {"name": "study", "structures": []})

@@ -1,12 +1,14 @@
-# AtomScope shared data contracts (v1)
+# Crystallume shared data contracts (v1)
 
-Both the Python backend and the browser frontend use these JSON shapes.
+Both the Python backend and the browser frontend use these JSON shapes. Documents written before the
+rename from AtomScope carry `"schema": "atomscope.structure/1"` or `"atomscope.project/1"`; readers
+accept them and read them the same way (writers always write the `crystallume.*` names).
 
-## Structure — `atomscope.structure/1`
+## Structure — `crystallume.structure/1`
 
 ```json
 {
-  "schema": "atomscope.structure/1",
+  "schema": "crystallume.structure/1",
   "name": "Cu fcc 3x3x3",
   "symbols": ["Cu", "Cu"],
   "positions": [[0.0, 0.0, 0.0], [1.805, 1.805, 0.0]],
@@ -24,11 +26,11 @@ Both the Python backend and the browser frontend use these JSON shapes.
   Each frame may override `cell`.
 * `props` holds optional per-atom arrays (same length as symbols); `info` free-form metadata.
 
-## Project — `atomscope.project/1`
+## Project — `crystallume.project/1`
 
 ```json
 {
-  "schema": "atomscope.project/1",
+  "schema": "crystallume.project/1",
   "id": "p_8f3a91c2d4",
   "name": "Perovskite study",
   "description": "",

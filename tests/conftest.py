@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from atomscope.config import Settings
-from atomscope.server import create_app
+from crystallume.config import Settings
+from crystallume.server import create_app
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = Path(__file__).resolve().parent / "data"

@@ -1,4 +1,4 @@
-"""AtomScope Python API tour.
+"""Crystallume Python API tour.
 
 Run from the repository root::
 
@@ -15,11 +15,11 @@ import argparse
 import tempfile
 from pathlib import Path
 
-import atomscope as ats
-from atomscope import analysis, build
+import crystallume as cl
+from crystallume import analysis, build
 
 
-def offline_tour(outdir: Path) -> ats.Structure:
+def offline_tour(outdir: Path) -> cl.Structure:
     # 1. Build structures -------------------------------------------------
     sto = build.crystal("perovskite", ["Sr", "Ti", "O"], a=3.905)
     print("perovskite:", sto, "spacegroup", sto.info["spacegroup"])
@@ -37,8 +37,8 @@ def offline_tour(outdir: Path) -> ats.Structure:
     for fmt, name in [("cif", "sto.cif"), ("poscar", "POSCAR"), ("extxyz", "cu.xyz"), ("pdb", "caffeine.pdb")]:
         target = outdir / name
         obj = {"cif": sto, "poscar": sto, "extxyz": cu, "pdb": caffeine}[fmt]
-        ats.write(target, obj, format=fmt)
-        back = ats.read(target)
+        cl.write(target, obj, format=fmt)
+        back = cl.read(target)
         print(f"  {name:<12s} -> {back.formula:<10s} ({back.info['format']})")
 
     # 3. Analysis ------------------------------------------------------------
@@ -56,14 +56,14 @@ def offline_tour(outdir: Path) -> ats.Structure:
     print(f"H-O-H angle: {water.get_angle(1, 0, 2):.1f}°, O-H {water.get_distance(0, 1):.3f} Å")
 
     # 5. Projects -------------------------------------------------------------
-    doc = ats.new_project("Demo project", [sto, au55], tags=["demo"])
-    ats.save_project(outdir / "demo.atomscope.json", doc)
+    doc = cl.new_project("Demo project", [sto, au55], tags=["demo"])
+    cl.save_project(outdir / "demo.crystallume.json", doc)
     print("project saved:", doc["id"], [s["name"] for s in doc["structures"]])
     return sto
 
 
 def server_tour(base_url: str) -> None:
-    client = ats.Client(base_url)
+    client = cl.Client(base_url)
     print("server:", client.health())
     info = client.info()
     print("mode:", info["mode"], "| plugins:", [p["name"] for p in info["plugins"]])
@@ -84,7 +84,7 @@ def main() -> None:
     if args.server:
         server_tour(args.server)
     if args.view:
-        print("viewer:", ats.view(sto))
+        print("viewer:", cl.view(sto))
         input("Press Enter to stop the background server...")
 
 

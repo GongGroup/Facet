@@ -1,105 +1,68 @@
-"""AtomScope — visualise and manage atoms, clusters and crystals.
+"""Former name of :mod:`crystallume`, kept so code written for AtomScope keeps working.
 
-Python API overview::
-
-    import atomscope as ats
-
-    s = ats.read("POSCAR")                         # Structure (multi-frame files → frames)
-    ats.write("out.cif", s)
-    cu = ats.build.crystal("fcc", "Cu").repeat(3, 3, 3)
-    bonds = ats.analysis.neighbors(cu)             # [(i, j, d, (ox, oy, oz)), ...]
-    ats.view(cu)                                   # open in the browser viewer
-    ats.serve(port=8765)                           # run the web app (blocking)
-
-    client = ats.Client("http://127.0.0.1:8765")   # REST client (stdlib only)
-
-    plugins = ats.load_plugins(["./plugins"])      # plugin formats now work in read/write
-    s = plugins.builders["hello-chain"].func(n=12)
-    plugins.analyses["hello-com"].func(s)
-
-Server-side pieces (FastAPI, uvicorn) are imported lazily, so ``import atomscope``
-stays light for scripting.
+``import atomscope`` gives the :mod:`crystallume` package itself, and ``atomscope.<sub>`` (``atomscope.io``,
+``atomscope.plugins``, ``atomscope.core.structure`` ...) the matching ``crystallume.<sub>`` module, so old plugins
+(``from atomscope import PluginContext, Structure``) and scripts (``import atomscope as ats``) run unchanged.
+New code should import ``crystallume``.
 """
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterable
+import importlib
+import importlib.abc
+import importlib.util
+import sys
+import warnings
 
-from . import analysis, build, io
-from ._version import __version__
-from .core.structure import Structure
-from .io import detect_format, formats, parse_text, read, to_text, write
-from .plugins import PluginContext, PluginManager
-from .project import (
-    add_structure,
-    load_project,
-    new_project,
-    normalize_project,
-    project_structures,
-    project_summary,
-    save_project,
-)
+import crystallume
 
-if TYPE_CHECKING:  # pragma: no cover
-    from .client import Client
-
-__all__ = [
-    "__version__",
-    "Structure",
-    "read",
-    "write",
-    "parse_text",
-    "to_text",
-    "detect_format",
-    "formats",
-    "io",
-    "build",
-    "analysis",
-    "new_project",
-    "load_project",
-    "save_project",
-    "normalize_project",
-    "project_summary",
-    "project_structures",
-    "add_structure",
-    "Client",
-    "serve",
-    "view",
-    "PluginContext",
-    "PluginManager",
-    "load_plugins",
-]
+_OLD, _NEW = "atomscope", "crystallume"
 
 
-def __getattr__(name: str) -> Any:
-    if name == "Client":
-        from .client import Client
+class _AliasFinder(importlib.abc.MetaPathFinder, importlib.abc.Loader):
+    """Import ``atomscope.<x>`` as the same module object as ``crystallume.<x>`` (no second copy)."""
 
-        return Client
-    raise AttributeError(f"module 'atomscope' has no attribute {name!r}")
+    @staticmethod
+    def _target(fullname):
+        return importlib.util.find_spec(_NEW + fullname[len(_OLD):])
+
+    def find_spec(self, fullname, path=None, target=None):  # noqa: D401 - importlib protocol
+        if not fullname.startswith(_OLD + "."):
+            return None
+        real = self._target(fullname)
+        if real is None:
+            return None
+        return importlib.util.spec_from_loader(fullname, self, origin=real.origin,
+                                               is_package=real.submodule_search_locations is not None)
+
+    # runpy (``python -m atomscope``, ``python -m atomscope.cli``) and other tools read the code via the loader
+    def get_code(self, fullname):
+        real = self._target(fullname)
+        return real.loader.get_code(real.name)
+
+    def get_source(self, fullname):
+        real = self._target(fullname)
+        return real.loader.get_source(real.name)
+
+    def is_package(self, fullname):
+        return self._target(fullname).submodule_search_locations is not None
+
+    def create_module(self, spec):
+        module = importlib.import_module(_NEW + spec.name[len(_OLD):])
+        spec.loader_state = module.__spec__
+        return module
+
+    def exec_module(self, module):
+        # importlib set __spec__ to the alias spec; give the crystallume module its own back
+        alias = module.__spec__
+        if alias is not None and alias.loader is self:
+            module.__spec__ = alias.loader_state
 
 
-def load_plugins(dirs: Iterable[str | Path] = (), entry_points: bool = True) -> PluginManager:
-    """Load plugins from *dirs* (and installed entry points) into this Python session.
+if not any(isinstance(f, _AliasFinder) for f in sys.meta_path):
+    sys.meta_path.insert(0, _AliasFinder())
 
-    Their file readers and writers join :func:`read` / :func:`write`; builders and analyses
-    are available on the returned manager (``.builders[name].func(**params)``,
-    ``.analyses[name].func(structure, **params)``).  Failed plugins are listed in
-    ``manager.records`` with ``status == "error"`` instead of raising.
-    """
-    return PluginManager([Path(d) for d in dirs], use_entry_points=entry_points).load_all()
+warnings.warn("the 'atomscope' package is now called 'crystallume'; import crystallume instead",
+              DeprecationWarning, stacklevel=2)
 
-
-def serve(*args: Any, **kwargs: Any) -> None:
-    """Run the AtomScope web server (blocking). See :func:`atomscope.server.serve`."""
-    from .server import serve as _serve
-
-    _serve(*args, **kwargs)
-
-
-def view(*args: Any, **kwargs: Any) -> str:
-    """Show structures in the browser viewer. See :func:`atomscope.server.view`."""
-    from .server import view as _view
-
-    return _view(*args, **kwargs)
+sys.modules[__name__] = crystallume

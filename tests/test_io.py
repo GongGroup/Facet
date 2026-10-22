@@ -8,9 +8,9 @@ import io as stdio
 import numpy as np
 import pytest
 
-import atomscope as ats
-from atomscope import Structure, build
-from atomscope.io import FormatError, ParseError, detect_format, parse_text, to_text
+import crystallume as cl
+from crystallume import Structure, build
+from crystallume.io import FormatError, ParseError, detect_format, parse_text, to_text
 
 
 def _same_positions(a: Structure, b: Structure, atol: float = 1e-4) -> bool:
@@ -123,7 +123,7 @@ def test_poscar_groups_species():
 
 # --------------------------------------------------------------------- CIF
 def test_cif_nacl_symmetry_expansion(data_dir):
-    s = ats.read(data_dir / "NaCl.cif")
+    s = cl.read(data_dir / "NaCl.cif")
     assert len(s) == 8
     assert s.composition == {"Na": 4, "Cl": 4}
     assert np.allclose(s.cellpar, (5.6402, 5.6402, 5.6402, 90, 90, 90))
@@ -133,7 +133,7 @@ def test_cif_nacl_symmetry_expansion(data_dir):
 
 
 def test_cif_perovskite_pm3m(data_dir):
-    s = ats.read(data_dir / "SrTiO3.cif")
+    s = cl.read(data_dir / "SrTiO3.cif")
     assert len(s) == 5
     assert s.formula == "SrTiO3"
     assert abs(s.cell[0, 0] - 3.905) < 1e-9  # uncertainty "(2)" stripped
@@ -227,7 +227,7 @@ def test_json_roundtrip_and_project_input():
     back = parse_text(to_text(s, "json"), "json")
     assert back.info.pop("format") == "json"
     assert back.to_dict() == s.to_dict()
-    proj = ats.new_project("p", [build.molecule("water"), s])
+    proj = cl.new_project("p", [build.molecule("water"), s])
     proj["activeStructure"] = proj["structures"][1]["id"]
     import json
 
@@ -249,15 +249,15 @@ def test_detect_by_name(name, fmt):
 def test_read_write_files_and_fileobj(tmp_path):
     si = build.crystal("diamond", "Si")
     p = tmp_path / "POSCAR"
-    ats.write(p, si)
-    assert ats.read(p).formula == "Si8"
-    ats.write(tmp_path / "si.xyz", si)  # .xyz paths use extended XYZ (keeps the cell)
-    assert ats.read(tmp_path / "si.xyz").cell is not None
+    cl.write(p, si)
+    assert cl.read(p).formula == "Si8"
+    cl.write(tmp_path / "si.xyz", si)   # .xyz paths use extended XYZ (keeps the cell)
+    assert cl.read(tmp_path / "si.xyz").cell is not None
     gz = tmp_path / "si.cif.gz"
     gz.write_bytes(gzip.compress(to_text(si, "cif").encode()))
-    assert len(ats.read(gz)) == 8
+    assert len(cl.read(gz)) == 8
     buf = stdio.StringIO(to_text(si, "xyz"))
-    assert len(ats.read(buf, format="xyz")) == 8
+    assert len(cl.read(buf, format="xyz")) == 8
 
 
 def test_errors():

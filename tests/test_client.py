@@ -6,10 +6,10 @@ import socket
 
 import pytest
 
-from atomscope import Client, build
-from atomscope.client import ClientError
-from atomscope.config import Settings
-from atomscope.server import BackgroundServer, create_app
+from crystallume import Client, build
+from crystallume.client import ClientError
+from crystallume.config import Settings
+from crystallume.server import BackgroundServer, create_app
 
 from .conftest import EXAMPLE_PLUGINS
 

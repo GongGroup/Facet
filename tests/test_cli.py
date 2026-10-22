@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 import os
 
-import atomscope as ats
-from atomscope.cli import main
-from atomscope.storage import SQLiteStore
+import crystallume as cl
+from crystallume.cli import main
+from crystallume.storage import SQLiteStore
 
 from .conftest import EXAMPLE_PLUGINS
 
@@ -15,7 +15,7 @@ from .conftest import EXAMPLE_PLUGINS
 def test_build_crystal_and_info(tmp_path, capsys):
     out = tmp_path / "out.xyz"
     assert main(["build", "crystal", "fcc", "Cu", "--a", "3.61", "--repeat", "3", "3", "3", "-o", str(out)]) == 0
-    s = ats.read(out)
+    s = cl.read(out)
     assert len(s) == 108 and s.cell is not None
     capsys.readouterr()
     assert main(["info", str(out), "--json", "--bonds"]) == 0
@@ -28,7 +28,7 @@ def test_build_crystal_and_info(tmp_path, capsys):
 def test_build_cluster_and_molecule(tmp_path, capsys):
     out = tmp_path / "au55.xyz"
     assert main(["build", "cluster", "icosahedron", "Au", "--size", "3", "-o", str(out)]) == 0
-    assert len(ats.read(out)) == 55
+    assert len(cl.read(out)) == 55
     capsys.readouterr()
     assert main(["build", "molecule", "caffeine"]) == 0
     assert capsys.readouterr().out.startswith("24\n")
@@ -37,7 +37,7 @@ def test_build_cluster_and_molecule(tmp_path, capsys):
 def test_convert(tmp_path, data_dir):
     out = tmp_path / "POSCAR"
     assert main(["convert", str(data_dir / "NaCl.cif"), str(out)]) == 0
-    assert ats.read(out).formula == "Na4Cl4"
+    assert cl.read(out).formula == "Na4Cl4"
     pdb = tmp_path / "nacl.pdb"
     assert main(["convert", str(out), str(pdb), "--to", "pdb"]) == 0
     assert "CRYST1" in pdb.read_text()
@@ -54,7 +54,7 @@ def test_user_create_and_list(tmp_path, capsys):
     assert main(["user", "create", "carol", "--password", "carolpass", "--data", str(data)]) == 0
     assert main(["user", "list", "--data", str(data)]) == 0
     assert "carol" in capsys.readouterr().out
-    store = SQLiteStore(data / "atomscope.db")
+    store = SQLiteStore(data / "crystallume.db")
     assert store.authenticate("carol", "carolpass") is not None
     store.close()
     assert main(["user", "create", "carol", "--password", "another1", "--data", str(data)]) == 1
@@ -76,14 +76,14 @@ def test_plugin_formats_on_the_command_line(tmp_path, capsys, monkeypatch):
     src.write_text(HELLO)
     out = tmp_path / "out.xyz"
     assert main(["convert", str(src), str(out), "--plugins", str(EXAMPLE_PLUGINS)]) == 0
-    assert ats.read(out).formula == "Cu2"
+    assert cl.read(out).formula == "Cu2"
     capsys.readouterr()
     assert main(["info", str(src), "--json", "--plugins", str(EXAMPLE_PLUGINS)]) == 0
     assert json.loads(capsys.readouterr().out)["natoms"] == 2
     assert main(["formats", "--plugins", str(EXAMPLE_PLUGINS)]) == 0
     assert "[plugin hello]" in capsys.readouterr().out
-    # ATOMSCOPE_PLUGIN_DIRS is the fallback for --plugins
-    monkeypatch.setenv("ATOMSCOPE_PLUGIN_DIRS", str(EXAMPLE_PLUGINS))
+    # CRYSTALLUME_PLUGIN_DIRS is the fallback for --plugins
+    monkeypatch.setenv("CRYSTALLUME_PLUGIN_DIRS", str(EXAMPLE_PLUGINS))
     back = tmp_path / "back.hello"
     assert main(["convert", str(out), str(back)]) == 0
     assert back.read_text().startswith("HELLO")
@@ -93,7 +93,7 @@ def test_build_custom_and_analyze(tmp_path, capsys):
     plugins = ["--plugins", str(EXAMPLE_PLUGINS)]
     out = tmp_path / "chain.xyz"
     assert main(["build", "custom", "hello-chain", "--param", "n=5", "--param", "element=Ag", "-o", str(out), *plugins]) == 0
-    assert ats.read(out).formula == "Ag5"
+    assert cl.read(out).formula == "Ag5"
     capsys.readouterr()
     assert main(["build", "custom", *plugins]) == 0
     assert "hello-chain" in capsys.readouterr().out
@@ -115,7 +115,7 @@ def test_plugins_option_before_positionals(tmp_path, capsys):
     src.write_text(HELLO)
     out = tmp_path / "out.xyz"
     assert main(["convert", "--plugins", str(EXAMPLE_PLUGINS), str(src), str(out)]) == 0
-    assert ats.read(out).formula == "Cu2"
+    assert cl.read(out).formula == "Cu2"
     capsys.readouterr()
     assert main(["analyze", "--plugins", str(EXAMPLE_PLUGINS), "hello-com", str(out)]) == 0
     assert "centerOfMass" in json.loads(capsys.readouterr().out)
@@ -143,8 +143,8 @@ def test_plugins_new_scaffolds_a_loadable_plugin(tmp_path, capsys):
 
 def test_serve_passes_root_path(monkeypatch):
     seen = {}
-    import atomscope.server as server
+    import crystallume.server as server
 
     monkeypatch.setattr(server, "serve", lambda **kw: seen.update(kw))
-    assert main(["serve", "--root-path", "/atomscope", "--port", "9999"]) == 0
-    assert seen["root_path"] == "/atomscope" and seen["settings"].port == 9999
+    assert main(["serve", "--root-path", "/crystallume", "--port", "9999"]) == 0
+    assert seen["root_path"] == "/crystallume" and seen["settings"].port == 9999

@@ -5,8 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from atomscope import build
-from atomscope.analysis import distance_matrix
+from crystallume import build
+from crystallume.analysis import distance_matrix
 
 
 @pytest.mark.parametrize(

@@ -1,37 +1,44 @@
 # docker compose up -d
-# docker compose exec atomscope atomscope user create alice     # accounts (registration is off)
+# docker compose exec crystallume crystallume user create alice     # accounts (registration is off)
+# Upgrading from AtomScope: the service is now "crystallume"; run `docker compose up -d --remove-orphans` once
+# so the old "atomscope" container stops and frees the port. The project keeps its pre-rename name below, so the
+# data volume stays "atomscope_atomscope-data" even when this checkout's folder is renamed or freshly cloned as
+# "crystallume". If your old checkout folder was not called "atomscope", its project (and volume prefix) was that
+# folder's name: put COMPOSE_PROJECT_NAME=<old folder name> in a .env file next to this one (or pass -p <old name>).
+name: atomscope
 services:
-  atomscope:
+  crystallume:
     build: .
-    image: atomscope:0.1.0
+    image: crystallume:0.1.0
     restart: unless-stopped
     ports:
       - "8765:8765"
       # Local mode has no login: publish it on this machine only, e.g.
       # - "127.0.0.1:8765:8765"
     environment:
-      ATOMSCOPE_MODE: cloud                  # or "local" for a single-user server (then also set ATOMSCOPE_TOKEN)
-      ATOMSCOPE_ALLOW_REGISTRATION: "false"  # "true" lets anyone who reaches the server sign up (5 per hour per address)
-      # ATOMSCOPE_TOKEN: <long random string>  # local mode: require this token (sign in as "local")
-      # ATOMSCOPE_TOKEN_TTL_DAYS: "30"       # cloud sign-ins expire after this many idle days (0 = never)
-      # ATOMSCOPE_SECRET: change-me          # optional; otherwise generated into /data/secret.key
-      # ATOMSCOPE_CORS_ORIGINS: https://viewer.example.org
-      # ATOMSCOPE_ROOT_PATH: /atomscope      # when a reverse proxy serves the app under a sub-path
-      # ATOMSCOPE_FORWARDED_ALLOW_IPS: "172.28.0.0/16"   # behind a reverse-proxy container: trust X-Forwarded-For
-      #                                      # from the proxy's address or network (the subnet below), else rate
-      #                                      # limits treat every user as the proxy. Never "*": any client could
-      #                                      # then forge its address and dodge the sign-in limits.
-      # ATOMSCOPE_FRAME_ANCESTORS: "'self' https://wiki.example.org"   # allow embedding in other sites
-      ATOMSCOPE_MAX_PROJECT_MB: "50"
-      ATOMSCOPE_MAX_ATOMS: "200000"          # largest structure the builder endpoints create
+      CRYSTALLUME_MODE: cloud                    # or "local" for a single-user server (then also set CRYSTALLUME_TOKEN)
+      CRYSTALLUME_ALLOW_REGISTRATION: "false"    # "true" lets anyone who reaches the server sign up (5 per hour per address)
+      # CRYSTALLUME_TOKEN: <long random string>  # local mode: require this token (sign in as "local")
+      # CRYSTALLUME_TOKEN_TTL_DAYS: "30"         # cloud sign-ins expire after this many idle days (0 = never)
+      # CRYSTALLUME_SECRET: change-me            # optional; otherwise generated into /data/secret.key
+      # CRYSTALLUME_CORS_ORIGINS: https://viewer.example.org
+      # CRYSTALLUME_ROOT_PATH: /crystallume      # when a reverse proxy serves the app under a sub-path
+      # CRYSTALLUME_FORWARDED_ALLOW_IPS: "172.28.0.0/16"   # behind a reverse-proxy container: trust X-Forwarded-For
+      #                                          # from the proxy's address or network (the subnet below), else rate
+      #                                          # limits treat every user as the proxy. Never "*": any client could
+      #                                          # then forge its address and dodge the sign-in limits.
+      # CRYSTALLUME_FRAME_ANCESTORS: "'self' https://wiki.example.org"   # allow embedding in other sites
+      CRYSTALLUME_MAX_PROJECT_MB: "50"
+      CRYSTALLUME_MAX_ATOMS: "200000"            # largest structure the builder endpoints create
     volumes:
       - atomscope-data:/data
-      - ./examples/plugins:/plugins:ro      # plugin directory (ATOMSCOPE_PLUGIN_DIRS=/plugins)
+      - ./examples/plugins:/plugins:ro           # plugin directory (CRYSTALLUME_PLUGIN_DIRS=/plugins)
 
 volumes:
+  # Named as before the rename from AtomScope; with the project name above, the volume is atomscope_atomscope-data.
   atomscope-data:
 
-# With a proxy container on this network, give the network a fixed subnet for ATOMSCOPE_FORWARDED_ALLOW_IPS
+# With a proxy container on this network, give the network a fixed subnet for CRYSTALLUME_FORWARDED_ALLOW_IPS
 # (and publish the port only on 127.0.0.1, or not at all, so clients cannot bypass the proxy):
 # networks:
 #   default:

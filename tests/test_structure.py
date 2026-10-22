@@ -7,8 +7,8 @@ import json
 import numpy as np
 import pytest
 
-from atomscope import Structure, build
-from atomscope.core.lattice import cart_to_frac, cell_to_cellpar, cellpar_to_cell, frac_to_cart
+from crystallume import Structure, build
+from crystallume.core.lattice import cart_to_frac, cell_to_cellpar, cellpar_to_cell, frac_to_cart
 
 
 def test_to_dict_from_dict_roundtrip():
@@ -16,7 +16,7 @@ def test_to_dict_from_dict_roundtrip():
                   props={"charges": [1.0, -1.0]}, info={"source": "test"}, name="NaCl",
                   frames=[{"positions": [[0.1, 0, 0], [2.9, 2.82, 2.82]]}])
     d = s.to_dict()
-    assert d["schema"] == "atomscope.structure/1"
+    assert d["schema"] == "crystallume.structure/1"
     assert set(d) == {"schema", "name", "symbols", "positions", "cell", "pbc", "frames", "props", "info"}
     assert d["positions"][1][0] == 2.82  # rounded to 6 decimals
     assert d["pbc"] == [True, True, True]
@@ -133,3 +133,43 @@ def test_lattice_roundtrip():
     assert np.allclose(cart_to_frac(frac_to_cart(frac, cell), cell), frac)
     with pytest.raises(ValueError):
         cellpar_to_cell(1, 1, 1, 10, 10, 170)
+
+
+def test_former_name_documents_still_load():
+    """Files written while the package was called AtomScope keep opening."""
+    from crystallume import Structure
+    from crystallume.project import normalize_project
+
+    s = Structure.from_dict({"schema": "atomscope.structure/1", "symbols": ["H"], "positions": [[0, 0, 0]]})
+    assert len(s) == 1
+    doc = normalize_project({"schema": "atomscope.project/1", "name": "old", "structures": []})
+    assert doc["schema"] == "crystallume.project/1"
+
+
+def test_former_name_environment_variables(tmp_path):
+    from crystallume.config import Settings
+
+    s = Settings.from_env({"ATOMSCOPE_PORT": "9123", "CRYSTALLUME_MODE": "local", "ATOMSCOPE_DATA_DIR": str(tmp_path)})
+    assert s.port == 9123 and s.data_dir == tmp_path
+    s2 = Settings.from_env({"ATOMSCOPE_PORT": "9123", "CRYSTALLUME_PORT": "9200"})
+    assert s2.port == 9200
+
+
+def test_former_name_cloud_database(tmp_path):
+    """A data directory from before the rename keeps using its atomscope.db."""
+    from crystallume.config import Settings
+    from crystallume.storage.sqlite import SQLiteStore
+
+    s = Settings(mode="cloud", data_dir=tmp_path)
+    assert s.db_path == tmp_path / "crystallume.db"   # nothing there yet: the new name
+    old = SQLiteStore(tmp_path / "atomscope.db", secret="x" * 32)
+    old.create_user("alice", "correct horse battery")
+    old.close()
+    assert s.db_path == tmp_path / "atomscope.db"
+    # also when an earlier start already created an empty crystallume.db next to it
+    SQLiteStore(tmp_path / "crystallume.db", secret="x" * 32).close()
+    assert s.db_path == tmp_path / "atomscope.db"
+    new = SQLiteStore(tmp_path / "crystallume.db", secret="x" * 32)
+    new.create_user("bob", "correct horse battery")
+    new.close()
+    assert s.db_path == tmp_path / "crystallume.db"   # a crystallume.db that holds data wins

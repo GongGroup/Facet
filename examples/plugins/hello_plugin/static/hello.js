@@ -1,11 +1,11 @@
 // Hello plugin — frontend part.
 //
-// AtomScope's web UI dynamic-imports every URL listed under
+// Crystallume's web UI dynamic-imports every URL listed under
 // `plugins[].frontend` in GET /api/v1/info and calls the default export:
 //
 //   export default function activate(api) { ... }
 //
-// `api` is window.atomscope: registerLook, registerStyle, registerMaterial, registerColorScheme,
+// `api` is window.crystallume: registerLook, registerStyle, registerMaterial, registerColorScheme,
 // registerLightingPreset, registerAnalysis, registerCommand, registerPanel, toast, … — see docs/PLUGINS.md.
 // This example uses:
 //   api.registerLightingPreset({ id, name, ... })
