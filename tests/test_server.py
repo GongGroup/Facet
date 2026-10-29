@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from crystallume import build
+from crystallume import __version__, build
 
 POSCAR_TEXT = """Si8 diamond
 5.431
@@ -27,7 +27,7 @@ Direct
 
 def test_health_and_info(local_client):
     r = local_client.get("/api/v1/health")
-    assert r.status_code == 200 and r.json() == {"status": "ok", "version": "0.1.0"}
+    assert r.status_code == 200 and r.json() == {"status": "ok", "version": __version__}
     info = local_client.get("/api/v1/info").json()
     assert info["name"] == "Crystallume" and info["mode"] == "local"
     assert info["authRequired"] is False and info["allowRegistration"] is False
