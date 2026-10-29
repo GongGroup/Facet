@@ -204,16 +204,19 @@ export class Viewer extends Emitter {
     old?.dispose();
     if (kind === 'trackball') {
       const c = new TrackballControls(this.camera, this.renderer.domElement);
-      c.rotateSpeed = 3; c.zoomSpeed = 1.4; c.panSpeed = 0.6; c.dynamicDampingFactor = 0.15;
+      c.rotateSpeed = 3; c.zoomSpeed = 1.4; c.dynamicDampingFactor = 0.15;
       c.keys = [];   // its A/S/D hold keys would change what a drag does
+      // its pan ran several times too far (its damping repeats the whole offset each frame) and crawled in an
+      // orthographic view: the viewer pans instead, for the mouse and for two fingers (_ptrMove)
+      c.noPan = true;
       this.controls = c;
     } else {
       const c = new OrbitControls(this.camera, this.renderer.domElement);
       c.enableDamping = true; c.dampingFactor = 0.12; c.rotateSpeed = 0.9; c.zoomSpeed = 1.1; c.screenSpacePanning = true;
       this.controls = c;
     }
-    // right-drag rotates and middle-drag pans, as in Materials Studio; the mouse's left button never
-    // reaches the controls (_ptrDown takes it for selection), so LEFT is only a pen tip's
+    // right-drag rotates, as in Materials Studio; the left and middle buttons and Alt+right never reach
+    // the controls (_ptrDown takes them for selection and panning), so LEFT is only a pen tip's
     this.controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
     this.controls.target.copy(target);
     this.controlsKind = kind;
@@ -250,6 +253,9 @@ export class Viewer extends Emitter {
     let raf = 0, lastMove = null;
     el.addEventListener('contextmenu', (e) => e.preventDefault());
     el.addEventListener('mousedown', (e) => { if (e.button === 1) e.preventDefault(); });   // no autoscroll when the middle button pans
+    // the controls are off during a press (a pan with the wheel button held, a box…), so they leave the wheel alone:
+    // a nudge of the wheel must not scroll the page around the view instead
+    el.addEventListener('wheel', (e) => { if (this._ptrs.size) e.preventDefault(); }, { passive: false });
     el.addEventListener('pointermove', (e) => {
       lastMove = e;
       if (e.buttons) { if (this.hoverIndex !== -1) this._setHover(-1, e); return; }
@@ -342,8 +348,8 @@ export class Viewer extends Emitter {
 
   /**
    * Start following a press on the canvas. Its `kind`: 'left' (selection, see _leftPress), 'axis' (X/Y/Z +
-   * right-drag), 'pan' (middle), 'chord' (left and right together: zoom) or 'controls' (the camera controls
-   * drag; a release without moving is a tap, or the atom menu for the right button).
+   * right-drag), 'pan' (middle or Alt+right), 'chord' (left and right together: zoom) or 'controls' (the
+   * camera controls drag; a release without moving is a tap, or the atom menu for the right button).
    */
   _ptrDown(e) {
     if (e.target !== this.renderer.domElement) return;
@@ -353,8 +359,6 @@ export class Viewer extends Emitter {
     if (!touch && [...this._ptrs.values()].some((q) => q.type !== 'touch')) return;
     if (!touch && e.button !== 0 && e.button !== 1 && e.button !== 2) return;   // back / forward buttons
     for (const k of this._held) this._heldUsed.add(k);   // a hold key used here does not run its own shortcut
-    const c = this.controls;
-    if (c.mouseButtons) c.mouseButtons.RIGHT = e.altKey ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE;   // Alt+right-drag pans
     const p = { id: e.pointerId, type: e.pointerType, button: e.button, x0: e.clientX, y0: e.clientY, lx: e.clientX, ly: e.clientY, t0: performance.now(), far: false, kind: 'controls' };
     const held = (k) => this._held.has(k);
     if (touch) {
@@ -367,9 +371,13 @@ export class Viewer extends Emitter {
       p.kind = 'axis'; p.axis = ['x', 'y', 'z'].find(held);
       this._holdControls(p);
       this._capture(p);
-    } else if (e.button === 1) {
+    } else if (e.button === 1 || (e.button === 2 && e.altKey)) {
+      // pan here rather than in the camera controls: the model stays under the pointer and stops with it
+      // (the controls' damping made it trail and glide on), whatever the controls and projection
       e.preventDefault();
       p.kind = 'pan';
+      this._holdControls(p);
+      this._capture(p);
     }
     this._ptrs.set(e.pointerId, p);
     if (this._ptrs.size === 1) {
@@ -410,14 +418,20 @@ export class Viewer extends Emitter {
     if (!p.far && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) >= CLICK_PX) p.far = true;
     const dx = e.clientX - p.lx, dy = e.clientY - p.ly;
     p.lx = e.clientX; p.ly = e.clientY;
+    if (p.type === 'touch') {
+      // the camera controls handle touch, except the trackball's two-finger pan: the model follows the fingers' midpoint
+      if (this.controlsKind === 'trackball' && (dx || dy) && [...this._ptrs.values()].filter((q) => q.type === 'touch').length === 2) this.panBy(dx / 2, dy / 2);
+      return;
+    }
     // the left and right buttons pressed together zoom, whichever went down first (the second button
     // of a mouse arrives as a move, not as a press)
-    if (p.type === 'mouse' && (e.buttons & 3) === 3 && (p.kind === 'left' || (p.kind === 'controls' && p.button === 2))) {
+    if (p.type === 'mouse' && (e.buttons & 3) === 3 && (p.kind === 'left' || (p.button === 2 && (p.kind === 'controls' || p.kind === 'pan')))) {
       p.kind = 'chord'; p.far = true;
       this._holdControls(p);
       this._removeShape(p);
     }
     if (p.cancelled) return;
+    if (p.kind === 'pan') { if (dx || dy) this.panBy(dx, dy); return; }
     if (p.kind === 'chord') { if (dy) this.zoomBy(Math.exp(-dy * 0.01)); return; }
     if (p.kind === 'axis') {
       // the same speed as a free rotation: dragging across the view's height turns about 320°
@@ -433,7 +447,7 @@ export class Viewer extends Emitter {
     const p = this._ptrs.get(e.pointerId);
     if (!p) return;
     this._endPress(e.pointerId);
-    if (cancelled || p.cancelled || p.kind === 'chord' || p.kind === 'pan') return;
+    if (cancelled || p.cancelled || p.kind === 'chord' || (p.kind === 'pan' && p.button === 1)) return;   // (Alt+right-click: the menu)
     if (!p.far && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) < CLICK_PX) {
       if (p.button === 2) this._context(e);
       else if (p.button === 0 && (p.kind === 'left' || performance.now() - p.t0 < 500)) this._tap(e);
@@ -1321,6 +1335,7 @@ export class Viewer extends Emitter {
     this.resolution.set(w, h);
     this.root.traverse((o) => { if (o.material?.isLineMaterial) o.material.resolution.set(w, h); });
     this.post.setSize(w, h);
+    this.controls.handleResize?.();   // TrackballControls measures the view for its rotation centre
     this._dirty = true;
   }
 
