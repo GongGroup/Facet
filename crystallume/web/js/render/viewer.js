@@ -4,16 +4,25 @@
  *
  * Events:
  *   'hover'       {index, x, y}                       pointer over a displayed atom (index −1: none)
- *   'atomclick'   {index, shiftKey, x, y}             click without drag (index −1: empty space)
+ *   'atomclick'   {index, mode, shiftKey, x, y}       click without drag (index −1: empty space); mode is
+ *                                                     'replace', 'add' (Shift) or 'toggle' (Ctrl/⌘), and
+ *                                                     shiftKey is true for the last two
+ *   'atomdblclick' {index, mode, altKey, x, y}        double-click on a displayed atom (Alt: the element)
  *   'atomcontext' {index, x, y, clientX, clientY}     right-click without drag (index −1: empty space);
  *                                                     x/y are relative to the viewport element
- *   'boxselect'   {indices, add}                      Shift+drag (add) or Alt+drag (replace) rectangle with
- *                                                     tool 'select'; indices are unique source (structure) indices
+ *   'boxselect'   {indices, mode, add, shape}         a rectangle (drag) or lasso (Q+drag) finished with tool
+ *                                                     'select'; indices are unique source (structure) indices,
+ *                                                     add = mode is not 'replace', shape 'rect' | 'lasso'
  *   'frame' i | 'play' bool | 'selection' srcIndices | 'render' | 'measure' list | 'camera' | 'model' model | 'error' err
  *
- * Keyboard, while the canvas has focus: arrows orbit by 10°, Shift+arrows pan, +/− zoom; those keys
- * do not reach the global shortcuts (plain ←/→ are left to frame stepping on trajectories).
- * `tool` is the app's active tool ('select' | 'measure' | …); box selection runs only with 'select'.
+ * Mouse, as in Materials Studio: left button selects (see _setupPointer), right-drag rotates, middle-drag
+ * pans, the wheel or both buttons together zoom. Touch, and a pen tip without modifiers: one finger rotates,
+ * two pan and pinch, a tap selects.
+ * Keyboard, while the canvas has focus: arrows turn the model 45° about the screen axes, Shift/Alt+arrows
+ * pan, +/− zoom; those keys do not reach the global shortcuts. `holdKeys` (X, Y, Z, R, Q, E) change
+ * what a drag does while held; `heldKeyUsed(k)` tells the shortcut router that a drag used one, so that
+ * releasing it does not also run the key's own shortcut.
+ * `tool` is the app's active tool ('select' | 'measure' | …); box and lasso selection run only with 'select'.
  * The app keeps it current by setting `toolProvider = () => app.tool` (or by assigning `tool`).
  * `helpers` = the building blocks styles receive as ctx.helpers (buildAtoms, buildBonds, …).
  */
@@ -42,7 +51,23 @@ const sig = (o) => JSON.stringify(o ?? null);
 const DEG = Math.PI / 180;
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const cssVar = (name, fallback) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
-const KEY_ORBIT = 10, KEY_PAN = 40, KEY_ZOOM = 1.2;
+const KEY_TURN = 45, KEY_PAN = 40, KEY_ZOOM = 1.2;
+/** A press that moves less than this (CSS px) is a click; two clicks this close in time and place are a double-click. */
+const CLICK_PX = 5, DOUBLE_MS = 450, DOUBLE_PX = 6;
+/** Keys held down to change what a drag does: X/Y/Z + right-drag, R (zoom box), Q (lasso), E (rectangle) + left-drag. */
+const HOLD_KEYS = new Set(['x', 'y', 'z', 'r', 'q', 'e']);
+const SVG_NS = 'http://www.w3.org/2000/svg';
+/** Selection mode of a click or drag from its modifier keys: Ctrl/⌘ toggles, Shift adds. */
+const selectMode = (e) => (e.ctrlKey || e.metaKey ? 'toggle' : e.shiftKey ? 'add' : 'replace');
+/** Even-odd test of a point against a polygon [[x, y], …]. */
+function inPolygon(pts, x, y) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i], [xj, yj] = pts[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
 /** Above this many drawn atoms the cell letters clear the atoms' bounding box instead of each atom. */
 const LETTER_DISC_LIMIT = 20000;
 
@@ -92,7 +117,7 @@ export class Viewer extends Emitter {
     el.className = 'viewer-canvas';
     el.tabIndex = 0;
     el.setAttribute('role', 'application');
-    el.setAttribute('aria-label', '3D structure view. Arrow keys rotate, +/- zoom, Shift+arrows pan');
+    el.setAttribute('aria-label', '3D structure view. Arrow keys rotate by 45 degrees, Shift or Alt+arrows pan, +/- zoom');
     container.appendChild(el);
     this.overlay = document.createElement('canvas');
     this.overlay.className = 'viewer-overlay';
@@ -141,6 +166,11 @@ export class Viewer extends Emitter {
     this.resolution = new THREE.Vector2(1, 1);
     this._tool = 'select';
     this.toolProvider = null;
+    this.holdKeys = HOLD_KEYS;
+    this._held = new Set();       // hold keys down now
+    this._heldUsed = new Set();   // hold keys that took part in a press since they went down
+    this._ptrs = new Map();       // pointerId → press being tracked (see _ptrDown)
+    this._lastTap = null;
     this.helpers = { buildAtoms, buildBonds, buildLines, buildPolyhedra, atomRadius, segmentsFor };
 
     // shared halo resources: one geometry, one material and one growable instanced mesh per kind
@@ -175,12 +205,16 @@ export class Viewer extends Emitter {
     if (kind === 'trackball') {
       const c = new TrackballControls(this.camera, this.renderer.domElement);
       c.rotateSpeed = 3; c.zoomSpeed = 1.4; c.panSpeed = 0.6; c.dynamicDampingFactor = 0.15;
+      c.keys = [];   // its A/S/D hold keys would change what a drag does
       this.controls = c;
     } else {
       const c = new OrbitControls(this.camera, this.renderer.domElement);
       c.enableDamping = true; c.dampingFactor = 0.12; c.rotateSpeed = 0.9; c.zoomSpeed = 1.1; c.screenSpacePanning = true;
       this.controls = c;
     }
+    // right-drag rotates and middle-drag pans, as in Materials Studio; the mouse's left button never
+    // reaches the controls (_ptrDown takes it for selection), so LEFT is only a pen tip's
+    this.controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
     this.controls.target.copy(target);
     this.controlsKind = kind;
     this._syncControlsUp();
@@ -203,54 +237,67 @@ export class Viewer extends Emitter {
     c._quatInverse.copy(c._quat).invert();
   }
 
+  /**
+   * Mouse buttons as in Materials Studio. Left: click selects (Shift adds, Ctrl/⌘ toggles, empty space
+   * clears), drag draws a selection rectangle (Q held: a lasso; R held: a box to zoom into), double-click
+   * selects the bonded fragment (Alt: every atom of the element). Right: drag rotates (Alt: pans; X/Y/Z
+   * held: turns about that screen axis), click opens the atom menu. Middle-drag pans; the wheel, or the
+   * left and right buttons dragged together, zoom. Touch and a pen tip without modifiers keep the camera
+   * controls' gestures, and a tap selects.
+   */
   _setupPointer() {
     const el = this.renderer.domElement;
-    let down = null, raf = 0, lastMove = null;
-    el.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY, t: performance.now(), b: e.button }; });
-    el.addEventListener('pointerup', (e) => {
-      if (!down) return;
-      const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
-      const dt = performance.now() - down.t;
-      if (moved < 5 && dt < 500 && down.b === 0) this._click(e);
-      else if (moved < 5 && down.b === 2) this._context(e);
-      down = null;
-    });
+    let raf = 0, lastMove = null;
     el.addEventListener('contextmenu', (e) => e.preventDefault());
+    el.addEventListener('mousedown', (e) => { if (e.button === 1) e.preventDefault(); });   // no autoscroll when the middle button pans
     el.addEventListener('pointermove', (e) => {
       lastMove = e;
       if (e.buttons) { if (this.hoverIndex !== -1) this._setHover(-1, e); return; }
       if (!raf) raf = requestAnimationFrame(() => { raf = 0; const ev = lastMove; const i = this.pickAtom(ev.clientX, ev.clientY); this._setHover(i, ev); });
     });
     el.addEventListener('pointerleave', (e) => this._setHover(-1, e));
-    el.addEventListener('dblclick', (e) => {
-      const i = this.pickAtom(e.clientX, e.clientY);
-      if (i >= 0) this.focusAtom(i); else this.fitView(true);
-    });
-    // box selection: a capture listener on the container runs before the camera controls see the press
-    this.container.addEventListener('pointerdown', (e) => this._boxStart(e), true);
+    // a capture listener on the container runs before the camera controls (on the canvas) see a press;
+    // moves and releases are followed on the window, in its capture phase, ahead of the controls too
+    this.container.addEventListener('pointerdown', (e) => this._ptrDown(e), true);
+    this._ptrMove = this._ptrMove.bind(this);
+    this._ptrUp = this._ptrUp.bind(this);
+    this._ptrCancel = (e) => this._ptrUp(e, true);
   }
 
   _setupKeys() {
+    // hold keys are followed on the window, wherever the focus is: a drag in the view reads them
+    const hold = (e, down) => {
+      const k = e.key?.toLowerCase();
+      if (!HOLD_KEYS.has(k)) return;
+      if (!down) this._held.delete(k);
+      else if (!e.repeat) { this._held.add(k); this._heldUsed.delete(k); }
+    };
+    addEventListener('keydown', (e) => {
+      hold(e, true);
+      if (e.key === 'Escape' && this._cancelShapes()) { e.preventDefault(); e.stopPropagation(); }   // (not also clearing the selection)
+    }, true);
+    addEventListener('keyup', (e) => hold(e, false), true);
+    addEventListener('blur', () => { this._held.clear(); for (const id of [...this._ptrs.keys()]) this._endPress(id); });
     this.renderer.domElement.addEventListener('keydown', (e) => {
-      if (e.ctrlKey || e.metaKey || e.altKey || !this.structure) return;
+      if (e.ctrlKey || e.metaKey || !this.structure) return;
       const k = e.key;
-      const trajectory = (this.structure?.nFrames ?? 1) > 1;
+      const arrow = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[k];
       let done = true;
-      if (k === 'ArrowLeft' || k === 'ArrowRight') {
-        const sgn = k === 'ArrowLeft' ? 1 : -1;
-        if (e.shiftKey) this.panBy(-sgn * KEY_PAN, 0);
-        else if (trajectory) done = false;          // ←/→ step frames on trajectories
-        else this.orbitBy(sgn * KEY_ORBIT, 0);
-      } else if (k === 'ArrowUp' || k === 'ArrowDown') {
-        const sgn = k === 'ArrowUp' ? 1 : -1;
-        if (e.shiftKey) this.panBy(0, -sgn * KEY_PAN);
-        else this.orbitBy(0, -sgn * KEY_ORBIT);
-      } else if (k === '+' || k === '=') this.zoomBy(KEY_ZOOM);
+      if (arrow) {
+        const [sx, sy] = arrow;
+        if (e.shiftKey || e.altKey) this.panBy(sx * KEY_PAN, sy * KEY_PAN);
+        // ←/→ turn about the screen's vertical axis, ↑/↓ about its horizontal one; a held arrow turns step by step
+        else if (!(e.repeat && this._camAnim)) this.rotateScreen(sx ? 'y' : 'x', (sx || sy) * KEY_TURN);
+      } else if (e.altKey) done = false;
+      else if (k === '+' || k === '=') this.zoomBy(KEY_ZOOM);
       else if (k === '-' || k === '_') this.zoomBy(1 / KEY_ZOOM);
       else done = false;
       if (done) { e.preventDefault(); e.stopPropagation(); }
     });
   }
+
+  /** True when hold key `k` took part in a press (a drag or click in the view) since it went down. */
+  heldKeyUsed(k) { return this._heldUsed.has(String(k).toLowerCase()); }
 
   _setHover(i, e) {
     if (i === this.hoverIndex && i === -1) return;
@@ -261,16 +308,30 @@ export class Viewer extends Emitter {
     this.emit('hover', { index: i, x: e.clientX - r.left, y: e.clientY - r.top });
   }
 
-  _click(e) {
+  /** A left press released without dragging, or a tap: the axis gizmo, else 'atomclick'. Returns the picked index (null: the gizmo took it). */
+  _click(e, mode = selectMode(e)) {
     const r = this.renderer.domElement.getBoundingClientRect();
     const gx = e.clientX - r.left, gy = r.bottom - e.clientY;
     if (this.settings.display.axes && gx < this.gizmo.size + 8 && gy < this.gizmo.size + 8 && gx > 8 && gy > 8) {
       const nx = ((gx - 8) / this.gizmo.size) * 2 - 1, ny = ((gy - 8) / this.gizmo.size) * 2 - 1;
       const hit = this.gizmo.pick(nx, ny);
-      if (hit) { this.setViewDirection(hit.dir.toArray(), null, true); return; }
+      if (hit) { this.setViewDirection(hit.dir.toArray(), null, true); return null; }
     }
     const i = this.pickAtom(e.clientX, e.clientY);
-    this.emit('atomclick', { index: i, shiftKey: e.shiftKey || e.metaKey || e.ctrlKey, x: e.clientX - r.left, y: e.clientY - r.top });
+    this.emit('atomclick', { index: i, mode, shiftKey: mode !== 'replace', x: e.clientX - r.left, y: e.clientY - r.top });
+    return i;
+  }
+
+  /** A click, and also an 'atomdblclick' when it closely follows the previous click on an atom. */
+  _tap(e) {
+    const now = performance.now(), last = this._lastTap;
+    const double = !!last && now - last.t < DOUBLE_MS && Math.hypot(e.clientX - last.x, e.clientY - last.y) < DOUBLE_PX;
+    this._lastTap = double ? null : { t: now, x: e.clientX, y: e.clientY };
+    const mode = selectMode(e);
+    const i = this._click(e, mode);
+    if (!double || i == null || i < 0) return;
+    const r = this.renderer.domElement.getBoundingClientRect();
+    this.emit('atomdblclick', { index: i, mode, altKey: e.altKey, x: e.clientX - r.left, y: e.clientY - r.top });
   }
 
   _context(e) {
@@ -279,51 +340,186 @@ export class Viewer extends Emitter {
     this.emit('atomcontext', { index, x: e.clientX - r.left, y: e.clientY - r.top, clientX: e.clientX, clientY: e.clientY });
   }
 
-  /** Shift+drag (add) or Alt+drag (replace) draws a selection rectangle; a press without drag is a click. */
-  _boxStart(e) {
-    const el = this.renderer.domElement;
-    if (e.target !== el || e.button !== 0 || !(e.shiftKey || e.altKey) || this.tool !== 'select' || !this.model?.n) return;
-    e.stopPropagation(); e.preventDefault();
-    el.focus?.({ preventScroll: true });
-    const host = this.container.getBoundingClientRect();
-    const x0 = e.clientX, y0 = e.clientY, add = e.shiftKey;
-    const box = document.createElement('div');
-    box.className = 'viewer-boxselect';
-    box.setAttribute('aria-hidden', 'true');
-    Object.assign(box.style, {   // its look comes from .viewer-boxselect in app.css
-      position: 'absolute', left: `${x0 - host.left}px`, top: `${y0 - host.top}px`, width: '0px', height: '0px', zIndex: 6, pointerEvents: 'none',
-    });
-    const enabled = this.controls.enabled;
-    this.controls.enabled = false;
-    try { this.container.setPointerCapture?.(e.pointerId); } catch { /* not capturable */ }
-    let shown = false;
-    const move = (ev) => {
-      if (!shown && Math.hypot(ev.clientX - x0, ev.clientY - y0) >= 5) { this.container.appendChild(box); shown = true; }
-      const l = Math.min(x0, ev.clientX) - host.left, t = Math.min(y0, ev.clientY) - host.top;
-      Object.assign(box.style, { left: `${l}px`, top: `${t}px`, width: `${Math.abs(ev.clientX - x0)}px`, height: `${Math.abs(ev.clientY - y0)}px` });
-    };
-    const end = (ev, cancelled = false) => {
-      removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', cancel); removeEventListener('keydown', key, true);
-      try { this.container.releasePointerCapture?.(e.pointerId); } catch { /* already released */ }
-      box.remove();
-      this.controls.enabled = enabled;
-      if (cancelled) return;
-      if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 5) { this._click(ev); return; }
-      this.emit('boxselect', { indices: this.atomsInRect(x0, y0, ev.clientX, ev.clientY), add });
-    };
-    const up = (ev) => end(ev);
-    const cancel = (ev) => end(ev, true);
-    const key = (ev) => { if (ev.key === 'Escape') { ev.stopPropagation(); ev.preventDefault(); end(ev, true); } };
-    addEventListener('pointermove', move); addEventListener('pointerup', up); addEventListener('pointercancel', cancel); addEventListener('keydown', key, true);
+  /**
+   * Start following a press on the canvas. Its `kind`: 'left' (selection, see _leftPress), 'axis' (X/Y/Z +
+   * right-drag), 'pan' (middle), 'chord' (left and right together: zoom) or 'controls' (the camera controls
+   * drag; a release without moving is a tap, or the atom menu for the right button).
+   */
+  _ptrDown(e) {
+    if (e.target !== this.renderer.domElement) return;
+    const touch = e.pointerType === 'touch';
+    // a mouse or pen goes down only with no button held: a press still followed lost its release
+    for (const [id, q] of this._ptrs) if (!touch && q.type === e.pointerType) this._endPress(id);
+    if (!touch && [...this._ptrs.values()].some((q) => q.type !== 'touch')) return;
+    if (!touch && e.button !== 0 && e.button !== 1 && e.button !== 2) return;   // back / forward buttons
+    for (const k of this._held) this._heldUsed.add(k);   // a hold key used here does not run its own shortcut
+    const c = this.controls;
+    if (c.mouseButtons) c.mouseButtons.RIGHT = e.altKey ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE;   // Alt+right-drag pans
+    const p = { id: e.pointerId, type: e.pointerType, button: e.button, x0: e.clientX, y0: e.clientY, lx: e.clientX, ly: e.clientY, t0: performance.now(), far: false, kind: 'controls' };
+    const held = (k) => this._held.has(k);
+    if (touch) {
+      // a second finger makes both presses a pan or pinch, not taps
+      for (const q of this._ptrs.values()) if (q.type === 'touch') { q.far = true; p.far = true; }
+    } else if (e.button === 0 && (e.pointerType === 'mouse' || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey || ['r', 'q', 'e'].some(held))) {
+      this._leftPress(e, p);
+    } else if (e.button === 2 && ['x', 'y', 'z'].some(held)) {
+      e.preventDefault();
+      p.kind = 'axis'; p.axis = ['x', 'y', 'z'].find(held);
+      this._holdControls(p);
+      this._capture(p);
+    } else if (e.button === 1) {
+      e.preventDefault();
+      p.kind = 'pan';
+    }
+    this._ptrs.set(e.pointerId, p);
+    if (this._ptrs.size === 1) {
+      addEventListener('pointermove', this._ptrMove, true);
+      addEventListener('pointerup', this._ptrUp, true);
+      addEventListener('pointercancel', this._ptrCancel, true);
+    }
   }
+
+  /** Left press: a click, a selection rectangle (or a lasso with Q held) with the Select tool, a zoom box with R held. */
+  _leftPress(e, p) {
+    e.preventDefault();   // no text selection while dragging; the canvas still takes the focus for its keys
+    this.renderer.domElement.focus?.({ preventScroll: true });
+    p.kind = 'left';
+    this._holdControls(p);
+    this._capture(p);
+    const select = this.tool === 'select' && !!this.model?.n;
+    p.shape = this._held.has('r') ? 'zoom' : !select ? null : this._held.has('q') ? 'lasso' : 'rect';
+    p.pts = [[e.clientX, e.clientY]];
+  }
+
+  /** Keep the camera controls out of press p until it ends. */
+  _holdControls(p) {
+    if (p.restore) return;
+    const c = this.controls, was = c.enabled;
+    c.enabled = false;
+    p.restore = () => { c.enabled = was; };
+  }
+
+  /** Send press p's events to the container while it lasts, even when the pointer leaves the view. */
+  _capture(p) {
+    try { this.container.setPointerCapture?.(p.id); p.captured = true; } catch { /* not capturable */ }
+  }
+
+  _ptrMove(e) {
+    const p = this._ptrs.get(e.pointerId);
+    if (!p) return;
+    if (!p.far && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) >= CLICK_PX) p.far = true;
+    const dx = e.clientX - p.lx, dy = e.clientY - p.ly;
+    p.lx = e.clientX; p.ly = e.clientY;
+    // the left and right buttons pressed together zoom, whichever went down first (the second button
+    // of a mouse arrives as a move, not as a press)
+    if (p.type === 'mouse' && (e.buttons & 3) === 3 && (p.kind === 'left' || (p.kind === 'controls' && p.button === 2))) {
+      p.kind = 'chord'; p.far = true;
+      this._holdControls(p);
+      this._removeShape(p);
+    }
+    if (p.cancelled) return;
+    if (p.kind === 'chord') { if (dy) this.zoomBy(Math.exp(-dy * 0.01)); return; }
+    if (p.kind === 'axis') {
+      // the same speed as a free rotation: dragging across the view's height turns about 320°
+      const deg = ((p.axis === 'x' ? dy : p.axis === 'y' ? dx : -dx) * 0.9 * 360) / Math.max(1, this.height);
+      if (deg) this.rotateScreen(p.axis, deg, { animate: false });
+      return;
+    }
+    if (p.kind === 'left' && p.far && p.shape) this._drawShape(p, e);
+  }
+
+  /** The last button of a press was released (cancelled: the browser took the pointer, or Esc). */
+  _ptrUp(e, cancelled = false) {
+    const p = this._ptrs.get(e.pointerId);
+    if (!p) return;
+    this._endPress(e.pointerId);
+    if (cancelled || p.cancelled || p.kind === 'chord' || p.kind === 'pan') return;
+    if (!p.far && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) < CLICK_PX) {
+      if (p.button === 2) this._context(e);
+      else if (p.button === 0 && (p.kind === 'left' || performance.now() - p.t0 < 500)) this._tap(e);
+      return;
+    }
+    if (p.kind !== 'left' || !p.shape) return;
+    if (p.shape === 'zoom') { this.zoomToRect(p.x0, p.y0, e.clientX, e.clientY); return; }
+    const indices = p.shape === 'lasso' ? this.atomsInPolygon([...p.pts, [e.clientX, e.clientY]]) : this.atomsInRect(p.x0, p.y0, e.clientX, e.clientY);
+    const mode = selectMode(e);
+    this.emit('boxselect', { indices, mode, add: mode !== 'replace', shape: p.shape });
+  }
+
+  /** Stop following press `id`: give the controls back (before their own release handler runs) and remove its shape. */
+  _endPress(id) {
+    const p = this._ptrs.get(id);
+    if (!p) return;
+    this._ptrs.delete(id);
+    if (!this._ptrs.size) {
+      removeEventListener('pointermove', this._ptrMove, true);
+      removeEventListener('pointerup', this._ptrUp, true);
+      removeEventListener('pointercancel', this._ptrCancel, true);
+    }
+    p.restore?.();
+    this._removeShape(p);
+    if (p.captured) { try { this.container.releasePointerCapture?.(id); } catch { /* already released */ } }
+  }
+
+  /** Esc during a drag drops its rectangle, lasso or zoom box; true when there was one. */
+  _cancelShapes() {
+    let any = false;
+    for (const p of this._ptrs.values()) if (p.kind === 'left' && !p.cancelled && p.far && p.shape) { p.cancelled = true; this._removeShape(p); any = true; }
+    return any;
+  }
+
+  /** Draw press p's rectangle, zoom box or lasso up to pointer event e (their looks come from app.css). */
+  _drawShape(p, e) {
+    const host = this.container.getBoundingClientRect();
+    if (p.shape === 'lasso') {
+      const last = p.pts[p.pts.length - 1];
+      if (Math.hypot(e.clientX - last[0], e.clientY - last[1]) >= 3) p.pts.push([e.clientX, e.clientY]);
+      if (!p.el) {
+        p.el = document.createElementNS(SVG_NS, 'svg');
+        p.el.setAttribute('class', 'viewer-lasso');
+        p.el.setAttribute('aria-hidden', 'true');
+        Object.assign(p.el.style, { position: 'absolute', left: '0', top: '0', width: '100%', height: '100%', zIndex: 6, pointerEvents: 'none', overflow: 'visible' });
+        p.el.appendChild(document.createElementNS(SVG_NS, 'polygon'));
+        this.container.appendChild(p.el);
+      }
+      p.el.firstChild.setAttribute('points', p.pts.map(([x, y]) => `${(x - host.left).toFixed(1)},${(y - host.top).toFixed(1)}`).join(' '));
+      return;
+    }
+    if (!p.el) {
+      p.el = document.createElement('div');
+      p.el.className = p.shape === 'zoom' ? 'viewer-boxselect zoom' : 'viewer-boxselect';
+      p.el.setAttribute('aria-hidden', 'true');
+      Object.assign(p.el.style, { position: 'absolute', zIndex: 6, pointerEvents: 'none' });
+      this.container.appendChild(p.el);
+    }
+    Object.assign(p.el.style, {
+      left: `${Math.min(p.x0, e.clientX) - host.left}px`, top: `${Math.min(p.y0, e.clientY) - host.top}px`,
+      width: `${Math.abs(e.clientX - p.x0)}px`, height: `${Math.abs(e.clientY - p.y0)}px`,
+    });
+  }
+
+  _removeShape(p) { p.el?.remove(); p.el = null; }
 
   /** Unique source indices of the displayed atoms whose centres project inside a client-space rectangle. */
   atomsInRect(x0, y0, x1, y1) {
+    const xa = Math.min(x0, x1), xb = Math.max(x0, x1), ya = Math.min(y0, y1), yb = Math.max(y0, y1);
+    return this._atomsWhere((x, y) => x >= xa && x <= xb && y >= ya && y <= yb);
+  }
+
+  /** Unique source indices of the displayed atoms whose centres project inside a client-space polygon [[x, y], …], as a lasso draws it. */
+  atomsInPolygon(points) {
+    const pts = (Array.isArray(points) ? points : []).filter((q) => Number.isFinite(q?.[0]) && Number.isFinite(q?.[1]));
+    if (pts.length < 3) return [];
+    let xa = Infinity, xb = -Infinity, ya = Infinity, yb = -Infinity;
+    for (const [x, y] of pts) { xa = Math.min(xa, x); xb = Math.max(xb, x); ya = Math.min(ya, y); yb = Math.max(yb, y); }
+    return this._atomsWhere((x, y) => x >= xa && x <= xb && y >= ya && y <= yb && inPolygon(pts, x, y));
+  }
+
+  /** Sorted unique source indices of the displayed atoms in front of the camera whose centres project to client (x, y) with test(x, y). */
+  _atomsWhere(test) {
     const m = this.model;
     if (!m?.n) return [];
     const r = this.renderer.domElement.getBoundingClientRect();
-    const nx = (x) => ((x - r.left) / r.width) * 2 - 1, ny = (y) => -((y - r.top) / r.height) * 2 + 1;
-    const xa = Math.min(nx(x0), nx(x1)), xb = Math.max(nx(x0), nx(x1)), ya = Math.min(ny(y0), ny(y1)), yb = Math.max(ny(y0), ny(y1));
     this.camera.updateMatrixWorld();
     const e = new THREE.Matrix4().multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse).elements;
     const p = m.positions, out = new Set();
@@ -331,9 +527,10 @@ export class Viewer extends Emitter {
       const x = p[3 * i], y = p[3 * i + 1], z = p[3 * i + 2];
       const w = e[3] * x + e[7] * y + e[11] * z + e[15];
       if (w <= 0) continue;
-      const cx = (e[0] * x + e[4] * y + e[8] * z + e[12]) / w, cy = (e[1] * x + e[5] * y + e[9] * z + e[13]) / w, cz = (e[2] * x + e[6] * y + e[10] * z + e[14]) / w;
+      const cz = (e[2] * x + e[6] * y + e[10] * z + e[14]) / w;
       if (cz < -1 || cz > 1) continue;
-      if (cx >= xa && cx <= xb && cy >= ya && cy <= yb) out.add(m.src[i]);
+      const cx = (e[0] * x + e[4] * y + e[8] * z + e[12]) / w, cy = (e[1] * x + e[5] * y + e[9] * z + e[13]) / w;
+      if (test(r.left + ((cx + 1) / 2) * r.width, r.top + ((1 - cy) / 2) * r.height)) out.add(m.src[i]);
     }
     return [...out].sort((a, b) => a - b);
   }
@@ -1017,6 +1214,43 @@ export class Viewer extends Emitter {
     this._camAnim = { t0: performance.now(), dur: 160, p0: this.camera.position.clone(), p1, u0: this.camera.up.clone(), u1: up, c0: this.controls.target.clone(), c1: target };
   }
 
+  /**
+   * Turn the model deg° about a screen axis — 'x' (right), 'y' (up) or 'z' (towards the viewer), right-hand
+   * rule — like a trackball, with no pole to stop at (arrow keys, X/Y/Z + right-drag). Steps accumulate
+   * while a previous one is still animating.
+   */
+  rotateScreen(axis, deg, { animate = true } = {}) {
+    if (!deg || !['x', 'y', 'z'].includes(axis)) return;
+    this._leaveTempOrtho();
+    const a = this._camAnim;
+    const target = (a ? a.c1 : this.controls.target).clone();
+    const off = (a ? a.p1 : this.camera.position).clone().sub(target);
+    const back = off.clone().normalize();
+    if (back.lengthSq() < 0.5) return;
+    const right = new THREE.Vector3().crossVectors((a ? a.u1 : this.camera.up), back);
+    if (right.lengthSq() < 1e-12) right.set(1, 0, 0).addScaledVector(back, -back.x);
+    right.normalize();
+    const up = new THREE.Vector3().crossVectors(back, right);
+    // the camera turns the other way round the target
+    const q = new THREE.Quaternion().setFromAxisAngle(axis === 'x' ? right : axis === 'y' ? up : back, -deg * DEG);
+    const p1 = target.clone().add(off.applyQuaternion(q)), u1 = up.applyQuaternion(q);
+    if (!animate) {
+      this._camAnim = null;
+      this.camera.position.copy(p1); this.camera.up.copy(u1); this.controls.target.copy(target); this.camera.lookAt(target);
+      this._syncControlsUp(); this.controls.update?.(); this._dirty = true; this.emit('camera'); return;
+    }
+    this._camAnim = { t0: performance.now(), dur: 200, p0: this.camera.position.clone(), p1, u0: this.camera.up.clone(), u1, c0: this.controls.target.clone(), c1: target };
+  }
+
+  /** Centre a client-space rectangle and zoom until it fills the view (R+drag). */
+  zoomToRect(x0, y0, x1, y1) {
+    const w = Math.abs(x1 - x0), h = Math.abs(y1 - y0);
+    if (!(w >= 2 || h >= 2)) return;
+    const r = this.renderer.domElement.getBoundingClientRect();
+    this.panBy(r.left + r.width / 2 - (x0 + x1) / 2, r.top + r.height / 2 - (y0 + y1) / 2);
+    this.zoomBy(clamp(Math.min(r.width / Math.max(w, 1), r.height / Math.max(h, 1)), 1, 40));
+  }
+
   /** Move the model on screen by (dx, dy) CSS pixels (+x right, +y down). */
   panBy(dx = 0, dy = 0) {
     if (!dx && !dy) return;
@@ -1187,6 +1421,7 @@ export class Viewer extends Emitter {
       this.scene3.fog.color.copy(this._fogColor);
     }
     this.post.setFocus(this.camera.position.distanceTo(this.controls.target));
+    this.post.setViewHeight(2 * this._viewHalfHeight());
     // a model that fills the frame would turn wide bloom into a full-screen haze: tighten the spread
     if (this.post.bloom) {
       const cover = (this.bounds.radius + (this.maxRadius ?? 0)) / Math.max(1e-6, this._viewHalfHeight());

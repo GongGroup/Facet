@@ -69,6 +69,8 @@ them, so every earlier project still opens.
 | `scene.display.orthoAxisViews` | `true`: views along a/b/c/x/y/z use an orthographic camera until the next free rotation. |
 | `scene.lighting.env.map` | environment map id (`room`, `studio`, `sky`, `sunset`, `dark`, or one added by a plugin). |
 | `scene.lighting.env.rotation` | rotation of the environment about the vertical axis, degrees. |
+| `scene.post.dropShadow` | drop shadows between parts: `{ enabled, distance, softness, opacity, angle, color }` (distances in Å, angle in degrees). |
+| `scene.post.paper` | paper texture over the picture: `{ enabled, strength }`. |
 | `importedFrom` | id of the project a file was imported from (imports always get a new id). |
 
 Every scene path with its type and range is listed in [PLUGINS.md §5](PLUGINS.md#5-scene-settings).

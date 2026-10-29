@@ -7,6 +7,7 @@ import { h, ic, btn } from './dom.js';
 import { toast, promptDialog } from './overlays.js';
 import { element, normalizeSymbol } from '../core/elements.js';
 import { elementColorHex } from '../render/colors.js';
+import { bondedFragment } from '../render/display.js';
 import { keyLabel } from './keys.js';
 
 const MEASURE = { 2: 'distance', 3: 'angle', 4: 'dihedral' };
@@ -92,6 +93,15 @@ export function selectNeighbours(app, srcs = null) {
   }
   app.select([...out]);
   if (out.size === base.size) toast(m.bonds?.count ? 'No more bonded neighbours to add.' : 'Bonds are hidden, so there are no neighbours to add.');
+}
+
+/** Select the bonded fragments (molecules) of `srcs` or of the selected atoms, as drawn. */
+export function selectFragment(app, srcs = null) {
+  const m = app.viewer.model;
+  const base = srcs ?? app.selection;
+  if (!m?.n || !base.length) { toast('Select an atom first.'); return; }
+  app.select(bondedFragment(m, base));
+  if (!m.bonds?.count && m.n > 1) toast('Bonds are hidden, so each atom is a fragment of its own.');
 }
 
 /** Select all atoms of the active structure. */

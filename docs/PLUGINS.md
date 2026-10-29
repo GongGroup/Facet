@@ -226,9 +226,9 @@ analyses appear here automatically (they run on the server); built-ins are `coor
 | `analyze(id, params?, s?) → Promise` | run any registered analysis (built-in, JS plugin or server plugin) |
 | `set(path, value)`, `get(path)`, `patch(partial)` | scene settings (§5); paths with `__proto__`, `constructor` or `prototype` are refused |
 | `applyLook(id)`, `setRepresentation(id)`, `setLighting(id)` | one-click presets |
-| `view(axis)`, `resetView()`, `fit()`, `orbit(dAz°, dEl°)`, `pan(dx, dy)`, `zoom(factor)`, `getCamera()`, `setCamera(c)` | camera |
-| `atomsInRect(x0, y0, x1, y1)` | source indices of the atoms drawn inside a client-space rectangle |
-| `select(indices, {add})`, `clearSelection()`, `selectAll()`, `selectSameElement(symbols?)`, `selectNeighbors(indices?, {add})` | selection |
+| `view(axis)`, `resetView()`, `fit()`, `orbit(dAz°, dEl°)`, `rotate(axis, deg°)`, `pan(dx, dy)`, `zoom(factor)`, `getCamera()`, `setCamera(c)` | camera (`rotate` turns the model about a screen axis, `'x'` right, `'y'` up or `'z'` towards the viewer, as the arrow keys do) |
+| `atomsInRect(x0, y0, x1, y1)`, `atomsInPolygon([[x, y], …])` | source indices of the atoms drawn inside a client-space rectangle or polygon (box and lasso selection) |
+| `select(indices, {mode})`, `clearSelection()`, `selectAll()`, `selectSameElement(symbols?)`, `selectNeighbors(indices?, {add})`, `selectFragment(indices?, {add})` | selection (`mode`: `'replace'` (default), `'add'`, `'toggle'` or `'remove'`; the older `{add: true}` toggles) |
 | `measure(type, displayIndices)`, `frame(i)`, `play(on)` | measurements and trajectories |
 | `screenshot({scale, transparent}) → Blob`, `exportText(format) → string \| Promise`, `exportGLB()`, `save(provider)` | output |
 | `projects.providers()`, `projects.list(provider)`, `projects.open(provider, id)` | storage |
@@ -259,9 +259,10 @@ analyses appear here automatically (they run on the server); built-ins are `coor
 | `plugins` | app | — | a frontend plugin was loaded or failed |
 | `registry` | app | `{kind, id, removed}` | an entry was added or removed through the API |
 | `hover` | viewer | `{index, x, y}` | pointer over a drawn atom (−1: none) |
-| `atomclick` | viewer | `{index, shiftKey, x, y}` | click on a drawn atom (−1: empty space) |
+| `atomclick` | viewer | `{index, mode, shiftKey, x, y}` | click on a drawn atom (−1: empty space); `mode` `'replace'`, `'add'` (Shift) or `'toggle'` (Ctrl/⌘), `shiftKey` true for the last two |
+| `atomdblclick` | viewer | `{index, mode, altKey, x, y}` | double-click on a drawn atom (the app selects its bonded fragment; with Alt, every atom of its element) |
 | `atomcontext` | viewer | `{index, x, y, clientX, clientY}` | right-click on a drawn atom |
-| `boxselect` | viewer | `{indices, add}` | rectangle selection finished |
+| `boxselect` | viewer | `{indices, mode, add, shape}` | rectangle (drag) or lasso (Q+drag) selection finished; `shape` `'rect'` or `'lasso'`, `add` = `mode` is not `'replace'` |
 | `frame` | viewer | frame index | trajectory frame changed |
 | `play` | viewer | boolean | playback started or stopped |
 | `camera` | viewer | — | the camera moved |
@@ -294,12 +295,12 @@ accepted but may look odd). Colours are `#rrggbb`. Angles are degrees, lengths �
 | `style.bondColor` | string | `split` | `split`, `uniform` |
 | `style.bondUniformColor` | colour | `#9aa1ab` | |
 | `style.bondMaterial` | string | `auto` | `auto`, `same`, or a material id |
-| `style.colorScheme` | string | `jmol` | a colour scheme id (`modern`, `morandi`, `vivid`, `soft`, `greyscale`, `jmol`, `vesta`, `pastel`, `mono`, `index`, `height`, `coordination`, `property`, plugins) |
+| `style.colorScheme` | string | `jmol` | a colour scheme id (`modern`, `morandi`, `vivid`, `soft`, `greyscale`, `jmol`, `vesta`, `ms`, `pastel`, `mono`, `index`, `height`, `coordination`, `property`, plugins) |
 | `style.monoColor` | colour | `#c9ced6` | used by `mono` |
 | `style.colorOverrides` | object | `{}` | `{ "O": "#ff0000" }` per element |
 | `style.radiusOverrides` | object | `{}` | `{ "O": 0.9 }` base radius in Å per element (scaled by `atomScale`) |
 | `style.property` | string \| null | null | per-atom property for the `property` scheme |
-| `style.material` | string | `standard` | a material id (`standard`, `glossy`, `matte`, `metallic`, `glass`, `crystal`, `pearl`, `clay`, `phong`, `toon`, `poster`, `flat`, `glow`, `xray`, plugins) |
+| `style.material` | string | `standard` | a material id (`standard`, `glossy`, `matte`, `metallic`, `glass`, `crystal`, `pearl`, `clay`, `phong`, `ms`, `toon`, `poster`, `flat`, `glow`, `xray`, plugins) |
 | `style.roughness`, `style.metalness` | number \| null | null | 0 – 1 (`null` = the material's own value) |
 | `style.opacity` | number | 1 | 0.1 – 1 |
 | `style.polyhedra.centers` | `'auto'` \| string[] | `auto` | element symbols at polyhedron centres |
@@ -308,7 +309,7 @@ accepted but may look odd). Colours are `#rrggbb`. Angles are degrees, lengths �
 | `style.polyhedra.edgeColor` | colour | `#22262c` | |
 | `style.lineWidth` | number | 2.5 | 0.5 – 8 px (wireframe) |
 | `style.quality` | string | `auto` | `auto`, `high`, `medium`, `low`, `draft` |
-| `lighting.preset` | string | `studio` | a lighting preset id (`studio`, `headlight`, `three-point`, `softbox`, `dramatic`, `sunset`, `cool-lab`, `warm-studio`, `soft-studio`, `window`, `night`, `poster`, `flat`, `neon`, `ibl`, plugins) |
+| `lighting.preset` | string | `studio` | a lighting preset id (`studio`, `ms`, `headlight`, `three-point`, `softbox`, `dramatic`, `sunset`, `cool-lab`, `warm-studio`, `soft-studio`, `window`, `night`, `poster`, `flat`, `neon`, `ibl`, plugins) |
 | `lighting.key` / `fill` / `rim` `.intensity` | number | 2.4 / 0.75 / 1.3 | 0 – 6 |
 | `lighting.key` / `fill` / `rim` `.color` | colour | `#fff4e6` / `#dbe6ff` / `#ffffff` | |
 | `lighting.key` / `fill` / `rim` `.azimuth` | number | −38 / 52 / 155 | −180 – 180 (0 = from the viewer, +90 = from the right) |
@@ -349,6 +350,14 @@ accepted but may look odd). Colours are `#rrggbb`. Angles are degrees, lengths �
 | `post.vignette.offset` | number | 1 | 0.2 – 2 |
 | `post.fog.enabled` | boolean | false | depth cueing |
 | `post.fog.strength` | number | 0.5 | 0 – 1 |
+| `post.dropShadow.enabled` | boolean | false | every atom and bond casts a soft shadow on the parts and background behind it |
+| `post.dropShadow.distance` | number | 0.3 | 0 – 1.5 Å, how far the shadow falls |
+| `post.dropShadow.softness` | number | 0.25 | 0 – 1 Å, blur of the shadow edge |
+| `post.dropShadow.opacity` | number | 0.35 | 0 – 1 |
+| `post.dropShadow.angle` | number | -55 | −180 – 180°, where the shadow falls (0 = right, −90 = down) |
+| `post.dropShadow.color` | colour | `#1c1a17` | |
+| `post.paper.enabled` | boolean | false | paper grain over the whole picture |
+| `post.paper.strength` | number | 0.6 | 0 – 2 |
 | `display.background.mode` | string | `gradient` | `solid`, `gradient`, `radial`, `transparent` |
 | `display.background.color1`, `color2` | colour | `#f7f8fa`, `#dde2e8` | |
 | `display.cell.show` | boolean | true | unit cell lines |

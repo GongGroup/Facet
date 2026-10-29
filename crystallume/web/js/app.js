@@ -17,6 +17,7 @@ import { uid, deepClone, deepMerge, setPath, getPath, debounce, relativeTime } f
 import { parseStructure, exportStructure, formats, detectFormat } from './io/index.js';
 import { samples } from './build/samples.js';
 import { Viewer, measureArity } from './render/viewer.js';
+import { bondedFragment } from './render/display.js';
 import { makeScene, DEFAULT_SCENE } from './render/settings.js';
 import { looks } from './render/looks.js';
 import { styles } from './render/styles.js';
@@ -31,7 +32,7 @@ import { toast, dialog } from './ui/overlays.js';
 import { h } from './ui/dom.js';
 import { makeZip } from './core/zip.js';
 
-export const VERSION = '0.2.0';
+export const VERSION = '0.3.0';
 const PREF_KEY = 'atomscope.prefs';   // key from the app's former name, kept so saved preferences survive the rename
 const RECOVERY_KEY = 'recovery';
 const RETRY_DELAYS = [5000, 15000, 60000];
@@ -72,7 +73,7 @@ const PATH_LABELS = [
   ['style.material', 'Material'], ['style.opacity', 'Opacity'], ['style.polyhedra', 'Polyhedra'], ['style', 'Style'],
   ['lighting.shadows', 'Shadows'], ['lighting.exposure', 'Exposure'], ['lighting', 'Lighting'],
   ['post.ao', 'Ambient occlusion'], ['post.outline', 'Outlines'], ['post.bloom', 'Bloom'], ['post.dof', 'Depth of field'],
-  ['post.vignette', 'Vignette'], ['post.fog', 'Depth cueing'], ['post', 'Effects'],
+  ['post.vignette', 'Vignette'], ['post.fog', 'Depth cueing'], ['post.dropShadow', 'Drop shadows'], ['post.paper', 'Paper texture'], ['post', 'Effects'],
   ['display.background', 'Background'], ['display.supercell', 'Supercell'], ['display.bonds', 'Bonds'], ['display.hiddenElements', 'Hidden elements'],
   ['display.cell', 'Unit cell'], ['display', 'Display'],
 ];
@@ -110,7 +111,7 @@ export class App extends Emitter {
     super();
     this.prefs = loadPrefs();
     this.viewer = new Viewer(viewportEl);
-    this.viewer.toolProvider = () => this.tool;   // box selection (Shift/Alt+drag) only with the Select tool
+    this.viewer.toolProvider = () => this.tool;   // box and lasso selection (left-drag) only with the Select tool
     this.storage = new StorageManager();
     this.browserStore = new BrowserStore();
     this.serverStore = new ServerStore('');
@@ -139,6 +140,7 @@ export class App extends Emitter {
     this._autosave = debounce(() => this.autosave(), 2500);
     this.serverStore.onAuth = (u) => this._onAuth(u);
     this.viewer.on('atomclick', (e) => this._onAtomClick(e));
+    this.viewer.on('atomdblclick', (e) => this._onAtomDblClick(e));
     this.viewer.on('measure', () => this._onViewerMeasure());
     this.viewer.on('error', (e) => toast(e.message, { type: 'error' }));
     this.viewer.on('camera', debounce(() => { if (this.structure) this.project.scene.camera = this.viewer.getCameraState(); }, 400));
@@ -627,18 +629,22 @@ export class App extends Emitter {
 
   // ------------------------------------------------------------------ selection + editing
   get selection() { return [...this.viewer.selection]; }
-  select(indices, { add = false } = {}) {
+  /**
+   * Select source atoms. mode: 'replace' (default), 'add', 'toggle' (each atom in or out) or 'remove';
+   * `add: true` without a mode toggles, as it always has.
+   */
+  select(indices, { add = false, mode = add ? 'toggle' : 'replace' } = {}) {
     const n = this.structure?.length ?? 0;
-    const s = add ? new Set(this.viewer.selection) : new Set();
+    const s = mode === 'replace' ? new Set() : new Set(this.viewer.selection);
     for (const v of indices) {
       const i = Number(v);
       if (!Number.isInteger(i) || i < 0 || i >= n) continue;
-      if (add && s.has(i)) s.delete(i); else s.add(i);
+      if (mode === 'remove' || (mode === 'toggle' && s.has(i))) s.delete(i); else s.add(i);
     }
     this.viewer.setSelection([...s]);
     this.emit('selection');
   }
-  selectElement(sym, add = false) { if (!this.structure) return; this.select(this.structure.symbols.map((s, i) => (s === sym ? i : -1)).filter((i) => i >= 0), { add }); }
+  selectElement(sym, add = false, mode = undefined) { if (!this.structure) return; this.select(this.structure.symbols.map((s, i) => (s === sym ? i : -1)).filter((i) => i >= 0), { add, mode }); }
   invertSelection() { if (!this.structure) return; const s = this.viewer.selection; this.select(this.structure.symbols.map((_, i) => i).filter((i) => !s.has(i))); }
   clearSelection() { this.viewer.setSelection([]); this.measurePicks = []; this.emit('selection'); }
 
@@ -719,7 +725,7 @@ export class App extends Emitter {
     this.emit('tool');
   }
 
-  _onAtomClick({ index, shiftKey }) {
+  _onAtomClick({ index, shiftKey, mode }) {
     if (this.tool === 'measure') {
       if (index < 0) { this.measurePicks = []; this.viewer.setSelection([]); this.emit('tool'); this.emit('selection'); return; }
       const need = { distance: 2, angle: 3, dihedral: 4 }[this.measureType];
@@ -735,8 +741,24 @@ export class App extends Emitter {
       this.emit('tool');
       return;
     }
-    if (index < 0) { if (!shiftKey) this.clearSelection(); return; }
-    this.select([this.viewer.model.src[index]], { add: shiftKey });
+    // as in Materials Studio: a click replaces the selection (on empty space: clears it), Shift adds, Ctrl/⌘ toggles
+    const m = mode ?? (shiftKey ? 'toggle' : 'replace');
+    if (index < 0) { if (m === 'replace') this.clearSelection(); return; }
+    this.select([this.viewer.model.src[index]], { mode: m });
+  }
+
+  /**
+   * Double-click on an atom with the Select tool: its bonded fragment (Alt: every atom of its element), replacing
+   * the selection, added with Shift, or with Ctrl/⌘ added — or removed when the atom was selected.
+   */
+  _onAtomDblClick({ index, mode = 'replace', altKey = false }) {
+    const m = this.viewer.model;
+    if (this.tool !== 'select' || !m || index < 0 || index >= m.n) return;
+    const src = m.src[index];
+    // the two clicks before this one toggled the atom twice: its state is what it was before the double-click
+    const how = mode === 'toggle' ? (this.viewer.selection.has(src) ? 'remove' : 'add') : mode;
+    if (altKey) this.selectElement(m.symbols[index], false, how);
+    else this.select(bondedFragment(m, src), { mode: how });
   }
 
   // ------------------------------------------------------------------ measurements (saved per structure)

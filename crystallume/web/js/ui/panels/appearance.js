@@ -335,7 +335,7 @@ registerInspectorTab({
 
 // ------------------------------------------------------------------ Effects
 registerInspectorTab({
-  id: 'effects', title: 'Effects', icon: 'sparkles', tip: 'Ambient occlusion, outlines, depth cueing, bloom, depth of field',
+  id: 'effects', title: 'Effects', icon: 'sparkles', tip: 'Ambient occlusion, outlines, depth cueing, drop shadows, paper texture, bloom, depth of field',
   render(app, el, shell) {
     const P = app.scene.post;
     const DP = DEFAULT_SCENE.post;
@@ -353,6 +353,14 @@ registerInspectorTab({
         toggle({ label: 'Crease lines', sub: 'Also draw lines where surfaces meet', checked: P.outline.creases !== false, onChange: (v) => app.set('post.outline.creases', v) })]),
       fx('fog', 'Depth cueing', 'Fade distant atoms into the background', () => [
         slider({ label: 'Strength', value: P.fog.strength ?? DP.fog.strength, min: 0, max: 1, step: 0.01, fmt: f2, onInput: q('post.fog.strength') })]),
+      fx('dropShadow', 'Drop shadows', 'Every atom and bond casts a soft shadow on what lies behind it, like layered paper', () => [
+        slider({ label: 'Distance', value: P.dropShadow.distance ?? DP.dropShadow.distance, min: 0, max: 1.5, step: 0.01, fmt: (v) => `${f2(v)} Å`, onInput: q('post.dropShadow.distance') }),
+        slider({ label: 'Softness', value: P.dropShadow.softness ?? DP.dropShadow.softness, min: 0, max: 1, step: 0.01, fmt: (v) => `${f2(v)} Å`, onInput: q('post.dropShadow.softness') }),
+        slider({ label: 'Opacity', value: P.dropShadow.opacity ?? DP.dropShadow.opacity, min: 0, max: 1, step: 0.01, fmt: f2, onInput: q('post.dropShadow.opacity') }),
+        slider({ label: 'Direction', value: P.dropShadow.angle ?? DP.dropShadow.angle, min: -180, max: 180, step: 1, fmt: (v) => `${Math.round(v)}°`, onInput: q('post.dropShadow.angle'), tip: 'Where the shadows fall: 0° to the right, −90° straight down' }),
+        h('div.row', h('span.ctl-label', { style: { width: '96px' } }, 'Colour'), colorInput(P.dropShadow.color ?? DP.dropShadow.color, q('post.dropShadow.color')))]),
+      fx('paper', 'Paper texture', 'Fine paper grain over the whole picture — for drawn and painted looks', () => [
+        slider({ label: 'Strength', value: P.paper.strength ?? DP.paper.strength, min: 0, max: 2, step: 0.05, fmt: f2, onInput: q('post.paper.strength') })]),
       fx('bloom', 'Bloom', 'Glow around bright highlights — try with Glow or Neon', () => [
         slider({ label: 'Strength', value: P.bloom.strength ?? DP.bloom.strength, min: 0, max: 3, step: 0.05, fmt: f2, onInput: q('post.bloom.strength') }),
         slider({ label: 'Radius', value: P.bloom.radius ?? DP.bloom.radius, min: 0, max: 1, step: 0.01, fmt: f2, onInput: q('post.bloom.radius') }),
@@ -360,7 +368,7 @@ registerInspectorTab({
       fx('dof', 'Depth of field', 'Camera blur in front of and behind the focus point', () => [
         slider({ label: 'Aperture', value: P.dof.aperture ?? DP.dof.aperture, min: 0.1, max: 10, step: 0.1, fmt: f1, onInput: q('post.dof.aperture') }),
         slider({ label: 'Max blur', value: P.dof.maxblur ?? DP.dof.maxblur, min: 0.001, max: 0.03, step: 0.001, fmt: (v) => (+v).toFixed(3), onInput: q('post.dof.maxblur') }),
-        h('p.hint', 'Focus follows the rotation centre. Double-click an atom to focus on it.')]),
+        h('p.hint', 'Focus follows the rotation centre. Right-click an atom and choose Centre here to focus on it.')]),
       fx('vignette', 'Vignette', 'Darken the corners of the frame', () => [
         slider({ label: 'Darkness', value: P.vignette.darkness ?? DP.vignette.darkness, min: 0, max: 2, step: 0.05, fmt: f2, onInput: q('post.vignette.darkness') }),
         slider({ label: 'Size', value: P.vignette.offset ?? DP.vignette.offset, min: 0.2, max: 2, step: 0.05, fmt: f2, onInput: q('post.vignette.offset') })]),

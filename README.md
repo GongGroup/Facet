@@ -283,17 +283,17 @@ python -m crystallume ...                                # 等价
 
 | 区域 | 内容 |
 |---|---|
-| **样式 Style** | 8 种一键“外观”（Studio 影棚釉面、Illustration 墨线卡通、Poster 海报、Line art 线稿、Morandi 莫兰迪、Crystal 浅色玻璃、Midnight 深蓝幻灯片、Glass 暗场玻璃）；6 种表示法（球棍、空间填充、原子球、Licorice、线框、配位多面体）；13 种配色（Modern 现代、Morandi 莫兰迪、Vivid 鲜明、Soft 柔和粉彩、Greyscale 灰度、Jmol、VESTA、Pastel、单色、按序号、按高度、按配位数、按原子属性）及逐元素改色/隐藏；14 种材质（Satin、Glossy、Matte、Metallic、Glass 透射、Crystal 浅色背景玻璃、Pearl 薄膜干涉、Clay、Classic Phong、Cel 卡通、Poster 双色卡通、Flat、Glow 自发光、X-ray 菲涅尔）；半径表、原子/键尺寸、键着色、细分质量 |
-| **光照 Light** | 15 种布光（Studio、Headlight、Three-point、Soft daylight、Dramatic、Golden hour、Cool lab、Warm studio、Soft studio、Window light、Night、Poster、Flat、Neon、Environment）；主光/补光/轮廓光的强度、方位、高度、颜色；天空光、环境反射；软阴影与阴影地面；灯光跟随相机；曝光与 7 种色调映射 |
-| **效果 Effects** | 环境光遮蔽（GTAO）、墨线描边（深度+法线边缘检测）、深度雾化、泛光、景深、暗角 |
+| **样式 Style** | 10 种一键“外观”（Studio 影棚釉面、Illustration 墨线卡通、Poster 海报、Line art 线稿、Morandi 莫兰迪、Crystal 浅色玻璃、Midnight 深蓝幻灯片、Glass 暗场玻璃、Paper cut 剪纸、MS 仿 Materials Studio 默认球棍）；6 种表示法（球棍、空间填充、原子球、Licorice、线框、配位多面体）；14 种配色（Modern 现代、Morandi 莫兰迪、Vivid 鲜明、Soft 柔和粉彩、Greyscale 灰度、Jmol、VESTA、Materials Studio、Pastel、单色、按序号、按高度、按配位数、按原子属性）及逐元素改色/隐藏；15 种材质（Satin、Glossy、Matte、Metallic、Glass 透射、Crystal 浅色背景玻璃、Pearl 薄膜干涉、Clay、Classic Phong、Plastic 塑料高光（Materials Studio）、Cel 卡通、Poster 双色卡通、Flat、Glow 自发光、X-ray 菲涅尔）；半径表、原子/键尺寸、键着色、细分质量 |
+| **光照 Light** | 16 种布光（Studio、MS、Headlight、Three-point、Soft daylight、Dramatic、Golden hour、Cool lab、Warm studio、Soft studio、Window light、Night、Poster、Flat、Neon、Environment）；主光/补光/轮廓光的强度、方位、高度、颜色；天空光、环境反射；软阴影与阴影地面；灯光跟随相机；曝光与 7 种色调映射 |
+| **效果 Effects** | 环境光遮蔽（GTAO）、墨线描边（深度+法线边缘检测）、深度雾化、层叠投影（每个原子和键在其后方投下柔和阴影）、纸张纹理、泛光、景深、暗角 |
 | **场景 Scene** | 背景（纯色/线性/径向渐变/透明）、晶胞线（单胞/外框/全部）、超胞显示、原子回卷、边界原子、跨边界补全配位、成键容差与逐元素对开关、标签、透视/正交、轨道/自由旋转、坐标轴、转台 |
 | **项目 Projects** | 存储位置：本浏览器（IndexedDB，离线）、服务器文件夹（local 模式）、云端账户（cloud 模式）、本地文件夹（File System Access API，项目即 `.crystallume.json` 文件）、Claude 云端（作为 claude.ai Artifact 运行时）。自动保存、复制、删除、导入/下载项目文件 |
 | **资源库 / 构建** | 18 个示例（晶体、二维材料、纳米团簇、分子、轨迹）；晶体原型构建器（16 种）、团簇构建器（7 种）、分子、粘贴文本、服务器插件构建器 |
 | **结构 Structure** | 化学式、晶胞参数、体积、密度、空间群；选择/删除/替换元素（可撤销）；距离/键角/二面角测量；配位统计；径向分布函数 g(r) |
 | **导出** | PNG（1×/2×/4×、透明背景）、glTF `.glb`（Blender/PowerPoint/AR）、XYZ、extXYZ、POSCAR、CIF、PDB、JSON、项目文件 |
 
-交互：左键旋转、右键平移、滚轮缩放、单击选择（Shift 多选）、双击居中；把文件拖进窗口或直接粘贴文本即可打开。
-`Ctrl/⌘ K` 打开命令面板，`?` 查看全部快捷键，“帮助 → Take the tour” 有 1 分钟新手引导。
+交互与 Materials Studio 一致：右键拖动旋转（按住 X/Y/Z 绕屏幕该轴旋转，Alt+右键平移）、中键拖动平移、滚轮或左右键同时拖动缩放、按住 R 左键框选放大；左键单击选择（Shift 加选、Ctrl/⌘ 反选、点空白处取消）、左键拖动框选（按住 Q 套索）、双击选中整个成键片段（Alt+双击选中同种元素），右键单击打开原子菜单；方向键每次旋转 45°，Shift/Alt+方向键平移，`Home` 复位视图。把文件拖进窗口或直接粘贴文本即可打开。
+`Ctrl/⌘ K` 打开命令面板，`?` 或 `F1` 查看全部快捷键，“帮助 → Take the tour” 有 1 分钟新手引导。
 
 #### JavaScript API 与前端扩展
 
@@ -659,17 +659,17 @@ The UI served by `crystallume serve` also works as a plain static site without t
 
 | Area | What is in it |
 |---|---|
-| **Style** | 8 one-click looks (Studio, Illustration/ink, Poster, Line art, Morandi, Crystal, Midnight, Glass); 6 representations (ball & stick, space-filling, atomic spheres, licorice, wireframe, coordination polyhedra); 13 colour schemes (Modern, Morandi, vivid, soft pastel, greyscale, Jmol, VESTA, pastel, single colour, by index, by height, by coordination, by per-atom property) plus per-element colour/visibility; 14 materials (satin, glossy, matte, metallic, transmissive glass, crystal glass for light backgrounds, iridescent pearl, clay, classic Phong, cel, two-tone poster cel, flat, glow, Fresnel X-ray); radius tables, sizes, bond colouring, tessellation quality |
-| **Light** | 15 rigs (Studio, Headlight, Three-point, Soft daylight, Dramatic, Golden hour, Cool lab, Warm studio, Soft studio, Window light, Night, Poster, Flat, Neon, Environment); key/fill/rim intensity, azimuth, elevation and colour; sky light and environment reflections; soft shadows and a shadow floor; camera-locked or world-fixed lights; exposure and 7 tone-mapping operators |
-| **Effects** | Ambient occlusion (GTAO), ink outlines (depth + normal edges), depth cueing, bloom, depth of field, vignette |
+| **Style** | 10 one-click looks (Studio, Illustration/ink, Poster, Line art, Morandi, Crystal, Midnight, Glass, Paper cut, MS: Materials Studio's default ball and stick); 6 representations (ball & stick, space-filling, atomic spheres, licorice, wireframe, coordination polyhedra); 14 colour schemes (Modern, Morandi, vivid, soft pastel, greyscale, Jmol, VESTA, Materials Studio, pastel, single colour, by index, by height, by coordination, by per-atom property) plus per-element colour/visibility; 15 materials (satin, glossy, matte, metallic, transmissive glass, crystal glass for light backgrounds, iridescent pearl, clay, classic Phong, Materials Studio plastic, cel, two-tone poster cel, flat, glow, Fresnel X-ray); radius tables, sizes, bond colouring, tessellation quality |
+| **Light** | 16 rigs (Studio, MS, Headlight, Three-point, Soft daylight, Dramatic, Golden hour, Cool lab, Warm studio, Soft studio, Window light, Night, Poster, Flat, Neon, Environment); key/fill/rim intensity, azimuth, elevation and colour; sky light and environment reflections; soft shadows and a shadow floor; camera-locked or world-fixed lights; exposure and 7 tone-mapping operators |
+| **Effects** | Ambient occlusion (GTAO), ink outlines (depth + normal edges), depth cueing, drop shadows (each atom and bond casts a soft shadow on what lies behind it), paper texture, bloom, depth of field, vignette |
 | **Scene** | Background (solid, linear/radial gradient, transparent), cell edges (unit/outline/all), display supercell, wrapping, boundary atoms, bonded images across the boundary, bond tolerance and per-pair switches, labels, perspective/orthographic, orbit/free rotation, axis gizmo, turntable |
 | **Projects** | Storage: this browser (IndexedDB, offline), server folder (local mode), cloud account (cloud mode), a local folder (File System Access API — projects are `.crystallume.json` files), Claude cloud (when running as a claude.ai artifact). Autosave, duplicate, delete, import/download project files |
 | **Library / Build** | 18 samples (crystals, 2D materials, nanoclusters, molecules, a trajectory); crystal prototypes (16), cluster shapes (7), molecules, paste-a-file, server plugin builders |
 | **Structure** | Formula, cell, volume, density, space group; select / delete / replace elements (undoable); distance, angle and dihedral measurements; coordination statistics; radial distribution g(r) |
 | **Export** | PNG (1×/2×/4×, transparent), glTF `.glb` (Blender, PowerPoint, AR), XYZ, extXYZ, POSCAR, CIF, PDB, JSON, project file |
 
-Mouse: drag to rotate, right-drag to pan, scroll to zoom, click to select (Shift adds), double-click to centre. Drop files on the window or paste file text to open it.
-`Ctrl/⌘ K` opens the command palette, `?` lists shortcuts, Help → Take the tour gives a one-minute walkthrough.
+Mouse and keys follow Materials Studio: right-drag rotates (hold X, Y or Z to turn about that screen axis; Alt+right-drag pans), middle-drag pans, the wheel or a left+right drag zooms, R+drag zooms into a box; click selects (Shift adds, Ctrl/⌘ toggles, empty space clears), drag draws a selection box (hold Q for a lasso), double-click selects the bonded fragment (Alt+double-click: every atom of that element), right-click opens the atom menu; arrow keys turn the model 45°, Shift/Alt+arrows pan, `Home` resets the view. Drop files on the window or paste file text to open it.
+`Ctrl/⌘ K` opens the command palette, `?` or `F1` lists shortcuts, Help → Take the tour gives a one-minute walkthrough.
 
 #### JavaScript API and frontend extensions
 
