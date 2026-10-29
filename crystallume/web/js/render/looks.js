@@ -65,7 +65,7 @@ const post = (p) => ({ ...JSON.parse(JSON.stringify(off)), ...p });
       post: post({ dropShadow: { enabled: true, distance: 0.35, softness: 0.24, opacity: 0.42, angle: -55, color: '#2b2118' }, paper: { enabled: true, strength: 0.6 } }),
       display: { background: { mode: 'solid', color1: '#f1eadc', color2: '#f1eadc' }, cell: { color: '#6b604f' } } } },
   { id: 'ms', name: 'MS', description: 'Materials Studio defaults: glossy ball and stick (balls 0.4 Å, sticks 0.2 Å) in one white light on black, white cell lines, orthographic view',
-    swatch: '#000000', ball: 'radial-gradient(circle at 34% 30%, #fff 0, #fff 9%, #ff5a5a 19%, #d40000 58%, #5c0000 100%)',
+    swatch: '#000000', ball: 'radial-gradient(circle at 34% 30%, #fff 0, #ffd6d6 6%, #f24848 17%, #d40000 58%, #5c0000 100%)',
     scene: { style: { rep: 'ballstick', radiusSource: 'uniform', atomScale: 2, bondRadius: 0.2, material: 'ms', colorScheme: 'ms' }, lighting: light('ms', { toneMapping: 'none' }), post: post({}),
       display: { background: { mode: 'solid', color1: '#000000', color2: '#000000' }, cell: { color: '#e6e6e6' }, projection: 'orthographic' } } },
 ].forEach((l) => looks.register(l));

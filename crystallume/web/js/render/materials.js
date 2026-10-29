@@ -126,9 +126,9 @@ materials.register({
   create: (p) => { const m = new THREE.MeshPhongMaterial({ shininess: 70, specular: new THREE.Color(0x444444) }); return applyCommon(m, p); },
 });
 materials.register({
-  id: 'ms', name: 'Plastic', description: 'OpenGL plastic with a broad, bright white highlight, as in Materials Studio',
-  swatch: 'radial-gradient(circle at 34% 30%, #fff 0, #fff 9%, #ff5a5a 19%, #d40000 58%, #5c0000 100%)',
-  create: (p) => applyCommon(new THREE.MeshPhongMaterial({ shininess: 32, specular: new THREE.Color(0.5, 0.5, 0.5) }), p),
+  id: 'ms', name: 'Plastic', description: 'OpenGL plastic with a soft white highlight, as in Materials Studio',
+  swatch: 'radial-gradient(circle at 34% 30%, #fff 0, #ffd6d6 6%, #f24848 17%, #d40000 58%, #5c0000 100%)',
+  create: (p) => applyCommon(new THREE.MeshPhongMaterial({ shininess: 40, specular: new THREE.Color(0.22, 0.22, 0.22) }), p),
 });
 materials.register({
   id: 'toon', name: 'Cel', description: 'Three-tone cartoon shading; add an ink outline',
