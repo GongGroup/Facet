@@ -8,12 +8,13 @@
  */
 export const isMac = /mac|iphone|ipad/i.test(globalThis.navigator?.platform ?? globalThis.navigator?.userAgent ?? '');
 export const MOD = isMac ? '⌘' : 'Ctrl';
+export const ALT = isMac ? '⌥' : 'Alt';
 
 const NAMES = {
   escape: 'Esc', ' ': 'Space', space: 'Space', arrowleft: '←', arrowright: '→', arrowup: '↑', arrowdown: '↓',
   delete: 'Del', backspace: '⌫', enter: 'Enter', tab: 'Tab', pageup: 'PgUp', pagedown: 'PgDn', home: 'Home', end: 'End',
 };
-const MODS = { mod: MOD, ctrl: 'Ctrl', cmd: '⌘', meta: '⌘', alt: isMac ? '⌥' : 'Alt', shift: isMac ? '⇧' : 'Shift' };
+const MODS = { mod: MOD, ctrl: 'Ctrl', cmd: '⌘', meta: '⌘', alt: ALT, shift: isMac ? '⇧' : 'Shift' };
 
 /** Split 'mod+shift+z' into {mods:Set, key}; '+' and 'shift++' keep '+' as the key. */
 export function parseKey(spec) {

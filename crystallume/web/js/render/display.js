@@ -226,6 +226,26 @@ export function keyOf(model, d) {
   return `${model.src[d]}:${model.img[3 * d]},${model.img[3 * d + 1]},${model.img[3 * d + 2]}`;
 }
 
+/**
+ * Source indices bonded to source atom `src` (or to any of an array of them) through the drawn bonds,
+ * directly or in a chain — its fragment or molecule; a framework crystal's whole network — sorted,
+ * `src` included.
+ */
+export function bondedFragment(model, src) {
+  const pairs = model?.bonds?.pairs ?? [];
+  const next = new Map();
+  for (let k = 0; k + 1 < pairs.length; k += 2) {
+    const a = model.src[pairs[k]], b = model.src[pairs[k + 1]];
+    if (a === b) continue;
+    if (!next.has(a)) next.set(a, []);
+    if (!next.has(b)) next.set(b, []);
+    next.get(a).push(b); next.get(b).push(a);
+  }
+  const seen = new Set([].concat(src)), queue = [...seen];
+  while (queue.length) for (const j of next.get(queue.pop()) ?? []) if (!seen.has(j)) { seen.add(j); queue.push(j); }
+  return [...seen].sort((x, y) => x - y);
+}
+
 /** Bounding sphere of the display model (+ cell corners). */
 export function modelBounds(model) {
   const p = model.positions;

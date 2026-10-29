@@ -9,9 +9,9 @@ import { elementColorHex } from '../render/colors.js';
 import { formats } from '../io/index.js';
 import { samples } from '../build/samples.js';
 import { VERSION } from '../app.js';
-import { keyLabel, matchKey, parseKey, hasMod, MOD } from './keys.js';
+import { keyLabel, matchKey, parseKey, hasMod, MOD, ALT } from './keys.js';
 import { canDownload, NO_DOWNLOADS } from '../storage/files.js';
-import { SelectionCard, selectSameElement, selectNeighbours, selectAll, measureFrom } from './selectioncard.js';
+import { SelectionCard, selectSameElement, selectNeighbours, selectFragment, selectAll, measureFrom } from './selectioncard.js';
 
 export const leftPanels = new Map();
 export const inspectorTabs = new Map();
@@ -474,7 +474,7 @@ export class Shell {
     this.fsBtn = btn('', { icon: 'maximize', cls: 'icon', tip: 'Full screen', kbd: keyLabel('shift+f'), pressed: false, on: () => this.fullscreen() });
     this.toolbar = h('div.float.toolbar.tb-top', { role: 'toolbar', 'aria-label': 'View tools', 'aria-orientation': 'vertical' },
       this.selectBtn, this.measureBtn, h('span.sep'),
-      btn('', { icon: 'reset', cls: 'icon', tip: 'Reset view', kbd: 'R', on: () => app.viewer.resetView() }),
+      btn('', { icon: 'reset', cls: 'icon', tip: 'Reset view', kbd: keyLabel('Home'), on: () => app.viewer.resetView() }),
       btn('', { icon: 'fit', cls: 'icon', tip: 'Fit to screen', kbd: 'F', on: () => app.viewer.fitView() }),
       viewBtn, this.projBtn, this.spinBtn, h('span.sep'),
       this.cameraBtn, this.fsBtn,
@@ -638,8 +638,8 @@ export class Shell {
       const n = app.selection.length;
       if (!app.structure) html = touch ? 'Open a file or pick a sample' : `Open a file (<b>${keyLabel('mod+o')}</b>), drop one here, paste text, or pick a sample`;
       else if (touch) html = n ? `<b>${n}</b> selected · ${this.selCard?.multi ? 'tap atoms to add or remove · ' : ''}tap empty space to clear` :'One finger rotates, two fingers pan and pinch to zoom, tap an atom to select it';
-      else html = n ? `<b>${n}</b> selected · <b>Del</b> delete · <b>Shift-click</b> add/remove · <b>Shift-drag</b> box select · <b>Esc</b> clear`
-        : '<b>Drag</b> rotate · <b>Right-drag</b> pan · <b>Scroll</b> zoom · <b>Click</b> select · <b>Right-click</b> atom menu · <b>Double-click</b> centre';
+      else html = n ? `<b>${n}</b> selected · <b>Del</b> delete · <b>Shift-click</b> add · <b>${MOD}-click</b> add/remove · <b>Drag</b> box select · <b>Double-click</b> fragment · <b>Esc</b> clear`
+        : '<b>Right-drag</b> rotate · <b>Middle-drag</b> pan · <b>Scroll</b> zoom · <b>Click</b> select · <b>Drag</b> box select · <b>Double-click</b> fragment · <b>Right-click</b> atom menu';
     }
     this._hintParts = html.split(' · ');
     this._fitHint();
@@ -769,7 +769,7 @@ export class Shell {
       ...(per ? [{ label: 'a axis', kbd: 'A', run: v('a') }, { label: 'b axis', kbd: 'B', run: v('b') }, { label: 'c axis', kbd: 'C', run: v('c') }, { separator: true }] : []),
       { label: 'x axis', kbd: 'X', run: v('x') }, { label: 'y axis', kbd: 'Y', run: v('y') }, { label: 'z axis', kbd: 'Z', run: v('z') },
       { separator: true },
-      { label: 'Default view', kbd: 'R', run: () => app.viewer.resetView() },
+      { label: 'Default view', kbd: keyLabel('Home'), run: () => app.viewer.resetView() },
     ], { label: 'View along an axis' });
   }
 
@@ -810,7 +810,7 @@ export class Shell {
     if (index < 0 || index >= m.n) {
       showMenu(at, [
         { label: 'Fit to screen', icon: 'fit', kbd: 'F', run: () => v.fitView() },
-        { label: 'Reset view', icon: 'reset', kbd: 'R', run: () => v.resetView() },
+        { label: 'Reset view', icon: 'reset', kbd: keyLabel('Home'), run: () => v.resetView() },
         { separator: true },
         { label: 'Select all atoms', icon: 'atom', kbd: keyLabel('mod+a'), run: () => selectAll(app) },
         { label: 'Clear selection', icon: 'x', kbd: 'Esc', disabled: !app.selection.length, run: () => app.clearSelection() },
@@ -823,6 +823,7 @@ export class Shell {
       { header: `${sym} #${src} · ${el.name}` },
       { label: `Select all ${sym}`, icon: 'atom', run: () => selectSameElement(app, sym) },
       { label: 'Select with neighbours', icon: 'neighbors', run: () => selectNeighbours(app, [src]) },
+      { label: 'Select bonded fragment', icon: 'neighbors', kbd: 'Double-click', run: () => selectFragment(app, [src]) },
       { label: 'Centre here', icon: 'crosshair', run: () => v.focusAtom(index) },
       { label: 'Measure from here', icon: 'ruler', run: () => measureFrom(app, index) },
       { separator: true },
@@ -944,8 +945,20 @@ export class Shell {
       }
       e.preventDefault();
       if (e.repeat && !c.repeat) return;   // holding T, P, Space… must not flicker a toggle
+      // keys held down to change what a drag does (X, Y, Z, R…) run their shortcut on release, and only
+      // when no drag or click in the view used them meanwhile
+      if (!ctrl && !e.altKey && app.viewer.holdKeys?.has(lk)) { held = { key: lk, command: c }; return; }
       this.runCommand(c);
     });
+    let held = null;
+    document.addEventListener('keyup', (e) => {
+      const p = held;
+      if (!p || e.key?.toLowerCase() !== p.key) return;
+      held = null;
+      if (app.viewer.heldKeyUsed?.(p.key) || modalOpen() || menuOpen() || document.querySelector('.scrim')) return;
+      this.runCommand(p.command);
+    });
+    addEventListener('blur', () => { held = null; });
   }
 
   bindDrop() {
@@ -1032,7 +1045,7 @@ export class Shell {
     v.on('play', (p) => { this.playBtn.replaceChildren(ic(p ? 'pause' : 'play')); });
     v.on('model', () => { this.updateInfo(); });
     v.on('atomcontext', (e) => this.onAtomContext(e));
-    v.on('boxselect', ({ indices = [], add } = {}) => { if (app.tool !== 'select' || !app.structure) return; app.select(add ? [...new Set([...app.selection, ...indices])] : indices); });
+    v.on('boxselect', ({ indices = [], add, mode } = {}) => { if (app.tool !== 'select' || !app.structure) return; app.select(indices, { mode: mode ?? (add ? 'add' : 'replace') }); });
     // multi-select (touch): a tap adds or removes an atom instead of replacing the selection
     // (both read at pointerdown: the app has already applied the plain click when 'atomclick' gets here)
     const cv = v.renderer.domElement;
@@ -1056,6 +1069,11 @@ export class Shell {
       if (want.has(s)) want.delete(s); else want.add(s);
       const cur = app.selection;
       if (cur.length !== want.size || cur.some((i) => !want.has(i))) app.select([...want]);
+    });
+    // multi-select (touch): a double tap adds the fragment (the app has just replaced the selection with it)
+    v.on('atomdblclick', () => {
+      if (!this._multiAtDown || app.tool !== 'select') return;
+      app.select([...(this._selAtDown ?? []), ...app.selection], { mode: 'replace' });
     });
     // frame rate, measured only over continuous rendering (an idle view renders nothing)
     let frames = 0, t0 = 0, last = 0;
@@ -1181,7 +1199,15 @@ export class Shell {
     const label = (r) => (r.specs.length > 1 ? groupLabel(r.specs) : keyLabel(r.specs[0]));
     const sections = [...rows.keys()].sort(byCategory).map((cat) => h('section.sc-sec', h('h3.sub-h', cat),
       h('div.shortcut-grid', rows.get(cat).map((r) => h('div', h('span', r.title), h('span.kbd', label(r)))))));
-    const mouse = [['Drag', 'Rotate'], ['Right-drag', 'Pan'], ['Scroll', 'Zoom'], ['Click', 'Select an atom'], ['Shift-click', 'Add or remove an atom'], ['Shift-drag', 'Box select (adds)'], ['Alt-drag', 'Box select (replaces)'], ['Double-click', 'Centre on an atom'], ['Right-click', 'Atom menu'], ['Arrows', 'Rotate (view focused)'], ['Shift arrows', 'Pan (view focused)']];
+    // as in Materials Studio
+    const mouse = [
+      ['Right-drag', 'Rotate'], ['X / Y / Z + right-drag', 'Rotate about the screen x, y or z axis'], ['Middle-drag', 'Pan'], [`${ALT} right-drag`, 'Pan'],
+      ['Scroll', 'Zoom'], ['Left + right drag', 'Zoom'], ['R + drag', 'Zoom into a box'],
+      ['Click', 'Select an atom (empty space: clear)'], ['Shift-click', 'Add an atom'], [`${MOD}-click`, 'Add or remove an atom'],
+      ['Drag', `Box select (Shift adds, ${MOD} toggles)`], ['Q + drag', 'Lasso select'],
+      ['Double-click', 'Select the bonded fragment'], [`${ALT} double-click`, 'Select all atoms of that element'], ['Right-click', 'Atom menu'],
+      ['Arrows', 'Rotate 45° (view focused)'], [`Shift or ${ALT} arrows`, 'Pan (view focused)'],
+    ];
     sections.push(h('section.sc-sec', h('h3.sub-h', 'Mouse'), h('div.shortcut-grid', mouse.map(([k, d]) => h('div', h('span', d), h('span.kbd', k))))));
     dialog({ title: 'Keyboard shortcuts', wide: true, className: 'shortcuts', body: h('div.sc-wrap', sections) });
   }
@@ -1277,8 +1303,8 @@ crystallume.registry.colorSchemes.register({
     return [
       { sel: '.rail', title: 'Panels', text: `Projects, the sample Library, the Builder and Structure details live here.${touch ? '' : ` ${keyLabel('shift+1')} – 4 open them.`}`, sheet: 'left', panel: 'library' },
       { sel: '.rail [data-panel="build"]', title: 'Build your own', text: 'Build crystals from prototypes, nanoclusters (icosahedra, decahedra, cuboctahedra) and molecules, or paste file text.', sheet: 'none' },
-      { sel: '.viewport', title: 'Rotate the view', try: 'camera', tryText: touch ? 'Drag one finger across the view' : 'Drag in the view',
-        text: touch ? 'One finger rotates, two fingers pan and pinch to zoom. Tap an atom to see its details.' : 'Drag to rotate, right-drag to pan, scroll to zoom. Hover an atom for details, click to select, right-click for more.', sheet: 'none' },
+      { sel: '.viewport', title: 'Rotate the view', try: 'camera', tryText: touch ? 'Drag one finger across the view' : 'Right-drag in the view',
+        text: touch ? 'One finger rotates, two fingers pan and pinch to zoom. Tap an atom to see its details.' : 'As in Materials Studio: right-drag rotates, middle-drag pans, scroll zooms. Hover an atom for details, click or drag to select, double-click for its fragment, right-click for more.', sheet: 'none' },
       { sel: '.inspector .aio-looks, .inspector .grid-cards', title: 'Pick a look', try: 'look', tryText: touch ? 'Tap any look' : 'Click any look',
         text: 'One click sets the material, light and effects together. Below it, choose the representation, colours and sizes.', sheet: 'inspector', tab: 'style' },
       { sel: '.inspector .tabs', title: 'Light, effects, scene', text: 'Shape the light rig, add ambient occlusion, ink outlines, bloom or depth of field, and set the unit cell, supercell, bonds and background.', sheet: 'inspector' },

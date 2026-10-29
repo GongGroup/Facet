@@ -226,9 +226,9 @@ analyses appear here automatically (they run on the server); built-ins are `coor
 | `analyze(id, params?, s?) → Promise` | run any registered analysis (built-in, JS plugin or server plugin) |
 | `set(path, value)`, `get(path)`, `patch(partial)` | scene settings (§5); paths with `__proto__`, `constructor` or `prototype` are refused |
 | `applyLook(id)`, `setRepresentation(id)`, `setLighting(id)` | one-click presets |
-| `view(axis)`, `resetView()`, `fit()`, `orbit(dAz°, dEl°)`, `pan(dx, dy)`, `zoom(factor)`, `getCamera()`, `setCamera(c)` | camera |
-| `atomsInRect(x0, y0, x1, y1)` | source indices of the atoms drawn inside a client-space rectangle |
-| `select(indices, {add})`, `clearSelection()`, `selectAll()`, `selectSameElement(symbols?)`, `selectNeighbors(indices?, {add})` | selection |
+| `view(axis)`, `resetView()`, `fit()`, `orbit(dAz°, dEl°)`, `rotate(axis, deg°)`, `pan(dx, dy)`, `zoom(factor)`, `getCamera()`, `setCamera(c)` | camera (`rotate` turns the model about a screen axis, `'x'` right, `'y'` up or `'z'` towards the viewer, as the arrow keys do) |
+| `atomsInRect(x0, y0, x1, y1)`, `atomsInPolygon([[x, y], …])` | source indices of the atoms drawn inside a client-space rectangle or polygon (box and lasso selection) |
+| `select(indices, {mode})`, `clearSelection()`, `selectAll()`, `selectSameElement(symbols?)`, `selectNeighbors(indices?, {add})`, `selectFragment(indices?, {add})` | selection (`mode`: `'replace'` (default), `'add'`, `'toggle'` or `'remove'`; the older `{add: true}` toggles) |
 | `measure(type, displayIndices)`, `frame(i)`, `play(on)` | measurements and trajectories |
 | `screenshot({scale, transparent}) → Blob`, `exportText(format) → string \| Promise`, `exportGLB()`, `save(provider)` | output |
 | `projects.providers()`, `projects.list(provider)`, `projects.open(provider, id)` | storage |
@@ -259,9 +259,10 @@ analyses appear here automatically (they run on the server); built-ins are `coor
 | `plugins` | app | — | a frontend plugin was loaded or failed |
 | `registry` | app | `{kind, id, removed}` | an entry was added or removed through the API |
 | `hover` | viewer | `{index, x, y}` | pointer over a drawn atom (−1: none) |
-| `atomclick` | viewer | `{index, shiftKey, x, y}` | click on a drawn atom (−1: empty space) |
+| `atomclick` | viewer | `{index, mode, shiftKey, x, y}` | click on a drawn atom (−1: empty space); `mode` `'replace'`, `'add'` (Shift) or `'toggle'` (Ctrl/⌘), `shiftKey` true for the last two |
+| `atomdblclick` | viewer | `{index, mode, altKey, x, y}` | double-click on a drawn atom (the app selects its bonded fragment; with Alt, every atom of its element) |
 | `atomcontext` | viewer | `{index, x, y, clientX, clientY}` | right-click on a drawn atom |
-| `boxselect` | viewer | `{indices, add}` | rectangle selection finished |
+| `boxselect` | viewer | `{indices, mode, add, shape}` | rectangle (drag) or lasso (Q+drag) selection finished; `shape` `'rect'` or `'lasso'`, `add` = `mode` is not `'replace'` |
 | `frame` | viewer | frame index | trajectory frame changed |
 | `play` | viewer | boolean | playback started or stopped |
 | `camera` | viewer | — | the camera moved |

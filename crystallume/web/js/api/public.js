@@ -20,6 +20,7 @@ import { colorSchemes, COLORMAPS } from '../render/colors.js';
 import { lightingPresets, environmentMaps } from '../render/lighting.js';
 import { looks } from '../render/looks.js';
 import { DEFAULT_SCENE } from '../render/settings.js';
+import { bondedFragment } from '../render/display.js';
 import { commands } from '../core/commands.js';
 import { uid } from '../core/util.js';
 import { analyses } from '../core/analyses.js';
@@ -51,9 +52,10 @@ export const EVENTS = [
   ['plugins', 'app', '—', 'A frontend plugin was loaded or failed to load'],
   ['registry', 'app', '{kind, id, removed}', 'An entry was added to or removed from a registry through the API'],
   ['hover', 'viewer', '{index, x, y}', 'Pointer over a drawn atom (index −1: none)'],
-  ['atomclick', 'viewer', '{index, shiftKey, x, y}', 'Click on a drawn atom (index −1: empty space)'],
+  ['atomclick', 'viewer', '{index, mode, shiftKey, x, y}', "Click on a drawn atom (index −1: empty space); mode 'replace', 'add' (Shift) or 'toggle' (Ctrl/⌘)"],
+  ['atomdblclick', 'viewer', '{index, mode, altKey, x, y}', 'Double-click on a drawn atom (selects its bonded fragment; Alt: its element)'],
   ['atomcontext', 'viewer', '{index, x, y, clientX, clientY}', 'Right-click on a drawn atom'],
-  ['boxselect', 'viewer', '{indices, add}', 'Rectangle selection finished'],
+  ['boxselect', 'viewer', '{indices, mode, add, shape}', "Rectangle (drag) or lasso (Q+drag) selection finished; shape 'rect' | 'lasso'"],
   ['frame', 'viewer', 'frame index', 'The trajectory frame changed'],
   ['play', 'viewer', 'boolean', 'Trajectory playback started or stopped'],
   ['camera', 'viewer', '—', 'The camera moved'],
@@ -234,12 +236,16 @@ export function createAPI(app, shell) {
     fit: () => app.viewer.fitView(),
     /** Orbit the camera by dAz° (to the right) and dEl° (upwards). */
     orbit: (dAz = 0, dEl = 0) => app.viewer.orbitBy(dAz, dEl),
+    /** Turn the model by deg° about a screen axis: 'x' (right), 'y' (up) or 'z' (towards the viewer), as the arrow keys do. */
+    rotate: (axis, deg) => app.viewer.rotateScreen(axis, deg),
     /** Move the model on screen by (dx, dy) CSS pixels. */
     pan: (dx = 0, dy = 0) => app.viewer.panBy(dx, dy),
     /** Zoom by a factor (> 1 zooms in). */
     zoom: (f) => app.viewer.zoomBy(f),
-    /** Source indices of the atoms drawn inside a client-space rectangle (as Shift+drag box selection uses). */
+    /** Source indices of the atoms drawn inside a client-space rectangle (as box selection uses). */
     atomsInRect: (x0, y0, x1, y1) => app.viewer.atomsInRect(x0, y0, x1, y1),
+    /** Source indices of the atoms drawn inside a client-space polygon [[x, y], …] (as lasso selection uses). */
+    atomsInPolygon: (points) => app.viewer.atomsInPolygon(points),
     getCamera: () => app.viewer.getCameraState(),
     setCamera: (c) => app.viewer.setCameraState(c),
     select: (indices, opt) => app.select(indices, opt),
@@ -279,6 +285,13 @@ export function createAPI(app, shell) {
         else { const b = findBonds(s.positions, s.symbols, opt); for (let k = 0; k < b.count; k++) { const i = b.pairs[2 * k], j = b.pairs[2 * k + 1]; if (base.has(i)) out.add(j); if (base.has(j)) out.add(i); } }
       }
       app.select([...out]);
+      return app.selection;
+    },
+    /** Select the bonded fragments (as drawn) of `indices` (default: the selection), as a double-click does. Returns the selection. */
+    selectFragment(indices = app.selection, { add = false } = {}) {
+      const m = app.viewer.model;
+      if (!app.structure || !m?.n) return [];
+      app.select(bondedFragment(m, [...indices].map(Number)), { mode: add ? 'add' : 'replace' });
       return app.selection;
     },
     measure(type, indices) { need(app.structure); const m = app.viewer.addMeasurement(type, indices); app.emit('measure'); return m; },

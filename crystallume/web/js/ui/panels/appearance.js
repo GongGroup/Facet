@@ -368,7 +368,7 @@ registerInspectorTab({
       fx('dof', 'Depth of field', 'Camera blur in front of and behind the focus point', () => [
         slider({ label: 'Aperture', value: P.dof.aperture ?? DP.dof.aperture, min: 0.1, max: 10, step: 0.1, fmt: f1, onInput: q('post.dof.aperture') }),
         slider({ label: 'Max blur', value: P.dof.maxblur ?? DP.dof.maxblur, min: 0.001, max: 0.03, step: 0.001, fmt: (v) => (+v).toFixed(3), onInput: q('post.dof.maxblur') }),
-        h('p.hint', 'Focus follows the rotation centre. Double-click an atom to focus on it.')]),
+        h('p.hint', 'Focus follows the rotation centre. Right-click an atom and choose Centre here to focus on it.')]),
       fx('vignette', 'Vignette', 'Darken the corners of the frame', () => [
         slider({ label: 'Darkness', value: P.vignette.darkness ?? DP.vignette.darkness, min: 0, max: 2, step: 0.05, fmt: f2, onInput: q('post.vignette.darkness') }),
         slider({ label: 'Size', value: P.vignette.offset ?? DP.vignette.offset, min: 0.2, max: 2, step: 0.05, fmt: f2, onInput: q('post.vignette.offset') })]),

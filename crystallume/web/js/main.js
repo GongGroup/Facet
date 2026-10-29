@@ -10,7 +10,7 @@ import { commands } from './core/commands.js';
 import { samples } from './build/samples.js';
 import { pickFiles, probeDownloads, canDownload, NO_DOWNLOADS, isArtifact } from './storage/files.js';
 import { toast } from './ui/overlays.js';
-import { selectAll, selectNeighbours, selectSameElement } from './ui/selectioncard.js';
+import { selectAll, selectNeighbours, selectSameElement, selectFragment } from './ui/selectioncard.js';
 import { createAPI } from './api/public.js';
 import { installEmbedAPI } from './api/embed.js';
 import { installExtensions, syncRegistryCommands } from './api/extensions.js';
@@ -88,7 +88,8 @@ function registerCommands(app, shell) {
   R({ id: 'export.pngT', title: 'Export PNG with transparent background', category: 'Export', keywords: 'image alpha', when: canExport, whyNot, run: () => run(app.exportImage({ scale: 2, transparent: true })) });
   R({ id: 'export.glb', title: 'Export 3D model (.glb)', category: 'Export', keywords: 'gltf blender', when: canExport, whyNot, run: () => run(app.exportGLB()) });
 
-  R({ id: 'view.reset', title: 'Reset view', category: 'View', key: 'r', when: hasS, run: () => app.viewer.resetView() });
+  // Home as in Materials Studio; R (also: hold R and drag to zoom into a box) runs on release
+  R({ id: 'view.reset', title: 'Reset view', category: 'View', key: ['Home', 'r'], when: hasS, run: () => app.viewer.resetView() });
   R({ id: 'view.fit', title: 'Fit to screen', category: 'View', key: 'f', when: hasS, run: () => app.viewer.fitView() });
   R({ id: 'view.zoomIn', title: 'Zoom in', category: 'View', key: ['+', '='], repeat: true, when: hasS, run: () => app.viewer.zoomBy(1.2) });
   R({ id: 'view.zoomOut', title: 'Zoom out', category: 'View', key: '-', repeat: true, when: hasS, run: () => app.viewer.zoomBy(1 / 1.2) });
@@ -112,18 +113,20 @@ function registerCommands(app, shell) {
   R({ id: 'sel.all', title: 'Select all atoms', category: 'Edit', key: 'mod+a', when: hasS, run: () => selectAll(app) });
   R({ id: 'sel.sameElement', title: 'Select same element', category: 'Edit', keywords: 'species all atoms of element', when: hasSel, run: () => selectSameElement(app) });
   R({ id: 'sel.grow', title: 'Select bonded neighbours', category: 'Edit', keywords: 'grow expand neighbors shell', when: hasSel, run: () => selectNeighbours(app) });
+  R({ id: 'sel.fragment', title: 'Select bonded fragment', category: 'Edit', keywords: 'molecule connected double-click', when: hasSel, run: () => selectFragment(app) });
   R({ id: 'sel.delete', title: 'Delete selected atoms', category: 'Edit', key: 'Delete', when: hasSel, run: () => app.deleteSelected() });
   R({ id: 'sel.delete2', title: 'Delete selected atoms', category: 'Edit', key: 'Backspace', when: hasSel, run: () => app.deleteSelected(), hidden: true });
   R({ id: 'sel.invert', title: 'Invert selection', category: 'Edit', when: hasS, run: () => app.invertSelection() });
   R({ id: 'edit.undo', title: 'Undo', category: 'Edit', kbd: 'mod+z', run: () => app.undo() });
   R({ id: 'edit.redo', title: 'Redo', category: 'Edit', kbd: 'mod+shift+z', run: () => app.redo() });
   R({ id: 'traj.play', title: 'Play / pause trajectory', category: 'Trajectory', key: ' ', when: () => (app.structure?.nFrames ?? 1) > 1, run: () => app.viewer.play() });
-  R({ id: 'traj.prev', title: 'Previous frame', category: 'Trajectory', key: 'ArrowLeft', repeat: true, when: () => (app.structure?.nFrames ?? 1) > 1, run: () => app.viewer.setFrame((app.structure.frame - 1 + app.structure.nFrames) % app.structure.nFrames) });
-  R({ id: 'traj.next', title: 'Next frame', category: 'Trajectory', key: 'ArrowRight', repeat: true, when: () => (app.structure?.nFrames ?? 1) > 1, run: () => app.viewer.setFrame((app.structure.frame + 1) % app.structure.nFrames) });
+  // , and . step frames anywhere; ← and → do too unless the view has the focus (there they rotate it)
+  R({ id: 'traj.prev', title: 'Previous frame', category: 'Trajectory', key: [',', 'ArrowLeft'], repeat: true, when: () => (app.structure?.nFrames ?? 1) > 1, run: () => app.viewer.setFrame((app.structure.frame - 1 + app.structure.nFrames) % app.structure.nFrames) });
+  R({ id: 'traj.next', title: 'Next frame', category: 'Trajectory', key: ['.', 'ArrowRight'], repeat: true, when: () => (app.structure?.nFrames ?? 1) > 1, run: () => app.viewer.setFrame((app.structure.frame + 1) % app.structure.nFrames) });
   R({ id: 'ui.left', title: 'Toggle side panel', category: 'Window', key: '[', run: () => shell.toggleLeft(shell.leftId) });
   R({ id: 'ui.right', title: 'Toggle appearance panel', category: 'Window', key: ']', run: () => shell.toggleInspector() });
   R({ id: 'ui.palette', title: 'Command palette', category: 'Help', kbd: 'mod+k', palette: false, run: () => shell.openPalette() });
-  R({ id: 'ui.shortcuts', title: 'Keyboard shortcuts', category: 'Help', key: '?', run: () => shell.shortcutsDialog() });
+  R({ id: 'ui.shortcuts', title: 'Keyboard shortcuts', category: 'Help', key: ['?', 'F1'], run: () => shell.shortcutsDialog() });
   R({ id: 'ui.tour', title: 'Take the tour', category: 'Help', keywords: 'help guide onboarding', run: () => shell.tour() });
   R({ id: 'ui.theme', title: 'Switch interface theme', category: 'Window', keywords: 'dark light mode', run: () => shell.cycleTheme() });
   R({ id: 'ui.api', title: 'Scripting & API', category: 'Help', run: () => shell.apiDialog() });
