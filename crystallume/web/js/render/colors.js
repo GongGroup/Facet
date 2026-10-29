@@ -91,8 +91,6 @@ function coolwarm(t) {
 }
 export const COLORMAPS = { viridis, turbo, coolwarm };
 
-const CPK_CLASSIC = { H: '#FFFFFF', C: '#C8C8C8', N: '#8F8FFF', O: '#F00000', S: '#FFC832', P: '#FFA500', Cl: '#00FF00', B: '#00FF00', Fe: '#FFA500', Na: '#0000FF', Mg: '#228B22', Ca: '#808090', Zn: '#A52A2A', Cu: '#A52A2A', Ni: '#A52A2A', Br: '#A52A2A', F: '#DAA520', Si: '#DAA520', Au: '#DAA520', Ag: '#808090', I: '#A020F0', Li: '#B22222', Ba: '#FFA500', Mn: '#808090', Al: '#808090', Cr: '#808090', K: '#FF1493' };
-
 /**
  * The Modern palette in OKLCH [L, C, h]: the familiar CPK hues (red O, blue N, grey C, white H, yellow S…)
  * at even, moderate chroma, with lightness tiers by role so neighbours stay apart. Elements not listed
@@ -129,14 +127,9 @@ const fromModern = (f) => (s) => oklchToHex(...f(modernLch(s)));
 // ---- built-in schemes -----------------------------------------------------------------
 colorSchemes.register({ id: 'jmol', name: 'Jmol', description: 'The common CPK-derived palette used by Jmol and ASE', colorFor: (s) => element(s).jmol });
 colorSchemes.register({ id: 'vesta', name: 'VESTA', description: 'Colours familiar from VESTA crystal drawings', colorFor: (s) => element(s).vesta });
-colorSchemes.register({ id: 'cpk', name: 'CPK classic', description: 'Corey–Pauling–Koltun / RasMol', colorFor: (s) => CPK_CLASSIC[s] ?? '#FF1493' });
 colorSchemes.register({
   id: 'pastel', name: 'Pastel', description: 'Softened Jmol colours for illustrations',
   colorFor: (s) => { const [h, sat, l] = rgbToHsl(hexToRgb(element(s).jmol)); return rgbToHex(hslToRgb([h, sat * 0.65, 0.62 + l * 0.28])); },
-});
-colorSchemes.register({
-  id: 'muted', name: 'Muted', description: 'Desaturated, print-friendly colours',
-  colorFor: (s) => { const [h, sat, l] = rgbToHsl(hexToRgb(element(s).jmol)); return rgbToHex(hslToRgb([h, sat * 0.45, 0.32 + l * 0.42])); },
 });
 colorSchemes.register({ id: 'modern', name: 'Modern', description: 'Familiar element hues at even, moderate saturation — clean on white and on dark', colorFor: fromModern((c) => c) });
 colorSchemes.register({

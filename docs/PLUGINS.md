@@ -285,7 +285,7 @@ accepted but may look odd). Colours are `#rrggbb`. Angles are degrees, lengths �
 
 | Path | Type | Default | Range / values |
 |---|---|---|---|
-| `look` | string \| null | `publication` | id of the last applied look (`null` after manual changes) |
+| `look` | string \| null | `studio` | id of the last applied look (`null` after manual changes) |
 | `lookBase` | string | — | the look the scene started from (kept when settings change) |
 | `style.rep` | string | `ballstick` | a representation id (`ballstick`, `spacefill`, `spheres`, `licorice`, `wireframe`, `polyhedra`, plugins) |
 | `style.radiusSource` | string | `atomic` | `atomic`, `covalent`, `vdw`, `uniform` |
@@ -294,7 +294,7 @@ accepted but may look odd). Colours are `#rrggbb`. Angles are degrees, lengths �
 | `style.bondColor` | string | `split` | `split`, `uniform` |
 | `style.bondUniformColor` | colour | `#9aa1ab` | |
 | `style.bondMaterial` | string | `auto` | `auto`, `same`, or a material id |
-| `style.colorScheme` | string | `jmol` | a colour scheme id (`jmol`, `vesta`, `cpk`, `pastel`, `muted`, `modern`, `morandi`, `vivid`, `soft`, `greyscale`, `mono`, `index`, `height`, `coordination`, `property`, plugins) |
+| `style.colorScheme` | string | `jmol` | a colour scheme id (`modern`, `morandi`, `vivid`, `soft`, `greyscale`, `jmol`, `vesta`, `pastel`, `mono`, `index`, `height`, `coordination`, `property`, plugins) |
 | `style.monoColor` | colour | `#c9ced6` | used by `mono` |
 | `style.colorOverrides` | object | `{}` | `{ "O": "#ff0000" }` per element |
 | `style.radiusOverrides` | object | `{}` | `{ "O": 0.9 }` base radius in Å per element (scaled by `atomScale`) |
@@ -308,7 +308,7 @@ accepted but may look odd). Colours are `#rrggbb`. Angles are degrees, lengths �
 | `style.polyhedra.edgeColor` | colour | `#22262c` | |
 | `style.lineWidth` | number | 2.5 | 0.5 – 8 px (wireframe) |
 | `style.quality` | string | `auto` | `auto`, `high`, `medium`, `low`, `draft` |
-| `lighting.preset` | string | `studio` | a lighting preset id (`studio`, `headlight`, `three-point`, `softbox`, `dramatic`, `sunset`, `cool-lab`, `paper`, `window`, `night`, `poster`, `flat`, `neon`, `ibl`, plugins) |
+| `lighting.preset` | string | `studio` | a lighting preset id (`studio`, `headlight`, `three-point`, `softbox`, `dramatic`, `sunset`, `cool-lab`, `warm-studio`, `soft-studio`, `window`, `night`, `poster`, `flat`, `neon`, `ibl`, plugins) |
 | `lighting.key` / `fill` / `rim` `.intensity` | number | 2.4 / 0.75 / 1.3 | 0 – 6 |
 | `lighting.key` / `fill` / `rim` `.color` | colour | `#fff4e6` / `#dbe6ff` / `#ffffff` | |
 | `lighting.key` / `fill` / `rim` `.azimuth` | number | −38 / 52 / 155 | −180 – 180 (0 = from the viewer, +90 = from the right) |

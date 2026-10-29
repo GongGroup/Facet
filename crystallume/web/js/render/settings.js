@@ -3,8 +3,8 @@ import { presetToSettings } from './lighting.js';
 import { deepClone, deepMerge } from '../core/util.js';
 
 export const DEFAULT_SCENE = {
-  look: 'publication',
-  lookBase: 'publication',       // the look the scene started from; `look` becomes null once settings are customised
+  look: 'studio',
+  lookBase: 'studio',            // the look the scene started from; `look` becomes null once settings are customised
   style: {
     rep: 'ballstick', radiusSource: 'atomic', atomScale: 0.42, bondRadius: 0.13, bondColor: 'split', bondUniformColor: '#9aa1ab',
     colorScheme: 'jmol', monoColor: '#c9ced6', colorOverrides: {}, property: null,

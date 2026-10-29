@@ -1211,7 +1211,7 @@ export class Shell {
     const code = `// In the browser console (or a plugin):
 const s = crystallume.build.crystal('perovskite', { elements: ['Ba','Ti','O'], a: 4.01, repeat: [3,3,3] });
 crystallume.load(s);                      // show it
-crystallume.applyLook('qutemol');          // restyle
+crystallume.applyLook('poster');           // restyle
 crystallume.set('post.outline.enabled', true);
 crystallume.view('c');                     // look along c
 const png = await crystallume.screenshot({ scale: 3 });

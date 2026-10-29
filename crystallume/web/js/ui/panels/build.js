@@ -7,7 +7,11 @@ import { Structure } from '../../core/structure.js';
 import { formats } from '../../io/index.js';
 import { toast } from '../overlays.js';
 import { registerLeftPanel, formulaEl } from '../shell.js';
+import { styles } from '../../render/styles.js';
 import { paramForm, elementInput } from '../paramform.js';
+
+/** Oxides with octahedra open as coordination polyhedra (rep defaults plus slightly firmer faces). */
+const polyhedraScene = () => ({ style: { rep: 'polyhedra', ...styles.get('polyhedra').defaults, polyhedra: { opacity: 0.72 } } });
 
 const state = { tab: 'crystal', proto: 'perovskite', params: {}, cluster: 'icosahedron', cel: 'Au', csize: null, paste: '', pasteFmt: '', custom: {} };
 
@@ -45,7 +49,7 @@ registerLeftPanel({
         p.defaults.c != null ? num('c', p.twoD ? 'Vacuum c (Å)' : 'c (Å)', 0.001) : null,
         p.defaults.u != null ? num('u', 'u (internal)', 0.001, 'Internal coordinate of the anion') : null,
         h('div.sub-h', 'Repeat (build a supercell)'), rep, preview,
-        h('div.row', btn('Build crystal', { icon: 'build', cls: 'primary', on: () => { try { const s = buildCrystal(p.id, prm); app.addStructure(s, { look: p.id === 'perovskite' || p.id === 'rutile' ? 'polyhedra-studio' : null }); toast(`Built ${s.name}`); } catch (e) { toast(e.message, { type: 'error' }); } } }),
+        h('div.row', btn('Build crystal', { icon: 'build', cls: 'primary', on: () => { try { const s = buildCrystal(p.id, prm); app.addStructure(s, { scene: p.id === 'perovskite' || p.id === 'rutile' ? polyhedraScene() : null }); toast(`Built ${s.name}`); } catch (e) { toast(e.message, { type: 'error' }); } } }),
           h('span.hint', 'Adds to the current project.'))].filter(Boolean));
       update();
     }

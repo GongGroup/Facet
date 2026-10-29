@@ -98,9 +98,17 @@ materials.register({
   },
 });
 materials.register({
-  id: 'crystal', name: 'Crystal', description: 'Clear coloured glass for light backgrounds: saturated body, dark Fresnel rim, crisp highlights',
-  swatch: 'radial-gradient(circle at 35% 30%, #fff 0, #fff 6%, rgba(90,140,230,.55) 22%, rgba(40,90,190,.8) 80%, #1d3f86 100%)',
-  create: (p) => applyCommon(new THREE.MeshPhysicalMaterial({ roughness: 0.04, metalness: 0, transmission: 1, thickness: 0.8, ior: 1.5, clearcoat: 1, clearcoatRoughness: 0.03 }), p),
+  id: 'crystal', name: 'Crystal', description: 'Clear, lightly tinted glass for light backgrounds: airy body, crisp highlights',
+  swatch: 'radial-gradient(circle at 35% 30%, #fff 0, #fff 6%, rgba(130,170,235,.5) 22%, rgba(90,130,210,.75) 80%, #3f5f9e 100%)',
+  create: (p) => {
+    const m = applyCommon(new THREE.MeshPhysicalMaterial({ roughness: 0.04, metalness: 0, transmission: 1, thickness: 0.8, ior: 1.5, clearcoat: 1, clearcoatRoughness: 0.03 }), p);
+    // a quarter of the way to white: element colours tint the glass instead of filling it
+    m.onBeforeCompile = (sh) => {
+      sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0), 0.25);');
+    };
+    m.customProgramCacheKey = () => 'crystal-tint';
+    return m;
+  },
 });
 materials.register({
   id: 'pearl', name: 'Pearl', description: 'Iridescent thin-film sheen',
