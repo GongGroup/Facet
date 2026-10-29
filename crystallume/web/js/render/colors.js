@@ -127,6 +127,9 @@ const fromModern = (f) => (s) => oklchToHex(...f(modernLch(s)));
 // ---- built-in schemes -----------------------------------------------------------------
 colorSchemes.register({ id: 'jmol', name: 'Jmol', description: 'The common CPK-derived palette used by Jmol and ASE', colorFor: (s) => element(s).jmol });
 colorSchemes.register({ id: 'vesta', name: 'VESTA', description: 'Colours familiar from VESTA crystal drawings', colorFor: (s) => element(s).vesta });
+/** Materials Studio's element colours: C, N, O and Si as its screenshots show them (darker carbon, pure red and blue, golden Si), the rest from the CPK table as in Jmol. */
+const MS_COLORS = { H: '#FFFFFF', C: '#787878', N: '#0000FF', O: '#FF0000', Si: '#D7AF50' };
+colorSchemes.register({ id: 'ms', name: 'Materials Studio', description: 'Element colours as in Materials Studio', colorFor: (s) => MS_COLORS[s] ?? element(s).jmol });
 colorSchemes.register({
   id: 'pastel', name: 'Pastel', description: 'Softened Jmol colours for illustrations',
   colorFor: (s) => { const [h, sat, l] = rgbToHsl(hexToRgb(element(s).jmol)); return rgbToHex(hslToRgb([h, sat * 0.65, 0.62 + l * 0.28])); },
@@ -147,10 +150,6 @@ colorSchemes.register({
 colorSchemes.register({
   id: 'greyscale', name: 'Greyscale', description: 'Light greys in the Modern lightness order — for line art and black-and-white print',
   colorFor: fromModern(([L]) => [0.62 + 0.36 * L, 0, 0]),
-});
-colorSchemes.register({
-  id: 'ink', name: 'Ink', description: 'Ink tones on rice paper, from pale wash to deep black in the Modern lightness order',
-  colorFor: fromModern(([L, C, h]) => [0.3 + 0.62 * L, Math.min(C * 0.12, 0.012), h]),
 });
 colorSchemes.register({ id: 'mono', name: 'Single colour', description: 'Every atom in one colour (set below)', colorFor: (s, i, ctx) => ctx.settings.monoColor ?? '#c9ced6' });
 colorSchemes.register({

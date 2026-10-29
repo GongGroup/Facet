@@ -2,15 +2,12 @@
  * Material ("shading") presets. Instance colours multiply the material colour, so every preset
  * keeps a white base colour.
  *   materials.register({ id, name, description, swatch, create(params, { THREE }) => THREE.Material,
- *                        update?(material, params), transparent?, prefersDark?, facets?, faces? })
+ *                        update?(material, params), transparent?, prefersDark? })
  * params = { roughness, metalness, opacity, envIntensity }
  * Slider changes (roughness / metalness / opacity) are applied to the existing material through
  * `updateMaterial()`: the preset's own `update()` when given, otherwise in place for materials built
  * with `applyCommon()`; anything else is rebuilt. `prefersDark` marks presets that read best on a
- * dark background (the appearance panel uses it for hints). `facets: { detail, radial }` asks for
- * low-poly geometry (atoms as icospheres of that detail, bonds as prisms with `radial` sides);
- * `faces(common, { THREE })` builds the material of coordination-polyhedron faces (`common` holds
- * vertexColors, opacity and the other face settings), for presets whose faces should match the atoms.
+ * dark background (the appearance panel uses it for hints).
  */
 import * as THREE from '../../vendor/three/three.module.js';
 
@@ -129,6 +126,11 @@ materials.register({
   create: (p) => { const m = new THREE.MeshPhongMaterial({ shininess: 70, specular: new THREE.Color(0x444444) }); return applyCommon(m, p); },
 });
 materials.register({
+  id: 'ms', name: 'Plastic', description: 'OpenGL plastic with a broad, bright white highlight, as in Materials Studio',
+  swatch: 'radial-gradient(circle at 34% 30%, #fff 0, #fff 9%, #ff5a5a 19%, #d40000 58%, #5c0000 100%)',
+  create: (p) => applyCommon(new THREE.MeshPhongMaterial({ shininess: 32, specular: new THREE.Color(0.5, 0.5, 0.5) }), p),
+});
+materials.register({
   id: 'toon', name: 'Cel', description: 'Three-tone cartoon shading; add an ink outline',
   swatch: 'linear-gradient(135deg, #8fd0a8 0 45%, #5aa77a 45% 75%, #3b7a55 75%)',
   create: (p) => applyCommon(new THREE.MeshToonMaterial({ gradientMap: getToonGradient() }), p),
@@ -211,162 +213,11 @@ materials.register({
   }),
 });
 
-materials.register({
-  id: 'facet', name: 'Facet', description: 'Low-poly facets: atoms as faceted icospheres, bonds as prisms',
-  swatch: 'conic-gradient(from 15deg at 46% 42%, #b9e3d8, #7fbfb0, #5a9b8f, #87c7b9, #c3e9df, #6daa9d, #b9e3d8)',
-  facets: { detail: 1, radial: 6 },
-  create: (p) => applyCommon(new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0, flatShading: true }), p),
-});
-
-// ------------------------------------------------------------------ drawn materials (wash, ink, pencil, screentone)
-/**
- * Uniforms shared by the drawn materials; the viewer keeps them current. `uRes` is the drawing-buffer size,
- * `uPixel` the device pixels per CSS pixel (export scale included, so strokes and grain keep their size in
- * high-resolution exports) and `uPaper` the paper colour (linear), taken from a light background.
- */
-export const drawnUniforms = { uRes: { value: new THREE.Vector2(1, 1) }, uPixel: { value: 1 }, uPaper: { value: new THREE.Color('#faf7f0') } };
-
-const DRAWN_PARS = `
-uniform vec2 uRes; uniform float uPixel; uniform vec3 uPaper;
-varying vec2 vCenterPx; varying vec2 vSeed;
-float dHash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
-float dNoise(vec2 p) {
-  vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f);
-  return mix(mix(dHash(i), dHash(i + vec2(1.0, 0.0)), u.x), mix(dHash(i + vec2(0.0, 1.0)), dHash(i + vec2(1.0, 1.0)), u.x), u.y);
-}
-float dFbm(vec2 p) { float s = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { s += a * dNoise(p); p = p * 2.03 + 17.1; a *= 0.5; } return s / 0.9375; }
-// coloured-pencil strokes: wavy, broken lines, spacing CSS px apart at angle ang, width a fraction of the spacing
-float dHatch(vec2 q, float ang, float spacing, float width, float seed) {
-  vec2 d = vec2(cos(ang), sin(ang));
-  float along = dot(q, d), t = dot(q, vec2(-d.y, d.x)) / spacing;
-  float row = floor(t + 0.5);
-  t += 0.22 * (dNoise(vec2(along / 46.0, row * 1.7 + seed)) - 0.5);
-  float aa = fwidth(t) + 1e-3, dist = abs(t - floor(t + 0.5));
-  float on = 1.0 - smoothstep(width * 0.5 - aa, width * 0.5 + aa, dist);
-  on *= smoothstep(0.16, 0.48, dNoise(vec2(along / 22.0, row * 3.1 + seed)));
-  return on * (0.6 + 0.4 * dNoise(q / 1.3 + seed));
-}`;
-
-/**
- * Each part (atom or bond) anchors its strokes and blotches at its own centre on screen, so they move with
- * the part instead of swimming across it, and every instance gets its own seed.
- */
-const DRAWN_VS = (src) => src
-  .replace('#include <common>', '#include <common>\nuniform vec2 uRes;\nvarying vec2 vCenterPx; varying vec2 vSeed;')
-  .replace('#include <project_vertex>', `#include <project_vertex>
-  {
-    vec4 cc = vec4(0.0, 0.0, 0.0, 1.0);
-    #ifdef USE_INSTANCING
-      cc = instanceMatrix * cc;
-      vSeed = vec2(float(gl_InstanceID) * 0.618034, float(gl_InstanceID) * 0.381966);
-    #else
-      vSeed = vec2(0.0);
-    #endif
-    cc = projectionMatrix * modelViewMatrix * cc;
-    vCenterPx = (cc.xy / cc.w * 0.5 + 0.5) * uRes;
-  }`);
-
-/** Shading from the key light (the first directional light) as a half-Lambert term: 0 facing away … 1 facing it. */
-const KEY_LIGHT = `
-  #if NUM_DIR_LIGHTS > 0
-    float lit = dot(normal, directionalLights[0].direction) * 0.5 + 0.5;
-  #else
-    float lit = dot(normal, geometryViewDir) * 0.5 + 0.5;
-  #endif
-  float rimT = 1.0 - abs(dot(normal, geometryViewDir));
-  vec2 q = (gl_FragCoord.xy - vCenterPx) / uPixel;`;
-
-const f3 = (v) => v.toFixed(3);
-/**
- * Pigment on paper: the colour of a layer of pigment `dens` thick is paper × colour^(k·dens), so thin washes
- * stay pale and dense ones deepen. Three washes are laid wet on dry: an uneven first wash over the whole
- * part (thinner in the highlight, pooled at the outer edge), a hard-edged wash over the shadow side and one
- * over the core shadow, each with a darker line where it dried. Noise bends the edges and the paper
- * granulates the pigment. `soft` widens the edges of the later washes (wet in wet instead of wet on dry).
- */
-const washShader = ({ w1, w2, w3, pool, edge, line, grain, k, soft = 0.02 }) => `{
-  ${KEY_LIGHT}
-  float shade = 1.0 - smoothstep(0.25, 0.95, lit);
-  float n1 = dFbm(q / 26.0 + vSeed * 13.0), n2 = dFbm(q / 15.0 + vSeed * 29.0 + 3.7), n3 = dFbm(q / 11.0 + vSeed * 41.0 + 9.1);
-  float dens = ${f3(w1)} * (0.7 + 0.6 * n1) * mix(1.0, 0.45, smoothstep(0.86, 0.99, lit));
-  dens += ${f3(pool)} * smoothstep(${f3(edge)}, 0.985, rimT);
-  float t2 = 0.38 + 0.22 * (n2 - 0.5), m2 = smoothstep(t2 - ${f3(soft)}, t2 + ${f3(soft)}, shade);
-  dens += ${f3(w2)} * m2 + ${f3(line)} * m2 * (1.0 - smoothstep(t2 + ${f3(soft)}, t2 + ${f3(soft + 0.08)}, shade));
-  float t3 = 0.72 + 0.16 * (n3 - 0.5), m3 = smoothstep(t3 - ${f3(1.5 * soft)}, t3 + ${f3(1.5 * soft)}, shade);
-  dens += ${f3(w3)} * m3 + ${f3(0.7 * line)} * m3 * (1.0 - smoothstep(t3 + ${f3(1.5 * soft)}, t3 + ${f3(1.5 * soft + 0.08)}, shade));
-  dens *= ${f3(1 - grain)} + ${f3(2 * grain)} * dNoise(q / 1.4 + vSeed * 7.0);
-  outgoingLight = uPaper * pow(clamp(diffuseColor.rgb, vec3(0.004), vec3(1.0)), vec3(${f3(k)} * dens));
-}`;
-
-/** Coloured pencil: a light first layer, hatching that thickens into cross-hatching in shadow, and a pressed contour. */
-const PENCIL_SHADER = `{
-  ${KEY_LIGHT}
-  float shade = 1.0 - smoothstep(0.18, 0.95, lit);
-  float s = vSeed.x * 5.0;
-  float c = dHatch(q, 1.0, 6.5, 0.45, s) * smoothstep(0.05, 0.32, shade);
-  c = max(c, dHatch(q, -0.6, 7.0, 0.42, s + 3.0) * smoothstep(0.45, 0.72, shade));
-  c = max(c, dHatch(q, 0.3, 4.6, 0.4, s + 7.0) * smoothstep(0.76, 0.96, shade));
-  c = max(c, smoothstep(0.78, 0.98, rimT) * 0.55 * (0.6 + 0.4 * dNoise(q / 1.5)));
-  vec3 pig = diffuseColor.rgb;
-  vec3 base = mix(uPaper, uPaper * pig, 0.34);
-  vec3 stroke = mix(pig, pig * pig, 0.45 + 0.45 * shade);
-  outgoingLight = mix(base, stroke, clamp(c, 0.0, 1.0) * 0.95);
-}`;
-
-/**
- * Manga screentone: a 45° dot screen laid over the page (aligned across parts, as a printed sheet is) whose dots
- * grow with the element's tone and the shade; the core shadow is solid ink.
- */
-const SCREENTONE_SHADER = `{
-  ${KEY_LIGHT}
-  float shade = 1.0 - smoothstep(0.2, 0.95, lit);
-  float tone = smoothstep(0.04, 0.5, 1.0 - dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)));
-  float dens = clamp(0.4 * tone + 0.7 * shade * shade, 0.0, 1.0) * (1.0 - smoothstep(0.84, 0.95, lit));
-  vec2 g = mat2(0.7071, 0.7071, -0.7071, 0.7071) * (gl_FragCoord.xy / uPixel) / 4.5;
-  float d = length(fract(g) - 0.5), r = 0.64 * sqrt(dens), aa = fwidth(d) + 1e-3;
-  float ink = (1.0 - smoothstep(r - aa, r + aa, d)) * step(0.03, dens);
-  ink = max(ink, smoothstep(0.88, 0.92, shade));
-  outgoingLight = mix(uPaper, vec3(0.03), ink);
-}`;
-
-/** A Lambert material whose colour is replaced by `body` (GLSL run where the lit colour is final). */
-function drawnMaterial(key, body, common = {}) {
-  const m = new THREE.MeshLambertMaterial(common);
-  m.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, drawnUniforms);
-    sh.vertexShader = DRAWN_VS(sh.vertexShader);
-    sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', `#include <common>\n${DRAWN_PARS}`)
-      .replace('#include <opaque_fragment>', `${body}\n#include <opaque_fragment>`);
-  };
-  m.customProgramCacheKey = () => key;
-  return m;
-}
-
-const drawn = (id, name, description, swatch, body) => materials.register({
-  id, name, description, swatch,
-  create: (p) => applyCommon(drawnMaterial(id, body), p),
-  faces: (common) => drawnMaterial(id, body, common),
-});
-drawn('wash', 'Watercolour', 'Transparent washes on paper: pale where lit, pigment pooling at the edges',
-  'radial-gradient(circle at 42% 38%, #f6efe2 0, #b9d8d0 30%, #7fb6a8 72%, #4f8f82 92%, #f6efe2 96%)',
-  washShader({ w1: 0.28, w2: 0.34, w3: 0.3, pool: 0.5, edge: 0.88, line: 0.3, grain: 0.12, k: 1.6 }));
-drawn('sumi', 'Ink wash', 'Ink on rice paper: soft gradations, blotches and dark pooled edges',
-  'radial-gradient(circle at 42% 38%, #f2ede1 0, #b8b3aa 34%, #6f6b66 74%, #2c2a27 92%, #f2ede1 96%)',
-  washShader({ w1: 0.32, w2: 0.48, w3: 0.45, pool: 0.85, edge: 0.84, line: 0.22, grain: 0.18, k: 1.35, soft: 0.07 }));
-drawn('pencil', 'Pencil', 'Coloured-pencil hatching on paper, cross-hatched in shadow',
-  'repeating-linear-gradient(60deg, #fbf9f4 0 2px, #7fb6a8 2px 3.5px), #fbf9f4',
-  PENCIL_SHADER);
-drawn('screentone', 'Screentone', 'Manga screentone: halftone dots for shade, solid ink in the core shadow',
-  'radial-gradient(circle at 34% 30%, #fff 0 22%, transparent 24%), radial-gradient(#141414 32%, transparent 36%) 0 0 / 5px 5px, #fff',
-  SCREENTONE_SHADER);
-
 export function createMaterial(id, params = {}) {
   const m = registry.get(id) ?? registry.get('standard');
   const mat = m.create(params, { THREE });
   mat.userData.preset = m.id;
   mat.userData.params = { ...params };
-  if (m.faces) mat.userData.faces = (common) => m.faces(common, { THREE });
   return mat;
 }
 

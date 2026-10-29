@@ -2,10 +2,8 @@
  * Representations ("drawing styles"). A style turns a display model into Three.js objects.
  *   styles.register({ id, name, description, icon, defaults, bonds: bool, inPlaceRadii?: bool, build(ctx) => THREE.Object3D })
  * ctx = { model, colors (Float32Array linear), radii (Float32Array), settings (style settings),
- *         atomMaterial, bondMaterial, segments, facets, showBonds, resolution, THREE,
+ *         atomMaterial, bondMaterial, segments, showBonds, resolution, THREE,
  *         helpers: { buildAtoms, buildBonds, buildLines, buildPolyhedra, atomRadius, segmentsFor } }
- * `facets` ({ detail, radial } or null) comes from a low-poly material: buildAtoms then draws icospheres of
- * that detail and buildBonds prisms with `radial` sides.
  * `inPlaceRadii: true` promises that only meshes built by helpers.buildAtoms / buildBonds depend on the
  * radii, so the viewer may rewrite their instance matrices instead of rebuilding when atom sizes change.
  */
@@ -62,8 +60,8 @@ export function writeAtomMatrices(mesh, model, radii) {
   mesh.boundingSphere = null;
 }
 
-export function buildAtoms({ model, colors, radii, atomMaterial, segments, facets }) {
-  const geo = facets ? new THREE.IcosahedronGeometry(1, facets.detail ?? 1) : new THREE.SphereGeometry(1, segments[0], segments[1]);
+export function buildAtoms({ model, colors, radii, atomMaterial, segments }) {
+  const geo = new THREE.SphereGeometry(1, segments[0], segments[1]);
   const mesh = new THREE.InstancedMesh(geo, atomMaterial, Math.max(1, model.n));
   mesh.count = model.n;
   writeAtomMatrices(mesh, model, radii);
@@ -120,9 +118,9 @@ export function writeBondMatrices(mesh, { model, colors, radii, settings }, bond
 
 /** Cylinders split in two halves, each coloured like its atom (or one uniform colour). */
 export function buildBonds(ctx, bondRadius) {
-  const { model, bondMaterial, settings, segments, facets } = ctx;
+  const { model, bondMaterial, settings, segments } = ctx;
   const split = settings.bondColor !== 'uniform';
-  const geo = new THREE.CylinderGeometry(1, 1, 1, facets?.radial ?? segments[2], 1, true);
+  const geo = new THREE.CylinderGeometry(1, 1, 1, segments[2], 1, true);
   const count = model.bonds.count * (split ? 2 : 1);
   const mesh = new THREE.InstancedMesh(geo, bondMaterial, Math.max(1, count));
   mesh.count = count;
@@ -185,16 +183,12 @@ function isFlat(pts) {
   return pts.every((q) => Math.abs(new THREE.Vector3().subVectors(q, a).dot(n)) < 0.15);
 }
 
-/**
- * Polyhedron faces follow the atoms' shading: flat looks get flat faces, cel looks cel faces, presets with
- * their own face material (drawn looks) that one, the rest a light gloss.
- */
+/** Polyhedron faces follow the atoms' shading: flat looks get flat faces, cel looks cel faces, the rest a light gloss. */
 function polyhedraMaterial(atomMaterial, opacity) {
   const common = {
     vertexColors: true, transparent: opacity < 1, opacity, side: THREE.DoubleSide, depthWrite: opacity >= 0.95,
     polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
   };
-  if (atomMaterial?.userData?.faces) return atomMaterial.userData.faces(common);
   if (atomMaterial?.isMeshBasicMaterial) return new THREE.MeshBasicMaterial(common);
   if (atomMaterial?.isMeshToonMaterial) return new THREE.MeshToonMaterial({ ...common, gradientMap: atomMaterial.gradientMap });
   return new THREE.MeshPhysicalMaterial({ ...common, roughness: 0.35, metalness: 0, clearcoat: 0.4 });

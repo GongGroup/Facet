@@ -30,7 +30,7 @@ import { element } from '../core/elements.js';
 import { buildDisplayModel, modelBounds, keyOf } from './display.js';
 import { styles, atomRadius, segmentsFor, autoPolyhedraCenters, buildAtoms, buildBonds, buildLines, buildPolyhedra, writeAtomMatrices, writeBondMatrices } from './styles.js';
 import { computeColors } from './colors.js';
-import { createMaterial, updateMaterial, isSeeThrough, materials, drawnUniforms } from './materials.js';
+import { createMaterial, updateMaterial, isSeeThrough, materials } from './materials.js';
 import { LightRig } from './lighting.js';
 import { PostPipeline } from './post.js';
 import { makeBackground } from './background.js';
@@ -493,8 +493,7 @@ export class Viewer extends Emitter {
     const bondMaterial = this._makeBondMaterial(atomMaterial, params);
     const ctx = {
       model: m, colors: this.colors, radii: this.radii, settings: st, atomMaterial, bondMaterial,
-      segments: segmentsFor(m.n, st.quality), facets: materials.get(st.material)?.facets ?? null,
-      showBonds: d.bonds?.show !== false && style.bonds, resolution: this.resolution, THREE,
+      segments: segmentsFor(m.n, st.quality), showBonds: d.bonds?.show !== false && style.bonds, resolution: this.resolution, THREE,
       helpers: this.helpers,
     };
     let rep;
@@ -693,8 +692,6 @@ export class Viewer extends Emitter {
     this.scene3.fog = fog?.enabled ? new THREE.Fog(bg.fogColor, 1, 100) : null;
     this.overlayDark = luminance(bg.fogColor) < 0.4;
     this.post.setTransparent(bg.alpha < 1);
-    // drawn materials paint on the background as paper; on a dark one they keep a light paper
-    drawnUniforms.uPaper.value.copy(luminance(bg.fogColor) > 0.3 ? bg.fogColor : PAPER);
   }
 
   /** The floor's "up": the c axis of periodic structures, otherwise the up of the last reset view (+Y by default). */
@@ -1084,8 +1081,6 @@ export class Viewer extends Emitter {
     }
     this.renderer.setSize(w, h, false);
     const pr = this.renderer.getPixelRatio();
-    drawnUniforms.uRes.value.set(w * pr, h * pr);
-    drawnUniforms.uPixel.value = pr;
     this.overlay.width = w * pr; this.overlay.height = h * pr;
     this.persp.aspect = w / h; this.persp.updateProjectionMatrix();
     this._updateOrtho();
@@ -1518,8 +1513,6 @@ export class Viewer extends Emitter {
     this.renderer.setPixelRatio(1);
     this.renderer.setSize(W, H, false);
     this.post.setSize(W, H);
-    drawnUniforms.uRes.value.set(W, H);
-    drawnUniforms.uPixel.value = W / w0;
     const lineMats = [];
     this.root.traverse((o) => { if (o.material?.isLineMaterial) { lineMats.push([o.material, o.material.linewidth]); o.material.resolution.set(W, H); o.material.linewidth *= scale; } });
     const ink = this.post.ink;
@@ -1642,7 +1635,6 @@ export class Viewer extends Emitter {
 }
 
 function luminance(c) { return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b; }
-const PAPER = new THREE.Color('#faf7f0');
 
 /** 2D convex hull (monotone chain), counter-clockwise in screen coordinates. */
 function convexHull(pts) {
