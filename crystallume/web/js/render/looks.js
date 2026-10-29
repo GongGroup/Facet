@@ -57,6 +57,6 @@ const post = (p) => ({ ...JSON.parse(JSON.stringify(off)), ...p });
       display: { background: { mode: 'gradient', color1: '#1d2a3c', color2: '#0c121b' }, cell: { color: '#8a9bb3' } } } },
   { id: 'glass', name: 'Glass', description: 'Refractive glass atoms in a dark studio with a little bloom',
     swatch: 'radial-gradient(circle at 50% 45%, #22303f, #07090d)', ball: 'radial-gradient(circle at 35% 30%, #fff 0, #c9f0ff 14%, rgba(80,170,220,.6) 55%, rgba(120,200,240,.85) 96%)',
-    scene: { style: { material: 'glass', colorScheme: 'jmol' }, lighting: light('dramatic', { env: { enabled: true, intensity: 0.9, map: 'studio' } }), post: post({ bloom: { enabled: true, strength: 0.35, radius: 0.5, threshold: 0.85 } }),
+    scene: { style: { material: 'glass', colorScheme: 'modern' }, lighting: light('dramatic', { env: { enabled: true, intensity: 0.9, map: 'studio' } }), post: post({ bloom: { enabled: true, strength: 0.35, radius: 0.5, threshold: 0.85 } }),
       display: { background: { mode: 'radial', color1: '#22303f', color2: '#07090d' }, cell: { color: '#8aa0b8' } } } },
 ].forEach((l) => looks.register(l));
