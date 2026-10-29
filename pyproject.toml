@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "crystallume"
-version = "0.1.0"
+version = "0.2.0"
 description = "Visualise and manage atoms, clusters and crystals in the browser — local app or multi-user server."
 readme = "README.md"
 requires-python = ">=3.10"

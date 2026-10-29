@@ -183,7 +183,18 @@ function isFlat(pts) {
   return pts.every((q) => Math.abs(new THREE.Vector3().subVectors(q, a).dot(n)) < 0.15);
 }
 
-export function buildPolyhedra({ model, colors, settings }) {
+/** Polyhedron faces follow the atoms' shading: flat looks get flat faces, cel looks cel faces, the rest a light gloss. */
+function polyhedraMaterial(atomMaterial, opacity) {
+  const common = {
+    vertexColors: true, transparent: opacity < 1, opacity, side: THREE.DoubleSide, depthWrite: opacity >= 0.95,
+    polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
+  };
+  if (atomMaterial?.isMeshBasicMaterial) return new THREE.MeshBasicMaterial(common);
+  if (atomMaterial?.isMeshToonMaterial) return new THREE.MeshToonMaterial({ ...common, gradientMap: atomMaterial.gradientMap });
+  return new THREE.MeshPhysicalMaterial({ ...common, roughness: 0.35, metalness: 0, clearcoat: 0.4 });
+}
+
+export function buildPolyhedra({ model, colors, settings, atomMaterial }) {
   const pset = settings.polyhedra ?? {};
   const centers = new Set(pset.centers === 'auto' || !pset.centers ? autoPolyhedraCenters(model) : pset.centers);
   const nbrs = Array.from({ length: model.n }, () => []);
@@ -210,11 +221,7 @@ export function buildPolyhedra({ model, colors, settings }) {
   const merged = mergeGeometries(geos, false);
   geos.forEach((g) => g.dispose());
   const opacity = pset.opacity ?? 0.55;
-  const mat = new THREE.MeshPhysicalMaterial({
-    vertexColors: true, transparent: opacity < 1, opacity, roughness: 0.35, metalness: 0, clearcoat: 0.4,
-    side: THREE.DoubleSide, depthWrite: opacity >= 0.95, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
-  });
-  const mesh = new THREE.Mesh(merged, mat);
+  const mesh = new THREE.Mesh(merged, polyhedraMaterial(atomMaterial, opacity));
   mesh.name = 'polyhedra-faces';
   mesh.userData.role = 'polyhedra';
   mesh.receiveShadow = true;

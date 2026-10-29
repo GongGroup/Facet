@@ -31,7 +31,7 @@ import { toast, dialog } from './ui/overlays.js';
 import { h } from './ui/dom.js';
 import { makeZip } from './core/zip.js';
 
-export const VERSION = '0.1.0';
+export const VERSION = '0.2.0';
 const PREF_KEY = 'atomscope.prefs';   // key from the app's former name, kept so saved preferences survive the rename
 const RECOVERY_KEY = 'recovery';
 const RETRY_DELAYS = [5000, 15000, 60000];
@@ -194,8 +194,10 @@ export class App extends Emitter {
   }
 
   _blankProject(name = 'Untitled project') {
+    // a new project starts from the default look, or from Midnight in a dark interface
     const scene = makeScene();
-    if (this._isDarkUI()) { deepMerge(scene, deepClone(looks.get('dark').scene)); scene.look = 'dark'; }
+    const look = looks.get(this._isDarkUI() ? 'midnight' : scene.look);
+    if (look) { deepMerge(scene, deepClone(look.scene)); scene.look = look.id; }
     scene.lookBase = scene.look;
     return { id: uid('p'), name, description: '', tags: [], created: new Date().toISOString(), updated: null, structures: [], activeStructure: null, scene, location: null, thumbnail: null };
   }
@@ -250,7 +252,7 @@ export class App extends Emitter {
       activeStructure: doc.activeStructure, scene: makeScene(doc.scene), location, thumbnail: doc.thumbnail ?? null,
     };
     if (doc.importedFrom) p.importedFrom = doc.importedFrom;
-    // projects saved before lookBase existed: the look they show, not the default's ('publication')
+    // projects saved before lookBase existed: the look they show, not the default's ('studio')
     if (doc.scene && !('lookBase' in doc.scene)) p.scene.lookBase = doc.scene.look ?? null;
     if (!p.structures.find((s) => s.id === p.activeStructure)) p.activeStructure = p.structures[0]?.id ?? null;
     const prev = { project: this.project, undo: this.undoStack, redo: this.redoStack, dirty: this.dirty, state: this.saveState, camera: this.structure ? this.viewer.getCameraState() : null, selection: this.selection };

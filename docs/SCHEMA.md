@@ -43,7 +43,7 @@ accept them and read them the same way (writers always write the `crystallume.*`
     { "id": "s_1", "name": "SrTiO3", "structure": { ...Structure... },
       "measurements": [ { "type": "distance", "keys": ["0:0,0,0", "4:1,0,0"] } ] }
   ],
-  "scene": { "look": "publication", "lookBase": "publication", "style": {}, "lighting": {}, "post": {}, "display": {}, "camera": {} }
+  "scene": { "look": "studio", "lookBase": "studio", "style": {}, "lighting": {}, "post": {}, "display": {}, "camera": {} }
 }
 ```
 

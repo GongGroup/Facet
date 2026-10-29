@@ -283,8 +283,8 @@ python -m crystallume ...                                # 等价
 
 | 区域 | 内容 |
 |---|---|
-| **样式 Style** | 13 种一键“外观”（Publication、VESTA、Illustration 墨线卡通、QuteMol、Clay、Glass、Metallic、Dark、Neon、X-ray、Pearl、Golden hour、Blueprint）；6 种表示法（球棍、空间填充、原子球、Licorice、线框、配位多面体）；10 种配色（Jmol、VESTA、CPK、Pastel、Muted、单色、按序号、按高度、按配位数、按原子属性）及逐元素改色/隐藏；12 种材质（Satin、Glossy、Matte、Metallic、Glass 透射、Pearl 薄膜干涉、Clay、Classic Phong、Cel 卡通、Flat、Glow 自发光、X-ray 菲涅尔）；半径表、原子/键尺寸、键着色、细分质量 |
-| **光照 Light** | 10 种布光（Studio、Headlight、Three-point、Soft daylight、Dramatic、Golden hour、Cool lab、Flat、Neon、Environment）；主光/补光/轮廓光的强度、方位、高度、颜色；天空光、环境反射；软阴影与阴影地面；灯光跟随相机；曝光与 7 种色调映射 |
+| **样式 Style** | 8 种一键“外观”（Studio 影棚釉面、Illustration 墨线卡通、Poster 海报、Line art 线稿、Morandi 莫兰迪、Crystal 浅色玻璃、Midnight 深蓝幻灯片、Glass 暗场玻璃）；6 种表示法（球棍、空间填充、原子球、Licorice、线框、配位多面体）；13 种配色（Modern 现代、Morandi 莫兰迪、Vivid 鲜明、Soft 柔和粉彩、Greyscale 灰度、Jmol、VESTA、Pastel、单色、按序号、按高度、按配位数、按原子属性）及逐元素改色/隐藏；14 种材质（Satin、Glossy、Matte、Metallic、Glass 透射、Crystal 浅色背景玻璃、Pearl 薄膜干涉、Clay、Classic Phong、Cel 卡通、Poster 双色卡通、Flat、Glow 自发光、X-ray 菲涅尔）；半径表、原子/键尺寸、键着色、细分质量 |
+| **光照 Light** | 15 种布光（Studio、Headlight、Three-point、Soft daylight、Dramatic、Golden hour、Cool lab、Warm studio、Soft studio、Window light、Night、Poster、Flat、Neon、Environment）；主光/补光/轮廓光的强度、方位、高度、颜色；天空光、环境反射；软阴影与阴影地面；灯光跟随相机；曝光与 7 种色调映射 |
 | **效果 Effects** | 环境光遮蔽（GTAO）、墨线描边（深度+法线边缘检测）、深度雾化、泛光、景深、暗角 |
 | **场景 Scene** | 背景（纯色/线性/径向渐变/透明）、晶胞线（单胞/外框/全部）、超胞显示、原子回卷、边界原子、跨边界补全配位、成键容差与逐元素对开关、标签、透视/正交、轨道/自由旋转、坐标轴、转台 |
 | **项目 Projects** | 存储位置：本浏览器（IndexedDB，离线）、服务器文件夹（local 模式）、云端账户（cloud 模式）、本地文件夹（File System Access API，项目即 `.crystallume.json` 文件）、Claude 云端（作为 claude.ai Artifact 运行时）。自动保存、复制、删除、导入/下载项目文件 |
@@ -302,7 +302,7 @@ python -m crystallume ...                                # 等价
 ```js
 const s = crystallume.build.crystal('perovskite', { elements: ['Ba', 'Ti', 'O'], a: 4.01, repeat: [3, 3, 3] });
 crystallume.load(s);
-crystallume.applyLook('qutemol');
+crystallume.applyLook('poster');
 crystallume.set('post.outline.enabled', true);      // 任意场景参数（点路径）
 crystallume.view('c');
 const png = await crystallume.screenshot({ scale: 3, transparent: true });
@@ -312,7 +312,7 @@ crystallume.registerColorScheme({ id: 'o-red', name: 'Oxygen highlight', colorFo
 crystallume.help();                                 // 在控制台以表格列出注册表、命令、场景参数和事件
 ```
 
-“帮助 → Scripting & API” 提供快速上手示例、实时生成的参考（点击即可复制调用代码，例如 `crystallume.applyLook('neon')`）以及服务器 API 文档与插件状态；命令面板中的 “Copy current scene as script” 会把当前场景复制为 `crystallume.patch({...})` 脚本。
+“帮助 → Scripting & API” 提供快速上手示例、实时生成的参考（点击即可复制调用代码，例如 `crystallume.applyLook('midnight')`）以及服务器 API 文档与插件状态；命令面板中的 “Copy current scene as script” 会把当前场景复制为 `crystallume.patch({...})` 脚本。
 
 可扩展的注册表：`formats`、`styles`（表示法）、`materials`、`colorSchemes`、`lighting`、`environmentMaps`、`looks`、`samples`、`analyses`、`prototypes`、
 `clusters`、`commands`、`storage`（存储后端，例如 S3/WebDAV）、`panels.left` / `panels.inspector`（界面面板）。每个表示法、外观、布光、配色、示例和可写格式都会自动出现在命令面板中。
@@ -659,8 +659,8 @@ The UI served by `crystallume serve` also works as a plain static site without t
 
 | Area | What is in it |
 |---|---|
-| **Style** | 13 one-click looks (Publication, VESTA, Illustration/ink, QuteMol, Clay, Glass, Metallic, Dark, Neon, X-ray, Pearl, Golden hour, Blueprint); 6 representations (ball & stick, space-filling, atomic spheres, licorice, wireframe, coordination polyhedra); 10 colour schemes (Jmol, VESTA, CPK, pastel, muted, single colour, by index, by height, by coordination, by per-atom property) plus per-element colour/visibility; 12 materials (satin, glossy, matte, metallic, transmissive glass, iridescent pearl, clay, classic Phong, cel, flat, glow, Fresnel X-ray); radius tables, sizes, bond colouring, tessellation quality |
-| **Light** | 10 rigs (Studio, Headlight, Three-point, Soft daylight, Dramatic, Golden hour, Cool lab, Flat, Neon, Environment); key/fill/rim intensity, azimuth, elevation and colour; sky light and environment reflections; soft shadows and a shadow floor; camera-locked or world-fixed lights; exposure and 7 tone-mapping operators |
+| **Style** | 8 one-click looks (Studio, Illustration/ink, Poster, Line art, Morandi, Crystal, Midnight, Glass); 6 representations (ball & stick, space-filling, atomic spheres, licorice, wireframe, coordination polyhedra); 13 colour schemes (Modern, Morandi, vivid, soft pastel, greyscale, Jmol, VESTA, pastel, single colour, by index, by height, by coordination, by per-atom property) plus per-element colour/visibility; 14 materials (satin, glossy, matte, metallic, transmissive glass, crystal glass for light backgrounds, iridescent pearl, clay, classic Phong, cel, two-tone poster cel, flat, glow, Fresnel X-ray); radius tables, sizes, bond colouring, tessellation quality |
+| **Light** | 15 rigs (Studio, Headlight, Three-point, Soft daylight, Dramatic, Golden hour, Cool lab, Warm studio, Soft studio, Window light, Night, Poster, Flat, Neon, Environment); key/fill/rim intensity, azimuth, elevation and colour; sky light and environment reflections; soft shadows and a shadow floor; camera-locked or world-fixed lights; exposure and 7 tone-mapping operators |
 | **Effects** | Ambient occlusion (GTAO), ink outlines (depth + normal edges), depth cueing, bloom, depth of field, vignette |
 | **Scene** | Background (solid, linear/radial gradient, transparent), cell edges (unit/outline/all), display supercell, wrapping, boundary atoms, bonded images across the boundary, bond tolerance and per-pair switches, labels, perspective/orthographic, orbit/free rotation, axis gizmo, turntable |
 | **Projects** | Storage: this browser (IndexedDB, offline), server folder (local mode), cloud account (cloud mode), a local folder (File System Access API — projects are `.crystallume.json` files), Claude cloud (when running as a claude.ai artifact). Autosave, duplicate, delete, import/download project files |
@@ -678,7 +678,7 @@ The whole UI is scriptable through `window.crystallume` (plugins receive the sam
 ```js
 const s = crystallume.build.crystal('perovskite', { elements: ['Ba', 'Ti', 'O'], a: 4.01, repeat: [3, 3, 3] });
 crystallume.load(s);
-crystallume.applyLook('qutemol');
+crystallume.applyLook('poster');
 crystallume.set('post.outline.enabled', true);      // any scene setting by dotted path
 crystallume.view('c');
 const png = await crystallume.screenshot({ scale: 3, transparent: true });
@@ -689,7 +689,7 @@ crystallume.help();                                 // console tables of registr
 ```
 
 Help › Scripting & API has a quick start, a live reference (click an entry to copy a call such as
-`crystallume.applyLook('neon')`) and the server's API docs and plugin status. The palette command
+`crystallume.applyLook('midnight')`) and the server's API docs and plugin status. The palette command
 "Copy current scene as script" copies the scene as a `crystallume.patch({...})` script.
 
 Extensible registries: `formats`, `styles` (representations), `materials`, `colorSchemes`, `lighting`, `environmentMaps`, `looks`, `samples`,

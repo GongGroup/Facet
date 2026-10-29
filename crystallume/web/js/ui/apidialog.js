@@ -117,7 +117,7 @@ function snippet(title, code, note) {
 
 function startTab(api) {
   const app = api.app;
-  const look = looks.list().find((l) => !l.hidden && l.id !== app.scene?.look)?.id ?? 'publication';
+  const look = looks.list().find((l) => !l.hidden && l.id !== app.scene?.look)?.id ?? 'studio';
   const console_ = `// Browser console (or a plugin). crystallume.help() lists everything.
 const s = crystallume.build.crystal('perovskite', { elements: ['Ba', 'Ti', 'O'], a: 4.01, repeat: [3, 3, 3] });
 crystallume.load(s);                           // show it
