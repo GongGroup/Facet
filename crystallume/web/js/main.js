@@ -132,7 +132,7 @@ function registerCommands(app, shell) {
   // representations (keys 1–9), looks, lighting presets, colour schemes, samples and Export <format>:
   // one command per registry entry, kept in step with plugin registrations by extensions.js
   syncRegistryCommands(app);
-  for (const [path, title] of [['post.ao.enabled', 'ambient occlusion'], ['post.outline.enabled', 'ink outlines'], ['post.bloom.enabled', 'bloom'], ['post.dof.enabled', 'depth of field'], ['post.fog.enabled', 'depth cueing'], ['lighting.shadows.enabled', 'shadows']]) {
+  for (const [path, title] of [['post.ao.enabled', 'ambient occlusion'], ['post.outline.enabled', 'ink outlines'], ['post.bloom.enabled', 'bloom'], ['post.dof.enabled', 'depth of field'], ['post.fog.enabled', 'depth cueing'], ['post.dropShadow.enabled', 'drop shadows'], ['post.paper.enabled', 'paper texture'], ['lighting.shadows.enabled', 'shadows']]) {
     R({ id: `toggle.${path}`, title: `Toggle ${title}`, category: 'Effects', run: () => { app.set(path, !app.get(path)); toast(`${title[0].toUpperCase() + title.slice(1)} ${app.get(path) ? 'on' : 'off'}`); } });
   }
 }

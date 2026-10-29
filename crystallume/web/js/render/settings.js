@@ -25,6 +25,8 @@ export const DEFAULT_SCENE = {
     dof: { enabled: false, aperture: 2, maxblur: 0.008 },
     vignette: { enabled: false, darkness: 1.1, offset: 1 },
     fog: { enabled: false, strength: 0.5 },
+    dropShadow: { enabled: false, distance: 0.3, softness: 0.25, opacity: 0.35, angle: -55, color: '#1c1a17' },   // Å, Å, 0–1, degrees
+    paper: { enabled: false, strength: 0.6 },
   },
   display: {
     background: { mode: 'gradient', color1: '#f7f8fa', color2: '#dde2e8' },

@@ -72,7 +72,7 @@ const PATH_LABELS = [
   ['style.material', 'Material'], ['style.opacity', 'Opacity'], ['style.polyhedra', 'Polyhedra'], ['style', 'Style'],
   ['lighting.shadows', 'Shadows'], ['lighting.exposure', 'Exposure'], ['lighting', 'Lighting'],
   ['post.ao', 'Ambient occlusion'], ['post.outline', 'Outlines'], ['post.bloom', 'Bloom'], ['post.dof', 'Depth of field'],
-  ['post.vignette', 'Vignette'], ['post.fog', 'Depth cueing'], ['post', 'Effects'],
+  ['post.vignette', 'Vignette'], ['post.fog', 'Depth cueing'], ['post.dropShadow', 'Drop shadows'], ['post.paper', 'Paper texture'], ['post', 'Effects'],
   ['display.background', 'Background'], ['display.supercell', 'Supercell'], ['display.bonds', 'Bonds'], ['display.hiddenElements', 'Hidden elements'],
   ['display.cell', 'Unit cell'], ['display', 'Display'],
 ];

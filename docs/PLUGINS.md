@@ -182,7 +182,7 @@ Required fields are **bold**. `api.registry.<name>` exposes each registry (`get(
 |---|---|---|
 | `registerFormat(f)` | `formats` | **`id`**, `name`, `extensions: ['xyz']`, `filenames: ['POSCAR']`, `mime`, `description`, **`read(text, filename) → Structure`** and/or **`write(structure) → string`** (either may return a Promise; set `server: true` for formats handled by the server) |
 | `registerStyle(s)` | `styles` (representations) | **`id`**, `name`, `description`, `icon` (inline SVG), `defaults` (style settings applied with it), `bonds: bool`, `inPlaceRadii`, **`build(ctx) → THREE.Object3D`** |
-| `registerMaterial(m)` | `materials` | **`id`**, `name`, `description`, `swatch`, **`create(params, { THREE }) → THREE.Material`**, `update?(material, params)`, `transparent`, `prefersDark`; params = `{roughness, metalness, opacity, envIntensity}` |
+| `registerMaterial(m)` | `materials` | **`id`**, `name`, `description`, `swatch`, **`create(params, { THREE }) → THREE.Material`**, `update?(material, params)`, `transparent`, `prefersDark`, `facets: {detail, radial}` (low-poly geometry: icosphere atoms of that detail, bonds with `radial` sides), `faces?(common, { THREE }) → THREE.Material` (coordination-polyhedron faces; `common` holds `vertexColors`, `opacity` and the other face settings); params = `{roughness, metalness, opacity, envIntensity}` |
 | `registerColorScheme(c)` | `colorSchemes` | **`id`**, `name`, `description`, `group: 'Element' \| 'Per atom'`, **`colorFor(symbol, index, ctx) → '#rrggbb'`**, `legend?(ctx) → {colormap, min, max, label}` |
 | `registerLightingPreset(p)` | `lighting` | **`id`**, `name`, `description`, `swatch`, `key`/`fill`/`rim` `{intensity, color, azimuth, elevation}`, `hemi {intensity, sky, ground}`, `ambient {intensity, color}`, `env {enabled, intensity, map}`, `extra: [light, …]` (omitted parts get defaults) |
 | `registerEnvironmentMap(m)` | `environmentMaps` | **`id`**, `name`, `description`, **`build() → THREE.Scene`** (rendered into a PMREM environment) |
@@ -197,7 +197,7 @@ Required fields are **bold**. `api.registry.<name>` exposes each registry (`get(
 Read-only registries: `prototypes`, `clusters` (crystal and cluster builders).
 
 **Representation `build(ctx)`** receives `ctx = { model, colors (Float32Array, linear RGB),
-radii (Float32Array), settings (scene.style), atomMaterial, bondMaterial, segments, showBonds,
+radii (Float32Array), settings (scene.style), atomMaterial, bondMaterial, segments, facets, showBonds,
 resolution, THREE, helpers }`. `model = { n, symbols, positions (Float32Array xyz), src (source atom
 index), img (periodic image offsets), bonds: {pairs, lengths, count}, cell, supercell, pbc }`.
 `helpers` (also `api.render`) = `buildAtoms`, `buildBonds`, `buildLines`, `buildPolyhedra`,
@@ -294,12 +294,12 @@ accepted but may look odd). Colours are `#rrggbb`. Angles are degrees, lengths �
 | `style.bondColor` | string | `split` | `split`, `uniform` |
 | `style.bondUniformColor` | colour | `#9aa1ab` | |
 | `style.bondMaterial` | string | `auto` | `auto`, `same`, or a material id |
-| `style.colorScheme` | string | `jmol` | a colour scheme id (`modern`, `morandi`, `vivid`, `soft`, `greyscale`, `jmol`, `vesta`, `pastel`, `mono`, `index`, `height`, `coordination`, `property`, plugins) |
+| `style.colorScheme` | string | `jmol` | a colour scheme id (`modern`, `morandi`, `vivid`, `soft`, `greyscale`, `ink`, `jmol`, `vesta`, `pastel`, `mono`, `index`, `height`, `coordination`, `property`, plugins) |
 | `style.monoColor` | colour | `#c9ced6` | used by `mono` |
 | `style.colorOverrides` | object | `{}` | `{ "O": "#ff0000" }` per element |
 | `style.radiusOverrides` | object | `{}` | `{ "O": 0.9 }` base radius in Å per element (scaled by `atomScale`) |
 | `style.property` | string \| null | null | per-atom property for the `property` scheme |
-| `style.material` | string | `standard` | a material id (`standard`, `glossy`, `matte`, `metallic`, `glass`, `crystal`, `pearl`, `clay`, `phong`, `toon`, `poster`, `flat`, `glow`, `xray`, plugins) |
+| `style.material` | string | `standard` | a material id (`standard`, `glossy`, `matte`, `metallic`, `glass`, `crystal`, `pearl`, `clay`, `phong`, `toon`, `poster`, `flat`, `glow`, `xray`, `facet`, `wash`, `sumi`, `pencil`, `screentone`, plugins) |
 | `style.roughness`, `style.metalness` | number \| null | null | 0 – 1 (`null` = the material's own value) |
 | `style.opacity` | number | 1 | 0.1 – 1 |
 | `style.polyhedra.centers` | `'auto'` \| string[] | `auto` | element symbols at polyhedron centres |
@@ -308,7 +308,7 @@ accepted but may look odd). Colours are `#rrggbb`. Angles are degrees, lengths �
 | `style.polyhedra.edgeColor` | colour | `#22262c` | |
 | `style.lineWidth` | number | 2.5 | 0.5 – 8 px (wireframe) |
 | `style.quality` | string | `auto` | `auto`, `high`, `medium`, `low`, `draft` |
-| `lighting.preset` | string | `studio` | a lighting preset id (`studio`, `headlight`, `three-point`, `softbox`, `dramatic`, `sunset`, `cool-lab`, `warm-studio`, `soft-studio`, `window`, `night`, `poster`, `flat`, `neon`, `ibl`, plugins) |
+| `lighting.preset` | string | `studio` | a lighting preset id (`studio`, `headlight`, `three-point`, `softbox`, `dramatic`, `sunset`, `cool-lab`, `warm-studio`, `soft-studio`, `window`, `night`, `poster`, `paper`, `flat`, `neon`, `ibl`, plugins) |
 | `lighting.key` / `fill` / `rim` `.intensity` | number | 2.4 / 0.75 / 1.3 | 0 – 6 |
 | `lighting.key` / `fill` / `rim` `.color` | colour | `#fff4e6` / `#dbe6ff` / `#ffffff` | |
 | `lighting.key` / `fill` / `rim` `.azimuth` | number | −38 / 52 / 155 | −180 – 180 (0 = from the viewer, +90 = from the right) |
@@ -349,6 +349,14 @@ accepted but may look odd). Colours are `#rrggbb`. Angles are degrees, lengths �
 | `post.vignette.offset` | number | 1 | 0.2 – 2 |
 | `post.fog.enabled` | boolean | false | depth cueing |
 | `post.fog.strength` | number | 0.5 | 0 – 1 |
+| `post.dropShadow.enabled` | boolean | false | every atom and bond casts a soft shadow on the parts and background behind it |
+| `post.dropShadow.distance` | number | 0.3 | 0 – 1.5 Å, how far the shadow falls |
+| `post.dropShadow.softness` | number | 0.25 | 0 – 1 Å, blur of the shadow edge |
+| `post.dropShadow.opacity` | number | 0.35 | 0 – 1 |
+| `post.dropShadow.angle` | number | -55 | −180 – 180°, where the shadow falls (0 = right, −90 = down) |
+| `post.dropShadow.color` | colour | `#1c1a17` | |
+| `post.paper.enabled` | boolean | false | paper grain over the whole picture |
+| `post.paper.strength` | number | 0.6 | 0 – 2 |
 | `display.background.mode` | string | `gradient` | `solid`, `gradient`, `radial`, `transparent` |
 | `display.background.color1`, `color2` | colour | `#f7f8fa`, `#dde2e8` | |
 | `display.cell.show` | boolean | true | unit cell lines |
