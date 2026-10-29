@@ -21,14 +21,16 @@ classifiers = [
 ]
 # Runtime dependencies are intentionally minimal.
 dependencies = [
-    "fastapi>=0.110",
+    "fastapi>=0.110.1",   # 0.110.0 pins Starlette 0.36, whose TestClient fails on httpx>=0.28
     "uvicorn>=0.31",   # CIDR networks in --forwarded-allow-ips
     "numpy>=1.24",
     "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]
-test = ["pytest>=7", "httpx>=0.27"]
+# Starlette >= 1.2 runs its TestClient on httpx2 and deprecates plain httpx; older Starlette,
+# still allowed by the fastapi range above, only knows httpx. Both are listed so either works.
+test = ["pytest>=7", "httpx>=0.27", "httpx2>=2.0"]
 
 [project.scripts]
 crystallume = "crystallume.cli:main"
