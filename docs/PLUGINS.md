@@ -294,12 +294,12 @@ accepted but may look odd). Colours are `#rrggbb`. Angles are degrees, lengths �
 | `style.bondColor` | string | `split` | `split`, `uniform` |
 | `style.bondUniformColor` | colour | `#9aa1ab` | |
 | `style.bondMaterial` | string | `auto` | `auto`, `same`, or a material id |
-| `style.colorScheme` | string | `jmol` | a colour scheme id (`jmol`, `vesta`, `cpk`, `pastel`, `muted`, `mono`, `index`, `height`, `coordination`, `property`, plugins) |
+| `style.colorScheme` | string | `jmol` | a colour scheme id (`jmol`, `vesta`, `cpk`, `pastel`, `muted`, `modern`, `morandi`, `vivid`, `soft`, `greyscale`, `mono`, `index`, `height`, `coordination`, `property`, plugins) |
 | `style.monoColor` | colour | `#c9ced6` | used by `mono` |
 | `style.colorOverrides` | object | `{}` | `{ "O": "#ff0000" }` per element |
 | `style.radiusOverrides` | object | `{}` | `{ "O": 0.9 }` base radius in Å per element (scaled by `atomScale`) |
 | `style.property` | string \| null | null | per-atom property for the `property` scheme |
-| `style.material` | string | `standard` | a material id (`standard`, `glossy`, `matte`, `metallic`, `glass`, `pearl`, `clay`, `phong`, `toon`, `flat`, `glow`, `xray`, plugins) |
+| `style.material` | string | `standard` | a material id (`standard`, `glossy`, `matte`, `metallic`, `glass`, `crystal`, `pearl`, `clay`, `phong`, `toon`, `poster`, `flat`, `glow`, `xray`, plugins) |
 | `style.roughness`, `style.metalness` | number \| null | null | 0 – 1 (`null` = the material's own value) |
 | `style.opacity` | number | 1 | 0.1 – 1 |
 | `style.polyhedra.centers` | `'auto'` \| string[] | `auto` | element symbols at polyhedron centres |
@@ -308,7 +308,7 @@ accepted but may look odd). Colours are `#rrggbb`. Angles are degrees, lengths �
 | `style.polyhedra.edgeColor` | colour | `#22262c` | |
 | `style.lineWidth` | number | 2.5 | 0.5 – 8 px (wireframe) |
 | `style.quality` | string | `auto` | `auto`, `high`, `medium`, `low`, `draft` |
-| `lighting.preset` | string | `studio` | a lighting preset id (`studio`, `headlight`, `three-point`, `softbox`, `dramatic`, `sunset`, `cool-lab`, `flat`, `neon`, `ibl`, plugins) |
+| `lighting.preset` | string | `studio` | a lighting preset id (`studio`, `headlight`, `three-point`, `softbox`, `dramatic`, `sunset`, `cool-lab`, `paper`, `window`, `night`, `poster`, `flat`, `neon`, `ibl`, plugins) |
 | `lighting.key` / `fill` / `rim` `.intensity` | number | 2.4 / 0.75 / 1.3 | 0 – 6 |
 | `lighting.key` / `fill` / `rim` `.color` | colour | `#fff4e6` / `#dbe6ff` / `#ffffff` | |
 | `lighting.key` / `fill` / `rim` `.azimuth` | number | −38 / 52 / 155 | −180 – 180 (0 = from the viewer, +90 = from the right) |

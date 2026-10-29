@@ -27,14 +27,16 @@ export const materials = {
   list: () => [...registry.values()],
 };
 
-let toonGradient = null;
-function getToonGradient() {
-  if (toonGradient) return toonGradient;
-  const data = new Uint8Array([90, 170, 255]);
-  toonGradient = new THREE.DataTexture(data, data.length, 1, THREE.RedFormat);
-  toonGradient.minFilter = toonGradient.magFilter = THREE.NearestFilter;
-  toonGradient.needsUpdate = true;
-  return toonGradient;
+const toonGradients = new Map();
+/** Cel-shading ramp: the tones are spread evenly over N·L from −1 to 1 (so [a, b] splits at the terminator). */
+function getToonGradient(tones = [90, 170, 255]) {
+  const key = tones.join();
+  if (toonGradients.has(key)) return toonGradients.get(key);
+  const tex = new THREE.DataTexture(new Uint8Array(tones), tones.length, 1, THREE.RedFormat);
+  tex.minFilter = tex.magFilter = THREE.NearestFilter;
+  tex.needsUpdate = true;
+  toonGradients.set(key, tex);
+  return tex;
 }
 
 export function applyCommon(mat, p, defaults = {}) {
@@ -96,6 +98,11 @@ materials.register({
   },
 });
 materials.register({
+  id: 'crystal', name: 'Crystal', description: 'Clear coloured glass for light backgrounds: saturated body, dark Fresnel rim, crisp highlights',
+  swatch: 'radial-gradient(circle at 35% 30%, #fff 0, #fff 6%, rgba(90,140,230,.55) 22%, rgba(40,90,190,.8) 80%, #1d3f86 100%)',
+  create: (p) => applyCommon(new THREE.MeshPhysicalMaterial({ roughness: 0.04, metalness: 0, transmission: 1, thickness: 0.8, ior: 1.5, clearcoat: 1, clearcoatRoughness: 0.03 }), p),
+});
+materials.register({
   id: 'pearl', name: 'Pearl', description: 'Iridescent thin-film sheen',
   swatch: 'radial-gradient(circle at 35% 30%, #fff 0, #f4e9ff 15%, #c6d9f5 45%, #a6b9c9 75%, #5d6c7c 100%)',
   create: (p) => applyCommon(new THREE.MeshPhysicalMaterial({ roughness: 0.32, metalness: 0.05, iridescence: 1, iridescenceIOR: 1.7, iridescenceThicknessRange: [180, 620], sheen: 0.6, sheenRoughness: 0.4, clearcoat: 0.5 }), p),
@@ -114,6 +121,22 @@ materials.register({
   id: 'toon', name: 'Cel', description: 'Three-tone cartoon shading; add an ink outline',
   swatch: 'linear-gradient(135deg, #8fd0a8 0 45%, #5aa77a 45% 75%, #3b7a55 75%)',
   create: (p) => applyCommon(new THREE.MeshToonMaterial({ gradientMap: getToonGradient() }), p),
+});
+materials.register({
+  id: 'poster', name: 'Poster', description: 'Two-tone cel shading with a crisp highlight — bold with an outline',
+  swatch: 'radial-gradient(circle at 34% 30%, #fff 0 9%, transparent 10%), linear-gradient(135deg, #f0705a 0 58%, #b84a3c 58%)',
+  create: (p) => {
+    const m = applyCommon(new THREE.MeshToonMaterial({ gradientMap: getToonGradient([120, 255]) }), p);
+    // a hard specular dot from the key light (the first directional light), added as emission
+    m.onBeforeCompile = (sh) => {
+      sh.fragmentShader = sh.fragmentShader.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+#if NUM_DIR_LIGHTS > 0
+  totalEmissiveRadiance += vec3(0.6) * smoothstep(0.972, 0.978, dot(normal, normalize(directionalLights[0].direction + geometryViewDir)));
+#endif`);
+    };
+    m.customProgramCacheKey = () => 'poster-glint';
+    return m;
+  },
 });
 materials.register({
   id: 'flat', name: 'Flat', description: 'Unlit solid colour — for diagrams and outlines',

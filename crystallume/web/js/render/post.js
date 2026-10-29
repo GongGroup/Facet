@@ -3,9 +3,14 @@
  * depth of field, bloom, tone mapping (OutputPass) and vignette. When every effect is off the
  * viewer renders directly for maximum speed.
  *
- * Transparent renders (background mode 'transparent' or a transparent export, see setTransparent):
- * bloom and depth of field write opaque pixels, so the scene alpha is saved before them and restored
- * at the end (glow keeps a matching partial alpha).
+ * The scene is always rendered over transparent black (premultiplied colour plus coverage alpha) and the
+ * background is laid under it after tone mapping, so a background shows exactly the colour it was given,
+ * as it does in direct rendering (tone mapping the whole frame turned white into #f0f0f0). Refractive
+ * materials still see the background: a full-screen layer draws it into three.js's transmission buffer.
+ *
+ * Transparent renders (background mode 'transparent' or a transparent export, see setTransparent) skip
+ * the background. Bloom writes over the alpha channel, so the coverage is saved before it; transparent
+ * renders restore it at the end (glow keeps a matching partial alpha).
  */
 import * as THREE from '../../vendor/three/three.module.js';
 import { EffectComposer } from '../../vendor/three/addons/postprocessing/EffectComposer.js';
@@ -69,7 +74,8 @@ const InkShader = {
       float edgeD = smoothstep(0.012, 0.03, dz * depthSensitivity);
       float edgeN = smoothstep(0.25, 0.55, dn * normalSensitivity);
       float edge = clamp(max(edgeD, edgeN), 0.0, 1.0) * strength;
-      gl_FragColor = vec4(mix(base.rgb, inkColor, edge), max(base.a, edge));
+      // ink over premultiplied colour: coverage adds up the same way
+      gl_FragColor = vec4(mix(base.rgb, inkColor, edge), edge + base.a * (1.0 - edge));
     }`,
 };
 
@@ -114,6 +120,88 @@ const RestoreAlphaShader = {
 };
 
 /**
+ * Tone mapping (as OutputPass) followed by the background: colour = T(premultiplied scene) + (1 − coverage) · bg,
+ * in linear light, then the output transfer. bgMode 0 keeps the alpha (transparent renders), 1 lays a
+ * colour under the scene, 2 a texture (gradients, sRGB, so they sample linear). With bloom the coverage
+ * comes from the alpha saved before it.
+ */
+const OUTPUT_FS = `
+  precision highp float;
+  uniform sampler2D tDiffuse; uniform sampler2D tAlpha; uniform sampler2D tBg;
+  uniform float savedAlpha; uniform float bgMode; uniform vec3 bgColor;
+  #include <tonemapping_pars_fragment>
+  #include <colorspace_pars_fragment>
+  varying vec2 vUv;
+  void main() {
+    gl_FragColor = texture2D(tDiffuse, vUv);
+    #ifdef LINEAR_TONE_MAPPING
+      gl_FragColor.rgb = LinearToneMapping(gl_FragColor.rgb);
+    #elif defined( REINHARD_TONE_MAPPING )
+      gl_FragColor.rgb = ReinhardToneMapping(gl_FragColor.rgb);
+    #elif defined( CINEON_TONE_MAPPING )
+      gl_FragColor.rgb = CineonToneMapping(gl_FragColor.rgb);
+    #elif defined( ACES_FILMIC_TONE_MAPPING )
+      gl_FragColor.rgb = ACESFilmicToneMapping(gl_FragColor.rgb);
+    #elif defined( AGX_TONE_MAPPING )
+      gl_FragColor.rgb = AgXToneMapping(gl_FragColor.rgb);
+    #elif defined( NEUTRAL_TONE_MAPPING )
+      gl_FragColor.rgb = NeutralToneMapping(gl_FragColor.rgb);
+    #endif
+    if (bgMode > 0.5) {
+      float a = clamp(savedAlpha > 0.5 ? texture2D(tAlpha, vUv).r : gl_FragColor.a, 0.0, 1.0);
+      vec3 bg = bgMode > 1.5 ? texture2D(tBg, vUv).rgb : bgColor;
+      gl_FragColor = vec4(gl_FragColor.rgb + (1.0 - a) * bg, 1.0);
+    }
+    #ifdef SRGB_TRANSFER
+      gl_FragColor = sRGBTransferOETF(gl_FragColor);
+    #endif
+  }`;
+
+class BackgroundOutputPass extends OutputPass {
+  constructor() {
+    super();
+    Object.assign(this.uniforms, { tAlpha: { value: null }, tBg: { value: null }, savedAlpha: { value: 0 }, bgMode: { value: 0 }, bgColor: { value: new THREE.Color() } });
+    this.material.fragmentShader = OUTPUT_FS;
+  }
+}
+
+/** Sets the background uniforms (bgMode, bgColor, tBg) for a scene background: null, a Color or a texture. */
+function setBackgroundUniforms(u, bg) {
+  u.bgMode.value = !bg ? 0 : bg.isColor ? 1 : 2;
+  if (bg?.isColor) u.bgColor.value.copy(bg);
+  u.tBg.value = bg?.isTexture ? bg : null;
+}
+
+/**
+ * A full-screen layer that stands in for scene.background while the scene renders over transparent black:
+ * it draws nothing into the frame itself (`target`) but paints the background into every other target —
+ * three.js's transmission buffer, which glass refracts.
+ */
+function makeBackgroundLayer() {
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { tBg: { value: null }, bgMode: { value: 0 }, bgColor: { value: new THREE.Color() }, on: { value: 0 } },
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 1.0, 1.0); }',
+    fragmentShader: `
+      uniform sampler2D tBg; uniform float bgMode; uniform vec3 bgColor; uniform float on; varying vec2 vUv;
+      void main() { vec3 c = bgMode > 1.5 ? texture2D(tBg, vUv).rgb : bgColor; gl_FragColor = vec4(c * on, on); }`,
+    depthTest: false, depthWrite: false, fog: false, toneMapped: false,
+  });
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat);
+  mesh.name = 'background-layer';
+  mesh.frustumCulled = false;
+  mesh.renderOrder = -1e6;
+  mesh.visible = false;
+  mesh.userData.noInk = true;
+  mesh.raycast = () => {};
+  mesh.target = null;
+  mesh.onBeforeRender = (renderer) => {
+    const on = renderer.getRenderTarget() === mesh.target ? 0 : 1;
+    if (mat.uniforms.on.value !== on) { mat.uniforms.on.value = on; mat.uniformsNeedUpdate = true; }
+  };
+  return mesh;
+}
+
+/**
  * GTAO blend without negative values: ao^intensity (the stock mix() went negative above 1 → bright fringes after
  * tone mapping). A five-tap rotated blur of about 1.3 px takes out the per-pixel grain the denoiser leaves in
  * contact creases and along silhouettes, which otherwise reads as dotted speckle where spheres touch.
@@ -148,14 +236,14 @@ export class PostPipeline {
     this.active = false;
     this.transparent = false;
     this.bloomScale = 1;
+    this.bgLayer = makeBackgroundLayer();
+    scene.add(this.bgLayer);
   }
 
-  /** The frame is composited over something (transparent background or export): keep alpha through bloom / DOF. */
+  /** The frame is composited over something (transparent background or export): keep alpha, leave out the background. */
   setTransparent(on) {
     this.transparent = !!on;
-    const need = this.transparent && !!(this.bloom || this.bokeh);
-    if (this.saveAlpha) this.saveAlpha.enabled = need;
-    if (this.restoreAlpha) this.restoreAlpha.enabled = need;
+    if (this.restoreAlpha) this.restoreAlpha.enabled = this.transparent;
   }
 
   /** Bloom spread multiplier (the viewer lowers it when the model fills the frame). */
@@ -211,7 +299,7 @@ export class PostPipeline {
     this.composer?.renderTarget1?.dispose(); this.composer?.renderTarget2?.dispose();
     this.gtao?.dispose?.(); this.bloom?.dispose?.(); this.saveAlpha?.dispose();
     this.normalTarget?.dispose();
-    this.composer = null; this.renderPass = this.gtao = this.bloom = this.ink = this.bokeh = this.vignette = null; this.normalTarget = null;
+    this.composer = null; this.renderPass = this.gtao = this.bloom = this.ink = this.bokeh = this.vignette = this.output = null; this.normalTarget = null;
     this.saveAlpha = this.restoreAlpha = null; this._aoState = null;
   }
 
@@ -267,24 +355,27 @@ export class PostPipeline {
       this.ink.uniforms.resolution.value.set(w * pr, h * pr);
       this.composer.addPass(this.ink);
     }
-    if (post.dof?.enabled || post.bloom?.enabled) {
-      this.saveAlpha = new SaveAlphaPass();
-      this.composer.addPass(this.saveAlpha);
-    }
     if (post.dof?.enabled) {
       this.bokeh = new BokehPass(scene, camera, { focus: 10, aperture: 0.002, maxblur: 0.008 });
       // the stock pass assumes a perspective camera and reads camera.aspect, which an orthographic one lacks
       this.bokeh.materialBokeh.defines.PERSPECTIVE_CAMERA = camera.isPerspectiveCamera ? 1 : 0;
+      // blur the coverage with the (premultiplied) colour instead of making every pixel opaque
+      this.bokeh.materialBokeh.fragmentShader = this.bokeh.materialBokeh.fragmentShader.replace('gl_FragColor.a = 1.0;', '');
       this.bokeh.uniforms.aspect.value = w / h;
       const bokehRender = this.bokeh.render.bind(this.bokeh);
       this.bokeh.render = (...args) => hideDuring(this.scene, () => bokehRender(...args));
       this.composer.addPass(this.bokeh);
     }
     if (post.bloom?.enabled) {
+      this.saveAlpha = new SaveAlphaPass();
+      this.composer.addPass(this.saveAlpha);
       this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.6, 0.4, 0.8);
       this.composer.addPass(this.bloom);
     }
-    this.composer.addPass(new OutputPass());
+    this.output = new BackgroundOutputPass();
+    this.output.uniforms.savedAlpha.value = this.saveAlpha ? 1 : 0;
+    this.output.uniforms.tAlpha.value = this.saveAlpha?.target.texture ?? null;
+    this.composer.addPass(this.output);
     if (post.vignette?.enabled) {
       this.vignette = new ShaderPass(VignetteShader);
       this.composer.addPass(this.vignette);
@@ -337,9 +428,8 @@ export class PostPipeline {
   }
 
   render() {
-    const cam = this.camera;
+    const cam = this.camera, r = this.renderer;
     if (this.ink) {
-      const r = this.renderer;
       const bg = this.scene.background, ov = this.scene.overrideMaterial, fog = this.scene.fog;
       hideDuring(this.scene, () => {
         this.scene.background = null; this.scene.overrideMaterial = this.normalMaterial; this.scene.fog = null;
@@ -355,6 +445,21 @@ export class PostPipeline {
       this.ink.uniforms.cameraNear.value = cam.near;
       this.ink.uniforms.cameraFar.value = cam.far;
     }
-    this.composer.render();
+    // the scene goes over transparent black; the output pass lays the background under it after tone mapping
+    const background = this.transparent ? null : this.scene.background;
+    setBackgroundUniforms(this.output.uniforms, background);
+    if (!background) { this.composer.render(); return; }
+    const layer = this.bgLayer;
+    setBackgroundUniforms(layer.material.uniforms, background);
+    layer.target = this.composer.readBuffer;   // RenderPass draws the frame here
+    layer.visible = true;
+    const clear = r.getClearColor(new THREE.Color()), clearAlpha = r.getClearAlpha();
+    this.scene.background = null;
+    r.setClearColor(0x000000, 0);
+    try { this.composer.render(); } finally {
+      this.scene.background = background;
+      r.setClearColor(clear, clearAlpha);
+      layer.visible = false;
+    }
   }
 }
