@@ -292,7 +292,7 @@ python -m crystallume ...                                # 等价
 | **结构 Structure** | 化学式、晶胞参数、体积、密度、空间群；选择/删除/替换元素（可撤销）；距离/键角/二面角测量；配位统计；径向分布函数 g(r) |
 | **导出** | PNG（1×/2×/4×、透明背景）、glTF `.glb`（Blender/PowerPoint/AR）、XYZ、extXYZ、POSCAR、CIF、PDB、JSON、项目文件 |
 
-交互与 Materials Studio 一致：右键拖动旋转（按住 X/Y/Z 绕屏幕该轴旋转，Alt+右键平移）、中键拖动平移、滚轮或左右键同时拖动缩放、按住 R 左键框选放大；左键单击选择（Shift 加选、Ctrl/⌘ 反选、点空白处取消）、左键拖动框选（按住 Q 套索）、双击选中整个成键片段（Alt+双击选中同种元素），右键单击打开原子菜单；方向键每次旋转 45°，Shift/Alt+方向键平移，`Home` 复位视图。把文件拖进窗口或直接粘贴文本即可打开。
+交互与 Materials Studio 一致：右键拖动旋转（按住 X/Y/Z 绕屏幕该轴旋转，Alt+右键平移）、中键拖动平移、滚轮或左右键同时拖动缩放、按住 R 左键框选放大；左键单击选择（Shift 加选、Ctrl/⌘ 反选、点空白处取消）、左键拖动框选（按住 Q 套索）、双击选中整个成键片段（Alt+双击选中同种元素），右键单击打开原子菜单；方向键每次旋转 45°，Shift/Alt+方向键平移，`Home` 复位视图。没有中键时（Mac 触控板、妙控鼠标）用 Alt/⌥+左键拖动平移；在 Mac 上 ⌃ Control+拖动旋转、⌃+单击打开原子菜单（与右键相同），⌘+单击反选。把文件拖进窗口或直接粘贴文本即可打开。
 `Ctrl/⌘ K` 打开命令面板，`?` 或 `F1` 查看全部快捷键，“帮助 → Take the tour” 有 1 分钟新手引导。
 
 #### JavaScript API 与前端扩展
@@ -668,7 +668,7 @@ The UI served by `crystallume serve` also works as a plain static site without t
 | **Structure** | Formula, cell, volume, density, space group; select / delete / replace elements (undoable); distance, angle and dihedral measurements; coordination statistics; radial distribution g(r) |
 | **Export** | PNG (1×/2×/4×, transparent), glTF `.glb` (Blender, PowerPoint, AR), XYZ, extXYZ, POSCAR, CIF, PDB, JSON, project file |
 
-Mouse and keys follow Materials Studio: right-drag rotates (hold X, Y or Z to turn about that screen axis; Alt+right-drag pans), middle-drag pans, the wheel or a left+right drag zooms, R+drag zooms into a box; click selects (Shift adds, Ctrl/⌘ toggles, empty space clears), drag draws a selection box (hold Q for a lasso), double-click selects the bonded fragment (Alt+double-click: every atom of that element), right-click opens the atom menu; arrow keys turn the model 45°, Shift/Alt+arrows pan, `Home` resets the view. Drop files on the window or paste file text to open it.
+Mouse and keys follow Materials Studio: right-drag rotates (hold X, Y or Z to turn about that screen axis; Alt+right-drag pans), middle-drag pans, the wheel or a left+right drag zooms, R+drag zooms into a box; click selects (Shift adds, Ctrl/⌘ toggles, empty space clears), drag draws a selection box (hold Q for a lasso), double-click selects the bonded fragment (Alt+double-click: every atom of that element), right-click opens the atom menu; arrow keys turn the model 45°, Shift/Alt+arrows pan, `Home` resets the view. Without a middle button (a Mac trackpad, a Magic Mouse), Alt/⌥+drag pans; on a Mac, ⌃ Control+drag rotates and ⌃-click opens the atom menu, as the right button does, and ⌘-click toggles. Drop files on the window or paste file text to open it.
 `Ctrl/⌘ K` opens the command palette, `?` or `F1` lists shortcuts, Help → Take the tour gives a one-minute walkthrough.
 
 #### JavaScript API and frontend extensions

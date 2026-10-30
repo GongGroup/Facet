@@ -16,8 +16,9 @@
  *   'frame' i | 'play' bool | 'selection' srcIndices | 'render' | 'measure' list | 'camera' | 'model' model | 'error' err
  *
  * Mouse, as in Materials Studio: left button selects (see _setupPointer), right-drag rotates, middle-drag
- * pans, the wheel or both buttons together zoom. Touch, and a pen tip without modifiers: one finger rotates,
- * two pan and pinch, a tap selects.
+ * pans, the wheel or both buttons together zoom. Without a middle button (trackpads, a Magic Mouse) Alt/⌥+drag
+ * pans, and on a Mac Control+drag rotates as a right-drag does. Touch, and a pen tip without modifiers: one
+ * finger rotates, two pan and pinch, a tap selects.
  * Keyboard, while the canvas has focus: arrows turn the model 45° about the screen axes, Shift/Alt+arrows
  * pan, +/− zoom; those keys do not reach the global shortcuts. `holdKeys` (X, Y, Z, R, Q, E) change
  * what a drag does while held; `heldKeyUsed(k)` tells the shortcut router that a drag used one, so that
@@ -57,6 +58,8 @@ const CLICK_PX = 5, DOUBLE_MS = 450, DOUBLE_PX = 6;
 /** Keys held down to change what a drag does: X/Y/Z + right-drag, R (zoom box), Q (lasso), E (rectangle) + left-drag. */
 const HOLD_KEYS = new Set(['x', 'y', 'z', 'r', 'q', 'e']);
 const SVG_NS = 'http://www.w3.org/2000/svg';
+/** A Mac, where Control-click is the right (secondary) click; the same test as ui/keys.js. */
+const IS_MAC = /mac|iphone|ipad/i.test(globalThis.navigator?.platform ?? globalThis.navigator?.userAgent ?? '');
 /** Selection mode of a click or drag from its modifier keys: Ctrl/⌘ toggles, Shift adds. */
 const selectMode = (e) => (e.ctrlKey || e.metaKey ? 'toggle' : e.shiftKey ? 'add' : 'replace');
 /** Even-odd test of a point against a polygon [[x, y], …]. */
@@ -215,8 +218,8 @@ export class Viewer extends Emitter {
       c.enableDamping = true; c.dampingFactor = 0.12; c.rotateSpeed = 0.9; c.zoomSpeed = 1.1; c.screenSpacePanning = true;
       this.controls = c;
     }
-    // right-drag rotates, as in Materials Studio; the left and middle buttons and Alt+right never reach
-    // the controls (_ptrDown takes them for selection and panning), so LEFT is only a pen tip's
+    // right-drag rotates, as in Materials Studio; the middle button and Alt never reach the controls and the
+    // left button only for a pen tip or a Mac's Control-drag (_ptrDown); _rotateWith adjusts this per press
     this.controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
     this.controls.target.copy(target);
     this.controlsKind = kind;
@@ -245,8 +248,10 @@ export class Viewer extends Emitter {
    * clears), drag draws a selection rectangle (Q held: a lasso; R held: a box to zoom into), double-click
    * selects the bonded fragment (Alt: every atom of the element). Right: drag rotates (Alt: pans; X/Y/Z
    * held: turns about that screen axis), click opens the atom menu. Middle-drag pans; the wheel, or the
-   * left and right buttons dragged together, zoom. Touch and a pen tip without modifiers keep the camera
-   * controls' gestures, and a tap selects.
+   * left and right buttons dragged together, zoom. For trackpads and mice without a middle button, Alt/⌥
+   * + left-drag pans too, and on a Mac Control works as the right button (Control+drag rotates,
+   * Control-click opens the menu), as Control-click does everywhere on a Mac. Touch and a pen tip without
+   * modifiers keep the camera controls' gestures, and a tap selects.
    */
   _setupPointer() {
     const el = this.renderer.domElement;
@@ -348,8 +353,9 @@ export class Viewer extends Emitter {
 
   /**
    * Start following a press on the canvas. Its `kind`: 'left' (selection, see _leftPress), 'axis' (X/Y/Z +
-   * right-drag), 'pan' (middle or Alt+right), 'chord' (left and right together: zoom) or 'controls' (the
-   * camera controls drag; a release without moving is a tap, or the atom menu for the right button).
+   * right-drag), 'pan' (middle, or Alt with the left or right button), 'chord' (left and right together:
+   * zoom) or 'controls' (the camera controls drag; a release without moving is a tap, or the atom menu for
+   * the right button). `button` is the press's button, with a Mac's Control+left counted as the right one.
    */
   _ptrDown(e) {
     if (e.target !== this.renderer.domElement) return;
@@ -359,26 +365,24 @@ export class Viewer extends Emitter {
     if (!touch && [...this._ptrs.values()].some((q) => q.type !== 'touch')) return;
     if (!touch && e.button !== 0 && e.button !== 1 && e.button !== 2) return;   // back / forward buttons
     for (const k of this._held) this._heldUsed.add(k);   // a hold key used here does not run its own shortcut
-    const p = { id: e.pointerId, type: e.pointerType, button: e.button, x0: e.clientX, y0: e.clientY, lx: e.clientX, ly: e.clientY, t0: performance.now(), far: false, kind: 'controls' };
+    const button = IS_MAC && !touch && e.button === 0 && e.ctrlKey && !e.metaKey ? 2 : e.button;
+    const p = { id: e.pointerId, type: e.pointerType, button, x0: e.clientX, y0: e.clientY, lx: e.clientX, ly: e.clientY, t0: performance.now(), far: false, kind: 'controls' };
     const held = (k) => this._held.has(k);
     if (touch) {
       // a second finger makes both presses a pan or pinch, not taps
       for (const q of this._ptrs.values()) if (q.type === 'touch') { q.far = true; p.far = true; }
-    } else if (e.button === 0 && (e.pointerType === 'mouse' || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey || ['r', 'q', 'e'].some(held))) {
+    } else if (button === 0 && e.altKey && !['r', 'q', 'e'].some(held)) {
+      this._panPress(e, p);   // Alt/⌥+drag: a pan without a middle button (a click stays a click)
+    } else if (button === 0 && (e.pointerType === 'mouse' || e.shiftKey || e.ctrlKey || e.metaKey || ['r', 'q', 'e'].some(held))) {
       this._leftPress(e, p);
-    } else if (e.button === 2 && ['x', 'y', 'z'].some(held)) {
+    } else if (button === 2 && ['x', 'y', 'z'].some(held)) {
       e.preventDefault();
       p.kind = 'axis'; p.axis = ['x', 'y', 'z'].find(held);
       this._holdControls(p);
       this._capture(p);
-    } else if (e.button === 1 || (e.button === 2 && e.altKey)) {
-      // pan here rather than in the camera controls: the model stays under the pointer and stops with it
-      // (the controls' damping made it trail and glide on), whatever the controls and projection
-      e.preventDefault();
-      p.kind = 'pan';
-      this._holdControls(p);
-      this._capture(p);
-    }
+    } else if (button === 1 || (button === 2 && e.altKey)) {
+      this._panPress(e, p);
+    } else this._rotateWith(e);
     this._ptrs.set(e.pointerId, p);
     if (this._ptrs.size === 1) {
       addEventListener('pointermove', this._ptrMove, true);
@@ -397,6 +401,31 @@ export class Viewer extends Emitter {
     const select = this.tool === 'select' && !!this.model?.n;
     p.shape = this._held.has('r') ? 'zoom' : !select ? null : this._held.has('q') ? 'lasso' : 'rect';
     p.pts = [[e.clientX, e.clientY]];
+  }
+
+  /**
+   * Pan press (middle button, or Alt with the left or right one). The viewer pans rather than the camera
+   * controls: the model stays under the pointer and stops with it (the controls' damping made it trail and
+   * glide on), whatever the controls and projection.
+   */
+  _panPress(e, p) {
+    e.preventDefault();
+    this.renderer.domElement.focus?.({ preventScroll: true });
+    p.kind = 'pan';
+    this._holdControls(p);
+    this._capture(p);
+  }
+
+  /**
+   * A press the camera controls drag (the right button, a Mac's Control+left, a pen tip): make it rotate.
+   * OrbitControls pans instead while Ctrl, ⌘ or Shift is held; the viewer has its own pans, so map the button to
+   * a pan that those keys turn back into the rotation.
+   */
+  _rotateWith(e) {
+    const c = this.controls, key = e.button === 0 ? 'LEFT' : e.button === 2 ? 'RIGHT' : null;
+    if (!c.mouseButtons || !key) return;
+    const swapped = this.controlsKind !== 'trackball' && (e.ctrlKey || e.metaKey || e.shiftKey);
+    c.mouseButtons[key] = swapped ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE;
   }
 
   /** Keep the camera controls out of press p until it ends. */
@@ -450,7 +479,7 @@ export class Viewer extends Emitter {
     if (cancelled || p.cancelled || p.kind === 'chord' || (p.kind === 'pan' && p.button === 1)) return;   // (Alt+right-click: the menu)
     if (!p.far && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) < CLICK_PX) {
       if (p.button === 2) this._context(e);
-      else if (p.button === 0 && (p.kind === 'left' || performance.now() - p.t0 < 500)) this._tap(e);
+      else if (p.button === 0 && (p.kind !== 'controls' || performance.now() - p.t0 < 500)) this._tap(e);
       return;
     }
     if (p.kind !== 'left' || !p.shape) return;
