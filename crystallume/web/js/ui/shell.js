@@ -9,7 +9,7 @@ import { elementColorHex } from '../render/colors.js';
 import { formats } from '../io/index.js';
 import { samples } from '../build/samples.js';
 import { VERSION } from '../app.js';
-import { keyLabel, matchKey, parseKey, hasMod, MOD, ALT } from './keys.js';
+import { keyLabel, matchKey, parseKey, hasMod, isMac, MOD, ALT } from './keys.js';
 import { canDownload, NO_DOWNLOADS } from '../storage/files.js';
 import { SelectionCard, selectSameElement, selectNeighbours, selectFragment, selectAll, measureFrom } from './selectioncard.js';
 
@@ -639,7 +639,8 @@ export class Shell {
       if (!app.structure) html = touch ? 'Open a file or pick a sample' : `Open a file (<b>${keyLabel('mod+o')}</b>), drop one here, paste text, or pick a sample`;
       else if (touch) html = n ? `<b>${n}</b> selected · ${this.selCard?.multi ? 'tap atoms to add or remove · ' : ''}tap empty space to clear` :'One finger rotates, two fingers pan and pinch to zoom, tap an atom to select it';
       else html = n ? `<b>${n}</b> selected · <b>Del</b> delete · <b>Shift-click</b> add · <b>${MOD}-click</b> add/remove · <b>Drag</b> box select · <b>Double-click</b> fragment · <b>Esc</b> clear`
-        : '<b>Right-drag</b> rotate · <b>Middle-drag</b> pan · <b>Scroll</b> zoom · <b>Click</b> select · <b>Drag</b> box select · <b>Double-click</b> fragment · <b>Right-click</b> atom menu';
+        : isMac ? '<b>⌃-drag</b> or <b>right-drag</b> rotate · <b>⌥-drag</b> or <b>middle-drag</b> pan · <b>Scroll</b> or <b>pinch</b> zoom · <b>Click</b> select · <b>Drag</b> box select · <b>Double-click</b> fragment · <b>⌃-click</b> atom menu'
+          : '<b>Right-drag</b> rotate · <b>Middle-drag</b> or <b>Alt-drag</b> pan · <b>Scroll</b> zoom · <b>Click</b> select · <b>Drag</b> box select · <b>Double-click</b> fragment · <b>Right-click</b> atom menu';
     }
     this._hintParts = html.split(' · ');
     this._fitHint();
@@ -1201,11 +1202,12 @@ export class Shell {
       h('div.shortcut-grid', rows.get(cat).map((r) => h('div', h('span', r.title), h('span.kbd', label(r)))))));
     // as in Materials Studio
     const mouse = [
-      ['Right-drag', 'Rotate'], ['X / Y / Z + right-drag', 'Rotate about the screen x, y or z axis'], ['Middle-drag', 'Pan'], [`${ALT} right-drag`, 'Pan'],
+      ['Right-drag', 'Rotate'], ...(isMac ? [['⌃ drag', 'Rotate (as right-drag)']] : []), ['X / Y / Z + right-drag', 'Rotate about the screen x, y or z axis'],
+      ['Middle-drag', 'Pan'], [`${ALT} drag`, 'Pan (no middle button needed)'], [`${ALT} right-drag`, 'Pan'],
       ['Scroll', 'Zoom'], ['Left + right drag', 'Zoom'], ['R + drag', 'Zoom into a box'],
       ['Click', 'Select an atom (empty space: clear)'], ['Shift-click', 'Add an atom'], [`${MOD}-click`, 'Add or remove an atom'],
       ['Drag', `Box select (Shift adds, ${MOD} toggles)`], ['Q + drag', 'Lasso select'],
-      ['Double-click', 'Select the bonded fragment'], [`${ALT} double-click`, 'Select all atoms of that element'], ['Right-click', 'Atom menu'],
+      ['Double-click', 'Select the bonded fragment'], [`${ALT} double-click`, 'Select all atoms of that element'], [isMac ? 'Right-click / ⌃ click' : 'Right-click', 'Atom menu'],
       ['Arrows', 'Rotate 45° (view focused)'], [`Shift or ${ALT} arrows`, 'Pan (view focused)'],
     ];
     sections.push(h('section.sc-sec', h('h3.sub-h', 'Mouse'), h('div.shortcut-grid', mouse.map(([k, d]) => h('div', h('span', d), h('span.kbd', k))))));
@@ -1303,8 +1305,10 @@ crystallume.registry.colorSchemes.register({
     return [
       { sel: '.rail', title: 'Panels', text: `Projects, the sample Library, the Builder and Structure details live here.${touch ? '' : ` ${keyLabel('shift+1')} – 4 open them.`}`, sheet: 'left', panel: 'library' },
       { sel: '.rail [data-panel="build"]', title: 'Build your own', text: 'Build crystals from prototypes, nanoclusters (icosahedra, decahedra, cuboctahedra) and molecules, or paste file text.', sheet: 'none' },
-      { sel: '.viewport', title: 'Rotate the view', try: 'camera', tryText: touch ? 'Drag one finger across the view' : 'Right-drag in the view',
-        text: touch ? 'One finger rotates, two fingers pan and pinch to zoom. Tap an atom to see its details.' : 'As in Materials Studio: right-drag rotates, middle-drag pans, scroll zooms. Hover an atom for details, click or drag to select, double-click for its fragment, right-click for more.', sheet: 'none' },
+      { sel: '.viewport', title: 'Rotate the view', try: 'camera', tryText: touch ? 'Drag one finger across the view' : isMac ? 'Hold ⌃ Control and drag in the view' : 'Right-drag in the view',
+        text: touch ? 'One finger rotates, two fingers pan and pinch to zoom. Tap an atom to see its details.'
+          : isMac ? 'As in Materials Studio: right-drag (or ⌃ Control+drag) rotates, middle-drag (or ⌥ Option+drag) pans, scroll or pinch zooms. Hover an atom for details, click or drag to select, double-click for its fragment, ⌃-click for more.'
+          : 'As in Materials Studio: right-drag rotates, middle-drag (or Alt+drag) pans, scroll zooms. Hover an atom for details, click or drag to select, double-click for its fragment, right-click for more.', sheet: 'none' },
       { sel: '.inspector .aio-looks, .inspector .grid-cards', title: 'Pick a look', try: 'look', tryText: touch ? 'Tap any look' : 'Click any look',
         text: 'One click sets the material, light and effects together. Below it, choose the representation, colours and sizes.', sheet: 'inspector', tab: 'style' },
       { sel: '.inspector .tabs', title: 'Light, effects, scene', text: 'Shape the light rig, add ambient occlusion, ink outlines, bloom or depth of field, and set the unit cell, supercell, bonds and background.', sheet: 'inspector' },
