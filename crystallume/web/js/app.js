@@ -32,7 +32,7 @@ import { toast, dialog } from './ui/overlays.js';
 import { h } from './ui/dom.js';
 import { makeZip } from './core/zip.js';
 
-export const VERSION = '0.3.0';
+export const VERSION = '0.3.1';
 const PREF_KEY = 'atomscope.prefs';   // key from the app's former name, kept so saved preferences survive the rename
 const RECOVERY_KEY = 'recovery';
 const RETRY_DELAYS = [5000, 15000, 60000];

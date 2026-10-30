@@ -639,7 +639,7 @@ export class Shell {
       if (!app.structure) html = touch ? 'Open a file or pick a sample' : `Open a file (<b>${keyLabel('mod+o')}</b>), drop one here, paste text, or pick a sample`;
       else if (touch) html = n ? `<b>${n}</b> selected · ${this.selCard?.multi ? 'tap atoms to add or remove · ' : ''}tap empty space to clear` :'One finger rotates, two fingers pan and pinch to zoom, tap an atom to select it';
       else html = n ? `<b>${n}</b> selected · <b>Del</b> delete · <b>Shift-click</b> add · <b>${MOD}-click</b> add/remove · <b>Drag</b> box select · <b>Double-click</b> fragment · <b>Esc</b> clear`
-        : isMac ? '<b>⌃-drag</b> or <b>right-drag</b> rotate · <b>⌥-drag</b> or <b>middle-drag</b> pan · <b>Scroll</b> or <b>pinch</b> zoom · <b>Click</b> select · <b>Drag</b> box select · <b>Double-click</b> fragment · <b>⌃-click</b> atom menu'
+        : isMac ? '<b>⌃-drag</b> or <b>right-drag</b> rotate · <b>⌥-drag</b> or <b>middle-drag</b> pan · <b>Scroll</b> zoom · <b>Click</b> select · <b>Drag</b> box select · <b>Double-click</b> fragment · <b>⌃-click</b> atom menu'
           : '<b>Right-drag</b> rotate · <b>Middle-drag</b> or <b>Alt-drag</b> pan · <b>Scroll</b> zoom · <b>Click</b> select · <b>Drag</b> box select · <b>Double-click</b> fragment · <b>Right-click</b> atom menu';
     }
     this._hintParts = html.split(' · ');
@@ -1307,7 +1307,7 @@ crystallume.registry.colorSchemes.register({
       { sel: '.rail [data-panel="build"]', title: 'Build your own', text: 'Build crystals from prototypes, nanoclusters (icosahedra, decahedra, cuboctahedra) and molecules, or paste file text.', sheet: 'none' },
       { sel: '.viewport', title: 'Rotate the view', try: 'camera', tryText: touch ? 'Drag one finger across the view' : isMac ? 'Hold ⌃ Control and drag in the view' : 'Right-drag in the view',
         text: touch ? 'One finger rotates, two fingers pan and pinch to zoom. Tap an atom to see its details.'
-          : isMac ? 'As in Materials Studio: right-drag (or ⌃ Control+drag) rotates, middle-drag (or ⌥ Option+drag) pans, scroll or pinch zooms. Hover an atom for details, click or drag to select, double-click for its fragment, ⌃-click for more.'
+          : isMac ? 'As in Materials Studio: right-drag (or ⌃ Control+drag) rotates, middle-drag (or ⌥ Option+drag) pans, scrolling zooms. Hover an atom for details, click or drag to select, double-click for its fragment, ⌃-click for more.'
           : 'As in Materials Studio: right-drag rotates, middle-drag (or Alt+drag) pans, scroll zooms. Hover an atom for details, click or drag to select, double-click for its fragment, right-click for more.', sheet: 'none' },
       { sel: '.inspector .aio-looks, .inspector .grid-cards', title: 'Pick a look', try: 'look', tryText: touch ? 'Tap any look' : 'Click any look',
         text: 'One click sets the material, light and effects together. Below it, choose the representation, colours and sizes.', sheet: 'inspector', tab: 'style' },
