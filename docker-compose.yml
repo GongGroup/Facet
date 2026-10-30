@@ -9,7 +9,7 @@ name: atomscope
 services:
   crystallume:
     build: .
-    image: crystallume:0.3.0
+    image: crystallume:0.3.1
     restart: unless-stopped
     ports:
       - "8765:8765"
