@@ -1250,9 +1250,9 @@ crystallume.registry.colorSchemes.register({
   colorFor: (sym) => sym === 'O' ? '#ff2244' : '#b0b6bd',
 });
 
-// Python (server): pip install crystallume && crystallume serve
-//   import crystallume as asc
-//   asc.view(asc.build.crystal('fcc', ['Au'], a=4.08).repeat(4,4,4))`;
+// Python (server), in a Crystallume checkout: pip install . && crystallume serve
+//   import crystallume as cl
+//   cl.view(cl.build.crystal('fcc', ['Au'], a=4.08).repeat(4,4,4))`;
     return dialog({ title: 'Scripting & API', wide: true, body: h('div', { style: { display: 'grid', gap: '10px' } },
       h('p.hint', 'The whole app is scriptable through window.crystallume. When Crystallume runs on its Python server, the same features are available as a REST API (see /docs on the server) and a Python package.'),
       h('pre', { style: { margin: 0, padding: '12px', background: 'var(--panel-2)', border: '1px solid var(--line)', borderRadius: '9px', overflowX: 'auto', fontFamily: 'var(--font-mono)', fontSize: '12px', lineHeight: '1.55' } }, code)) });

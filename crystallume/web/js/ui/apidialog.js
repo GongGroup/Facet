@@ -230,7 +230,7 @@ p = c.create_project("From Python", structures=[s])`),
   } else {
     out.append(h('div.callout', h('b', 'Running without the Python server'),
       h('span.hint', 'Projects are kept in this browser or a folder on your computer. Run the server for the REST API, plugin formats and cloud projects:'),
-      h('pre.api-code', 'pip install crystallume\ncrystallume serve --plugins ./plugins     # then open http://127.0.0.1:8765')));
+      h('pre.api-code', 'pip install .                             # in a Crystallume checkout\ncrystallume serve --plugins ./plugins     # then open http://127.0.0.1:8765')));
   }
   out.append(snippet('Command line', `crystallume plugins new my-plugin --dir ./plugins   # scaffold a plugin
 crystallume plugins --plugins ./plugins                # list plugins and their status
