@@ -1,33 +1,41 @@
-# Extending Crystallume
+# Scripting and extending Crystallume
 
-Crystallume is built from registries: file formats, builders, representations ("drawing styles"),
-materials, colour schemes, lighting presets, environment maps, looks, samples, analyses, storage
-backends, panels and commands. Plugins add entries to them. There are two kinds, and one plugin
-can be both:
+Crystallume is built from **registries**: lists of file formats, builders, representations, materials,
+colour schemes, lighting presets, environment maps, looks, samples, analyses, storage backends, panels and
+commands. A **plugin** adds entries to them. There are two kinds of plugin, and one plugin can be both:
 
-| Kind | Runs in | Adds | Loaded from |
+| Kind | Runs in | Can add | Loaded from |
 |---|---|---|---|
-| **Python plugin** | the Crystallume server and the CLI | file readers/writers, structure builders, analyses, REST routes, UI presets, static files | `--plugins DIR`, `CRYSTALLUME_PLUGIN_DIRS`, entry points |
-| **JavaScript plugin** | the browser | everything in the web UI (all registries below) | a Python plugin's `add_frontend_module`, `plugins.json`, `?plugin=`, `crystallume.plugins.load()` |
+| **Python plugin** | the server and the command line | file readers and writers, structure builders, analyses, REST routes, presets for the app, static files | `--plugins DIR`, `CRYSTALLUME_PLUGIN_DIRS`, entry points |
+| **JavaScript plugin** | the browser | anything in the app (every registry in §3) | a Python plugin's `add_frontend_module`, `plugins.json`, `?plugin=`, `crystallume.plugins.load()` |
 
-Quick start:
+## Your first plugin
 
 ```bash
-crystallume plugins new my-plugin --dir ./plugins     # plugin.py + static/my-plugin.js
-crystallume plugins --plugins ./plugins               # it loads? (status ok / ERROR)
-crystallume serve --plugins ./plugins                 # open http://127.0.0.1:8765
+crystallume plugins new my-plugin --dir ./plugins      # writes plugin.py and static/my-plugin.js
+crystallume plugins --plugins ./plugins                # check that it loads (status ok or ERROR)
+crystallume serve --plugins ./plugins                  # open http://127.0.0.1:8765
 crystallume analyze my-plugin-count POSCAR --plugins ./plugins
 ```
 
-In the web UI, **Help › Scripting & API** shows a live reference of every registry entry, command,
-scene path and event (click to copy a call), plus the status of each plugin. In the browser console,
-`crystallume.help()` prints the same as tables.
+The new plugin adds an analysis (shown under Analyses in the Structure panel), a look and a browser module.
+Edit `plugins/my-plugin/plugin.py` and restart the server to see your changes.
+[`examples/plugins/hello_plugin`](../examples/plugins/hello_plugin) uses every Python extension point.
+
+**Look things up as you go.** In the app, **Help › Scripting & API** lists every registry entry, command,
+scene setting and event (click one to copy a call), and shows each plugin's status. In the browser console,
+`crystallume.help()` prints the same lists as tables.
+
+**Contents:** [1. Python plugins](#1-python-plugins) · [2. JavaScript plugins](#2-javascript-plugins) ·
+[3. Registries](#3-registries-and-entry-shapes) · [4. JavaScript API](#4-the-javascript-api-windowcrystallume) ·
+[5. Scene settings](#5-scene-settings) · [6. Embedding](#6-embedding-postmessage) ·
+[7. Python API, REST client and CLI](#7-python-api-rest-client-and-cli)
 
 ---
 
 ## 1. Python plugins
 
-A plugin is a module with a `register(ctx)` function and an optional `PLUGIN` dict:
+A Python plugin is a module with a `register(ctx)` function and, optionally, a `PLUGIN` dict:
 
 ```python
 # plugins/my_plugin/plugin.py
@@ -42,25 +50,32 @@ def register(ctx: PluginContext) -> None:
     ctx.add_frontend_module("my-plugin.js")      # served from plugins/my-plugin/static/
 ```
 
-### Lifecycle
+### How plugins are found and loaded
 
-1. **Discovery.** Every sub-folder of a plugin directory that contains `plugin.py`, and every
-   top-level `*.py` file (names starting with `_` or `.` are skipped). Installed packages can
-   advertise `[project.entry-points."crystallume.plugins"] name = "package.module"` (a module or a
-   `register` function). The former group `atomscope.plugins` is still discovered (an entry point listed
-   in both groups by the same package loads once), and `import atomscope` / `from atomscope import ...`
-   in older plugins gives the matching `crystallume` module.
-2. **Registration.** `register(ctx)` is called once. Readers and writers go into the global
-   `crystallume.io` registry; builders, analyses, routes, presets and frontend modules are recorded on
-   the plugin.
-3. **Failure.** If import or `register` raises, the plugin is listed with `status: "error"` and the
-   error message (`crystallume plugins`, `GET /api/v1/plugins`, the web UI shows one notice at start-up);
-   its readers/writers are rolled back. A broken plugin never stops the server.
-4. **Use.** The server exposes builders at `POST /api/v1/build/custom/{name}`, analyses at
-   `POST /api/v1/analysis/custom/{name}`, formats through `/api/v1/io/*`, routers under
-   `/api/v1/ext`, static files at `/plugins/<name>/`. `/api/v1/info` lists everything for the UI.
-   The CLI loads the same plugins for `convert`, `info`, `formats`, `build` and `analyze`
-   (`--plugins DIR`, else `CRYSTALLUME_PLUGIN_DIRS`). In Python: `crystallume.load_plugins(["./plugins"])`.
+1. **Found.** Crystallume loads every sub-folder of a plugin folder that contains `plugin.py`, and every
+   top-level `*.py` file (except names starting with `_` or `.`). An installed package can declare an
+   entry point instead (a module or a `register` function):
+   ```toml
+   [project.entry-points."crystallume.plugins"]
+   myplugin = "my_package.crystallume_plugin"
+   ```
+2. **Registered.** `register(ctx)` runs once. Readers and writers join the global `crystallume.io`
+   registry; builders, analyses, routes, presets and frontend modules are kept with the plugin.
+3. **Failed?** If importing the plugin or `register` raises an error, the plugin is listed with
+   `status: "error"` and the message (in `crystallume plugins`, `GET /api/v1/plugins` and one notice in the
+   app), and its readers and writers are removed again. A broken plugin never stops the server.
+4. **Used.**
+   - The server runs builders at `POST /api/v1/build/custom/{name}` and analyses at
+     `POST /api/v1/analysis/custom/{name}`.
+   - Formats work through `/api/v1/io/*`, routers live under `/api/v1/ext`, and static files are served at
+     `/plugins/<name>/`.
+   - `/api/v1/info` lists everything for the app, where the plugin's formats, builders and analyses appear
+     by themselves.
+   - The CLI loads the same plugins for `convert`, `info`, `formats`, `build` and `analyze`.
+   - In Python: `crystallume.load_plugins(["./plugins"])`.
+
+Plugins written for AtomScope keep working: the entry-point group `atomscope.plugins` is still searched
+(a package listed in both groups loads once), and `import atomscope` gives the matching `crystallume` module.
 
 ### `PluginContext`
 
@@ -76,12 +91,12 @@ def register(ctx: PluginContext) -> None:
 | `add_frontend_module(path)` | ES module (relative to the static folder) the web UI imports; returns `plugins/<name>/<path>` |
 | `add_preset(kind, preset)` | `kind`: `lighting`, `colorScheme` or `look` (`style` is the older name for a look) |
 
-Builder and analysis names match `[A-Za-z0-9][A-Za-z0-9_.-]*`. Frontend URLs are **relative**
+Builder and analysis names match `[A-Za-z0-9][A-Za-z0-9_.-]*`. Frontend URLs are relative
 (`plugins/<name>/x.js`), so they also work when the app is served under a sub-path (`--root-path`).
 
-### Parameter schema (builders and analyses)
+### Parameters of builders and analyses
 
-The UI renders a form from `params`; the CLI coerces `--param KEY=VALUE` with it.
+The app draws a form from `params`, and the CLI converts `--param KEY=VALUE` with it.
 
 | Field | Meaning |
 |---|---|
@@ -92,13 +107,13 @@ The UI renders a form from `params`; the CLI coerces `--param KEY=VALUE` with it
 | `min`, `max`, `step` | numeric limits (checked before running) |
 | `options` | for `select`: `["a", "b"]`, `[["value", "Label"], …]` or `[{value, label}]`; in JavaScript also a function of the structure |
 
-### Preset shapes
+### Presets
 
-Presets are passed to the web UI unchanged (plus `plugin`); `/api/v1/info` lists them under
+The app receives presets as they are (plus `plugin`); `/api/v1/info` lists them under
 `presets.lighting`, `presets.colorSchemes` and `presets.styles` (looks).
 
 ```python
-ctx.add_preset("lighting", {          # any omitted part falls back to the UI defaults
+ctx.add_preset("lighting", {          # any omitted part falls back to the app's defaults
     "id": "sunset", "name": "Sunset",
     "key":  {"intensity": 2.2, "color": "#ff9f68", "azimuth": -40, "elevation": 20},
     "fill": {"intensity": 0.6, "color": "#6c8cff", "azimuth": 50, "elevation": 10},
@@ -114,42 +129,46 @@ ctx.add_preset("look", {"id": "dusk", "name": "Dusk", "swatch": "#2f3a5a",
                                   "post": {"bloom": {"enabled": True}}}})
 ```
 
-A **look** (`style` preset) is a partial scene (see §5). Applying it first resets the look-owned
-settings (lighting, effects, material, colour scheme, background, cell colour) to the defaults, so a
-look always produces the same picture; representation, sizes, bonds and the camera are kept unless
-the look sets them.
+A **look** is a partial scene (§5). Applying one first resets the settings a look owns (lighting, effects,
+material, colour scheme, background, cell colour) to their defaults, so a look always gives the same
+picture. The representation, sizes, bonds and camera stay as they are unless the look sets them.
 
 ---
 
 ## 2. JavaScript plugins
 
+A JavaScript plugin is an ES module whose default export (or `activate` export) receives the API:
+
 ```js
 // my-plugin.js
-export default async function activate(api) {      // `activate` may also be a named export
+export default async function activate(api) {
   const off = api.registerLook({ id: 'lab-night', name: 'Lab night', scene: { post: { outline: { enabled: true } } } });
   api.registerCommand({ id: 'my.hello', title: 'Say hello', run: (app) => api.toast(`${app.structure?.length ?? 0} atoms`) });
 }
 ```
 
-### Lifecycle
+### How plugins are loaded
 
-1. **Loading.** At start-up the app (`installExtensions`) loads, in order:
-   the frontend modules of server plugins (`/api/v1/info` → `plugins[].frontend`); every entry of
-   `plugins.json` next to `index.html`; and, in static mode only (no server, not embedded as an
-   artifact), each same-origin `?plugin=<url>` in the address. Later, any script can call
-   `await crystallume.plugins.load(url, { name })`.
-2. **Activation.** The module is imported (relative URLs resolve against the page) and its default
-   export (or `activate`) is called with the API object (`window.crystallume`). It may be `async`.
-   Each URL loads once; loading it again returns the same result.
-3. **Registration.** Every `api.register*` call validates the entry (missing required fields throw,
-   e.g. `samples.register: missing build()`), warns in the console when it replaces an entry with the
-   same id (pass `{ replace: true }` as the second argument to do that on purpose), updates the
-   command palette and the panels, emits a `registry` event, and returns a function that removes the
-   entry again. Removing an entry that replaced another (for example a built-in look) brings the
-   replaced entry back. Entries registered during activation are tagged with `plugin: <name>`.
-4. **Failure.** If import or `activate` throws, the registrations it made are undone, the plugin is
-   listed with `status: 'error'` in `crystallume.plugins.list()` and Help › Scripting & API › Server,
-   and a single notice is shown at start-up.
+1. **Loaded.** At start-up the app loads, in this order:
+   - the frontend modules of server plugins (`plugins[].frontend` in `/api/v1/info`);
+   - every entry of `plugins.json` next to `index.html`;
+   - without a server only, each same-origin `?plugin=<url>` in the address.
+
+   Any script can load one later with `await crystallume.plugins.load(url, { name })`.
+2. **Activated.** The module is imported (relative URLs resolve against the page) and its default export,
+   or `activate`, is called with the API object (`window.crystallume`). It may be `async`. Each URL loads
+   only once; loading it again returns the same result.
+3. **Registered.** Every `api.register*` call checks the entry and throws if a required field is missing
+   (for example `samples.register: missing build()`).
+   - Replacing an entry with the same id warns in the console; pass `{ replace: true }` as the second
+     argument to do it on purpose.
+   - The call updates the command palette and panels, emits a `registry` event, and returns a function
+     that removes the entry. If the entry replaced another one (such as a built-in look), removing it
+     brings the old one back.
+   - Entries registered during activation are tagged with `plugin: <name>`.
+4. **Failed?** If the import or `activate` throws, its registrations are undone. The plugin is listed with
+   `status: 'error'` in `crystallume.plugins.list()` and in Help › Scripting & API › Server, and the app
+   shows one notice at start-up.
 
 ### `plugins.json`
 
@@ -160,14 +179,14 @@ export default async function activate(api) {      // `activate` may also be a n
 ]
 ```
 
-Same-origin file next to `index.html` (ship `[]` when unused). URLs resolve against the manifest;
-`"enabled": false` skips an entry. `python scripts/build_artifact.py --plugin DIR` copies a plugin's
-`static/` folder into the bundle and writes this file for you. Only the JavaScript part of a plugin
-runs without the server.
+This file sits next to `index.html` on the same site; ship `[]` when it is unused. URLs resolve against the
+file, and `"enabled": false` skips an entry. `python scripts/build_artifact.py --plugin DIR` copies a
+plugin's `static/` folder into the bundle and writes this file for you. Without a server, only the
+JavaScript part of a plugin runs.
 
-### Command palette
+### Commands
 
-Commands mirror the registries automatically: `rep.<id>`, `look.<id>`, `light.<id>`, `color.<id>`,
+The command palette follows the registries: `rep.<id>`, `look.<id>`, `light.<id>`, `color.<id>`,
 `sample.<id>` and `export.<format>` exist for every entry and disappear with it. The first nine
 representations get the keys `1`–`9`. A command's `run(app, ...args)` always receives the app first.
 
@@ -175,8 +194,8 @@ representations get the keys `1`–`9`. A command's `run(app, ...args)` always r
 
 ## 3. Registries and entry shapes
 
-Required fields are **bold**. `api.registry.<name>` exposes each registry (`get(id)`, `list()`,
-`register(entry, opts)`; `register` goes through the same validation as the `api.register*` helpers).
+Required fields are **bold**. `api.registry.<name>` exposes each registry with `get(id)`, `list()` and
+`register(entry, opts)`; `register` checks entries just like the `api.register*` helpers.
 
 | Helper | Registry | Entry |
 |---|---|---|
@@ -188,33 +207,38 @@ Required fields are **bold**. `api.registry.<name>` exposes each registry (`get(
 | `registerEnvironmentMap(m)` | `environmentMaps` | **`id`**, `name`, `description`, **`build() → THREE.Scene`** (rendered into a PMREM environment) |
 | `registerLook(l)` | `looks` | **`id`**, `name`, `description`, `swatch` (CSS background), `ball` (optional CSS background of a sphere drawn in the middle of the card; `swatch` is then its backdrop), **`scene`** (partial scene, §5), `backgroundDark`, `cellDark`, `hidden` |
 | `registerSample(s)` | `samples` | **`id`**, `name`, `category` (default `Plugins`), `tags`, **`build() → Structure`**, `look`, `rep`, `scene` |
-| `registerAnalysis(a)` | `analyses` | **`id`**, `name`, `description`, `params` (§1 schema), **`run(structure, params, ctx) → result \| Promise`**, `render?(result, el, ctx)`, `auto: bool \| (structure) => bool`, `dependsOn: ['display.bonds']` |
+| `registerAnalysis(a)` | `analyses` | **`id`**, `name`, `description`, `params` (§1), **`run(structure, params, ctx) → result \| Promise`**, `render?(result, el, ctx)`, `auto: bool \| (structure) => bool`, `dependsOn: ['display.bonds']` |
 | `registerCommand(c)` | `commands` | **`id`**, `title`, `category` (default `Plugin`), `keywords`, `key` (`'g'`, `'mod+g'` or an array), `hidden`, **`run(app, ...args)`**, `when?(app)`, `whyNot?(app)` (the sentence shown when `when` is false) |
 | `registerStorage(p)` | `storage` | **`id`**, `label`, `icon`, `description`, `where`, `init()`, `available()`, **`list(q?)`**, **`get(id)`**, **`save(project, {force}?)`**, `remove(id)` — `save` rejects with `err.code = 'conflict' \| 'auth' \| 'offline'` |
 | `registerPanel(p)` | `panels.left` | **`id`**, `title`, `icon` (icon name), `tip`, **`render(app, el, shell)`**, `headActions?(app, shell) → [Node]`, `refreshOn: ['project', 'structure', 'selection', 'measure', …]`, `signature?(app) → string` (skip re-renders while it is unchanged) |
 | `registerInspectorTab(t)` | `panels.inspector` | **`id`**, `title`, `icon`, `tip`, **`render(app, el, shell)`** |
 
-Read-only registries: `prototypes`, `clusters` (crystal and cluster builders).
+Two registries are read-only: `prototypes` and `clusters` (the crystal and cluster builders).
 
-**Representation `build(ctx)`** receives `ctx = { model, colors (Float32Array, linear RGB),
-radii (Float32Array), settings (scene.style), atomMaterial, bondMaterial, segments, showBonds,
-resolution, THREE, helpers }`. `model = { n, symbols, positions (Float32Array xyz), src (source atom
-index), img (periodic image offsets), bonds: {pairs, lengths, count}, cell, supercell, pbc }`.
-`helpers` (also `api.render`) = `buildAtoms`, `buildBonds`, `buildLines`, `buildPolyhedra`,
-`atomRadius`, `segmentsFor`, plus `createMaterial`, `COLORMAPS` and `THREE` on `api.render`.
+**A representation's `build(ctx)`** receives
+`ctx = { model, colors, radii, settings, atomMaterial, bondMaterial, segments, showBonds, resolution, THREE, helpers }`:
 
-**Analyses.** `ctx = { app, scene, bondOptions: {tolerance, disabledPairs}, ui }`, where
-`ui = { h, lineChart, kvTable, renderResult }` helps `render` build DOM. Without `render`, results are
-shown automatically: scalars and short vectors as a table, long numeric arrays as a line chart (two
-equally long arrays → x/y), anything else as JSON. Results are cached per structure version, params
-and the scene values in `dependsOn`, so re-rendering the panel never recomputes them. Server plugin
-analyses appear here automatically (they run on the server); built-ins are `coordination` and `rdf`.
+- `colors` (linear RGB) and `radii` are `Float32Array`s; `settings` is `scene.style`.
+- `model = { n, symbols, positions, src, img, bonds: {pairs, lengths, count}, cell, supercell, pbc }`, where
+  `positions` is a `Float32Array` of xyz, `src` maps each drawn atom to its structure atom and `img` holds
+  periodic image offsets.
+- `helpers` (also `api.render`) offers `buildAtoms`, `buildBonds`, `buildLines`, `buildPolyhedra`,
+  `atomRadius` and `segmentsFor`; `api.render` adds `createMaterial`, `COLORMAPS` and `THREE`.
+
+**An analysis** receives `ctx = { app, scene, bondOptions: {tolerance, disabledPairs}, ui }`. `ui` offers
+`h`, `lineChart`, `kvTable` and `renderResult` for building a `render` function.
+- **Without `render`**, results are shown automatically: numbers and short lists as a table, long numeric
+  arrays as a line chart (two equally long arrays become x and y), anything else as JSON.
+- **Caching:** results are cached per structure version, parameters and the scene values in `dependsOn`, so
+  redrawing the panel never recomputes them.
+- **Server analyses:** server plugin analyses appear here too and run on the server. The built-in analyses are
+  `coordination` and `rdf`.
 
 ---
 
 ## 4. The JavaScript API (`window.crystallume`)
 
-`window.atomscope` (the former name) is an alias of the same object.
+`window.atomscope` (the former name) is the same object.
 
 | Member | Description |
 |---|---|
@@ -226,9 +250,9 @@ analyses appear here automatically (they run on the server); built-ins are `coor
 | `analyze(id, params?, s?) → Promise` | run any registered analysis (built-in, JS plugin or server plugin) |
 | `set(path, value)`, `get(path)`, `patch(partial)` | scene settings (§5); paths with `__proto__`, `constructor` or `prototype` are refused |
 | `applyLook(id)`, `setRepresentation(id)`, `setLighting(id)` | one-click presets |
-| `view(axis)`, `resetView()`, `fit()`, `orbit(dAz°, dEl°)`, `pan(dx, dy)`, `zoom(factor)`, `getCamera()`, `setCamera(c)` | camera |
-| `atomsInRect(x0, y0, x1, y1)` | source indices of the atoms drawn inside a client-space rectangle |
-| `select(indices, {add})`, `clearSelection()`, `selectAll()`, `selectSameElement(symbols?)`, `selectNeighbors(indices?, {add})` | selection |
+| `view(axis)`, `resetView()`, `fit()`, `orbit(dAz°, dEl°)`, `rotate(axis, deg°)`, `pan(dx, dy)`, `zoom(factor)`, `getCamera()`, `setCamera(c)` | camera (`rotate` turns the model about a screen axis, `'x'` right, `'y'` up or `'z'` towards the viewer, as the arrow keys do) |
+| `atomsInRect(x0, y0, x1, y1)`, `atomsInPolygon([[x, y], …])` | source indices of the atoms drawn inside a client-space rectangle or polygon (box and lasso selection) |
+| `select(indices, {mode})`, `clearSelection()`, `selectAll()`, `selectSameElement(symbols?)`, `selectNeighbors(indices?, {add})`, `selectFragment(indices?, {add})` | selection (`mode`: `'replace'` (default), `'add'`, `'toggle'` or `'remove'`; the older `{add: true}` toggles) |
 | `measure(type, displayIndices)`, `frame(i)`, `play(on)` | measurements and trajectories |
 | `screenshot({scale, transparent}) → Blob`, `exportText(format) → string \| Promise`, `exportGLB()`, `save(provider)` | output |
 | `projects.providers()`, `projects.list(provider)`, `projects.open(provider, id)` | storage |
@@ -237,6 +261,18 @@ analyses appear here automatically (they run on the server); built-ins are `coor
 | `registry.*`, `registerFormat`, `registerStyle`, `registerMaterial`, `registerColorScheme`, `registerLightingPreset`, `registerEnvironmentMap`, `registerLook`, `registerSample`, `registerAnalysis`, `registerCommand`, `registerStorage`, `registerPanel`, `registerInspectorTab` | §3 |
 | `plugins.load(url, {name})`, `plugins.list()` | plugin loading and status (`active` / `error`, server plugins included) |
 | `reference()`, `help(topic?)` | everything above as data / console tables (`help('looks')`, `help('scene')`, `help('events')`) |
+
+```js
+const s = crystallume.build.crystal('perovskite', { elements: ['Ba', 'Ti', 'O'], a: 4.01, repeat: [3, 3, 3] });
+crystallume.load(s);
+crystallume.applyLook('poster');
+crystallume.set('post.outline.enabled', true);              // any scene setting, by its path
+crystallume.view('c');
+const png = await crystallume.screenshot({ scale: 3, transparent: true });
+const g = await crystallume.analyze('rdf', { rmax: 6 });
+```
+
+The palette command **Copy current scene as script** copies the scene as a `crystallume.patch({...})` call.
 
 ### Events (`crystallume.on(name, fn)`)
 
@@ -259,9 +295,10 @@ analyses appear here automatically (they run on the server); built-ins are `coor
 | `plugins` | app | — | a frontend plugin was loaded or failed |
 | `registry` | app | `{kind, id, removed}` | an entry was added or removed through the API |
 | `hover` | viewer | `{index, x, y}` | pointer over a drawn atom (−1: none) |
-| `atomclick` | viewer | `{index, shiftKey, x, y}` | click on a drawn atom (−1: empty space) |
+| `atomclick` | viewer | `{index, mode, shiftKey, x, y}` | click on a drawn atom (−1: empty space); `mode` `'replace'`, `'add'` (Shift) or `'toggle'` (Ctrl/⌘), `shiftKey` true for the last two |
+| `atomdblclick` | viewer | `{index, mode, altKey, x, y}` | double-click on a drawn atom (the app selects its bonded fragment; with Alt, every atom of its element) |
 | `atomcontext` | viewer | `{index, x, y, clientX, clientY}` | right-click on a drawn atom |
-| `boxselect` | viewer | `{indices, add}` | rectangle selection finished |
+| `boxselect` | viewer | `{indices, mode, add, shape}` | rectangle (drag) or lasso (Q+drag) selection finished; `shape` `'rect'` or `'lasso'`, `add` = `mode` is not `'replace'` |
 | `frame` | viewer | frame index | trajectory frame changed |
 | `play` | viewer | boolean | playback started or stopped |
 | `camera` | viewer | — | the camera moved |
@@ -269,19 +306,19 @@ analyses appear here automatically (they run on the server); built-ins are `coor
 | `render` | viewer | — | a frame was rendered |
 | `error` | viewer | `Error` | drawing failed or the WebGL context was lost |
 
-`crystallume.registry.storage` (the storage manager) has its own `change` event (`registry.storage.on('change', fn)`),
-emitted when a storage provider is added or removed.
+The storage manager, `crystallume.registry.storage`, has its own `change` event
+(`registry.storage.on('change', fn)`) for providers being added or removed.
 
-Display indices (viewer events, `measure`) refer to drawn atoms, which include periodic images;
+Viewer events and `measure` use **display indices**. They count drawn atoms, including periodic images;
 `app.viewer.model.src[d]` is the structure atom of drawn atom `d`.
 
 ---
 
 ## 5. Scene settings
 
-`crystallume.set('post.ao.intensity', 1.4)` changes one value; `crystallume.patch({...})` deep-merges a
-partial scene; looks are partial scenes. Ranges are those of the UI controls (values outside are
-accepted but may look odd). Colours are `#rrggbb`. Angles are degrees, lengths Å.
+`crystallume.set('post.ao.intensity', 1.4)` changes one value, and `crystallume.patch({...})` merges a partial
+scene; a look is a partial scene too. The ranges are those of the app's controls (other values are accepted
+but may look odd). Colours are `#rrggbb`, angles are in degrees and lengths in Å.
 
 | Path | Type | Default | Range / values |
 |---|---|---|---|
@@ -294,12 +331,12 @@ accepted but may look odd). Colours are `#rrggbb`. Angles are degrees, lengths �
 | `style.bondColor` | string | `split` | `split`, `uniform` |
 | `style.bondUniformColor` | colour | `#9aa1ab` | |
 | `style.bondMaterial` | string | `auto` | `auto`, `same`, or a material id |
-| `style.colorScheme` | string | `jmol` | a colour scheme id (`modern`, `morandi`, `vivid`, `soft`, `greyscale`, `jmol`, `vesta`, `pastel`, `mono`, `index`, `height`, `coordination`, `property`, plugins) |
+| `style.colorScheme` | string | `jmol` | a colour scheme id (`modern`, `morandi`, `vivid`, `soft`, `greyscale`, `jmol`, `vesta`, `ms`, `pastel`, `mono`, `index`, `height`, `coordination`, `property`, plugins) |
 | `style.monoColor` | colour | `#c9ced6` | used by `mono` |
 | `style.colorOverrides` | object | `{}` | `{ "O": "#ff0000" }` per element |
 | `style.radiusOverrides` | object | `{}` | `{ "O": 0.9 }` base radius in Å per element (scaled by `atomScale`) |
 | `style.property` | string \| null | null | per-atom property for the `property` scheme |
-| `style.material` | string | `standard` | a material id (`standard`, `glossy`, `matte`, `metallic`, `glass`, `crystal`, `pearl`, `clay`, `phong`, `toon`, `poster`, `flat`, `glow`, `xray`, plugins) |
+| `style.material` | string | `standard` | a material id (`standard`, `glossy`, `matte`, `metallic`, `glass`, `crystal`, `pearl`, `clay`, `phong`, `ms`, `toon`, `poster`, `flat`, `glow`, `xray`, plugins) |
 | `style.roughness`, `style.metalness` | number \| null | null | 0 – 1 (`null` = the material's own value) |
 | `style.opacity` | number | 1 | 0.1 – 1 |
 | `style.polyhedra.centers` | `'auto'` \| string[] | `auto` | element symbols at polyhedron centres |
@@ -308,7 +345,7 @@ accepted but may look odd). Colours are `#rrggbb`. Angles are degrees, lengths �
 | `style.polyhedra.edgeColor` | colour | `#22262c` | |
 | `style.lineWidth` | number | 2.5 | 0.5 – 8 px (wireframe) |
 | `style.quality` | string | `auto` | `auto`, `high`, `medium`, `low`, `draft` |
-| `lighting.preset` | string | `studio` | a lighting preset id (`studio`, `headlight`, `three-point`, `softbox`, `dramatic`, `sunset`, `cool-lab`, `warm-studio`, `soft-studio`, `window`, `night`, `poster`, `flat`, `neon`, `ibl`, plugins) |
+| `lighting.preset` | string | `studio` | a lighting preset id (`studio`, `ms`, `headlight`, `three-point`, `softbox`, `dramatic`, `sunset`, `cool-lab`, `warm-studio`, `soft-studio`, `window`, `night`, `poster`, `flat`, `neon`, `ibl`, plugins) |
 | `lighting.key` / `fill` / `rim` `.intensity` | number | 2.4 / 0.75 / 1.3 | 0 – 6 |
 | `lighting.key` / `fill` / `rim` `.color` | colour | `#fff4e6` / `#dbe6ff` / `#ffffff` | |
 | `lighting.key` / `fill` / `rim` `.azimuth` | number | −38 / 52 / 155 | −180 – 180 (0 = from the viewer, +90 = from the right) |
@@ -349,6 +386,14 @@ accepted but may look odd). Colours are `#rrggbb`. Angles are degrees, lengths �
 | `post.vignette.offset` | number | 1 | 0.2 – 2 |
 | `post.fog.enabled` | boolean | false | depth cueing |
 | `post.fog.strength` | number | 0.5 | 0 – 1 |
+| `post.dropShadow.enabled` | boolean | false | every atom and bond casts a soft shadow on the parts and background behind it |
+| `post.dropShadow.distance` | number | 0.3 | 0 – 1.5 Å, how far the shadow falls |
+| `post.dropShadow.softness` | number | 0.25 | 0 – 1 Å, blur of the shadow edge |
+| `post.dropShadow.opacity` | number | 0.35 | 0 – 1 |
+| `post.dropShadow.angle` | number | -55 | −180 – 180°, where the shadow falls (0 = right, −90 = down) |
+| `post.dropShadow.color` | colour | `#1c1a17` | |
+| `post.paper.enabled` | boolean | false | paper grain over the whole picture |
+| `post.paper.strength` | number | 0.6 | 0 – 2 |
 | `display.background.mode` | string | `gradient` | `solid`, `gradient`, `radial`, `transparent` |
 | `display.background.color1`, `color2` | colour | `#f7f8fa`, `#dde2e8` | |
 | `display.cell.show` | boolean | true | unit cell lines |
@@ -378,11 +423,13 @@ accepted but may look odd). Colours are `#rrggbb`. Angles are degrees, lengths �
 | `display.scaleBar` | boolean | false | length scale bar in the view and in exports |
 | `camera` | object \| null | null | `{position, up, target, zoom}` (set with `setCamera`) |
 
-`crystallume.help('scene')` prints the current list with defaults and current values.
+`crystallume.help('scene')` prints this list with the defaults and current values.
 
 ---
 
 ## 6. Embedding (`postMessage`)
+
+To show Crystallume inside another page, put it in an `<iframe>` and talk to it with `postMessage`:
 
 ```html
 <iframe id="viewer" src="https://your-host/crystallume/"></iframe>
@@ -395,8 +442,8 @@ accepted but may look odd). Colours are `#rrggbb`. Angles are degrees, lengths �
 </script>
 ```
 
-The frame accepts messages from its parent window only and replies to the sender's origin with the
-same `type` and `id`. To embed on another site, start the server with
+The frame accepts messages from its parent window only, and replies to the sender's origin with the same
+`type` and `id`. To embed it on another site, start the server with
 `CRYSTALLUME_FRAME_ANCESTORS="'self' https://your-site"`.
 
 | Message | Reply |
@@ -408,38 +455,105 @@ same `type` and `id`. To embed on another site, start the server with
 | `{type: 'crystallume:get', what: 'scene' \| 'summary' \| 'selection' \| 'camera', id}` | `{result}` |
 | `{type: 'crystallume:subscribe', events: ['selection', ...]}` / `'crystallume:unsubscribe'` | `{ok, events}`, then `{type: 'crystallume:event', name, detail}` per event |
 
-`crystallume:call` methods: `setRepresentation`, `setLighting`, `applyLook`, `patch`, `set`, `sample`,
-`setCamera`, `getCamera`, `fit`, `resetView`, `select`, `frame`, `command`, `exportText`. Scene paths
-or keys containing `__proto__`, `constructor` or `prototype` are refused. Event details are plain
-data: `selection` → indices, `structure` → summary, `camera` → camera state (at most every 100 ms),
-`scene`/`project`/`model`/`render` → `null` (ask with `crystallume:get`). Once it has started and shows its
-first structure, the frame posts `{type: 'crystallume:ready', version}`; a load sent then stays on screen.
-
-Pages written for the former name keep working: `'atomscope:*'` messages are accepted (replies repeat
-that `type`), the frame also posts `{type: 'atomscope:ready', version}`, and a parent that subscribed
-with `'atomscope:subscribe'` receives its events as `{type: 'atomscope:event', name, detail}`.
+- **`crystallume:call`** accepts these methods: `setRepresentation`, `setLighting`, `applyLook`, `patch`,
+  `set`, `sample`, `setCamera`, `getCamera`, `fit`, `resetView`, `select`, `frame`, `command`, `exportText`.
+  Scene paths or keys containing `__proto__`, `constructor` or `prototype` are refused.
+- **Event details** are plain data: `selection` → indices, `structure` → a summary, `camera` → the camera
+  state (at most every 100 ms), and `scene`, `project`, `model` and `render` → `null` (ask with
+  `crystallume:get`).
+- **Ready message:** once the frame has started and shows its first structure, it posts
+  `{type: 'crystallume:ready', version}`. A `load` sent after that stays on screen.
+- **Older pages:** pages written for AtomScope keep working. `'atomscope:*'` messages are accepted (replies
+  repeat that `type`), the frame also posts `{type: 'atomscope:ready', version}`, and a parent that
+  subscribed with `'atomscope:subscribe'` receives `{type: 'atomscope:event', name, detail}`.
 
 ---
 
-## 7. Python client and CLI
+## 7. Python API, REST client and CLI
 
-`crystallume.Client` has a method for every REST endpoint (the test suite checks this):
-`health`, `info`, `elements`, `plugins`, project CRUD, `formats`, `upload_structure`, `parse_text`,
-`export_structure`, `convert`, `prototypes`, `molecules`, `build_crystal`, `build_cluster`,
-`supercell`, `molecule`, `custom_builders`, `build_custom`, `bonds`, `summary`, `coordination`, `rdf`,
-`custom_analyses`, `analysis`. The interactive OpenAPI docs are at `/docs` on a running server.
+### Python API
 
-```bash
-crystallume convert t.hello out.xyz --plugins ./plugins
-crystallume build custom hello-chain --param n=12 --param element=Ag -o chain.xyz --plugins ./plugins
-crystallume analyze hello-com chain.xyz --plugins ./plugins       # also: summary, coordination, rdf
-crystallume formats --plugins ./plugins
-crystallume plugins new my-plugin --dir ./plugins
+```python
+import crystallume as cl
+from crystallume import build, analysis
+
+s = cl.read("POSCAR")                       # format detected automatically; multi-frame files fill s.frames
+s = cl.read("traj.xyz", index=-1)           # only the last frame
+cl.write("out.cif", s)                      # format from the extension
+text = cl.to_text(s, "extxyz")
+
+cu = build.crystal("fcc", "Cu", a=3.61).repeat(3, 3, 3)
+sto = build.crystal("perovskite", ["Sr", "Ti", "O"])
+au55 = build.cluster("icosahedron", "Au", 3)          # Mackay icosahedron: 3 shells, 55 atoms
+caf = build.molecule("caffeine")
+
+bonds = analysis.neighbors(cu)              # [(i, j, distance, (ox, oy, oz)), ...], periodic-aware
+cn = analysis.coordination_numbers(cu)
+r, g = analysis.rdf(cu, rmax=6.0, nbins=120)
+print(analysis.summary(sto))                # formula, volume, density, cell parameters, …
+
+cl.view(sto)                                # start a local server in the background and open the browser
+
+plugins = cl.load_plugins(["./plugins"])    # read and write now handle the plugins' formats too
+chain = plugins.builders["hello-chain"].func(n=12)
 ```
 
-On these commands `--plugins` takes one directory per flag and may stand anywhere on the line; repeat
-it (`--plugins ./a --plugins ./b`) or join directories with the path separator (`./a:./b`, `;` on
-Windows) to load several. Without it, `CRYSTALLUME_PLUGIN_DIRS` is used.
+Useful `Structure` methods: `to_dict`/`from_dict`, `copy`, `formula`, `composition`, `repeat`, `wrap`,
+`center(vacuum=)`, `translate`, `frac_positions`, `volume`, `density`, `get_distance(i, j, mic=)`,
+`get_angle`, `get_dihedral`, `append`, `extend`, `delete`, `select(elements=)`, `bounding_box`, `get_frame`,
+`iter_frames`.
 
-The example plugin in `examples/plugins/hello_plugin` uses every Python extension point and ships
-a frontend module (`static/hello.js`).
+File formats:
+- `xyz`/`extxyz`: multiple frames, `Lattice`, `Properties`.
+- `poscar`: VASP 4 and 5, Direct or Cartesian, selective dynamics, negative scale factors.
+- `cif`: symmetry operators are applied when reading; written as P1.
+- `pdb`: `CRYST1`, `MODEL` frames.
+- `json`: the Crystallume structure format ([SCHEMA.md](SCHEMA.md)).
+
+Plugins can add more formats.
+
+### REST client
+
+`crystallume.Client` is a REST client that needs only the standard library. It has a method for every
+endpoint (the test suite checks this):
+
+```python
+client = cl.Client("http://127.0.0.1:8765")
+client.login("alice", "secret")                     # cloud mode
+p = client.create_project("Copper", structures=[cu])
+client.coordination(cu)["average"]
+client.analysis("hello-com", cu)                    # a plugin analysis, run on the server
+client.convert("in.cif", "poscar", "out.vasp")      # converted on the server, plugin formats included
+```
+
+The methods are `health`, `info`, `elements`, `plugins`, the project methods, `formats`,
+`upload_structure`, `parse_text`, `export_structure`, `convert`, `prototypes`, `molecules`,
+`build_crystal`, `build_cluster`, `supercell`, `molecule`, `custom_builders`, `build_custom`, `bonds`,
+`summary`, `coordination`, `rdf`, `custom_analyses` and `analysis`. A running server shows the REST API
+at `/docs`; [DEPLOY.md](DEPLOY.md#rest-api) has an overview.
+
+### Command line
+
+```bash
+crystallume serve [--host H] [--port P] [--mode local|cloud] [--data DIR] [--plugins DIR ...] \
+                  [--no-registration] [--open] [--cors ORIGIN ...] [--root-path /PREFIX]
+crystallume convert input.cif POSCAR                    # formats from the names; or --from / --to
+crystallume build crystal fcc Cu --a 3.61 --repeat 3 3 3 -o cu.xyz
+crystallume build cluster icosahedron Au --size 3 -o au55.xyz
+crystallume build molecule caffeine -o caffeine.pdb
+crystallume build custom hello-chain --param n=12 --param element=Ag -o chain.xyz --plugins ./plugins
+crystallume analyze rdf structure.cif --param rmax=6    # summary, coordination, rdf or a plugin analysis (JSON)
+crystallume info structure.cif [--bonds] [--json]
+crystallume user create NAME [--password PW] [--data DIR]   # also: user list, passwd, delete
+crystallume plugins [--plugins DIR] [--json]            # plugins and their status
+crystallume plugins new NAME [--dir DIR]                # a plugin skeleton that loads right away
+crystallume formats
+python -m crystallume ...                               # the same
+```
+
+`convert`, `info`, `formats`, `build` and `analyze` load plugins first, so plugin formats work on the command
+line too (for example `crystallume convert t.hello out.xyz --plugins examples/plugins`).
+- **Choosing plugin folders:** on these commands, `--plugins` takes one folder per flag and may go anywhere on
+  the line. To load several, repeat it (`--plugins ./a --plugins ./b`) or join the folders with the path
+  separator (`./a:./b`; `;` on Windows).
+- **Default:** without `--plugins`, `CRYSTALLUME_PLUGIN_DIRS` is used, plus installed entry-point plugins.

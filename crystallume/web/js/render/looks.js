@@ -59,4 +59,13 @@ const post = (p) => ({ ...JSON.parse(JSON.stringify(off)), ...p });
     swatch: 'radial-gradient(circle at 50% 45%, #22303f, #07090d)', ball: 'radial-gradient(circle at 35% 30%, #fff 0, #c9f0ff 14%, rgba(80,170,220,.6) 55%, rgba(120,200,240,.85) 96%)',
     scene: { style: { material: 'glass', colorScheme: 'modern' }, lighting: light('dramatic', { env: { enabled: true, intensity: 0.9, map: 'studio' } }), post: post({ bloom: { enabled: true, strength: 0.35, radius: 0.5, threshold: 0.85 } }),
       display: { background: { mode: 'radial', color1: '#22303f', color2: '#07090d' }, cell: { color: '#8aa0b8' } } } },
+  { id: 'papercut', name: 'Paper cut', description: 'Flat paper shapes stacked in layers, each casting a soft shadow on the ones behind', backgroundDark: { mode: 'solid', color1: '#e8dfcf', color2: '#e8dfcf' },
+    swatch: '#f1eadc', ball: 'radial-gradient(circle closest-side at 44% 42%, #ef8a6b 0 76%, transparent 78%), radial-gradient(circle closest-side at 54% 54%, rgba(70,50,30,.38) 0 70%, transparent 86%), #f1eadc',
+    scene: { style: { material: 'flat', colorScheme: 'modern' }, lighting: light('flat', { toneMapping: 'none' }),
+      post: post({ dropShadow: { enabled: true, distance: 0.35, softness: 0.24, opacity: 0.42, angle: -55, color: '#2b2118' }, paper: { enabled: true, strength: 0.6 } }),
+      display: { background: { mode: 'solid', color1: '#f1eadc', color2: '#f1eadc' }, cell: { color: '#6b604f' } } } },
+  { id: 'ms', name: 'MS', description: 'Materials Studio defaults: glossy ball and stick (balls 0.4 Å, sticks 0.2 Å) in one white light on black, white cell lines, orthographic view',
+    swatch: '#000000', ball: 'radial-gradient(circle at 34% 30%, #fff 0, #ffd6d6 6%, #f24848 17%, #d40000 58%, #5c0000 100%)',
+    scene: { style: { rep: 'ballstick', radiusSource: 'uniform', atomScale: 2, bondRadius: 0.2, material: 'ms', colorScheme: 'ms' }, lighting: light('ms', { toneMapping: 'none' }), post: post({}),
+      display: { background: { mode: 'solid', color1: '#000000', color2: '#000000' }, cell: { color: '#e6e6e6' }, projection: 'orthographic' } } },
 ].forEach((l) => looks.register(l));
