@@ -151,6 +151,8 @@ def cmd_convert(args: argparse.Namespace) -> int:
 
 
 def cmd_build(args: argparse.Namespace) -> int:
+    import warnings
+
     from . import build
 
     if args.kind == "crystal":
@@ -159,7 +161,13 @@ def cmd_build(args: argparse.Namespace) -> int:
             kw["u"] = args.u
         if args.vacuum is not None:
             kw["vacuum"] = args.vacuum
-        s = build.crystal(args.prototype, args.elements or None, a=args.a, c=args.c, **kw)
+        with warnings.catch_warnings():
+            # --vacuum is explained by the note below rather than by build.crystal's DeprecationWarning
+            warnings.filterwarnings("ignore", message=r"build\.crystal\(vacuum=\)", category=DeprecationWarning)
+            s = build.crystal(args.prototype, args.elements or None, a=args.a, c=args.c, **kw)
+        if args.vacuum is not None:
+            print("crystallume: note: --vacuum adds vacuum on each side; "
+                  "use 'crystallume edit vacuum IN --vacuum V' for the total gap", file=sys.stderr)
         if args.repeat:
             s = s.repeat(*args.repeat)
     elif args.kind == "cluster":
@@ -438,12 +446,12 @@ def build_parser() -> argparse.ArgumentParser:
     bsub = b.add_subparsers(dest="kind", metavar="KIND", required=True)
     bc = bsub.add_parser("crystal", help="crystal from a prototype")
     bc.add_argument("prototype", help="sc bcc fcc hcp diamond zincblende wurtzite rocksalt cscl fluorite perovskite "
-                                      "rutile graphene mos2 graphite")
+                                      "rutile graphene hbn mos2 graphite")
     bc.add_argument("elements", nargs="*", help="element symbols in role order (default per prototype)")
     bc.add_argument("--a", type=float, help="lattice constant a (Å)")
-    bc.add_argument("--c", type=float, help="lattice constant c (Å)")
+    bc.add_argument("--c", type=float, help="lattice constant c (Å; 2D prototypes: the cell height)")
     bc.add_argument("--u", type=float, help="internal parameter (wurtzite, rutile)")
-    bc.add_argument("--vacuum", type=float, help="vacuum (2D prototypes)")
+    bc.add_argument("--vacuum", type=float, help="vacuum on each side (Å); the gap between periodic images is twice this")
     bc.add_argument("--repeat", type=int, nargs=3, metavar=("NX", "NY", "NZ"), help="supercell")
     bk = bsub.add_parser("cluster", help="nanoparticle / cluster")
     bk.add_argument("cluster_kind", help="icosahedron cuboctahedron decahedron octahedron tetrahedron sphere fullerene")
