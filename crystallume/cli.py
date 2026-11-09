@@ -70,40 +70,52 @@ def load_cli_plugins(plugin_dirs: Sequence[str] | None = None, verbose: bool = F
     return mgr
 
 
-def _coerce(value: str, kind: str | None) -> Any:
-    """Turn a ``--param`` string into the type the parameter schema asks for."""
-    if kind == "int":
-        return int(value)
-    if kind == "float":
-        return float(value)
-    if kind == "bool":
-        v = value.strip().lower()
-        if v in ("1", "true", "yes", "on", "y", "t"):
-            return True
-        if v in ("0", "false", "no", "off", "n", "f"):
-            return False
-        raise ValueError(f"not a boolean: {value!r}")
-    if kind in ("string", "element", "select"):
-        return value
-    try:
-        return json.loads(value)
-    except ValueError:
-        return value
+def _coerce(value: str, spec: dict[str, Any] | None, key: str) -> Any:
+    """Turn a ``--param`` string into the value the parameter's spec asks for (``crystallume.core.params``).
+
+    Messages name the option once, in place of the field's label: ``--param hkl: (0 0 0) is not a plane.``.
+    """
+    from .core.params import coerce_param, parse_cli_value
+
+    if spec is None:  # not in the schema: JSON if it parses, else the string
+        try:
+            return json.loads(value)
+        except ValueError:
+            return value
+    cli_spec = {**spec, "label": f"--param {key}"}
+    return coerce_param(cli_spec, parse_cli_value(cli_spec, value))
 
 
 def parse_params(pairs: Sequence[str] | None, schema: Sequence[dict[str, Any]] = ()) -> dict[str, Any]:
-    """``["n=8", "element=Au"]`` → ``{"n": 8, "element": "Au"}`` using the plugin's parameter schema."""
-    types = {p.get("name"): p.get("type") for p in schema or () if isinstance(p, dict)}
+    """``["n=8", "element=Au"]`` → ``{"n": 8, "element": "Au"}`` using the plugin's parameter schema.
+
+    Each value goes through :func:`~crystallume.core.params.parse_cli_value` and
+    :func:`~crystallume.core.params.coerce_param` with its parameter's spec, so ``--param hkl=1,0,-1,0`` gives
+    ``[1, 0, 0]`` for a ``miller`` parameter and ``--param P="2 1 0; -1 1 0; 0 0 1"`` a 3×3 ``imatrix``.  A value that
+    does not fit raises :class:`~crystallume.core.params.ParamError` (a ``ValueError``) worded
+    ``--param <key>: <what to enter>.``; so does a ``required`` parameter that is not given
+    (``--param vacuum: enter a value.``).  A parameter not given takes its declared ``default``, as over REST
+    (``validate_params``); keys the schema does not declare are read as JSON, or kept as strings.
+    """
+    import copy
+
+    from .core.params import ParamError
+
+    specs = {str(p["name"]): p for p in schema or () if isinstance(p, dict) and p.get("name")}
     out: dict[str, Any] = {}
     for item in pairs or ():
         key, sep, value = item.partition("=")
         key = key.strip()
         if not sep or not key:
             raise ValueError(f"--param expects KEY=VALUE, got {item!r}")
-        try:
-            out[key] = _coerce(value, types.get(key))
-        except ValueError as exc:
-            raise ValueError(f"--param {key}: {exc}") from None
+        out[key] = _coerce(value, specs.get(key), key)
+    for name, spec in specs.items():
+        if name in out:
+            continue
+        if spec.get("required"):
+            raise ParamError(f"--param {name}: enter a value.")
+        if "default" in spec:
+            out[name] = copy.deepcopy(spec["default"])
     return out
 
 

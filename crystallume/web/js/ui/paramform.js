@@ -1,12 +1,16 @@
 /**
  * Parameter forms and result views shared by plugin builders (Build panel) and analyses (Structure panel).
- * A parameter is { name, type: 'int'|'float'|'string'|'element'|'bool'|'select', default, label?,
- * description?, min?, max?, step?, options? } — the schema plugins use for builders and analyses.
+ * A parameter is { name, type: 'int'|'float'|'string'|'element'|'bool'|'select'|'vector'|'miller'|'imatrix',
+ * default, label?, description?, required?, unit?, min?, max?, step?, options?, … } — the schema plugins use for
+ * builders and analyses, checked by core/params.js (the fields of each type are listed there).
  */
 import { h, select, toggle } from './dom.js';
 import { lineChart } from './chart.js';
 import { normalizeSymbol, ELEMENTS } from '../core/elements.js';
-import { defaultParams, paramOptions } from '../core/analyses.js';
+import { paramOptions } from '../core/analyses.js';
+import { defaultParams } from '../core/params.js';
+import { surfaceNormal } from '../core/lattice.js';
+import { numberInput, vec3Input, millerInput, imatrixInput, setInvalid } from './inputs.js';
 import { disabledPairsFor } from '../render/display.js';
 
 /** Element symbol input with completion; calls onChange(symbol) with a valid symbol only. */
@@ -20,21 +24,43 @@ export function elementInput(value, onChange, label) {
 
 const labelOf = (p) => p.label ?? p.name;
 
+/** The surface normal a vector field's 'surface' frame needs (null without a structure or a usable one). */
+function surfaceOf(p, structure) {
+  if (!structure || !Array.isArray(p.frames) || !p.frames.includes('surface')) return null;
+  try { return surfaceNormal(structure); } catch { return null; }
+}
+
 /**
- * Build a form for `params`. Returns { el, values, validate() } — `values` is updated live,
- * validate() returns an error message for the first invalid field (and marks it) or null.
+ * Build a form for `params`. Returns { el, values, validate(), valid, onValidity(cb) }: `values` holds the value of
+ * every field and is updated on each valid change (then onChange(values, name) runs); validate() marks the invalid
+ * fields and returns the first message, or null; `valid` says whether every field is valid now (a required field
+ * left empty is not), and onValidity(cb) calls cb(valid) whenever that changes (it returns a function that stops
+ * it), so a panel can keep its main button disabled until the form can run (U4). int and float fields show `unit`
+ * after the box and start empty when `required`; vector, miller and imatrix fields use the controls of ui/inputs.js,
+ * with the structure's cell for the Å / frac switch and the four-index display.
  */
 export function paramForm(params = [], { values = {}, structure = null, onChange = () => {} } = {}) {
   const vals = { ...defaultParams(params, structure), ...values };
-  const checks = [];
+  const checked = [];   // { valid, validate() } of the fields that can be invalid
+  const listeners = new Set();
+  const formValid = () => checked.every((c) => c.valid);
+  let lastValid = true;
+  const notify = () => {
+    const v = formValid();
+    if (v === lastValid) return;
+    lastValid = v;
+    for (const cb of [...listeners]) cb(v);
+  };
   const set = (name, v) => { vals[name] = v; onChange(vals, name); };
-  const row = (p, control) => {
+  const row = (p, control, wide = false) => {
     const l = h('label', labelOf(p));
     if (p.description) l.dataset.tip = p.description;
-    return h('div.pf-field', l, control);
+    return h(`div.pf-field${wide ? '.pf-wide' : ''}`, l, control);
   };
+  const control = (ctl) => { checked.push(ctl); return ctl.el; };
   const fields = (params ?? []).filter((p) => p?.name).map((p) => {
     const label = labelOf(p);
+    const common = { label, required: !!p.required, optional: p.default === null && !p.required, onChange: (v) => set(p.name, v), onValidity: notify };
     if (p.type === 'bool') return h('div.pf-field.pf-wide', toggle({ label, sub: p.description, checked: !!vals[p.name], onChange: (v) => set(p.name, v) }));
     if (p.type === 'element') return row(p, elementInput(vals[p.name] ?? 'C', (v) => set(p.name, v), label));
     if (p.type === 'select') {
@@ -49,31 +75,48 @@ export function paramForm(params = [], { values = {}, structure = null, onChange
       }
       return row(p, select({ options: opts, value: String(vals[p.name] ?? ''), label, onChange: (v) => set(p.name, typed.get(v) ?? v) }));
     }
-    const numeric = p.type === 'int' || p.type === 'float';
-    const inp = h(`input.field${numeric ? '.num' : ''}`, { type: numeric ? 'number' : 'text', value: vals[p.name] ?? '', 'aria-label': label, min: p.min, max: p.max, step: p.step ?? (p.type === 'int' ? 1 : 'any'), placeholder: p.placeholder ?? null, spellcheck: false });
-    const check = () => {
-      inp.removeAttribute('aria-invalid');
-      if (!numeric) return null;
+    if (p.type === 'int' || p.type === 'float') {
       const v = vals[p.name];
-      let msg = null;
-      if (!Number.isFinite(v)) msg = `${label}: enter a number.`;
-      else if (p.type === 'int' && !Number.isInteger(v)) msg = `${label}: enter a whole number.`;
-      else if ((p.min != null && v < p.min) || (p.max != null && v > p.max)) msg = `${label}: use a value from ${p.min ?? '−∞'} to ${p.max ?? '∞'}.`;
-      if (msg) inp.setAttribute('aria-invalid', 'true');
-      return msg;
-    };
-    inp.addEventListener('input', () => {
-      const raw = inp.value.trim();
-      set(p.name, !numeric ? inp.value : raw === '' ? NaN : p.type === 'int' ? Number(raw) : parseFloat(raw));
-      check();
-    });
-    checks.push(check);
-    return row(p, inp);
+      return row(p, control(numberInput({
+        ...common, value: Number.isFinite(v) ? v : null, unit: p.unit, min: p.min, max: p.max, step: p.step, integer: p.type === 'int',
+        placeholder: p.placeholder,
+      })));
+    }
+    if (p.type === 'vector') {
+      return row(p, control(vec3Input({
+        ...common, value: vals[p.name], size: p.size, labels: p.labels, integer: p.integer, nonzero: p.nonzero, frame: p.frame, frames: p.frames,
+        unit: p.unit, cell: structure?.cell ?? null, surface: surfaceOf(p, structure),
+      })), true);
+    }
+    if (p.type === 'miller') {
+      return row(p, control(millerInput({ ...common, value: vals[p.name], cell: structure?.cell ?? null, hexagonal: p.hexagonal, max: p.max, warnAbove: p.warnAbove })), true);
+    }
+    if (p.type === 'imatrix') {
+      return row(p, control(imatrixInput({
+        ...common, value: vals[p.name], size: p.size, presets: p.presets ?? null, positive: p.positive, max: p.max, maxDet: p.maxDet, warnDet: p.warnDet,
+        rowLabels: p.rowLabels, colLabels: p.colLabels, structure,
+      })), true);
+    }
+    // text: 'string' and types the form does not know
+    const inp = h('input.field', { type: 'text', value: vals[p.name] ?? '', 'aria-label': label, placeholder: p.required ? null : p.placeholder ?? null, spellcheck: false, 'aria-required': p.required ? 'true' : null });
+    const slot = h('div.pf-msg');
+    const message = () => (p.required && inp.value === '' ? `${label}: enter a value.` : null);
+    inp.addEventListener('input', () => { set(p.name, inp.value); setInvalid(inp, message(), slot); notify(); });
+    checked.push({ get valid() { return !message(); }, validate() { const m = message(); setInvalid(inp, m, slot); return m; } });
+    return row(p, h('div.inp', inp, slot));
   });
+  lastValid = formValid();
   const el = h('div.pf', fields);
   return {
     el, values: vals,
-    validate() { for (const c of checks) { const m = c(); if (m) return m; } return null; },
+    /** Mark every invalid field; the first message (in form order), or null. */
+    validate() {
+      let first = null;
+      for (const c of checked) { const m = c.validate(); if (m && first === null) first = m; }
+      return first;
+    },
+    get valid() { return formValid(); },
+    onValidity(cb) { listeners.add(cb); return () => { listeners.delete(cb); }; },
   };
 }
 
