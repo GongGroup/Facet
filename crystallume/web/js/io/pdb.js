@@ -1,4 +1,7 @@
-/** PDB reader (ATOM/HETATM, CRYST1, MODEL frames) and writer. */
+/**
+ * PDB reader (ATOM/HETATM, CRYST1, MODEL frames) and writer. The residue names are `props.residue_names`, as in the
+ * Python reader, and the notes in `info.warnings` are worded as the Python reader words them.
+ */
 import { Structure, addWarning } from '../core/structure.js';
 import { num } from './index.js';
 import { cellFromParams, cellParams } from '../core/util.js';
@@ -80,9 +83,9 @@ export function readPDB(text, filename = '') {
   }
   if (!models.length || !models[0].symbols.length) throw new Error('PDB: no ATOM or HETATM records found.');
   const m0 = models[0];
-  const s = new Structure({ name: title || filename.replace(/\.[^.]+$/, '') || 'PDB structure', symbols: m0.symbols, positions: m0.pos, cell, pbc: cell ? [true, true, true] : [false, false, false], info: { source: 'pdb' }, props: { residue: residues } });
+  const s = new Structure({ name: title || filename.replace(/\.[^.]+$/, '') || 'PDB structure', symbols: m0.symbols, positions: m0.pos, cell, pbc: cell ? [true, true, true] : [false, false, false], info: { source: 'pdb' }, props: { residue_names: residues } });
   if (models.every((m) => m.symbols.length === m0.symbols.length)) s.frames = models.slice(1).map((m) => ({ positions: new Float64Array(m.pos.flat()) }));
-  else addWarning(s.info, 'Models have different atom counts; only the first model was loaded.');
+  else addWarning(s.info, `input contains ${models.length} structures with different atom counts; only the first was loaded`);
   return s;
 }
 
