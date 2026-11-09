@@ -30,6 +30,8 @@ def _too_many(n: int, limit: int) -> HTTPException:
 
 
 def _check_repeat(n_atoms: int, rep: list[int] | None, limit: int = MAX_ATOMS) -> None:
+    """Refuse a repeat that would make more than *limit* atoms; *n_atoms* counts the atoms of every frame
+    (``repeat()`` tiles each frame of a trajectory)."""
     if rep is None:
         return
     if any(int(r) < 1 for r in rep):
@@ -92,7 +94,7 @@ def build_supercell(body: SupercellRequest, settings: Settings = Depends(get_set
     """Repeat a periodic structure ``[nx, ny, nz]`` times."""
     try:
         s = body.structure.to_structure()
-        _check_repeat(len(s), body.repeat, _limit(settings))
+        _check_repeat(len(s) * s.n_frames, body.repeat, _limit(settings))
         out = s.repeat(*body.repeat)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc

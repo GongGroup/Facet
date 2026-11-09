@@ -13,6 +13,7 @@ Example::
 
 from __future__ import annotations
 
+from .contacts import close_contacts
 from .geometry import angle_between, dihedral_from_vectors, distance_matrix, minimum_image_vectors
 from .neighbors import NeighborList, coordination_numbers, neighbor_arrays, neighbors, rdf, summary
 from .vacuum import (
@@ -55,4 +56,5 @@ __all__ = [
     "vacuum_gap_hint",
     "contiguous_shifts",
     "make_contiguous",
+    "close_contacts",
 ]

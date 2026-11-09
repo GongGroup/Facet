@@ -32,7 +32,7 @@ def _creds(request: Request):
 
 router = APIRouter(prefix="/analysis", tags=["analysis"], dependencies=[Depends(_signed_in_on_cloud)])
 
-#: Upper bound on atom pairs one analysis request may examine (``CRYSTALLUME_MAX_PAIRS`` overrides).
+#: Upper bound on atom pairs one analysis request may examine (a fixed limit).
 MAX_PAIRS = 50_000_000
 #: Upper bound on periodic images searched around the cell.
 MAX_IMAGES = 9_261  # 21³
@@ -44,7 +44,6 @@ def _guard_work(s: Structure, radius: float, settings: Any) -> None:
     limit = int(getattr(settings, "max_atoms", None) or MAX_ATOMS)
     if n > limit:
         raise HTTPException(400, f"This structure has {n:,} atoms; the analysis limit is {limit:,}.")
-    max_pairs = int(getattr(settings, "max_pairs", None) or MAX_PAIRS)
     cell = None if s.cell is None else np.asarray(s.cell, dtype=float)
     pbc = list(getattr(s, "pbc", (False, False, False)) or (False, False, False))
     if cell is not None and any(pbc):
@@ -62,8 +61,8 @@ def _guard_work(s: Structure, radius: float, settings: Any) -> None:
         pairs = n * n / vol * (4.0 / 3.0) * np.pi * radius ** 3
     else:
         pairs = n * (n - 1) / 2
-    if pairs > max_pairs:
-        raise HTTPException(400, f"This would compare about {pairs:,.0f} atom pairs (limit {max_pairs:,}). "
+    if pairs > MAX_PAIRS:
+        raise HTTPException(400, f"This would compare about {pairs:,.0f} atom pairs (limit {MAX_PAIRS:,}). "
                                  "Use fewer atoms or a smaller radius.")
 
 

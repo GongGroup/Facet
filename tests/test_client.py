@@ -6,8 +6,8 @@ import socket
 
 import pytest
 
-from crystallume import Client, build
-from crystallume.client import ClientError
+from crystallume import Client, build, read
+from crystallume.client import ClientError, ExportResult
 from crystallume.config import Settings
 from crystallume.server import BackgroundServer, create_app
 
@@ -49,6 +49,8 @@ ROUTE_METHODS = {
 }
 #: Routes without a dedicated method on purpose (auth has register/login/logout/me; docs are HTML).
 NO_METHOD_PREFIXES = ("/api/v1/auth/", "/api/v1/ext/", "/docs", "/redoc", "/openapi.json")
+#: Second methods on a route of ROUTE_METHODS (a different return type, never a flag that changes it).
+EXTRA_METHODS = {"export_structure_with_warnings"}
 
 
 def _free_port() -> int:
@@ -75,7 +77,7 @@ def test_every_route_has_a_client_method(tmp_path):
     assert ("GET", "/api/v1/health") in routes and len(routes) > 25
     missing = sorted(f"{m} {p}" for m, p in routes if not p.startswith(NO_METHOD_PREFIXES) and (m, p) not in ROUTE_METHODS)
     assert not missing, f"add Client methods (and ROUTE_METHODS entries) for: {missing}"
-    for name in ROUTE_METHODS.values():
+    for name in [*ROUTE_METHODS.values(), *sorted(EXTRA_METHODS)]:
         assert callable(getattr(Client, name, None)), name
     stale = sorted(f"{m} {p}" for m, p in ROUTE_METHODS if (m, p) not in routes)
     assert not stale, f"ROUTE_METHODS lists routes the server no longer has: {stale}"
@@ -142,6 +144,14 @@ def test_client_local(servers, data_dir):
     assert len(c.bonds(si)) == 32
     assert len(c.build_cluster("icosahedron", "Au", 3)) == 55
     assert "data_" in c.export_structure(si, "cif")
+    slab = read(data_dir / "surface" / "contcar_pt111.vasp")
+    res = c.export_structure_with_warnings(slab, "cif")
+    assert isinstance(res, ExportResult) and res.text.startswith("# Generated") and res.notes == []
+    assert (res.filename, res.mimetype) == ("Pt_111_p_3x3_4L_relaxed.cif", "chemical/x-cif")
+    assert res.warnings == ["18 atom(s) are fixed or partly fixed (selective dynamics), but CIF cannot store "
+                            "constraints; use POSCAR, Extended XYZ or Crystallume JSON to keep them"]
+    clean = c.export_structure_with_warnings(slab.to_dict(), "poscar")
+    assert clean.warnings == [] and clean.notes == [] and "Selective dynamics" in clean.text
     assert c.summary(si)["formula"] == "Si16"
     c.delete_project(p["id"])
     with pytest.raises(ClientError) as exc:

@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 
 from crystallume import __version__, build
+from crystallume.io.capabilities import WRITER_CAPABILITIES
+from crystallume.server.models import ExportResponse
 
 POSCAR_TEXT = """Si8 diamond
 5.431
@@ -195,6 +197,69 @@ def test_io_export_and_convert(local_client, data_dir):
         r = local_client.post("/api/v1/io/convert", files={"file": ("NaCl.cif", fh)}, data={"to": "extxyz"})
     assert r.status_code == 200 and r.text.startswith("8\nLattice=")
     assert "attachment" in r.headers["content-disposition"]
+
+
+CONSTRAINTS_LOST = ("18 atom(s) are fixed or partly fixed (selective dynamics), but CIF cannot store constraints; "
+                    "use POSCAR, Extended XYZ or Crystallume JSON to keep them")
+ORDER_NOTE = ("POSCAR groups atoms by element, so the atom order in the file differs from the order in the structure; "
+              "sort the atoms by species to make them match")
+
+
+def test_io_export_warnings_and_notes(local_client, data_dir):
+    """F0-D §7.4: the export check in the /io/export response (CIF loses the constraints; POSCAR keeps them)."""
+    contcar = (data_dir / "surface" / "contcar_pt111.vasp").read_text()
+    slab = local_client.post("/api/v1/io/parse", json={"text": contcar, "filename": "CONTCAR"}).json()["structure"]
+    assert slab["pbc"] == [True, True, True]  # reading changes no pbc (design decision U1)
+    cif = local_client.post("/api/v1/io/export", json={"structure": slab, "format": "cif"}).json()
+    assert cif["warnings"] == [CONSTRAINTS_LOST] and cif["notes"] == [] and cif["text"].startswith("# Generated")
+    poscar = local_client.post("/api/v1/io/export", json={"structure": slab, "format": "poscar"}).json()
+    assert poscar["warnings"] == [] and poscar["notes"] == [] and "Selective dynamics" in poscar["text"]
+    mixed = {"symbols": ["O", "Ti", "O", "Ti"], "positions": [[0, 0, 0], [1, 1, 1], [2, 2, 2], [3, 3, 3]],
+             "cell": [[4, 0, 0], [0, 4, 0], [0, 0, 4]], "pbc": [True, True, True]}
+    r = local_client.post("/api/v1/io/export", json={"structure": mixed, "format": "poscar"}).json()
+    assert r["warnings"] == [] and r["notes"] == [ORDER_NOTE]
+    assert set(ExportResponse.model_fields) >= {"warnings", "notes"}
+
+
+def test_formats_list_writer_capabilities(local_client, plugin_client):
+    writers = {w["name"]: w for w in local_client.get("/api/v1/formats").json()["writers"]}
+    table = {k: dict(v) for k, v in WRITER_CAPABILITIES.items()}
+    assert {k: writers[k]["capabilities"] for k in WRITER_CAPABILITIES} == table
+    info = local_client.get("/api/v1/info").json()["formats"]["writers"]
+    assert all("capabilities" in w for w in info)
+    hello = {w["name"]: w for w in plugin_client.get("/api/v1/formats").json()["writers"]}["hello"]
+    assert hello["capabilities"] is None and hello["source"] == "hello"  # a plugin that declares nothing
+
+
+def test_supercell_estimate_counts_every_frame(tmp_path):
+    """Defect E-63: repeat() tiles every frame, so the atom estimate counts them all."""
+    from fastapi.testclient import TestClient
+
+    from crystallume.config import Settings
+    from crystallume.server import create_app
+
+    si = build.crystal("diamond", "Si")
+    traj = si.to_dict()
+    traj["frames"] = [{"positions": (si.positions + 0.01 * k).tolist()} for k in (1, 2)]   # 8 atoms, 3 frames
+    settings = Settings(data_dir=tmp_path / "d", entry_point_plugins=False, web_dir=tmp_path / "w", max_atoms=100)
+    with TestClient(create_app(settings)) as c:
+        one = c.post("/api/v1/build/supercell", json={"structure": si.to_dict(), "repeat": [2, 2, 2]})
+        assert one.status_code == 200 and len(one.json()["structure"]["symbols"]) == 64
+        r = c.post("/api/v1/build/supercell", json={"structure": traj, "repeat": [2, 2, 2]})
+        assert r.status_code == 400 and r.json()["detail"] == "This would create about 192 atoms (limit 100)."
+        r = c.post("/api/v1/build/supercell", json={"structure": traj, "repeat": [2, 2, 1]})   # 32 x 3 = 96
+        assert r.status_code == 200 and len(r.json()["structure"]["frames"]) == 2
+
+
+def test_pair_limit_is_a_fixed_constant():
+    """Defect E-64: no setting overrides MAX_PAIRS (the comment that said so is gone)."""
+    from types import SimpleNamespace
+
+    from crystallume.config import Settings
+    from crystallume.server.routes import analysis
+
+    assert analysis.MAX_PAIRS == 50_000_000 and not hasattr(Settings(), "max_pairs")
+    analysis._guard_work(build.crystal("fcc", "Cu"), 5.0, SimpleNamespace(max_pairs=1, max_atoms=None))
 
 
 def test_build_endpoints(local_client):

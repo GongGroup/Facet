@@ -171,7 +171,11 @@ function installServerAnalyses(app, api, info) {
   }
 }
 
-/** File formats only the server can read or write (e.g. from Python plugins) are added as `server: true` formats. */
+/**
+ * File formats only the server can read or write (e.g. from Python plugins) are added as `server: true` formats.
+ * A writer's `capabilities` from GET /formats are copied, so exportReport (io/index.js) checks its exports locally
+ * and synchronously, from the same table as the `warnings` of the server's /io/export.
+ */
 function installServerFormats(app, api, info) {
   const R = info.formats?.readers ?? [], W = info.formats?.writers ?? [];
   const store = app.serverStore;
@@ -185,6 +189,7 @@ function installServerFormats(app, api, info) {
       filenames: (r?.filenames ?? []).map((n) => String(n).toUpperCase()),
       description: (r ?? w)?.description || 'Read and written by the Crystallume server',
       mime: w?.mimetype ?? 'text/plain',
+      capabilities: w?.capabilities ?? null,
       read: r ? async (text, filename) => Structure.fromJSON((await store.api('/io/parse', { method: 'POST', body: { text, filename: filename || null, format: id } })).structure) : undefined,
       write: w ? async (st) => (await store.api('/io/export', { method: 'POST', body: { structure: st.toJSON(), format: id } })).text : undefined,
     }));

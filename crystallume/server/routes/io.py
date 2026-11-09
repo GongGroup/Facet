@@ -9,7 +9,8 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
 
-from ...io import FormatError, ParseError, _decode, export_filename, formats, get_writer, parse_text, to_text
+from ...io import (FormatError, ParseError, _decode, export_filename, export_report, formats, get_writer, parse_text,
+                   to_text)
 from ..deps import get_settings, is_multipart, json_response, read_json_body, read_upload
 from ..models import ExportRequest, ExportResponse, ParseResponse, ParseTextRequest
 
@@ -57,7 +58,12 @@ def _http_error(exc: Exception) -> HTTPException:
 
 @router.get("/formats", summary="Supported file formats")
 def list_formats() -> dict[str, Any]:
-    """``{"readers": [{name, extensions, filenames, description, source}], "writers": [{name, extensions, description, mimetype, source}]}``."""
+    """``{"readers": [{name, extensions, filenames, description, source}],
+    "writers": [{name, extensions, description, mimetype, source, capabilities}]}``.
+
+    ``capabilities`` says what a writer can store (``crystallume.io.capabilities``; ``null`` for a plugin writer
+    that declares nothing): the web app computes the export warnings of server-only formats from it.
+    """
     return formats()
 
 
@@ -94,14 +100,20 @@ async def parse(request: Request):
 
 @router.post("/io/export", response_model=ExportResponse, summary="Export a structure as text")
 def export(body: ExportRequest) -> Any:
-    """Serialise ``structure`` with the ``format`` writer → ``{text, filename, mimetype}``."""
+    """Serialise ``structure`` with the ``format`` writer → ``{text, filename, mimetype, warnings, notes}``.
+
+    ``warnings`` and ``notes`` are the export check (``crystallume.io.export_report``): what the file loses, and
+    what changes without affecting a calculation.
+    """
     try:
         s = body.structure.to_structure()
         spec = get_writer(body.format)
         text = to_text(s, body.format)
+        report = export_report(s, body.format)
     except (FormatError, ValueError) as exc:
         raise HTTPException(400, str(exc)) from exc
-    return json_response({"text": text, "filename": export_filename(s, body.format), "mimetype": spec.mimetype})
+    return json_response({"text": text, "filename": export_filename(s, body.format), "mimetype": spec.mimetype,
+                          "warnings": report["warnings"], "notes": report["notes"]})
 
 
 @router.post("/io/convert", summary="Convert a file to another format", response_class=Response,
