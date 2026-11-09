@@ -261,10 +261,16 @@ export class Viewer extends Emitter {
    * + left-drag pans too, and on a Mac Control works as the right button (Control+drag rotates,
    * Control-click opens the menu), as Control-click does everywhere on a Mac. Touch and a pen tip without
    * modifiers keep the camera controls' gestures, and a tap selects.
+   * What is under the pointer comes from one merged pick (pick()): when an item of a pickable overlay layer wins
+   * over the atoms, the view sends 'overlayhover' {layer, index, item, x, y} (index −1 once the pointer leaves the
+   * layer), 'overlayclick' and 'overlaydblclick' {layer, index, item, x, y, mode} and 'overlaycontext' {…, clientX,
+   * clientY} instead of 'hover' on an atom, 'atomclick', 'atomdblclick' and 'atomcontext' (F0-A §3.11.5).
    */
   _setupPointer() {
     const el = this.renderer.domElement;
     let raf = 0, lastMove = null;
+    // a pick still waiting for its frame would hover again after the pointer left or a button went down
+    const dropPending = () => { if (raf) { cancelAnimationFrame(raf); raf = 0; } };
     el.addEventListener('contextmenu', (e) => e.preventDefault());
     el.addEventListener('mousedown', (e) => { if (e.button === 1) e.preventDefault(); });   // no autoscroll when the middle button pans
     // the controls are off during a press (a pan with the wheel button held, a box…), so they leave the wheel alone:
@@ -272,10 +278,10 @@ export class Viewer extends Emitter {
     el.addEventListener('wheel', (e) => { if (this._ptrs.size) e.preventDefault(); }, { passive: false });
     el.addEventListener('pointermove', (e) => {
       lastMove = e;
-      if (e.buttons) { if (this.hoverIndex !== -1) this._setHover(-1, e); return; }
-      if (!raf) raf = requestAnimationFrame(() => { raf = 0; const ev = lastMove; const i = this.pickAtom(ev.clientX, ev.clientY); this._setHover(i, ev); });
+      if (e.buttons) { dropPending(); this._clearHover(e); return; }
+      if (!raf) raf = requestAnimationFrame(() => { raf = 0; this._hoverAt(lastMove); });
     });
-    el.addEventListener('pointerleave', (e) => this._setHover(-1, e));
+    el.addEventListener('pointerleave', (e) => { dropPending(); this._clearHover(e); });
     // a capture listener on the container runs before the camera controls (on the canvas) see a press;
     // moves and releases are followed on the window, in its capture phase, ahead of the controls too
     this.container.addEventListener('pointerdown', (e) => this._ptrDown(e), true);
@@ -328,7 +334,46 @@ export class Viewer extends Emitter {
     this.emit('hover', { index: i, x: e.clientX - r.left, y: e.clientY - r.top });
   }
 
-  /** A left press released without dragging, or a tap: the axis gizmo, else 'atomclick'. Returns the picked index (null: the gizmo took it). */
+  /** A pointer move without buttons (once a frame): one pick gives the hovered overlay item and the hovered atom. */
+  _hoverAt(e) {
+    const hit = this.pick(e.clientX, e.clientY);
+    this._setOverlayHover(hit.kind === 'overlay' ? hit.overlay : null, e);
+    this._setHover(hit.kind === 'atom' ? hit.atom.index : -1, e);
+  }
+
+  /** The pointer left the view, or a button went down: no overlay item and no atom is hovered any more. */
+  _clearHover(e) {
+    this._setOverlayHover(null, e);
+    this._setHover(-1, e);
+  }
+
+  /**
+   * 'overlayhover' {layer, index, item, x, y} while the pointer is over an item of a pickable overlay layer (`ov`, the
+   * pick's overlay hit; sent on every move, as 'hover' is), and {layer, index: −1, item: null, x, y} once for the
+   * layer the pointer was over when it leaves it (`ov` null or on another layer). The layers hear of each change
+   * (overlays.hover: a marker layer enlarges the marker under the pointer).
+   */
+  _setOverlayHover(ov, e) {
+    const prev = this._overlayHover ?? null;
+    if (!ov && !prev) return;
+    const r = this.container.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    this._overlayHover = ov ? { layer: ov.layer, index: ov.index } : null;
+    if (prev && prev.layer !== ov?.layer) {
+      this.overlays?.hover(prev.layer, -1);
+      this.emit('overlayhover', { layer: prev.layer, index: -1, item: null, x, y });
+    }
+    if (ov) {
+      if (prev?.layer !== ov.layer || prev.index !== ov.index) this.overlays?.hover(ov.layer, ov.index);
+      this.emit('overlayhover', { layer: ov.layer, index: ov.index, item: ov.item, x, y });
+    }
+  }
+
+  /**
+   * A left press released without dragging, or a tap: the axis gizmo; else 'overlayclick' when an item of a pickable
+   * overlay layer is under the pointer (instead of 'atomclick', A-D8), or 'atomclick'. Returns the pick (null: the
+   * gizmo took the click).
+   */
   _click(e, mode = selectMode(e)) {
     const r = this.renderer.domElement.getBoundingClientRect();
     const gx = e.clientX - r.left, gy = r.bottom - e.clientY;
@@ -337,27 +382,47 @@ export class Viewer extends Emitter {
       const hit = this.gizmo.pick(nx, ny);
       if (hit) { this.setViewDirection(hit.dir.toArray(), null, true); return null; }
     }
-    const i = this.pickAtom(e.clientX, e.clientY);
-    this.emit('atomclick', { index: i, mode, shiftKey: mode !== 'replace', x: e.clientX - r.left, y: e.clientY - r.top });
-    return i;
+    const hit = this.pick(e.clientX, e.clientY);
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    if (hit.kind === 'overlay') {
+      const { layer, index, item } = hit.overlay;
+      this.emit('overlayclick', { layer, index, item, x, y, mode });
+    } else {
+      this.emit('atomclick', { index: hit.kind === 'atom' ? hit.atom.index : -1, mode, shiftKey: mode !== 'replace', x, y });
+    }
+    return hit;
   }
 
-  /** A click, and also an 'atomdblclick' when it closely follows the previous click on an atom. */
+  /**
+   * A click, and also a double-click when it closely follows the previous click: 'overlaydblclick' on an item of a
+   * pickable overlay layer (instead of 'atomdblclick'), 'atomdblclick' on an atom.
+   */
   _tap(e) {
     const now = performance.now(), last = this._lastTap;
     const double = !!last && now - last.t < DOUBLE_MS && Math.hypot(e.clientX - last.x, e.clientY - last.y) < DOUBLE_PX;
     this._lastTap = double ? null : { t: now, x: e.clientX, y: e.clientY };
     const mode = selectMode(e);
-    const i = this._click(e, mode);
-    if (!double || i == null || i < 0) return;
+    const hit = this._click(e, mode);
+    if (!double || !hit || hit.kind === 'none') return;
     const r = this.renderer.domElement.getBoundingClientRect();
-    this.emit('atomdblclick', { index: i, mode, altKey: e.altKey, x: e.clientX - r.left, y: e.clientY - r.top });
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    if (hit.kind === 'overlay') {
+      const { layer, index, item } = hit.overlay;
+      this.emit('overlaydblclick', { layer, index, item, x, y, mode });
+    } else this.emit('atomdblclick', { index: hit.atom.index, mode, altKey: e.altKey, x, y });
   }
 
+  /** A right click without dragging: 'overlaycontext' on an item of a pickable overlay layer (instead of 'atomcontext'), else 'atomcontext'. */
   _context(e) {
     const r = this.container.getBoundingClientRect();
-    const index = this.pickAtom(e.clientX, e.clientY);
-    this.emit('atomcontext', { index, x: e.clientX - r.left, y: e.clientY - r.top, clientX: e.clientX, clientY: e.clientY });
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    const hit = this.pick(e.clientX, e.clientY);
+    if (hit.kind === 'overlay') {
+      const { layer, index, item } = hit.overlay;
+      this.emit('overlaycontext', { layer, index, item, x, y, mode: selectMode(e), clientX: e.clientX, clientY: e.clientY });
+      return;
+    }
+    this.emit('atomcontext', { index: hit.kind === 'atom' ? hit.atom.index : -1, x, y, clientX: e.clientX, clientY: e.clientY });
   }
 
   /**
@@ -1787,16 +1852,35 @@ export class Viewer extends Emitter {
   }
 
   // ------------------------------------------------------------------ picking
-  pickAtom(clientX, clientY) {
-    if (!this.model || !this.model.n) return -1;
+  /**
+   * The pick ray through a point of the page (client coordinates): a THREE.Ray in world coordinates, which are the
+   * drawn coordinates of the model, for the current camera. It starts at the camera position (perspective) or on
+   * the plane through it that faces the view, along the view direction (orthographic). Its direction has unit
+   * length, so a distance t along it is in Å, and t < 0 is behind the camera.
+   */
+  ray(clientX, clientY) {
+    const cam = this.camera;
     const r = this.renderer.domElement.getBoundingClientRect();
-    const ndc = new THREE.Vector2(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
-    const ray = new THREE.Raycaster();
-    ray.setFromCamera(ndc, this.camera);
-    const o = ray.ray.origin, dv = ray.ray.direction;
-    const p = this.model.positions;
+    const w = r.width > 0 ? r.width : this.width, h = r.height > 0 ? r.height : this.height;
+    const ndc = new THREE.Vector2(((clientX - r.left) / w) * 2 - 1, -((clientY - r.top) / h) * 2 + 1);
+    cam.updateMatrixWorld();
+    const caster = (this._raycaster ??= new THREE.Raycaster());
+    caster.setFromCamera(ndc, cam);
+    return caster.ray.clone();
+  }
+
+  /**
+   * The nearest drawn atom on a pick ray (by default the ray through the point): {index, t}, index into the drawn
+   * model and t the distance along the ray to the front of its sphere (Å), or null. Spheres have the drawn radius,
+   * at least 0.22 Å; those whose centre lies behind the ray origin do not count. Atoms a visibility mask hides are
+   * not in the model, so they are never hit. This does not look at a preview's input lock: pick and pickAtom do.
+   */
+  pickAtomHit(clientX, clientY, ray = this.ray(clientX, clientY)) {
+    const m = this.model;
+    if (!m || !m.n) return null;
+    const o = ray.origin, dv = ray.direction, p = m.positions;
     let best = -1, bestT = Infinity;
-    for (let i = 0; i < this.model.n; i++) {
+    for (let i = 0; i < m.n; i++) {
       const rr = Math.max(this.radii?.[i] ?? 0.3, 0.22);
       const lx = p[3 * i] - o.x, ly = p[3 * i + 1] - o.y, lz = p[3 * i + 2] - o.z;
       const tca = lx * dv.x + ly * dv.y + lz * dv.z;
@@ -1806,7 +1890,105 @@ export class Viewer extends Emitter {
       const t = tca - Math.sqrt(rr * rr - d2);
       if (t < bestT) { bestT = t; best = i; }
     }
-    return best;
+    return best < 0 ? null : { index: best, t: bestT };
+  }
+
+  /** The drawn atom under a point of the page (index into the drawn model) or −1, as pick() sees it without the overlays (−1 while a preview locks the input). */
+  pickAtom(clientX, clientY) {
+    const hit = this.pick(clientX, clientY, { overlays: false });
+    return hit.kind === 'atom' ? hit.atom.index : -1;
+  }
+
+  /**
+   * What is under a point of the page, the merged pick (F0-A §3.12.2):
+   *   {kind: 'overlay' | 'atom' | 'none', t, point, ray, atom: {index, src, t} | null, overlay: {layer, index, item, t, tier} | null}
+   * The atom is the nearest drawn atom (pickAtomHit; none while a preview locks the input): index into the drawn model,
+   * src the structure atom that copy draws (model.src: the display's own wrapping, cut and copies, U1). An item of an
+   * overlay layer that is visible, pickable and pickable under the current tool (pickIn) wins over it as
+   * Overlays.pick decides: tier B ('top') first, then tier A ('scene') within 0.05 Å behind the atom. `atom` is set
+   * for kind 'atom' only and `overlay` for kind 'overlay' only; t is the distance along `ray` (Å) and point the hit
+   * in drawn coordinates (Infinity and null for 'none'). opts {atoms, overlays}: false leaves that kind out.
+   */
+  pick(clientX, clientY, { atoms = true, overlays = true } = {}) {
+    const ray = this.ray(clientX, clientY);
+    const a = atoms && !this.inputLocked ? this.pickAtomHit(clientX, clientY, ray) : null;
+    const o = overlays && this.overlays ? this.overlays.pick(ray, { tool: this.tool, atom: a, ctx: this._pickContext(clientX, clientY) }) : null;
+    if (o) return { kind: 'overlay', t: o.t, point: ray.at(o.t, new THREE.Vector3()), ray, atom: null, overlay: o };
+    if (a) {
+      const src = this.model.src ? this.model.src[a.index] : a.index;
+      return { kind: 'atom', t: a.t, point: ray.at(a.t, new THREE.Vector3()), ray, atom: { index: a.index, src, t: a.t }, overlay: null };
+    }
+    return { kind: 'none', t: Infinity, point: null, ray, atom: null, overlay: null };
+  }
+
+  /**
+   * The ctx an overlay layer's pick(ray, ctx) receives: {viewer, tool, camera, clientX, clientY, x, y (view pixels from
+   * the top left), width, height, project(x, y, z) → [px, py, z] (view pixels; z −1…1 between the clipping planes),
+   * worldPerPixel(point)}, for layers that test their items in screen space.
+   */
+  _pickContext(clientX, clientY) {
+    const r = this.renderer.domElement.getBoundingClientRect();
+    const w = this.width, h = this.height;
+    return {
+      viewer: this, tool: this.tool, camera: this.camera, clientX, clientY, x: clientX - r.left, y: clientY - r.top, width: w, height: h,
+      project: (x, y, z) => this.project(x, y, z, w, h),
+      worldPerPixel: (point) => this.worldPerPixel(point),
+    };
+  }
+
+  /**
+   * Where the pick ray through a point of the page meets the plane through `point` with normal `normal` (each [x, y, z],
+   * a typed array, a THREE.Vector3 or {x, y, z}, in drawn coordinates): a THREE.Vector3, or null when the ray runs
+   * parallel to the plane (|n·d| < 1e-6 for the unit normal: a plane seen edge-on) or meets it behind the camera.
+   */
+  pointOnPlane(clientX, clientY, point, normal) {
+    const p = this._vec3(point, 'pointOnPlane: point'), n = this._vec3(normal, 'pointOnPlane: normal');
+    const len = n.length();
+    if (!(len > 0)) throw new TypeError('pointOnPlane: normal must not be zero.');
+    n.divideScalar(len);
+    const r = this.ray(clientX, clientY);
+    const nd = n.dot(r.direction);
+    if (Math.abs(nd) < 1e-6) return null;
+    const t = n.dot(p.sub(r.origin)) / nd;
+    return t >= 0 ? r.at(t, new THREE.Vector3()) : null;
+  }
+
+  /**
+   * The point of the line origin + s·dir (drawn coordinates; the forms pointOnPlane takes) closest to the pick ray
+   * through a point of the page, for dragging along an axis: {point: THREE.Vector3, s}, s in units of |dir| (Å for a
+   * unit dir). null when the line runs parallel to the ray (the sine of the angle between them below 1e-6).
+   */
+  pointOnLine(clientX, clientY, origin, dir) {
+    const p = this._vec3(origin, 'pointOnLine: origin'), u = this._vec3(dir, 'pointOnLine: dir');
+    if (!(u.length() > 0)) throw new TypeError('pointOnLine: dir must not be zero.');
+    const r = this.ray(clientX, clientY), d = r.direction;
+    const a = u.dot(u), b = u.dot(d), c = d.dot(d);
+    const denom = a * c - b * b;   // |u|² |d|² sin²(angle)
+    if (!(denom > 1e-12 * a * c)) return null;
+    const w0 = p.clone().sub(r.origin);
+    const s = (b * d.dot(w0) - c * u.dot(w0)) / denom;
+    return { point: p.addScaledVector(u, s), s };
+  }
+
+  /**
+   * Å per CSS pixel of the view at the depth of `point` ([x, y, z], a Vector3 or {x, y, z}; default: the camera's
+   * target): 2 · depth · tan(fov / 2) / zoom / height for the perspective camera, (top − bottom) / zoom / height
+   * (the same at every depth) for the orthographic one. Its inverse is the view's pixels per Å there.
+   */
+  worldPerPixel(point = null) {
+    const cam = this.camera, h = Math.max(1, this.height);
+    if (cam.isOrthographicCamera) return (cam.top - cam.bottom) / (cam.zoom || 1) / h;
+    const p = point == null ? this.controls.target.clone() : this._vec3(point, 'worldPerPixel: point');
+    cam.updateMatrixWorld();
+    const depth = -p.applyMatrix4(cam.matrixWorldInverse).z;
+    return (2 * Math.max(1e-6, depth) * Math.tan(((cam.fov ?? 30) * DEG) / 2)) / (cam.zoom || 1) / h;
+  }
+
+  /** [x, y, z], a typed array, a THREE.Vector3 or {x, y, z} as a new THREE.Vector3; anything else, or a component that is not a finite number, is a TypeError naming `what`. */
+  _vec3(v, what) {
+    const c = Array.isArray(v) || ArrayBuffer.isView(v) ? [v[0], v[1], v[2]] : v && typeof v === 'object' ? [v.x, v.y, v.z] : null;
+    if (!c || !c.every(Number.isFinite)) throw new TypeError(`${what} must be three numbers [x, y, z].`);
+    return new THREE.Vector3(c[0], c[1], c[2]);
   }
 
   /**
