@@ -39,14 +39,18 @@ import { Emitter } from '../core/events.js';
 import { element } from '../core/elements.js';
 import { buildDisplayModel, modelBounds, keyOf } from './display.js';
 import { styles, atomRadius, segmentsFor, autoPolyhedraCenters, buildAtoms, buildBonds, buildLines, buildPolyhedra, writeAtomMatrices, writeBondMatrices } from './styles.js';
-import { computeColors } from './colors.js';
+import { computeColors, colorSchemes } from './colors.js';
 import { createMaterial, updateMaterial, isSeeThrough, materials } from './materials.js';
 import { LightRig } from './lighting.js';
-import { PostPipeline } from './post.js';
+import { PostPipeline, skipInAuxPass } from './post.js';
 import { makeBackground } from './background.js';
 import { AxisGizmo, axisColors } from './gizmo.js';
-import { makeScene } from './settings.js';
+import { makeScene, scenePathValues } from './settings.js';
 import { drawLegends } from './legend.js';
+import {
+  Overlays, haloMaterial, normalizeHighlight, checkHighlightName, highlightIndexSet, haloOrder, remapIndices, resolveColor,
+  DEFAULT_HIGHLIGHT_COLOR, HALO_EDGE, HALO_ORDER_BASE,
+} from './overlays.js';
 
 const sig = (o) => JSON.stringify(o ?? null);
 const DEG = Math.PI / 180;
@@ -176,9 +180,18 @@ export class Viewer extends Emitter {
     this._lastTap = null;
     this.helpers = { buildAtoms, buildBonds, buildLines, buildPolyhedra, atomRadius, segmentsFor };
 
-    // shared halo resources: one geometry, one material and one growable instanced mesh per kind
+    // shared halo resources: one geometry, one material and one growable instanced mesh per kind; the selection and
+    // hover halos take the theme's accent colour, named highlights (setHighlight) keep their own
     this._haloGeo = new THREE.SphereGeometry(1, 32, 20);
-    this._halo = { select: this._makeHalo(rimMaterial(2.0)), hover: this._makeHalo(rimMaterial(0.9)) };
+    this._halo = { select: this._makeHalo(rimMaterial(2.0), { name: 'select', themed: true, grow: 1.25 }), hover: this._makeHalo(rimMaterial(0.9), { name: 'hover', themed: true, grow: 1.32 }) };
+    this._haloHidden = new Set();   // halo kinds an export leaves out (overlays.exportScope)
+    this._highlights = new Map();   // name → { set (source indices), color, grow, opacity, strength, contrast, export }
+    this._orderHalos();
+    // overlay layers (render/overlays.js): tier A under the root next to the halos, tier B in a scene of its own
+    this.overlays = new Overlays(this);
+    this.overlayGroup = this.overlays.sceneGroup;
+    this.root.add(this.overlayGroup);
+    this.topScene = this.overlays.topScene;
 
     this._setupControls('orbit');
     this._setupPointer();
@@ -314,7 +327,7 @@ export class Viewer extends Emitter {
     if (i === this.hoverIndex && i === -1) return;
     const changed = i !== this.hoverIndex;
     this.hoverIndex = i;
-    if (changed) { this._writeHalos(); this._dirty = true; }
+    if (changed) { this._writeHalos(['hover']); this._dirty = true; }
     const r = this.container.getBoundingClientRect();
     this.emit('hover', { index: i, x: e.clientX - r.left, y: e.clientY - r.top });
   }
@@ -597,7 +610,7 @@ export class Viewer extends Emitter {
       camera: sig([d.projection, d.fov, d.controls]),
       model: sig([d.supercell, d.wrap, d.boundaryAtoms, d.completeBonds, d.bonds, d.hiddenElements, styles.get(st.rep)?.wantsImages ? st.polyhedra?.centers : null]),
       frame: sig(this.structure?.frame),
-      colors: sig([st.colorScheme, st.monoColor, st.colorOverrides, st.property]),
+      colors: sig([st.colorScheme, st.monoColor, st.colorOverrides, st.property, this._colorDeps(settings)]),
       geom: sig([st.rep, st.radiusSource, st.bondRadius, st.bondColor, st.bondUniformColor, st.lineWidth, st.quality, st.polyhedra, d.bonds?.show]),
       radii: sig([st.atomScale, st.radiusOverrides]),
       material: sig([st.material, st.bondMaterial]),
@@ -669,7 +682,7 @@ export class Viewer extends Emitter {
     this.emit('model', model);
   }
 
-  _computeColors() { this.colors = computeColors(this.model, this.structure, this.settings.style, this.cn); }
+  _computeColors() { this.colors = computeColors(this.model, this.structure, this.settings.style, this.cn, { scene: this.settings, extras: this._colorExtras }); }
 
   _disposeObject(obj) {
     obj?.traverse?.((o) => {
@@ -827,60 +840,151 @@ export class Viewer extends Emitter {
     return ext;
   }
 
-  _makeHalo(material) {
+  /**
+   * A halo kind: one growable instanced mesh with its own material. opts: name, themed (takes the theme's accent:
+   * the selection and hover halos), grow (halo radius ÷ atom radius, about), export (policy, named highlights).
+   */
+  _makeHalo(material, { name = 'halo', themed = false, grow = 1.25, export: exp = 'never' } = {}) {
     const mesh = new THREE.InstancedMesh(this._haloGeo, material, 16);
     mesh.count = 1;
     mesh.setMatrixAt(0, new THREE.Matrix4().makeScale(0, 0, 0));   // keeps the program compiled while idle
+    mesh.setColorAt(0, new THREE.Color(0.8, 0, 0));                 // instanceColor.r: the atom's share of the halo radius
     mesh.frustumCulled = false;
-    mesh.userData.noInk = true;
-    mesh.userData.sharedMaterial = true;
-    mesh.renderOrder = 10;
+    Object.assign(mesh.userData, { noInk: true, sharedMaterial: true, highlight: name, themed, grow, export: exp });
+    mesh.renderOrder = HALO_ORDER_BASE;
     mesh.name = 'halo';
     this.root.add(mesh);
     return mesh;
   }
 
-  _writeHalo(kind, indices, grow) {
+  _writeHalo(kind, indices) {
     let mesh = this._halo[kind];
+    if (!mesh) return;
     if (indices.length > mesh.instanceMatrix.count) {
       const next = new THREE.InstancedMesh(this._haloGeo, mesh.material, Math.max(indices.length, mesh.instanceMatrix.count * 2));
-      Object.assign(next, { frustumCulled: false, renderOrder: mesh.renderOrder, name: mesh.name });
+      Object.assign(next, { frustumCulled: false, renderOrder: mesh.renderOrder, name: mesh.name, visible: mesh.visible });
       Object.assign(next.userData, mesh.userData);
       this.root.remove(mesh);
       mesh.dispose();
       this.root.add(next);
       this._halo[kind] = mesh = next;
     }
-    const mtx = new THREE.Matrix4(), p = this.model?.positions;
+    const grow = mesh.userData.grow ?? 1.25;
+    const mtx = new THREE.Matrix4(), share = new THREE.Color(), p = this.model?.positions;
     if (!indices.length || !p) { mesh.count = 1; mesh.setMatrixAt(0, mtx.makeScale(0, 0, 0)); }
     else {
       mesh.count = indices.length;
       indices.forEach((i, k) => {
-        const r = Math.max(this.radii?.[i] ?? 0.3, 0.18) * grow + 0.05;
+        const ra = this.radii?.[i] ?? 0.3;
+        const r = Math.max(ra, 0.18) * grow + 0.05;
         mtx.makeScale(r, r, r).setPosition(p[3 * i], p[3 * i + 1], p[3 * i + 2]);
         mesh.setMatrixAt(k, mtx);
+        mesh.setColorAt(k, share.setRGB(Math.min(0.98, ra / r), 0, 0));
       });
     }
     mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }
 
-  /** Rewrite selection and hover halos (no new materials or geometry). */
-  _writeHalos() {
+  /**
+   * Rewrite halos — every kind, or only `kinds` — from the selection, the hovered atom and the named highlights
+   * (no new materials or geometry); each drawn image of an atom gets one. One pass over the drawn atoms.
+   */
+  _writeHalos(kinds = null) {
     if (!this._halo) return;
     const m = this.model;
-    const sel = [];
-    if (m && this.selection.size) for (let i = 0; i < m.n; i++) if (this.selection.has(m.src[i])) sel.push(i);
-    this._writeHalo('select', sel, 1.25);
-    const h = this.hoverIndex;
-    this._writeHalo('hover', m && h >= 0 && h < m.n ? [h] : [], 1.32);
+    const want = (kinds ?? Object.keys(this._halo)).filter((k) => this._halo[k]);
+    // a preview of other atoms (previewStructure without sameAtoms) shows neither the selection nor named highlights
+    const other = this._preview?.kind === 'structure' && !this._preview.sameAtoms;
+    const lists = new Map();
+    if (m && !other) {
+      const sets = [];
+      for (const k of want) {
+        const set = k === 'select' ? this.selection : k === 'hover' ? null : this._highlights.get(k)?.set;
+        if (set?.size) { const list = []; lists.set(k, list); sets.push([set, list]); }
+      }
+      if (sets.length) {
+        const src = m.src;
+        for (let d = 0; d < m.n; d++) { const s = src[d]; for (const [set, list] of sets) if (set.has(s)) list.push(d); }
+      }
+    }
+    for (const k of want) {
+      if (k === 'hover') { const h = this.hoverIndex; this._writeHalo('hover', m && h >= 0 && h < m.n ? [h] : []); }
+      else this._writeHalo(k, lists.get(k) ?? []);
+    }
     this._dirty = true;
   }
 
-  /** Re-read theme colours (accent, fonts) and refresh the halos; the shell calls this on theme changes. */
+  /**
+   * A named halo around atoms (source indices; every drawn image gets one), e.g. fixed atoms. opts: color
+   * ('#c93636', {light, dark} chosen by the background, or 'var(--token)' read from the page's CSS again on every
+   * theme change; never the theme's accent), grow (radius factor, 1.15), opacity (1), strength (1.4), contrast
+   * (true: a dark inner line, then the colour), export ('never' | 'marker' (default: PNG exports with "Include
+   * markers") | 'always'). Highlights are drawn in grow order, the smallest first. indices null clears it.
+   * Kept through edits by remapIndexed, dropped when another structure is shown; never saved.
+   */
+  setHighlight(name, srcIndices, opts = {}) {
+    checkHighlightName(name);
+    if (srcIndices == null) { this.clearHighlight(name); return; }
+    const o = normalizeHighlight(name, opts ?? {});
+    const set = highlightIndexSet(name, srcIndices);
+    const mesh = this._halo[name] ?? (this._halo[name] = this._makeHalo(haloMaterial(o), { name }));
+    const u = mesh.material.uniforms;
+    u.strength.value = o.strength; u.opacity.value = o.opacity; u.contrast.value = o.contrast ? 1 : 0;
+    Object.assign(mesh.userData, { grow: o.grow, export: o.export });
+    this._highlights.set(name, { ...o, set });
+    this._colorHighlight(name);
+    this._orderHalos();
+    this._writeHalos([name]);
+  }
+
+  /** Remove a named highlight (its halo kind stays, empty, for the next setHighlight of that name). */
+  clearHighlight(name) {
+    if (!this._highlights.delete(name)) return;
+    this._writeHalos([name]);
+    this._orderHalos();
+  }
+
+  /** Names of the named highlights shown now. */
+  highlightNames() { return [...this._highlights.keys()]; }
+
+  /** After an edit that renumbered atoms: map[old] = new index (−1 or null: removed). remapIndexed calls this. */
+  _remapHighlights(map) {
+    for (const h of this._highlights.values()) h.set = remapIndices(h.set, map);
+    this._writeHalos();
+  }
+
+  /** Halo draw order: by grow, the smallest first, the selection (1.25) and hover (1.32) halos included. */
+  _orderHalos() {
+    const entries = [...Object.entries(this._halo)].filter(([k, mesh]) => mesh.userData.themed || this._highlights.has(k)).map(([name, mesh]) => ({ name, grow: mesh.userData.grow }));
+    const order = haloOrder(entries);
+    for (const [k, mesh] of Object.entries(this._halo)) mesh.renderOrder = order.get(k) ?? HALO_ORDER_BASE;
+    this._dirty = true;
+  }
+
+  /** Set a named highlight's colour (its {light, dark} by the background, 'var(--token)' from the page) and inner line. */
+  _colorHighlight(name) {
+    const h = this._highlights.get(name), mesh = this._halo[name];
+    if (!h || !mesh) return;
+    const dark = !!this.overlayDark;
+    const fallback = dark ? DEFAULT_HIGHLIGHT_COLOR.dark : DEFAULT_HIGHLIGHT_COLOR.light;
+    mesh.material.uniforms.color.value.set(resolveColor(h.color, { dark, css: (token) => cssVar(token, ''), fallback }));
+    mesh.material.uniforms.edge.value.set(dark ? HALO_EDGE.dark : HALO_EDGE.light);
+  }
+
+  /** The background turned dark or light, or the theme changed: named highlights and overlay building blocks follow. */
+  _themeOverlays() {
+    this._themeDark = !!this.overlayDark;
+    for (const name of this._highlights.keys()) this._colorHighlight(name);
+    this.overlays.theme(this._themeDark);
+    this._dirty = true;
+  }
+
+  /** Re-read theme colours (accent, fonts, CSS tokens) and refresh the halos; the shell calls this on theme changes. */
   _updateHalos() {
     this._css = null;
-    const accent = this._cssTheme().accent;
-    for (const k of Object.keys(this._halo ?? {})) this._halo[k].material.uniforms.color.value.set(accent);
+    this._cssTheme();        // the accent of the selection and hover halos
+    this._themeOverlays();   // 'var(--token)' colours of named highlights
     this._writeHalos();
   }
 
@@ -890,9 +994,74 @@ export class Viewer extends Emitter {
         accent: cssVar('--accent', '#e8a33d'), accentStrong: cssVar('--accent-strong', '#c27c12'),
         font: cssVar('--font-ui', 'system-ui, sans-serif'),
       };
-      for (const k of Object.keys(this._halo ?? {})) this._halo[k].material.uniforms.color.value.set(this._css.accent);
+      // only the themed kinds take the accent: named highlights keep the colour they were given
+      for (const mesh of Object.values(this._halo ?? {})) if (mesh.userData.themed) mesh.material.uniforms.color.value.set(this._css.accent);
     }
     return this._css;
+  }
+
+  /** The app showed another structure entry: overlay layers marked clearOnSwitch and the named highlights go. */
+  structureSwitched() {
+    this.overlays.switched();
+    if (!this._highlights.size) return;
+    this._highlights.clear();
+    this._writeHalos();
+    this._orderHalos();
+  }
+
+  /**
+   * What a colour scheme reads besides the style settings, for the 'colors' signature: the values at its dependsOn
+   * scene paths and the app's extras (app.registerColorExtra, fetched through extrasProvider before every settings pass).
+   */
+  _colorDeps(settings) {
+    let extras = {};
+    try { extras = this.extrasProvider?.() ?? {}; } catch (e) { console.error('[crystallume] colour extras failed', e); }
+    const scheme = colorSchemes.get(settings.style?.colorScheme);
+    let key;
+    try { key = JSON.stringify([scenePathValues(settings, scheme?.dependsOn), extras]); } catch { extras = {}; key = '[]'; }
+    this._colorExtras = extras;
+    return key;
+  }
+
+  /** Overlay pixels per Å at the depth of `point` ([x, y, z] or a Vector3; default: the target), for a canvas `h` pixels high. */
+  _pxPerAAt(point = null, h = this.height) {
+    const cam = this.camera;
+    if (cam.isOrthographicCamera || !point) return this.pixelsPerAngstrom(h);
+    const p = Array.isArray(point) || ArrayBuffer.isView(point) ? new THREE.Vector3(point[0], point[1], point[2]) : new THREE.Vector3(point.x, point.y, point.z);
+    cam.updateMatrixWorld();
+    const depth = -p.applyMatrix4(cam.matrixWorldInverse).z;
+    return h / (2 * Math.max(1e-6, depth) * Math.tan(((cam.fov ?? 30) * DEG) / 2));
+  }
+
+  /**
+   * A see-through drawing of `structure` in the current representation, wrapped with the drawn model's cuts and
+   * without boundary copies (ghostLayer, P-ghost previews). Returns a THREE.Object3D or null (no atoms).
+   */
+  buildGhost(structure, { opacity = 0.45 } = {}) {
+    if (!structure?.length) return null;
+    const st = this.settings.style, d = this.settings.display;
+    const style = styles.get(st.rep) ?? styles.get('ballstick');
+    const model = buildDisplayModel(structure, { ...d, boundaryAtoms: false, completeBonds: false }, { cuts: this.model?.cuts });
+    if (!model.n) return null;
+    const cn = new Int32Array(model.n);
+    for (let b = 0; b < model.bonds.count; b++) { cn[model.bonds.pairs[2 * b]]++; cn[model.bonds.pairs[2 * b + 1]]++; }
+    const colors = computeColors(model, structure, st, cn, { scene: this.settings, extras: this._colorExtras });
+    const radii = new Float32Array(model.n);
+    for (let i = 0; i < model.n; i++) radii[i] = atomRadius(model.symbols[i], st);
+    // depthWrite keeps the instanced spheres from showing through each other (no per-instance sorting)
+    const see = (mat, op) => { mat.transparent = true; mat.opacity = op; mat.depthWrite = true; mat.needsUpdate = true; return mat; };
+    const atomMaterial = see(createMaterial(st.material, this._matParams()), opacity);
+    const ctx = {
+      model, colors, radii, settings: st, atomMaterial, bondMaterial: atomMaterial, segments: segmentsFor(model.n, st.quality),
+      showBonds: d.bonds?.show !== false && style.bonds, resolution: this.resolution, THREE, helpers: this.helpers,
+    };
+    const rep = style.build(ctx);
+    if (!rep?.isObject3D) { atomMaterial.dispose(); return null; }
+    rep.traverse((o) => {
+      for (const mat of o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []) if (mat !== atomMaterial) see(mat, Math.min(mat.opacity ?? 1, opacity));
+    });
+    rep.name = 'ghost';
+    return rep;
   }
 
   _buildCell() {
@@ -1453,8 +1622,10 @@ export class Viewer extends Emitter {
   }
 
   _updateClipping() {
-    const D = this.camera.position.distanceTo(this.bounds.center);
-    const R = this.bounds.radius * 1.4 + 2;
+    // near and far hold the model and the overlay layers' bounds (a plane preview reaching past the atoms)
+    const b = this.overlays.clipBounds(this.bounds);
+    const D = this.camera.position.distanceTo(b.center);
+    const R = b.radius * 1.4 + 2;
     const near = Math.max(0.05, D - R * 1.6), far = D + R * 1.6;
     for (const cam of [this.persp, this.ortho]) { cam.near = cam.isOrthographicCamera ? Math.max(0.01, D - R * 2) : near; cam.far = far; cam.updateProjectionMatrix(); }
     if (this.scene3.fog) {
@@ -1482,13 +1653,18 @@ export class Viewer extends Emitter {
 
   render({ gizmo = true, overlay = true } = {}) {
     this._updateClipping();
+    this.overlays.beforeRender({ camera: this.camera, width: this.width, height: this.height, pxPerA: (point) => this._pxPerAAt(point) });
     this.lights.update(this.camera);
     const live = !!this.model;
-    for (const k in this._halo) this._halo[k].visible = live;
+    if (this._themeDark !== !!this.overlayDark) this._themeOverlays();
+    // every halo kind shows unless an export leaves it out (_haloHidden, see overlays.exportScope)
+    for (const k in this._halo) this._halo[k].visible = live && !this._haloHidden.has(k);
+    this.overlayGroup.visible = live;
     if (!live) this.floor.visible = false;
     try {
       if (this.post.active) this.post.render();
       else { this.renderer.setRenderTarget(null); this.renderer.render(this.scene3, this.camera); }
+      if (live) this._renderTop();
       if (gizmo && this.settings.display.axes) {
         const cell = this._cell();
         const dark = { dark: !!this.overlayDark };
@@ -1504,6 +1680,52 @@ export class Viewer extends Emitter {
     this.emit('render');
   }
 
+  /**
+   * Tier B overlays, over the finished frame (after post-processing, so no outlines, ambient occlusion or bloom):
+   * layers with depth 'atoms' after a depth-only pass of the drawn structure (they hide behind atoms), then the
+   * others over everything. Lit by their own ambient light and a light that follows the camera.
+   */
+  _renderTop() {
+    const state = this.overlays.topState();
+    if (!state.any) return;
+    const r = this.renderer, ov = this.overlays, auto = r.autoClear;
+    ov.topLight.position.copy(this.camera.position);
+    ov.topLight.target.position.copy(this.controls.target);
+    r.setRenderTarget(null);
+    r.autoClear = false;
+    try {
+      r.clearDepth();
+      if (state.atoms) {
+        this._depthPrepass();
+        ov.topFree.visible = false;
+        r.render(this.topScene, this.camera);
+        ov.topFree.visible = true;
+        r.clearDepth();
+      }
+      ov.topAtoms.visible = false;
+      r.render(this.topScene, this.camera);
+    } finally {
+      ov.topAtoms.visible = true;
+      r.autoClear = auto;
+    }
+  }
+
+  /** Write the depth of the drawn structure (atoms, bonds, polyhedra; no lines, halos or overlays) into the frame's depth buffer only. */
+  _depthPrepass() {
+    const sc = this.scene3, r = this.renderer;
+    const bg = sc.background, fog = sc.fog, override = sc.overrideMaterial, shadows = r.shadowMap.autoUpdate;
+    const hidden = [];
+    sc.traverse((o) => { if (o.visible && skipInAuxPass(o)) { hidden.push(o); o.visible = false; } });
+    this._depthOnly ??= new THREE.MeshBasicMaterial({ colorWrite: false });
+    sc.background = null; sc.fog = null; sc.overrideMaterial = this._depthOnly;
+    r.shadowMap.autoUpdate = false;
+    try { r.render(sc, this.camera); } finally {
+      sc.background = bg; sc.fog = fog; sc.overrideMaterial = override;
+      r.shadowMap.autoUpdate = shadows;
+      hidden.forEach((o) => { o.visible = true; });
+    }
+  }
+
   project(x, y, z, w, h) {
     const v = new THREE.Vector3(x, y, z).project(this.camera);
     return [(v.x + 1) / 2 * w, (1 - v.y) / 2 * h, v.z];
@@ -1515,8 +1737,9 @@ export class Viewer extends Emitter {
   }
 
   /**
-   * Labels, measurement values, cell axis letters, colour legend and scale bar on a 2D canvas.
-   * opt.export: drawing into an image export (no status bar to keep clear of).
+   * Labels, measurement values, cell axis letters, canvas overlay layers, colour legend, overlay legend rows
+   * and scale bar on a 2D canvas. opt.export: drawing into an image export (no status bar to keep clear of);
+   * opt.markers: the export includes markers (canvas layers read it as ctx.markers).
    */
   drawOverlay(g, scale = 1, w = this.width * scale, h = this.height * scale, opt = {}) {
     g.setTransform(1, 0, 0, 1, 0, 0);
@@ -1551,12 +1774,20 @@ export class Viewer extends Emitter {
       text(label, mid[0], mid[1] - 12 * scale, 12.5, accent, 700);
     }
     const mode = d.legend === true ? 'always' : d.legend === false ? 'none' : (d.legend ?? 'auto');
+    // canvas overlay layers (tier C), clear of the letters and labels placed above through the occupancy grid
+    this.overlays.drawCanvas(g, {
+      scale, w, h, dark: !!dark, font: fontFam, text, occupancy: occ, export: !!opt.export, markers: !!opt.markers, model: m,
+      project: (x, y, z) => this.project(x, y, z, w, h), pxPerA: (point) => this._pxPerAAt(point, h),
+    });
+    g.globalAlpha = 1;
     const info = this.colors?.legend;
-    const legend = info && mode !== 'none' && (info.kind === 'gradient' || mode === 'always') ? info : null;
+    // element chips only with 'always'; a colour bar or category chips also with 'auto'
+    const legend = info && mode !== 'none' && (info.kind !== 'elements' || mode === 'always') ? info : null;
+    const items = mode !== 'none' ? this.overlays.legendItems() : [];
     const ppa = d.scaleBar ? this.pixelsPerAngstrom(h) : null;
-    if (legend || ppa) {
+    if (legend || ppa || items.length) {
       const traj = !opt.export && (this.structure?.nFrames ?? 1) > 1;
-      drawLegends(g, { legend, pxPerAngstrom: ppa, width: w, height: h, scale, dark, font: fontFam, right: opt.export ? 16 : 14, bottom: opt.export ? 16 : (traj ? 96 : 38) });
+      drawLegends(g, { legend, items, pxPerAngstrom: ppa, width: w, height: h, scale, dark, font: fontFam, right: opt.export ? 16 : 14, bottom: opt.export ? 16 : (traj ? 96 : 38) });
     }
   }
 
@@ -1781,8 +2012,10 @@ export class Viewer extends Emitter {
   /**
    * High-resolution PNG. Returns a Blob. With `transparent` the background is left out (bloom and
    * depth of field keep the alpha). Labels, legend and scale bar are drawn in at the same scale.
+   * `selection` keeps the selection halo (default), `markers` adds named highlights and overlay layers
+   * whose export policy is 'marker'; the hover halo and 'never' layers are always left out (overlays.exportScope).
    */
-  async screenshot({ scale = 2, transparent = false, gizmo = false, maxSize = 8192 } = {}) {
+  async screenshot({ scale = 2, transparent = false, gizmo = false, maxSize = 8192, selection = true, markers = false } = {}) {
     const pr0 = this.renderer.getPixelRatio();
     const w0 = this.width, h0 = this.height;
     scale = Math.min(scale, maxSize / Math.max(w0, h0));
@@ -1791,8 +2024,16 @@ export class Viewer extends Emitter {
     this.renderer.setPixelRatio(1);
     this.renderer.setSize(W, H, false);
     this.post.setSize(W, H);
-    const lineMats = [];
-    this.root.traverse((o) => { if (o.material?.isLineMaterial) { lineMats.push([o.material, o.material.linewidth]); o.material.resolution.set(W, H); o.material.linewidth *= scale; } });
+    // fat lines (cell, plane and cell-outline overlays, tier B handles) keep their on-screen width relative to the picture
+    const lineMats = new Map();
+    const widen = (o) => {
+      const mat = o.material;
+      if (!mat?.isLineMaterial || lineMats.has(mat)) return;
+      lineMats.set(mat, [mat.linewidth, mat.resolution.clone()]);
+      mat.resolution.set(W, H); mat.linewidth *= scale;
+    };
+    this.root.traverse(widen);
+    this.topScene.traverse(widen);
     const ink = this.post.ink;
     const inkT = ink?.uniforms.thickness.value;
     if (ink) ink.uniforms.thickness.value = inkT * scale;
@@ -1800,16 +2041,19 @@ export class Viewer extends Emitter {
     const out = document.createElement('canvas');
     out.width = W; out.height = H;
     const g = out.getContext('2d');
+    const restore = this.overlays.exportScope('png', { selection, markers });
     try {
       this.render({ gizmo, overlay: false });
       g.drawImage(this.renderer.domElement, 0, 0);
       const ov = document.createElement('canvas'); ov.width = W; ov.height = H;
-      this.drawOverlay(ov.getContext('2d'), scale, W, H, { export: true, gizmo });
+      this.drawOverlay(ov.getContext('2d'), scale, W, H, { export: true, gizmo, markers: !!markers });
       g.drawImage(ov, 0, 0);
     } finally {
+      restore();
       this.scene3.background = bg; this.renderer.setClearAlpha(clearA); this.post.setTransparent(postT);
       if (ink) ink.uniforms.thickness.value = inkT;
-      lineMats.forEach(([mat, lw]) => { mat.linewidth = lw; });
+      // newest first: materials sharing one resolution vector (overlays share the view's) end on the first value seen
+      [...lineMats].reverse().forEach(([mat, [lw, res]]) => { mat.linewidth = lw; mat.resolution.copy(res); });
       this.renderer.setPixelRatio(pr0);
       this.resize();
       this.render();
@@ -1817,11 +2061,12 @@ export class Viewer extends Emitter {
     return new Promise((res) => out.toBlob(res, 'image/png'));
   }
 
-  /** Small JPEG data URL for project thumbnails. */
+  /** Small JPEG data URL for project thumbnails: the structure only, without halos or overlay layers. */
   thumbnail(w = 320, h = 200, quality = 0.82) {
     const c = document.createElement('canvas');
     c.width = w; c.height = h;
-    this.render({ gizmo: false, overlay: false });
+    const restore = this.overlays.exportScope('thumbnail');
+    try { this.render({ gizmo: false, overlay: false }); } finally { restore(); }
     const src = this.renderer.domElement;
     const s = Math.max(w / src.width, h / src.height);
     const g = c.getContext('2d');

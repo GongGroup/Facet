@@ -732,12 +732,16 @@ export class Shell {
     const why = none ? 'Load a structure first' : busy ? 'Wait for the current task to finish' : null;
     const run = (fn) => () => fn().catch((e) => toast(e.message, { type: 'error' }));
     const img = (label, opt, kbd) => ({ label, icon: 'image', kbd, disabled: !!why, tip: why, run: run(() => app.exportImage(opt)) });
+    // what PNG exports draw besides the structure (preferences; the hovered atom's halo is never drawn)
+    const sel = app.prefs.exportSelection !== false, marks = app.prefs.exportMarkers === true;
     const items = [
       { header: 'Image' },
       img('PNG — screen size', { scale: 1 }),
       img('PNG — 2× (print)', { scale: 2 }, keyLabel('mod+e')),
       img('PNG — 4× (poster)', { scale: 4 }),
       img('PNG — transparent background', { scale: 2, transparent: true }),
+      { label: 'Include selection highlight', icon: 'check', checked: sel, tip: 'Draw the rings around selected atoms into PNG images', run: () => app.setPref('exportSelection', !sel) },
+      { label: 'Include markers (sites, fixed atoms)', icon: 'check', checked: marks, tip: 'Draw site markers, fixed-atom rings and other markers into PNG images', run: () => app.setPref('exportMarkers', !marks) },
       { header: '3D model' },
       { label: 'glTF binary (.glb) for Blender, PowerPoint, AR', icon: 'cube', disabled: !!why, tip: why, run: run(() => app.exportGLB()) },
       { header: 'Structure file' },
