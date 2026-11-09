@@ -677,8 +677,8 @@ export class Shell {
   updateHistory() {
     const app = this.app;
     const u = app.undoLabel?.() ?? null, r = app.redoLabel?.() ?? null;
-    this.undoBtn.disabled = !(app.canUndo?.() ?? app.undoStack.length > 0);
-    this.redoBtn.disabled = !(app.canRedo?.() ?? app.redoStack.length > 0);
+    this.undoBtn.disabled = !app.canUndo();
+    this.redoBtn.disabled = !app.canRedo();
     this.undoBtn.dataset.tip = u ? `Undo ${u}` : 'Undo';
     this.redoBtn.dataset.tip = r ? `Redo ${r}` : 'Redo';
     this.undoBtn.setAttribute('aria-label', this.undoBtn.dataset.tip);

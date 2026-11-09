@@ -31,6 +31,7 @@ import { saveFile, readText, slug, isArtifact } from './storage/files.js';
 import { toast, dialog } from './ui/overlays.js';
 import { h } from './ui/dom.js';
 import { makeZip } from './core/zip.js';
+import { HistoryStore, historyBudget, snapStructure, snapPositions, structureFromSnap, applyPositionsSnap, patchPositions, mergePositions, BUDGET_NOTICE, INCONSISTENT, HistoryError } from './core/history.js';
 
 export const VERSION = '0.3.1';
 const PREF_KEY = 'atomscope.prefs';   // key from the app's former name, kept so saved preferences survive the rename
@@ -102,6 +103,8 @@ const cleanMeasurements = (list) => (Array.isArray(list) ? list : [])
   .map((m) => ({ type: m.type, keys: m.keys.slice() }));
 const toStructure = (s) => (s instanceof Structure ? s : Structure.fromJSON(s));
 const pause = (ms = 30) => new Promise((r) => setTimeout(r, ms));
+/** Bump the structure's change counter (Structure.touch() once the data layer provides it). */
+const bumpRev = (s) => { if (typeof s.touch === 'function') s.touch(); else s.rev = (s.rev ?? 0) + 1; };
 
 export function loadPrefs() { try { return JSON.parse(localStorage.getItem(PREF_KEY)) ?? {}; } catch { return {}; } }
 export function savePrefs(p) { try { localStorage.setItem(PREF_KEY, JSON.stringify(p)); } catch { /* storage blocked */ } }
@@ -128,10 +131,10 @@ export class App extends Emitter {
     this.tool = 'select';
     this.measureType = 'distance';
     this.measurePicks = [];
-    this.undoStack = []; this.redoStack = [];
+    this.history = this._newHistory();
     this._authUser = null;
     this._rev = 0;               // bumped on every edit; tells a finished save whether newer edits exist
-    this._sceneBefore = null; this._sceneLabel = null; this._lastEntry = null; this._tx = null;
+    this._sceneBefore = null; this._sceneLabel = null; this._tx = null;
     this._saving = null; this._savingFor = null; this._again = null; this._retry = null; this._recovery = null;
     this._busyOps = [];
     this._measGuard = 0;
@@ -257,7 +260,7 @@ export class App extends Emitter {
     // projects saved before lookBase existed: the look they show, not the default's ('studio')
     if (doc.scene && !('lookBase' in doc.scene)) p.scene.lookBase = doc.scene.look ?? null;
     if (!p.structures.find((s) => s.id === p.activeStructure)) p.activeStructure = p.structures[0]?.id ?? null;
-    const prev = { project: this.project, undo: this.undoStack, redo: this.redoStack, dirty: this.dirty, state: this.saveState, camera: this.structure ? this.viewer.getCameraState() : null, selection: this.selection };
+    const prev = { project: this.project, history: this.history.detach(), dirty: this.dirty, state: this.saveState, camera: this.structure ? this.viewer.getCameraState() : null, selection: this.selection };
     this._switchProject(p);
     try { this._activate(p.activeStructure, { camera: doc.scene?.camera }); }
     catch (err) { this._restorePrevious(prev); throw err; }
@@ -277,7 +280,7 @@ export class App extends Emitter {
     this._cancelRetry();
     this._commitScene.cancel(); this._sceneBefore = null; this._sceneLabel = null;
     this.project = project;
-    this.undoStack = []; this.redoStack = []; this._lastEntry = null;
+    this.history.clear();
     this.dirty = false;
     this.measurePicks = [];
     this.viewer.selection?.clear?.();   // the old project's atoms; _activate redraws the halos and emits 'selection'
@@ -285,7 +288,7 @@ export class App extends Emitter {
   }
 
   _restorePrevious(prev) {
-    this.project = prev.project; this.undoStack = prev.undo; this.redoStack = prev.redo; this.dirty = prev.dirty;
+    this.project = prev.project; this.history.attach(prev.history); this.dirty = prev.dirty;
     this.viewer.measurements = [];   // the failed project's; the previous structure's own are shown again below
     try {
       this._activate(prev.project.activeStructure, { camera: prev.camera });
@@ -337,7 +340,7 @@ export class App extends Emitter {
    */
   addStructure(structure, { look = null, scene = null, newProject = false, name = null } = {}) {
     if (newProject || this.pristine) {
-      const prev = { project: this.project, undo: this.undoStack, redo: this.redoStack, dirty: this.dirty, state: this.saveState, camera: this.structure ? this.viewer.getCameraState() : null, selection: this.selection, scene: JSON.stringify(this.project.scene) };
+      const prev = { project: this.project, history: this.history.detach(), dirty: this.dirty, state: this.saveState, camera: this.structure ? this.viewer.getCameraState() : null, selection: this.selection, scene: JSON.stringify(this.project.scene) };
       const proj = this._blankProject(name ?? structure.name ?? 'Untitled project');
       // an empty scratch project keeps the settings chosen so far; an untouched sample's settings are not the user's
       if (!newProject && !this.project._fromSample) proj.scene = this.project.scene;
@@ -359,7 +362,7 @@ export class App extends Emitter {
     }
     let entry;
     this.transaction(`Add ${structure.name || name || 'structure'}`, () => {
-      this._pushStructureHistory();
+      this._pushStructureHistory(null, null);   // the layout only: no existing structure changes
       entry = this._newEntry(structure);
       this.project.structures.push(entry);
       if (scene) deepMerge(this.scene, deepClone(scene));
@@ -373,7 +376,7 @@ export class App extends Emitter {
   removeStructure(sid) {
     const i = this.project.structures.findIndex((s) => s.id === sid);
     if (i < 0) return;
-    this._pushStructureHistory(`Remove ${this.project.structures[i].name}`);
+    this._pushStructureHistory(`Remove ${this.project.structures[i].name}`, { id: sid, how: 'full' });
     this.project.structures.splice(i, 1);
     if (this.project.activeStructure === sid) this._activate(this.project.structures[Math.max(0, i - 1)]?.id ?? null);
     this.markDirty();
@@ -481,11 +484,19 @@ export class App extends Emitter {
   }
 
   // ------------------------------------------------------------------ history
+  // app.history (core/history.js) holds the steps. A structure step keeps a ProjectSnap: the project layout
+  // plus binary snapshots of only the entries the step changes; the other entries keep their Structure
+  // objects (and analysis caches) through undo and redo.
   /** Label of the step Undo would revert (e.g. 'Delete 2 atoms'), or null. */
-  undoLabel() { return this._sceneBefore != null ? this._sceneLabel : (this.undoStack.at(-1)?.label ?? null); }
-  redoLabel() { return this._sceneBefore != null ? null : (this.redoStack.at(-1)?.label ?? null); }
-  canUndo() { return this._sceneBefore != null || this.undoStack.length > 0; }
-  canRedo() { return this._sceneBefore == null && this.redoStack.length > 0; }
+  undoLabel() { return this._sceneBefore != null ? this._sceneLabel : (this.history.top()?.label ?? null); }
+  redoLabel() { return this._sceneBefore != null ? null : (this.history.redoTop()?.label ?? null); }
+  canUndo() { return this._sceneBefore != null || this.history.length > 0; }
+  canRedo() { return this._sceneBefore == null && this.history.redoLength > 0; }
+  /** Deprecated, use app.history: read-only copies of the undo and redo steps, oldest first. */
+  get undoStack() { return this.history.stacks().undo; }
+  get redoStack() { return this.history.stacks().redo; }
+  /** The undo store: 80 steps within this device's byte budget; says once when the budget costs steps. */
+  _newHistory(budget = historyBudget()) { return new HistoryStore({ ...budget, onBudget: () => toast(BUDGET_NOTICE) }); }
 
   /**
    * Run fn as one undo step: scene and structure changes made inside are recorded together under `label`.
@@ -496,20 +507,21 @@ export class App extends Emitter {
   transaction(label, fn) {
     if (this._tx) return fn();
     this._commitScene.flush();
-    const tx = this._tx = { label, sceneBefore: this._sceneJSON(), before: null, selBefore: null };
+    const tx = this._tx = { label, sceneBefore: this._sceneJSON(), snap: null, selBefore: null };
     const finish = () => {
       this._tx = null;
       const sceneAfter = this._sceneJSON();
       const sc = sceneAfter !== tx.sceneBefore;
-      if (tx.before && sc) this._record({ kind: 'both', label, sceneBefore: tx.sceneBefore, sceneAfter, before: tx.before, selBefore: tx.selBefore });
-      else if (tx.before) this._record({ kind: 'structure', label, before: tx.before, selBefore: tx.selBefore });
+      const snap = tx.snap ? { before: tx.snap, after: null } : null;
+      if (snap && sc) this._record({ kind: 'both', label, sceneBefore: tx.sceneBefore, sceneAfter, snap, selBefore: tx.selBefore });
+      else if (snap) this._record({ kind: 'structure', label, snap, selBefore: tx.selBefore });
       else if (sc) this._record({ kind: 'scene', label, before: tx.sceneBefore, after: sceneAfter });
     };
     const fail = (err) => {
       this._tx = null;
       try {
         if (this._sceneJSON() !== tx.sceneBefore) this._restoreScene(tx.sceneBefore);
-        if (tx.before) this._restoreStructures(tx.before, tx.selBefore);
+        if (tx.snap) this._applySnap(tx.snap, tx.selBefore);
       } catch (e) { console.error('rollback failed', e); }
       throw err;
     };
@@ -521,10 +533,7 @@ export class App extends Emitter {
   }
 
   _record(e) {
-    this.undoStack.push(e);
-    this.redoStack = [];
-    this._lastEntry = e;
-    if (this.undoStack.length > 80) this.undoStack.shift();
+    this.history.record(e);
     this.emit('history');
   }
 
@@ -557,10 +566,10 @@ export class App extends Emitter {
     const before = this._sceneBefore, label = this._sceneLabel ?? 'Settings';
     this._sceneBefore = null; this._sceneLabel = null;
     const after = this._sceneJSON();
-    const top = this.undoStack.at(-1);
-    if (label === 'View' && top && top === this._lastEntry && top.kind === 'scene' && top.label === 'View') {
-      top.after = after;
-      if (top.before === after) { this.undoStack.pop(); this._lastEntry = null; }
+    const top = this.history.top();
+    if (label === 'View' && top && top === this.history.lastRecorded?.entry && top.kind === 'scene' && top.label === 'View') {
+      if (top.before === after) this.history.popTop();
+      else { top.after = after; this.history.replaceTop(top); }
       this.emit('history');
       return;
     }
@@ -568,25 +577,91 @@ export class App extends Emitter {
     else this.emit('history');
   }
 
-  _structuresSnapshot() {
-    const active = this._activeEntry();
-    return JSON.stringify({
-      active: this.project.activeStructure,
-      list: this.project.structures.map((s) => ({ id: s.id, name: s.name, structure: s.structure.toJSON({ precision: 8 }), frame: s.structure.frame, measurements: s === active ? this._viewerMeasurements() : (s.measurements ?? []) })),
-    });
+  /** Measurements of project entry `e` for a snapshot (the viewer holds the active entry's). */
+  _measOf(e) { return e === this._activeEntry() ? this._viewerMeasurements() : deepClone(e.measurements ?? []); }
+
+  /** The project layout (which structures, in which order, under which names, which one is shown), no structure data. */
+  _snapBegin() {
+    const p = this.project;
+    return { v: 2, active: p.activeStructure, order: p.structures.map((e) => e.id),
+      names: Object.fromEntries(p.structures.map((e) => [e.id, e.name])), entries: Object.create(null) };
   }
-  _pushStructureHistory(label = 'Edit structure') {
+
+  /**
+   * Record entry `id` in `snap` as it is now, before a change: how = 'full' or { positions: atom indices | null }
+   * (null = every atom). The first call for an entry wins; a later call in the same step only widens it.
+   */
+  _snapTouch(snap, id, how = 'full') {
+    const e = this.project.structures.find((x) => x.id === id);
+    if (!e) return;
+    const s = e.structure, has = snap.entries[id];
+    const full = !(how && typeof how === 'object' && 'positions' in how) || s.nFrames > 1;   // several frames: always the whole structure
+    if (!has) {
+      snap.entries[id] = full ? { full: snapStructure(s), meas: this._measOf(e) } : { positions: snapPositions(s, how.positions), meas: this._measOf(e) };
+    } else if (has.positions && full) {
+      // positions first, then another edit in the same step: the structure now, with the earlier positions put back
+      snap.entries[id] = { full: patchPositions(snapStructure(s), has.positions), meas: has.meas };
+    } else if (has.positions) {
+      snap.entries[id] = { positions: mergePositions(has.positions, snapPositions(s, how.positions)), meas: has.meas };
+    }
+  }
+
+  /**
+   * Start a structure step (or join the open transaction). `touch` names the entry the step changes and how
+   * to snapshot it: { id, how: 'full' | { positions } }, by default the active structure in full; null records
+   * the layout only (adding a structure).
+   */
+  _pushStructureHistory(label = 'Edit structure', touch = { id: this.project.activeStructure, how: 'full' }) {
     this._commitScene.flush();
     if (this._tx) {
-      if (!this._tx.before) { this._tx.before = this._structuresSnapshot(); this._tx.selBefore = this.selection; }
+      this._tx.snap ??= this._snapBegin();
+      this._tx.selBefore ??= this.selection;
+      if (touch?.id) this._snapTouch(this._tx.snap, touch.id, touch.how);
       return;
     }
-    this._record({ kind: 'structure', label, before: this._structuresSnapshot(), selBefore: this.selection });
+    const snap = this._snapBegin();
+    if (touch?.id) this._snapTouch(snap, touch.id, touch.how);
+    this._record({ kind: 'structure', label, snap: { before: snap, after: null }, selBefore: this.selection });
   }
-  _restoreStructures(json, selection = null) {
-    const o = JSON.parse(json);
-    this.project.structures = o.list.map((s) => { const st = Structure.fromJSON(s.structure); st.setFrame(s.frame ?? 0); return { id: s.id, name: s.name, structure: st, measurements: cleanMeasurements(s.measurements) }; });
-    this._activate(o.active, { resetCamera: false });
+
+  /** The other side of a step: the entries `before` recorded, as they are now, plus the entries added since. */
+  _snapAfter(before) {
+    const after = this._snapBegin(), had = new Set(before.order);
+    for (const [id, es] of Object.entries(before.entries)) this._snapTouch(after, id, es.positions ? { positions: es.positions.indices } : 'full');
+    for (const id of after.order) if (!had.has(id)) this._snapTouch(after, id, 'full');
+    return after;
+  }
+
+  /** Throws HistoryError when `snap` cannot be applied to the project as it is (an entry is missing or has other atoms). */
+  _checkSnap(snap) {
+    if (!Array.isArray(snap?.order) || !snap.entries) throw new HistoryError();
+    const live = new Map(this.project.structures.map((e) => [e.id, e]));
+    for (const id of snap.order) {
+      const es = snap.entries[id];
+      if (es?.full) continue;
+      const cur = live.get(id), ps = es?.positions;
+      if (!cur || (ps && (cur.structure.length !== ps.n || ps.frame >= cur.structure.nFrames))) throw new HistoryError();
+    }
+  }
+
+  /** Make the project look like `snap`: snapshot entries are rebuilt or patched, the others are kept as they are. */
+  _applySnap(snap, selection = null) {
+    this._checkSnap(snap);
+    const live = new Map(this.project.structures.map((e) => [e.id, e]));
+    this.project.structures = snap.order.map((id) => {
+      const es = snap.entries[id];
+      if (es?.full) return { id, name: snap.names[id] ?? es.full.name, structure: structureFromSnap(es.full), measurements: cleanMeasurements(es.meas) };
+      const cur = live.get(id), name = snap.names[id] ?? cur.name;
+      if (es?.positions) {
+        applyPositionsSnap(cur.structure, es.positions);
+        bumpRev(cur.structure);
+        cur.measurements = cleanMeasurements(es.meas);
+      }
+      // renaming is not an undo step, but a step taken before a rename puts the old name back (as it always has)
+      if (cur.name !== name) { if (cur.structure.name === cur.name) cur.structure.name = name; cur.name = name; }
+      return cur;
+    });
+    this._activate(snap.active, { resetCamera: false });
     const n = this.structure?.length ?? 0;
     this.viewer.setSelection((selection ?? []).filter((i) => i >= 0 && i < n));
     this.measurePicks = [];
@@ -594,36 +669,55 @@ export class App extends Emitter {
     this.emit('project');
   }
 
+  /** A step that no longer fits the project: the history is dropped (nothing was changed yet). */
+  _historyBroken(err) {
+    console.error(INCONSISTENT, err);
+    this.history.clear();
+    this.emit('history');
+    toast(INCONSISTENT, { type: 'error' });
+    return null;
+  }
+
   /** Undo the last step. Returns its label (or null when there is nothing to undo). */
   undo() {
     this._commitScene.flush();
-    const e = this.undoStack.pop();
+    const e = this.history.popUndo();
     if (!e) { toast('Nothing to undo'); return null; }
-    this._lastEntry = null;
-    if (e.kind === 'scene') this._restoreScene(e.before);
-    else {
-      e.after = this._structuresSnapshot(); e.selAfter = this.selection;
-      if (e.kind === 'both') this._restoreScene(e.sceneBefore);
-      this._restoreStructures(e.before, e.selBefore);
+    if (e.kind !== 'scene') {
+      try { e.snap.after = this._snapAfter(e.snap.before); this._checkSnap(e.snap.before); } catch (err) { return this._historyBroken(err); }
+      e.selAfter = this.selection;
     }
-    this.redoStack.push(e);
-    this.markDirty(); this.emit('history');
+    try {
+      if (e.kind === 'scene') this._restoreScene(e.before);
+      else {
+        if (e.kind === 'both') this._restoreScene(e.sceneBefore);
+        this._applySnap(e.snap.before, e.selBefore);
+      }
+    } finally {
+      this.history.pushRedo(e);
+      this.markDirty(); this.emit('history');
+    }
     return e.label ?? null;
   }
 
   redo() {
     this._commitScene.flush();
-    const e = this.redoStack.pop();
+    const e = this.history.popRedo();
     if (!e) { toast('Nothing to redo'); return null; }
-    this._lastEntry = null;
-    if (e.kind === 'scene') this._restoreScene(e.after);
-    else {
-      e.before = this._structuresSnapshot(); e.selBefore = this.selection;
-      if (e.kind === 'both') this._restoreScene(e.sceneAfter);
-      this._restoreStructures(e.after, e.selAfter);
+    if (e.kind !== 'scene') {
+      try { e.snap.before = this._snapAfter(e.snap.after); this._checkSnap(e.snap.after); } catch (err) { return this._historyBroken(err); }
+      e.selBefore = this.selection;
     }
-    this.undoStack.push(e);
-    this.markDirty(); this.emit('history');
+    try {
+      if (e.kind === 'scene') this._restoreScene(e.after);
+      else {
+        if (e.kind === 'both') this._restoreScene(e.sceneAfter);
+        this._applySnap(e.snap.after, e.selAfter);
+      }
+    } finally {
+      this.history.pushUndo(e);
+      this.markDirty(); this.emit('history');
+    }
     return e.label ?? null;
   }
 
@@ -687,30 +781,21 @@ export class App extends Emitter {
   replaceActiveStructure(newStructure, { resetCamera = false, label = 'Edit structure', indexMap = null } = {}) {
     const e = this._activeEntry();
     if (!e) return this.addStructure(newStructure);
-    const old = e.structure, n = old.length, m = newStructure.length;
+    const n = e.structure.length, m = newStructure.length;
     const map = new Int32Array(n);
     for (let i = 0; i < n; i++) map[i] = typeof indexMap === 'function' ? indexMap(i) : indexMap ? (indexMap[i] ?? -1) : (i < m ? i : -1);
-    const selBefore = this.selection, sel = selBefore.map((i) => (i < n ? map[i] : -1)).filter((i) => i >= 0 && i < m);
-    const measBefore = this._viewerMeasurements();   // the viewer holds the active entry's measurements
-    this._pushStructureHistory(label);
-    e.structure = newStructure; e.name = newStructure.name;
-    this.structure = newStructure;
-    this._remapMeasurements(map);
-    this.viewer.selection = new Set(sel);   // no old indices past the end while the viewer rebuilds ('model' listeners read it)
-    this._measGuard++;
-    try { this.viewer.setStructure(newStructure, { resetCamera }); }
-    catch (err) {
-      // put back the structure, its measurements and the selection; the failed step leaves no undo entry
-      e.structure = old; e.name = old.name; this.structure = old;
-      e.measurements = measBefore;
-      try {
-        this.viewer.setStructure(old, { resetCamera: false });
-        this._showMeasurements(e);
-        this.viewer.setSelection(selBefore);
-      } catch { /* keep the error below */ }
-      if (!this._tx && this.undoStack.at(-1)?.label === label) { this.undoStack.pop(); this.emit('history'); }
-      throw err;
-    } finally { this._measGuard--; }
+    const sel = this.selection.map((i) => (i < n ? map[i] : -1)).filter((i) => i >= 0 && i < m);
+    // if the viewer cannot show the new structure, the transaction puts back the structure, its measurements and
+    // the selection, and the failed step leaves no undo entry
+    this.transaction(label, () => {
+      this._pushStructureHistory(label, { id: e.id, how: 'full' });
+      e.structure = newStructure; e.name = newStructure.name;
+      this.structure = newStructure;
+      this._remapMeasurements(map);
+      this.viewer.selection = new Set(sel);   // no old indices past the end while the viewer rebuilds ('model' listeners read it)
+      this._measGuard++;
+      try { this.viewer.setStructure(newStructure, { resetCamera }); } finally { this._measGuard--; }
+    });
     this._showMeasurements(e);
     this.viewer.setSelection(sel);
     this.markDirty();
@@ -834,7 +919,7 @@ export class App extends Emitter {
     this._autosave.cancel();
     this.dirty = false;
     this.setSaveState('idle');
-    this.undoStack = []; this.redoStack = []; this._lastEntry = null;
+    this.history.clear();
     this.emit('history');
     return structure;
   }
@@ -848,13 +933,18 @@ export class App extends Emitter {
 
   async _openSampleAsNew(s, { offerAdd, adaptBackground }) {
     if (!(await this.confirmLeave(`open ${s.name}`))) return null;
-    const prev = { project: this.project, undo: this.undoStack, redo: this.redoStack, dirty: this.dirty, camera: this.structure ? this.viewer.getCameraState() : null };
-    const structure = this._openSample(s, { adaptBackground });
+    const prev = { project: this.project, history: this.history.detach(), dirty: this.dirty, camera: this.structure ? this.viewer.getCameraState() : null };
+    let structure;
+    try { structure = this._openSample(s, { adaptBackground }); }
+    catch (err) {   // the current project stayed open: give it its history back
+      if (this.project === prev.project) { this.history.attach(prev.history); this.emit('history'); }
+      throw err;
+    }
     const fresh = this.project;
     const back = () => {
       if (this.project !== fresh || !this.pristine) { toast('The sample has been changed since, so it stays a separate project.'); return; }
       this._switchProject(prev.project);
-      this.undoStack = prev.undo; this.redoStack = prev.redo; this.dirty = prev.dirty;
+      this.history.attach(prev.history); this.dirty = prev.dirty;
       this._activate(prev.project.activeStructure, { camera: prev.camera });
       this.setSaveState(this.dirty ? 'dirty' : prev.project.location ? 'saved' : 'idle');
       this.emit('project'); this.emit('history');
