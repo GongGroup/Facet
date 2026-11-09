@@ -1,4 +1,8 @@
-/** Structure panel: identity, cell, composition, structures in the project, selection editing, measurements, analyses, tools. */
+/**
+ * Structure panel: identity, cell, composition, structures in the project, selection editing, measurements, analyses, tools.
+ * Two slots take sections that modules register (ui/sections.js): 'cell' after the summary (M1's Cell) and
+ * 'transform' after the selection (M4's Transform, M3's Constraints); an empty slot shows nothing.
+ */
 import { h, ic, btn, field } from '../dom.js';
 import { toast, promptDialog, confirmDialog } from '../overlays.js';
 import { element, normalizeSymbol } from '../../core/elements.js';
@@ -6,6 +10,7 @@ import { elementColorHex } from '../../render/colors.js';
 import { formulaHTML, formulaEl, registerLeftPanel } from '../shell.js';
 import { analyses, runKey, structureKey, defaultParams } from '../../core/analyses.js';
 import { paramForm, renderResult, analysisContext } from '../paramform.js';
+import { renderSections, sectionsSignature } from '../sections.js';
 
 /** Analysis results by runKey (structure version, params, scene deps): re-renders never recompute. */
 const results = new Map();
@@ -81,6 +86,7 @@ registerLeftPanel({
       app.selection.join(','), ms.map((m) => `${m.id}:${m.valid && Number.isFinite(m.value) ? m.value.toFixed(4) : '-'}`),
       sc?.style?.colorScheme, sc?.style?.monoColor, sc?.style?.colorOverrides, sc?.display?.bonds, sc?.display?.supercell,
       analyses.list().map((a) => a.id),
+      sectionsSignature('structure', app),
     ]);
   },
   render(app, el, shell) {
@@ -115,6 +121,7 @@ registerLeftPanel({
         s.info.note ? [h('dt', 'Note'), h('dd', { style: { fontFamily: 'var(--font-ui)', textAlign: 'left' } }, s.info.note)] : null,
       ));
     el.append(sum);
+    renderSections('structure', app, el, shell, { slot: 'cell' });
 
     // composition chips (click = select element)
     const comp = s.composition();
@@ -144,6 +151,7 @@ registerLeftPanel({
         h('div.row', h('span.ctl-label', 'Replace with'), rep, btn('Apply', { cls: 'small', on: () => { const sym = normalizeSymbol(rep.value); if (sym === 'X') { toast('Type an element symbol, like Fe or O.', { type: 'error' }); return; } app.replaceSelected(sym); toast(`Replaced ${sel.length} atom${sel.length > 1 ? 's' : ''} with ${sym}`); } })));
     }
     el.append(selSec);
+    renderSections('structure', app, el, shell, { slot: 'transform' });
 
     // measurements
     const ms = app.viewer.measurements;

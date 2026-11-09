@@ -26,6 +26,9 @@ import { uid } from '../core/util.js';
 import { analyses } from '../core/analyses.js';
 import { rdf, coordinationStats } from '../core/analysis.js';
 import { registerLeftPanel, registerInspectorTab, leftPanels, inspectorTabs } from '../ui/shell.js';
+import { registerPanelSection } from '../ui/sections.js';
+import { registerSelectionAction } from '../ui/selectioncard.js';
+import { registerAtomInfo } from '../ui/atominfo.js';
 import { toast } from '../ui/overlays.js';
 import { analysisContext } from '../ui/paramform.js';
 import { sceneScript } from '../ui/apidialog.js';
@@ -168,6 +171,8 @@ export function createAPI(app, shell) {
     return dispose;
   }
   const panelReg = (map, fn) => ({ get: (id) => map.get(id), register: fn });
+  /** A remover from a UI registry; a plugin's are undone when its activation fails. */
+  const owned = (dispose) => { activating?.disposers.push(dispose); return dispose; };
   const wrap = (reg, register) => { const w = Object.create(reg); w.register = register; return w; };
 
   const api = {
@@ -349,6 +354,12 @@ export function createAPI(app, shell) {
     registerPanel: (p, o) => registerIn('panels', panelReg(leftPanels, registerLeftPanel), { icon: 'plug', ...p }, o),
     /** Add an inspector tab: { id, title, icon, tip?, render(app, el, shell) }. */
     registerInspectorTab: (t, o) => registerIn('inspector', panelReg(inspectorTabs, registerInspectorTab), { icon: 'plug', ...t }, o),
+    /** Add a section to the Surface panel ('surface') or a Structure panel slot ('structure', slot 'cell' | 'transform'). */
+    registerPanelSection: (panelId, s, o) => owned(registerPanelSection(panelId, s, o)),
+    /** Add a selection-card button and/or atom-menu item: { id, label, icon, order, when, run(app, sel, ctx), … }. */
+    registerSelectionAction: (a, o) => owned(registerSelectionAction(a, o)),
+    /** Add lines to the atom hover card and selection card: fn(app, index, { where }) → [{ label, value }] | null. */
+    registerAtomInfo: (fn, o) => owned(registerAtomInfo(fn, o)),
 
     plugins: {
       /** Server plugins (name, version, status, error, frontend) and frontend plugins (name, url, status, error). */

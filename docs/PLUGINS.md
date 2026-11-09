@@ -212,8 +212,19 @@ Required fields are **bold**. `api.registry.<name>` exposes each registry with `
 | `registerStorage(p)` | `storage` | **`id`**, `label`, `icon`, `description`, `where`, `init()`, `available()`, **`list(q?)`**, **`get(id)`**, **`save(project, {force}?)`**, `remove(id)` — `save` rejects with `err.code = 'conflict' \| 'auth' \| 'offline'` |
 | `registerPanel(p)` | `panels.left` | **`id`**, `title`, `icon` (icon name), `tip`, **`render(app, el, shell)`**, `headActions?(app, shell) → [Node]`, `refreshOn: ['project', 'structure', 'selection', 'measure', …]`, `signature?(app) → string` (skip re-renders while it is unchanged) |
 | `registerInspectorTab(t)` | `panels.inspector` | **`id`**, `title`, `icon`, `tip`, **`render(app, el, shell)`** |
+| `registerPanelSection(panelId, s)` | sections of the Surface panel (`'surface'`) and the Structure panel (`'structure'`) | **`id`**, **`title`**, `order` (100), `slot` (Structure panel: `'cell'` after the summary or `'transform'` after the selection), `defaultOpen` (true), **`render(app, el, shell, ctx)`**, `available?(app) → true \| reason`, `emptyActions?(app) → [Node]`, `signature?(app) → string`, `refreshOn` (`['project', 'structure']`), `badge?(app) → string` |
+| `registerSelectionAction(a)` | selection-card buttons and atom-menu items | **`id`**, **`label`**, `short`, `icon`, `tip` (strings or `(app, sel) → string`), `kbd`, `order` (100), `card` (true), `menu` (`true`: atom menu, `'blank'`: menu on empty space, `'both'`, `false`), `when?(app, sel)`, `enabled?(app, sel)`, **`run(app, sel, ctx)`** and/or `items?(app, sel) → [{id, label, …}]`, `rows?(app, sel) → [{label, value}]` |
+| `registerAtomInfo(fn, {order})` | lines of the atom hover card and the selection card | `fn(app, index, { where: 'hover' \| 'card' }) → [{label, value}] \| null` |
 
 Two registries are read-only: `prototypes` and `clusters` (the crystal and cluster builders).
+
+**Panel sections** are collapsible (`details.sec`) and each is drawn again on its own when an event in its `refreshOn`
+changes its `signature`. While `available(app)` returns a reason, the section shows only that sentence and the
+buttons of `emptyActions`; `ui/sections.js` exports `requireCell`, `requireVacuumGap`, `requireNoPreview` and
+`requireBootTask` for this. `openSection(panelId, id, { focus, tab })` (or `shell.openLeft(panelId, { section, focus, tab })`)
+opens a panel at a section. **Selection actions** show on the selection card in `order` (up to 7 buttons, 5 on touch
+and narrow screens, the rest under More) and in the atom menu after *Measure from here*; there `sel` is the whole
+selection when the clicked atom is part of it, else that atom, and `ctx = {source, atom, display}`.
 
 **A representation's `build(ctx)`** receives
 `ctx = { model, colors, radii, settings, atomMaterial, bondMaterial, segments, showBonds, resolution, THREE, helpers }`:
@@ -258,7 +269,7 @@ Two registries are read-only: `prototypes` and `clusters` (the crystal and clust
 | `projects.providers()`, `projects.list(provider)`, `projects.open(provider, id)` | storage |
 | `sceneScript()` | the current scene as `crystallume.patch({...})` + `setCamera(...)` (palette: *Copy current scene as script*) |
 | `on(event, fn) → off()`, `toast(msg, {type})`, `command(id, ...args)` | events, notices, commands (`command` throws an Error saying why when the command's `when` guard says it cannot run now, e.g. “Load a structure first.”) |
-| `registry.*`, `registerFormat`, `registerStyle`, `registerMaterial`, `registerColorScheme`, `registerLightingPreset`, `registerEnvironmentMap`, `registerLook`, `registerSample`, `registerAnalysis`, `registerCommand`, `registerStorage`, `registerPanel`, `registerInspectorTab` | §3 |
+| `registry.*`, `registerFormat`, `registerStyle`, `registerMaterial`, `registerColorScheme`, `registerLightingPreset`, `registerEnvironmentMap`, `registerLook`, `registerSample`, `registerAnalysis`, `registerCommand`, `registerStorage`, `registerPanel`, `registerInspectorTab`, `registerPanelSection`, `registerSelectionAction`, `registerAtomInfo` | §3 |
 | `plugins.load(url, {name})`, `plugins.list()` | plugin loading and status (`active` / `error`, server plugins included) |
 | `reference()`, `help(topic?)` | everything above as data / console tables (`help('looks')`, `help('scene')`, `help('events')`) |
 

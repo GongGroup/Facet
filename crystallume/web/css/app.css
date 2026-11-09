@@ -496,6 +496,47 @@ input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 3px; }
 .selcard .chip.multi { height: 26px; cursor: pointer; }
 .selcard .chip.multi[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); opacity: 1; text-decoration: none; }
 .selcard .chip.multi[aria-pressed="false"] { opacity: 1; text-decoration: none; }
+/* registered actions: greyed but in place when not usable, split buttons (main part + ▾ menu); rows share one label column */
+.btn[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }
+.selcard .rows { grid-template-columns: minmax(40px, max-content) minmax(0, 1fr); column-gap: 8px; }
+.selcard .r { grid-column: 1 / -1; grid-template-columns: subgrid; }
+.selcard .r .v { min-width: 0; overflow-wrap: anywhere; }
+.selcard .split { display: inline-flex; align-items: stretch; min-width: 0; }
+.selcard .split > .btn:first-child { padding-right: 3px; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.selcard .split > .caret { width: 18px; padding: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; color: var(--muted); }
+.selcard .split > .caret svg.i { width: 13px; height: 13px; }
+.selcard .acts .split:has(> .stack) { flex: 1 1 0; }
+
+/* ------------------------------------------------------------------ panel sections (ui/sections.js)
+   the Surface panel and the Structure panel's Cell / Transform slots: collapsible sections, each redrawn on its own */
+.sec { border-bottom: 1px solid var(--line); min-width: 0; }
+.sec:last-child { border-bottom: 0; }
+.sec > summary {
+  list-style: none; display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 6px 0; cursor: pointer;
+  border-radius: var(--r-sm); -webkit-user-select: none; user-select: none;
+}
+.sec > summary::-webkit-details-marker { display: none; }
+.sec > summary::marker { content: ""; }
+.sec > summary h3 {
+  margin: 0; flex: 1; min-width: 0; font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sec > summary:hover h3, .sec[open] > summary h3 { color: var(--fg-2); }
+.sec > summary .chev { color: var(--muted); transition: transform .15s; }
+.sec[open] > summary .chev { transform: rotate(90deg); }
+.sec > summary .badge { flex: none; max-width: 55%; font: 500 11px var(--font-mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sec-body { display: grid; gap: 10px; min-width: 0; padding: 2px 0 14px; }
+.sec-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+/* a panel with nothing to work on yet (Surface without a structure) */
+.panel-empty { display: grid; gap: 8px; justify-items: start; margin-top: 2px; padding: 16px 14px; border: 1px dashed var(--line-strong); border-radius: var(--r); }
+.panel-empty > svg.i { width: 26px; height: 26px; color: var(--muted); }
+.panel-empty h3 { margin: 0; font-size: 13.5px; font-weight: 600; color: var(--fg); }
+.panel-empty .acts { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 4px; }
+@media (max-width: 920px) {
+  .sec > summary { min-height: 44px; }   /* finger-sized */
+  .panel-empty .btn.small, .sec-acts .btn.small { height: 36px; padding: 0 12px; font-size: 13px; }
+  .selcard .acts .split > .caret { width: 22px; }
+}
 
 /* one-time touch gesture hint */
 .gesture-chip {

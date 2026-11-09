@@ -11,7 +11,9 @@ import { samples } from '../build/samples.js';
 import { VERSION } from '../app.js';
 import { keyLabel, matchKey, parseKey, hasMod, isMac, MOD, ALT } from './keys.js';
 import { canDownload, NO_DOWNLOADS } from '../storage/files.js';
-import { SelectionCard, selectSameElement, selectNeighbours, selectFragment, selectAll, measureFrom } from './selectioncard.js';
+import { SelectionCard, selectSameElement, selectNeighbours, selectFragment, selectAll, measureFrom, selectionActions, actionMenuItems, menuTarget } from './selectioncard.js';
+import { attachSections, openSection } from './sections.js';
+import { atomInfoRows } from './atominfo.js';
 
 export const leftPanels = new Map();
 export const inspectorTabs = new Map();
@@ -119,6 +121,12 @@ function groupLabel(specs) {
 /** Reader error without the generic "could not tell the format" lead-in. */
 const pasteReason = (e) => String(e?.message ?? e).replace(/^Could not tell the format of "[^"]*"\.\s*/, '').replace(/\.$/, '');
 
+/** Whether app event `reason` may change panel `p` (its refreshOn, or the rule for panels without one). */
+const LEGACY_REFRESH = { project: null, structure: ['structure', 'build'], selection: ['structure'], measure: ['structure'], providers: ['projects'], auth: ['projects'] };
+function wantsRefresh(p, reason) {
+  return Array.isArray(p.refreshOn) ? p.refreshOn.includes(reason) : (LEGACY_REFRESH[reason] === null || !!LEGACY_REFRESH[reason]?.includes(p.id));
+}
+
 const ident = (el) => (el.dataset?.key ? `k:${el.dataset.key}` : `${el.tagName}|${el.getAttribute('role') ?? ''}|${el.getAttribute('aria-label') ?? el.textContent.trim().slice(0, 60)}`);
 
 export class Shell {
@@ -135,6 +143,7 @@ export class Shell {
     this._fitPanels();
     this._drawerScroll = {};
     this._inspectorScroll = {};
+    attachSections(this);   // panel sections (Surface panel, Structure panel slots) follow app events and open through openSection()
     this.build();
     current = this;
     installTooltips(document.body);
@@ -279,8 +288,14 @@ export class Shell {
     this.renderDrawer();
   }
 
-  /** Open a left panel. `args` are handed once to its render through panelArgs(), e.g. {provider: 'server'} for Projects. */
-  openLeft(id, args) { this._panelArgs = args ? { id, args } : null; this.leftOpen = false; this.toggleLeft(id); }
+  /**
+   * Open a left panel. `args` are handed once to its render through panelArgs(), e.g. {provider: 'server'} for Projects;
+   * {section, focus, tab} opens the panel at one of its sections instead (openSection in ui/sections.js).
+   */
+  openLeft(id, args) {
+    if (args?.section) return openSection(id, args.section, { focus: args.focus, tab: args.tab });
+    this._panelArgs = args ? { id, args } : null; this.leftOpen = false; this.toggleLeft(id);
+  }
   /** The args openLeft() passed for panel `id`, or null; each set is read once. */
   panelArgs(id) { const a = this._panelArgs; if (a?.id !== id) return null; this._panelArgs = null; return a.args; }
   /** Projects panel on the server's sign-in form (or project list once signed in). */
@@ -395,14 +410,33 @@ export class Shell {
    */
   refreshDrawer(reason) {
     const p = leftPanels.get(this.leftId);
-    if (!p) return;
-    const legacy = { project: null, structure: ['structure', 'build'], selection: ['structure'], measure: ['structure'], providers: ['projects'], auth: ['projects'] };
-    const want = Array.isArray(p.refreshOn) ? p.refreshOn.includes(reason) : (legacy[reason] === null || !!legacy[reason]?.includes(p.id));
-    if (!want) return;
+    if (!p || !wantsRefresh(p, reason)) return;
     if (typeof p.signature === 'function') { let sig; try { sig = p.signature(this.app); } catch { sig = NaN; } if (sig === this._drawerSig) return; }
     if (!this.leftOpen) { this._drawerStale = true; return; }
     if (this._deferRender('drawer')) return;
     this._refreshDrawerSoon();
+  }
+
+  /** Draw panel `id` again soon if the drawer shows it (after the user leaves a field they type in), e.g. when its sections change. */
+  refreshPanel(id) {
+    if (this.leftId !== id) return;
+    if (!this.leftOpen) { this._drawerStale = true; return; }
+    if (this._deferRender('drawer')) return;
+    this._refreshDrawerSoon();
+  }
+
+  /**
+   * For the panel sections (ui/sections.js): 'hidden' when panel `id` is not on screen, 'rebuild' when the events
+   * `reasons` (or a pending refresh) draw it again as a whole, else 'current' (its sections refresh one by one).
+   */
+  panelState(id, reasons = []) {
+    const p = leftPanels.get(id);
+    if (!p || !this.leftOpen || this.leftId !== id || this._drawerPanel !== id || !this.drawerBody?.isConnected) return 'hidden';
+    if (this._drawerStale || this._drawerPending) return 'rebuild';
+    if (!reasons.some((r) => wantsRefresh(p, r))) return 'current';
+    if (typeof p.signature !== 'function') return 'rebuild';
+    let sig; try { sig = p.signature(this.app); } catch { sig = NaN; }
+    return sig === this._drawerSig ? 'current' : 'rebuild';
   }
 
   renderInspector() {
@@ -515,9 +549,11 @@ export class Shell {
     this.app.viewer.renderer.domElement.style.cursor = 'pointer';
     const color = elementColorHex(info.symbol, this.app.scene.style);
     const f = (a) => a.map((v) => v.toFixed(3)).join('  ');
+    // lines that modules add (registerAtomInfo), after the bonds line
+    const extra = atomInfoRows(this.app, info.index, 'hover').flatMap((r) => [h('br'), `${r.label}  ${r.value}`]);
     this.hover.replaceChildren(
       h('div.h', h('span.dot', { style: { background: color } }), `${info.symbol}`, h('small', `#${info.index} · ${info.name}`)),
-      h('div.m', `xyz  ${f(info.position)} Å`, info.frac ? h('br') : null, info.frac ? `frac ${f(info.frac)}` : null, h('br'), `bonds ${info.cn}${info.image.some(Boolean) ? `  ·  image ${info.image.join(',')}` : ''}`),
+      h('div.m', `xyz  ${f(info.position)} Å`, info.frac ? h('br') : null, info.frac ? `frac ${f(info.frac)}` : null, h('br'), `bonds ${info.cn}${info.image.some(Boolean) ? `  ·  image ${info.image.join(',')}` : ''}`, ...extra),
     );
     this.hover.hidden = false;
     const W = this.stage.clientWidth, H = this.stage.clientHeight;
@@ -803,23 +839,32 @@ export class Shell {
     ], { align: 'end', label: 'More' });
   }
 
-  /** Right-click on an atom (or on empty space) in the view. */
+  /**
+   * Right-click on an atom (or on empty space) in the view. Registered selection actions follow "Measure from here"
+   * (menu: true | 'both', on the clicked atom or the selection it is part of) and "Clear selection" (menu: 'blank' | 'both').
+   */
   onAtomContext({ index, clientX, clientY }) {
     const app = this.app, v = app.viewer, m = v.model;
     if (!app.structure || !m) return;
     const at = { x: clientX, y: clientY };
+    const registered = (sel, where, ctx) => selectionActions(app, sel, where).flatMap((a) => actionMenuItems(a, app, sel, ctx));
     if (index < 0 || index >= m.n) {
+      const blank = registered(app.selection, 'blank', { source: 'blank', atom: -1, display: -1 });
+      const hidden = (v.hiddenCount ?? 0) > 0 && commands.get('view.showAll');
       showMenu(at, [
         { label: 'Fit to screen', icon: 'fit', kbd: 'F', run: () => v.fitView() },
         { label: 'Reset view', icon: 'reset', kbd: keyLabel('Home'), run: () => v.resetView() },
+        hidden ? { label: 'Show all atoms', icon: 'eye', run: () => this.runCommand('view.showAll') } : null,
         { separator: true },
         { label: 'Select all atoms', icon: 'atom', kbd: keyLabel('mod+a'), run: () => selectAll(app) },
         { label: 'Clear selection', icon: 'x', kbd: 'Esc', disabled: !app.selection.length, run: () => app.clearSelection() },
+        ...(blank.length ? [{ separator: true }, ...blank] : []),
       ], { label: 'View' });
       return;
     }
     const src = m.src[index], sym = m.symbols[index], el = element(sym);
     const sel = app.selection, inSel = sel.includes(src);
+    const extra = registered(menuTarget(sel, src), 'menu', { source: 'menu', atom: src, display: index });
     showMenu(at, [
       { header: `${sym} #${src} · ${el.name}` },
       { label: `Select all ${sym}`, icon: 'atom', run: () => selectSameElement(app, sym) },
@@ -827,6 +872,7 @@ export class Shell {
       { label: 'Select bonded fragment', icon: 'neighbors', kbd: 'Double-click', run: () => selectFragment(app, [src]) },
       { label: 'Centre here', icon: 'crosshair', run: () => v.focusAtom(index) },
       { label: 'Measure from here', icon: 'ruler', run: () => measureFrom(app, index) },
+      ...(extra.length ? [{ separator: true }, ...extra] : []),
       { separator: true },
       { label: `Hide ${el.name}`, icon: 'eyeOff', run: () => this.hideElement(sym) },
       { label: inSel && sel.length > 1 ? `Delete ${sel.length} selected atoms` : 'Delete atom', icon: 'trash', kbd: keyLabel('Delete'), run: () => { if (!inSel) app.select([src]); app.deleteSelected(); } },
@@ -1303,7 +1349,7 @@ crystallume.registry.colorSchemes.register({
       ? `This browser blocks storage here, so projects only last until you close this tab. Use Save › Download project file to keep your work.${also}`
       : `Changes autosave to ${def?.label ?? 'This browser'} after your first edit.${also} Use Save to choose where a project lives.`;
     return [
-      { sel: '.rail', title: 'Panels', text: `Projects, the sample Library, the Builder and Structure details live here.${touch ? '' : ` ${keyLabel('shift+1')} – 4 open them.`}`, sheet: 'left', panel: 'library' },
+      { sel: '.rail', title: 'Panels', text: `Projects, the sample Library, the Builder, Structure details and Surface tools live here.${touch ? '' : ` ${keyLabel('shift+1')} – 5 open them.`}`, sheet: 'left', panel: 'library' },
       { sel: '.rail [data-panel="build"]', title: 'Build your own', text: 'Build crystals from prototypes, nanoclusters (icosahedra, decahedra, cuboctahedra) and molecules, or paste file text.', sheet: 'none' },
       { sel: '.viewport', title: 'Rotate the view', try: 'camera', tryText: touch ? 'Drag one finger across the view' : isMac ? 'Hold ⌃ Control and drag in the view' : 'Right-drag in the view',
         text: touch ? 'One finger rotates, two fingers pan and pinch to zoom. Tap an atom to see its details.'
