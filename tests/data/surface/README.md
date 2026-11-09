@@ -8,7 +8,8 @@ their results with the same expectation.
 tests/data/surface/
   README.md               this file
   contcar_pt111.vasp      the shared CONTCAR fixture (the only one; see below)
-  f0d/                    F0-D cases: shell.json now; props, sourcemap, edits, constraints, poscar, extxyz, vacuum, export
+  gaps.json               F0-A's 89 gap-cut structures, run against the vacuum-gap module (F0-D T7)
+  f0d/                    F0-D cases: shell.json, vacuum.json now; props, sourcemap, edits, constraints, poscar, extxyz, export
   <module>/ ...           cases of the other modules (cleave/, layers/, ...)
 ```
 
@@ -120,9 +121,10 @@ unless they carry a `skip` with a reason. A recipe (`@recipe("name")` / `recipe(
 from `args`, so that large structures need no coordinates in the files. Recipes of the same name must build the same
 structure in both languages, which one case per recipe checks by comparing the full atom list.
 
-F0-D registers the ops `load`, `read`, `write`, `roundtrip` and the recipe `crystal` (a bulk crystal from the
-builders, `{"prototype", "elements", "a", "c", "u", "repeat"}`, with every lattice parameter of the prototype given
-explicitly; see `tests/ops/f0d.py`).
+F0-D registers the ops `load`, `read`, `write`, `roundtrip`, the vacuum-gap ops (`findVacuumGap`, `gapCut`,
+`surfaceNormal`, `vacuumReport` and the others listed in `tests/ops/f0d.py`) and the recipe `crystal` (a bulk crystal
+from the builders, `{"prototype", "elements", "a", "c", "u", "repeat"}`, with every lattice parameter of the prototype
+given explicitly).
 
 ## The CONTCAR fixture `contcar_pt111.vasp`
 
