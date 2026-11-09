@@ -112,10 +112,10 @@ describe('case shell', () => {
     assert.deepEqual(file.structure.symbols, ['H', 'H']);
     assert.ok(approx(file.structure.pos(1), [0, 0, 0.75], 1e-12));
 
-    const doc = { symbols: ['O'], positions: [[0, 0, 0]], props: { tags: [[1]] } };
+    const doc = { symbols: ['O'], positions: [[0, 0, 0]], props: { extra: [[1]] } };   // a key without a normalizer (tags has one)
     const c = { id: 'b', input: { structure: doc } };
-    (await resolveInput(c)).structure.props.tags[0].push(2);   // the case document is not touched
-    assert.deepEqual(c.input.structure.props.tags, [[1]]);
+    (await resolveInput(c)).structure.props.extra[0].push(2);   // the case document is not touched
+    assert.deepEqual(c.input.structure.props.extra, [[1]]);
     assert.throws(() => (new CaseInput('structure', { structure: doc })).text, /has no text/);
 
     const text = await resolveInput({ id: 'c', input: { text: '2\nwater?\nH 0 0 0\nH 0 0 0.74\n' } });
