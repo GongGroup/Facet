@@ -37,7 +37,9 @@ import { GLTFExporter } from '../../vendor/three/addons/exporters/GLTFExporter.j
 import { mergeGeometries } from '../../vendor/three/addons/utils/BufferGeometryUtils.js';
 import { Emitter } from '../core/events.js';
 import { element } from '../core/elements.js';
-import { buildDisplayModel, modelBounds, keyOf } from './display.js';
+import { buildDisplayModel, modelBounds, refOf, storedImage } from './display.js';
+import { parseRef, normalizeRefs, measurementPoints, migrateMeasurementKeys, newMeasurementId } from '../core/measure.js';
+import { inv3, cartToFrac } from '../core/util.js';
 import { styles, atomRadius, segmentsFor, autoPolyhedraCenters, buildAtoms, buildBonds, buildLines, buildPolyhedra, writeAtomMatrices, writeBondMatrices } from './styles.js';
 import { computeColors, colorSchemes } from './colors.js';
 import { createMaterial, updateMaterial, isSeeThrough, materials } from './materials.js';
@@ -590,10 +592,13 @@ export class Viewer extends Emitter {
     this.structure = structure;
     this._sigs = {};
     if (resetCamera) { this.measurements = []; this.selection.clear(); }
+    // visibility masks of another atom count (an undone deletion, a structure swapped without remapIndexed) go
+    const dropped = this._fitVisibility();
     this._noRefit = resetCamera;
     try { this.applySettings(this.settings, { force: true }); } finally { this._noRefit = false; }
     if (resetCamera) this.resetView(false);
     this.emit('model', this.model);
+    if (dropped) this.emit('visibility', { hidden: this.hiddenCount, names: this.visibilityNames() });
   }
 
   /** Apply a full scene-settings object; rebuilds only what changed. */
@@ -602,7 +607,7 @@ export class Viewer extends Emitter {
     const st = settings.style, d = settings.display;
     const S = {
       camera: sig([d.projection, d.fov, d.controls]),
-      model: sig([d.supercell, d.wrap, d.boundaryAtoms, d.completeBonds, d.bonds, d.hiddenElements, styles.get(st.rep)?.wantsImages ? st.polyhedra?.centers : null]),
+      model: sig([d.supercell, d.wrap, d.boundaryAtoms, d.completeBonds, d.bonds, d.hiddenElements, styles.get(st.rep)?.wantsImages ? st.polyhedra?.centers : null, this._visRev ?? 0, this.gapCut]),
       frame: sig(this.structure?.frame),
       colors: sig([st.colorScheme, st.monoColor, st.colorOverrides, st.property, this._colorDeps(settings)]),
       geom: sig([st.rep, st.radiusSource, st.bondRadius, st.bondColor, st.bondUniformColor, st.lineWidth, st.quality, st.polyhedra, d.bonds?.show]),
@@ -653,14 +658,169 @@ export class Viewer extends Emitter {
 
   setSelection(srcIndices) { this.selection = new Set(srcIndices); this._writeHalos(); this._dirty = true; this.emit('selection', [...this.selection]); }
 
+  // ------------------------------------------------------------------ per-atom visibility
+  /**
+   * Hide atoms under a name (masks of several names combine: an atom is drawn when none hides it). spec: null
+   * (remove that mask), {hide: indices}, {show: indices} (every other atom hidden) or a Uint8Array with one entry per
+   * atom (1 = drawn). Hidden atoms are not drawn, so they cannot be clicked, hovered or box-selected; selecting by
+   * index still reaches them. Masks are view state, never saved: remapIndexed carries them through edits, another
+   * structure entry drops them. A mask that hides nothing is removed; one of another length than the structure is
+   * ignored with a console warning. Emits 'visibility' {hidden, names}; returns the number of atoms hidden.
+   */
+  setVisibility(name, spec) {
+    if (typeof name !== 'string' || !name) throw new TypeError('setVisibility: the name must be a non-empty string.');
+    const vis = (this._vis ??= new Map());
+    if (spec == null) {
+      if (!vis.delete(name)) return this.hiddenCount;
+    } else {
+      const mask = this._maskFrom(name, spec, this.structure?.length ?? 0);
+      if (!mask) return this.hiddenCount;
+      if (mask.includes(0)) vis.set(name, mask);
+      else if (!vis.delete(name)) return this.hiddenCount;
+    }
+    this._visibilityChanged();
+    return this.hiddenCount;
+  }
+
+  /** A mask (Uint8Array, 1 = drawn) from a setVisibility spec; null (with a warning) for a mask of the wrong length. */
+  _maskFrom(name, spec, n) {
+    if (ArrayBuffer.isView(spec)) {
+      if (spec.length !== n) { console.warn(`setVisibility “${name}”: the mask has ${spec.length} entries for ${n} atoms, so it is ignored.`); return null; }
+      return Uint8Array.from(spec, (v) => (v ? 1 : 0));
+    }
+    const show = spec && typeof spec === 'object' && 'show' in spec;
+    const list = show ? spec.show : spec?.hide;
+    if (!spec || typeof spec !== 'object' || (!show && !('hide' in spec)) || list == null || typeof list === 'string' || typeof list[Symbol.iterator] !== 'function') {
+      throw new TypeError(`setVisibility “${name}”: pass null, {hide: indices}, {show: indices} or a Uint8Array with one entry per atom.`);
+    }
+    const mask = new Uint8Array(n).fill(show ? 0 : 1);
+    for (const i of list) {
+      if (!Number.isInteger(i) || i < 0) throw new TypeError(`setVisibility “${name}”: atom indices must be whole numbers ≥ 0 (got ${typeof i === 'number' ? i : typeof i}).`);
+      if (i < n) mask[i] = show ? 1 : 0;
+    }
+    return mask;
+  }
+
+  /** The combined visibility mask of the shown structure (Uint8Array, 1 = drawn), or null when no mask hides an atom. */
+  visibleMask() {
+    const n = this.structure?.length ?? 0;
+    if (!this._vis?.size) return null;
+    const key = `${this._visRev ?? 0}:${n}`;
+    if (this._visMask !== undefined && this._visMaskKey === key) return this._visMask;
+    const { mask, hidden } = this._combinedMask(n, { warn: true });
+    this._visMask = mask; this._visMaskKey = key; this._visHidden = hidden;
+    return mask;
+  }
+
+  /** The AND of the masks of n entries (others skipped, with a warning when `warn`): {mask | null, hidden}. */
+  _combinedMask(n, { warn = false } = {}) {
+    let out = null;
+    for (const [name, mask] of this._vis ?? []) {
+      if (mask.length !== n) {
+        if (warn) console.warn(`setVisibility “${name}”: the mask has ${mask.length} entries for ${n} atoms, so it is ignored.`);
+        continue;
+      }
+      if (!out) out = mask.slice(); else for (let i = 0; i < n; i++) out[i] &= mask[i];
+    }
+    let hidden = 0;
+    if (out) for (let i = 0; i < n; i++) if (!out[i]) hidden++;
+    return hidden ? { mask: out, hidden } : { mask: null, hidden: 0 };
+  }
+
+  /** Atoms hidden by visibility masks (atoms of hidden elements not counted). */
+  get hiddenCount() { return this.visibleMask() ? this._visHidden : 0; }
+  /** Names of the visibility masks. */
+  visibilityNames() { return [...(this._vis?.keys() ?? [])]; }
+  /** False for a structure atom that a visibility mask hides (hidden elements do not count) or that does not exist. */
+  isVisible(i) {
+    const n = this.structure?.length ?? 0;
+    if (!Number.isInteger(i) || i < 0 || i >= n) return false;
+    const mask = this.visibleMask();
+    return !mask || mask[i] === 1;
+  }
+
+  /** Remove every visibility mask (the view.showAll command). Returns how many atoms were hidden. */
+  showAll() {
+    if (!this._vis?.size) return 0;
+    const hidden = this.hiddenCount;
+    this._vis.clear();
+    this._visibilityChanged();
+    return hidden;
+  }
+
+  /**
+   * After an edit that renumbered atoms (map[old] = new index, −1 or null: removed; n1 = the new number of atoms):
+   * visibility masks follow their atoms (new atoms are visible; a mask that hides nothing any more is dropped), and so
+   * do the named highlights. The edit's rebuild (setStructure) draws the result.
+   */
+  remapIndexed(map, n1) {
+    const n = Math.max(0, Math.floor(Number(n1)) || 0);
+    const vis = this._vis;
+    if (vis?.size) {
+      for (const [name, mask] of [...vis]) {
+        const next = new Uint8Array(n).fill(1);
+        for (let i = 0; i < mask.length; i++) {
+          const j = map?.[i];
+          if (!mask[i] && Number.isInteger(j) && j >= 0 && j < n) next[j] = 0;
+        }
+        if (next.includes(0)) vis.set(name, next); else vis.delete(name);
+      }
+      // the viewer may still hold the structure from before the edit: count against the new number of atoms
+      this._visRev = (this._visRev ?? 0) + 1;
+      this._visMask = undefined;
+      this.emit('visibility', { hidden: this._combinedMask(n).hidden, names: this.visibilityNames() });
+    }
+    this._remapHighlights?.(map);
+  }
+
+  /** Drop masks whose length is not the shown structure's (setStructure). True when one was dropped. */
+  _fitVisibility() {
+    const vis = this._vis, n = this.structure?.length ?? 0;
+    if (!vis?.size) return false;
+    let dropped = false;
+    for (const [name, mask] of [...vis]) if (mask.length !== n) { vis.delete(name); dropped = true; }
+    if (dropped) { this._visRev = (this._visRev ?? 0) + 1; this._visMask = undefined; }
+    return dropped;
+  }
+
+  /** Another structure entry is shown: its atoms start visible. */
+  _clearVisibility() {
+    if (!this._vis?.size) return;
+    this._vis.clear();
+    this._visibilityChanged({ rebuild: false });
+  }
+
+  _visibilityChanged({ rebuild = true } = {}) {
+    this._visRev = (this._visRev ?? 0) + 1;
+    this._visMask = undefined;
+    if (rebuild && this.structure) this.applySettings(this.settings);
+    this.emit('visibility', { hidden: this.hiddenCount, names: this.visibilityNames() });
+  }
+
+  /** The whole cells by which the drawing moves each atom to its home copy (model.home; Int32Array(3n)), or null. */
+  homeOffsets() { return this.model?.home ?? null; }
+
+  /**
+   * Debug switch (not saved): false draws with the [0, 1) wrapping on every axis instead of the vacuum-gap cuts of
+   * U1, for comparing with the old rule.
+   */
+  get gapCut() { return this._gapCut !== false; }
+  set gapCut(on) {
+    const v = on !== false;
+    if (v === this.gapCut) return;
+    this._gapCut = v;
+    if (this.structure) this.applySettings(this.settings);
+  }
+
   // ------------------------------------------------------------------ building
   _buildModel() {
     const s = this.structure, st = this.settings.style, d = this.settings.display;
     const style = styles.get(st.rep) ?? styles.get('ballstick');
-    let model = buildDisplayModel(s, d, {});
+    const opt = { visible: this.visibleMask(), cuts: this.gapCut ? undefined : false };
+    let model = buildDisplayModel(s, d, opt);
     if (style.wantsImages && model.periodic && !d.completeBonds) {
       const centers = st.polyhedra?.centers === 'auto' || !st.polyhedra?.centers ? autoPolyhedraCenters(model) : st.polyhedra.centers;
-      if (centers.length) model = buildDisplayModel(s, d, { imageCenters: new Set(centers) });
+      if (centers.length) model = buildDisplayModel(s, d, { ...opt, cuts: model.cuts, imageCenters: new Set(centers) });
     }
     this.model = model;
     const cn = new Int32Array(model.n);
@@ -1025,8 +1185,9 @@ export class Viewer extends Emitter {
     return this._css;
   }
 
-  /** The app showed another structure entry: overlay layers marked clearOnSwitch and the named highlights go. */
+  /** The app showed another structure entry: overlay layers marked clearOnSwitch, visibility masks and the named highlights go. */
   structureSwitched() {
+    this._clearVisibility();
     this.overlays.switched();
     if (!this._highlights.size) return;
     this._highlights.clear();
@@ -1194,20 +1355,54 @@ export class Viewer extends Emitter {
     } else shadow.radius = softness;
   }
 
+  /**
+   * Values and lines of the measurements: {id, type, refs} (core/measure.js; an entry with the old `keys` is migrated)
+   * gets value (Å or °, from the Float64 stored coordinates of the referenced atoms and images), valid (false for an
+   * unknown type, the wrong number of atoms or an atom the structure does not have: kept, never drawn), drawn
+   * ('exact': on drawn copies whose stored images match; 'floating': no such set of copies is drawn, so the line starts
+   * at the first atom's home copy and an end may have no atom drawn at it; 'hidden': an atom is hidden, no line; null
+   * when not valid), idx (the drawn index of each atom, −1 where none) and points (the line's drawn coordinates).
+   */
   _buildMeasurements() {
     this._disposeObject(this.measureObj); this.measureObj = null;
     if (!this.model) return;
-    const m = this.model;
+    const m = this.model, s = this.structure;
+    const wrap = this.settings?.display?.wrap !== false;
+    let copies = null;
+    /** The drawn copies of atom i, its home copy first. */
+    const copiesOf = (i) => {
+      if (!copies) {
+        copies = new Map();
+        for (let d = 0; d < m.n; d++) { const a = m.src[d]; let l = copies.get(a); if (!l) copies.set(a, (l = [])); l.push(d); }
+      }
+      const l = copies.get(i) ?? [], h = m.homeIndex?.[i] ?? -1;
+      return h >= 0 && l[0] !== h ? [h, ...l.filter((d) => d !== h)] : l;
+    };
+    const homeOf = (i) => (m.homeIndex ? m.homeIndex[i] ?? -1 : copiesOf(i)[0] ?? -1);
     const pts = [];
     for (const ms of this.measurements) {
-      ms.idx = (Array.isArray(ms.keys) ? ms.keys : []).map((k) => m.keys.get(k) ?? -1);
-      // an unknown type or a wrong number of atoms (a hand-edited or newer file) is kept but never drawn
-      ms.valid = measureArity(ms.type) === ms.idx.length && ms.idx.every((i) => i >= 0);
-      if (!ms.valid) { ms.value = undefined; continue; }
-      const P = ms.idx.map((i) => new THREE.Vector3(m.positions[3 * i], m.positions[3 * i + 1], m.positions[3 * i + 2]));
-      try { ms.value = measureValue(ms.type, P); } catch { ms.value = NaN; }
-      if (!Number.isFinite(ms.value)) { ms.valid = false; ms.value = undefined; continue; }
-      for (let k = 0; k + 1 < P.length; k++) pts.push(P[k], P[k + 1]);
+      if (!Array.isArray(ms.refs) && Array.isArray(ms.keys) && s) {
+        const refs = migrateMeasurementKeys(s, ms.keys, { wrap });
+        if (refs) { ms.refs = refs; delete ms.keys; }
+      }
+      const refs = Array.isArray(ms.refs) ? ms.refs : [];
+      const parsed = refs.map(parseRef);
+      ms.idx = refs.map(() => -1); ms.points = null; ms.drawn = null;
+      const P = s && measureArity(ms.type) === refs.length && parsed.every(Boolean) ? measurementPoints(s, refs) : null;
+      let value = NaN;
+      if (P) {
+        const V = parsed.map((_, k) => new THREE.Vector3(P[3 * k], P[3 * k + 1], P[3 * k + 2]));
+        try { value = measureValue(ms.type, V); } catch { value = NaN; }
+      }
+      ms.valid = Number.isFinite(value);
+      ms.value = ms.valid ? value : undefined;
+      if (!ms.valid) continue;
+      if (parsed.some(({ atom }) => homeOf(atom) < 0)) { ms.drawn = 'hidden'; continue; }
+      Object.assign(ms, this._measureLine(m, parsed, P, copiesOf, homeOf));
+      const Q = ms.points;
+      for (let k = 0; k + 1 < parsed.length; k++) {
+        pts.push(new THREE.Vector3(Q[3 * k], Q[3 * k + 1], Q[3 * k + 2]), new THREE.Vector3(Q[3 * k + 3], Q[3 * k + 4], Q[3 * k + 5]));
+      }
     }
     if (pts.length) {
       const g = new THREE.BufferGeometry().setFromPoints(pts);
@@ -1221,7 +1416,36 @@ export class Viewer extends Emitter {
     this._dirty = true;
   }
 
-  /** Measure between drawn atoms: type 'distance' | 'angle' | 'dihedral' with 2 | 3 | 4 display indices. Returns the entry. */
+  /**
+   * Where a measurement's line goes: on the first set of drawn copies whose stored images match the references
+   * (anchored on each drawn copy of the first atom, its home copy first), else 'floating' from the first atom's home
+   * copy by the stored offsets P_k − P_0.
+   */
+  _measureLine(m, parsed, P, copiesOf, homeOf) {
+    const refs = m.refs, I0 = parsed[0].image;
+    const lookup = (T) => parsed.map(({ atom, image }) => refs.get(`${atom}:${image[0] + T[0]},${image[1] + T[1]},${image[2] + T[2]}`) ?? -1);
+    const shift = (d) => { const S = storedImage(m, d); return [S[0] - I0[0], S[1] - I0[1], S[2] - I0[2]]; };
+    for (const d of copiesOf(parsed[0].atom)) {
+      const idx = lookup(shift(d));
+      if (idx.every((x) => x >= 0)) {
+        const points = new Float64Array(3 * idx.length);
+        idx.forEach((x, k) => { points[3 * k] = m.positions[3 * x]; points[3 * k + 1] = m.positions[3 * x + 1]; points[3 * k + 2] = m.positions[3 * x + 2]; });
+        return { drawn: 'exact', idx, points };
+      }
+    }
+    const h = homeOf(parsed[0].atom);
+    const idx = lookup(shift(h));
+    idx[0] = h;
+    const points = new Float64Array(3 * parsed.length);
+    for (let k = 0; k < parsed.length; k++) for (let c = 0; c < 3; c++) points[3 * k + c] = m.positions[3 * h + c] + (P[3 * k + c] - P[c]);
+    return { drawn: 'floating', idx, points };
+  }
+
+  /**
+   * Measure between drawn atoms: type 'distance' | 'angle' | 'dihedral' with 2 | 3 | 4 display indices. Returns the
+   * entry {id, type, refs, …}: the atoms and their stored images (core/measure.js), so later edits and other wrapping
+   * rules keep it on the same atoms; the id stays for the session.
+   */
   addMeasurement(type, displayIndices) {
     const n = measureArity(type);
     if (!n) throw new Error(`Unknown measurement “${typeof type === 'string' ? type : typeof type}”: use distance, angle or dihedral.`);
@@ -1230,7 +1454,7 @@ export class Viewer extends Emitter {
     if (idx.length !== n) throw new Error(`${type === 'angle' ? 'An' : 'A'} ${type} needs ${n} atoms (got ${idx.length}).`);
     const bad = idx.find((i) => !Number.isInteger(i) || i < 0 || i >= this.model.n);
     if (bad !== undefined) throw new Error(`No drawn atom with index ${bad} (0–${this.model.n - 1}).`);
-    const ms = { id: Math.random().toString(36).slice(2, 8), type, keys: idx.map((i) => keyOf(this.model, i)) };
+    const ms = { id: newMeasurementId(), type, refs: normalizeRefs(idx.map((d) => refOf(this.model, d))) };
     this.measurements.push(ms);
     this._buildMeasurements();
     return ms;
@@ -1585,20 +1809,25 @@ export class Viewer extends Emitter {
     return best;
   }
 
-  atomInfo(i) {
+  /**
+   * What drawn atom `d` is, for the hover and selection cards: {display, index (the structure atom), symbol, name,
+   * cn, position (its stored Cartesian coordinates, Float64, current frame: what files and the structure hold),
+   * frac (the stored fractional coordinates as Structure.fracPositions gives them, not wrapped; null without a
+   * cell), image (storedImage: the whole cells from the stored position to this drawn copy), drawn (the drawn
+   * coordinates)}; null for an index that is not drawn.
+   */
+  atomInfo(d) {
     const m = this.model;
-    if (!m || i < 0 || i >= m.n) return null;
-    const src = m.src[i];
-    const el = element(m.symbols[i]);
-    const pos = [m.positions[3 * i], m.positions[3 * i + 1], m.positions[3 * i + 2]];
-    const img = [m.img[3 * i], m.img[3 * i + 1], m.img[3 * i + 2]];
+    if (!m || !Number.isInteger(d) || d < 0 || d >= m.n) return null;
+    const i = m.src[d], s = this.structure;
+    const el = element(m.symbols[d]);
+    const drawn = [m.positions[3 * d], m.positions[3 * d + 1], m.positions[3 * d + 2]];
+    const stored = !!s && i < s.length;
+    const position = stored ? s.pos(i) : drawn;
+    const cell = stored ? s.cell : m.cell;
     let frac = null;
-    if (m.cell) {
-      const inv = new THREE.Matrix3().set(...m.cell[0], ...m.cell[1], ...m.cell[2]).transpose().invert();
-      const f = new THREE.Vector3(...pos).applyMatrix3(inv);
-      frac = f.toArray();
-    }
-    return { display: i, index: src, symbol: el.symbol, name: el.name, position: pos, frac, image: img, cn: this.cn?.[i] ?? 0 };
+    if (cell) { try { frac = cartToFrac(position, inv3(cell)); } catch { frac = null; } }
+    return { display: d, index: i, symbol: el.symbol, name: el.name, cn: this.cn?.[d] ?? 0, position, frac, image: storedImage(m, d), drawn };
   }
 
   // ------------------------------------------------------------------ loop
@@ -1792,9 +2021,11 @@ export class Viewer extends Emitter {
     g.textAlign = 'center'; g.textBaseline = 'middle';
     const accent = css.accentStrong;
     for (const ms of this.measurements) {
-      if (!ms.valid || !Number.isFinite(ms.value)) continue;
-      const P = ms.idx.map((i) => this.project(m.positions[3 * i], m.positions[3 * i + 1], m.positions[3 * i + 2], w, h));
-      const mid = ms.type === 'distance' ? [(P[0][0] + P[1][0]) / 2, (P[0][1] + P[1][1]) / 2] : P[ms.type === 'angle' ? 1 : 1].slice(0, 2);
+      // the value sits on the drawn line (ms.points), which a 'floating' measurement has without drawn atoms at its ends
+      if (!ms.valid || !Number.isFinite(ms.value) || !(ms.points?.length >= 6)) continue;
+      const Q = ms.points, P = [];
+      for (let k = 0; 3 * k + 2 < Q.length; k++) P.push(this.project(Q[3 * k], Q[3 * k + 1], Q[3 * k + 2], w, h));
+      const mid = ms.type === 'distance' ? [(P[0][0] + P[1][0]) / 2, (P[0][1] + P[1][1]) / 2] : P[1].slice(0, 2);
       const label = ms.type === 'distance' ? `${ms.value.toFixed(3)} Å` : `${ms.value.toFixed(1)}°`;
       text(label, mid[0], mid[1] - 12 * scale, 12.5, accent, 700);
     }

@@ -5,10 +5,11 @@
  * selection actions (registerSelectionAction) behind the card's buttons and the atom menus.
  */
 import { h, ic, btn } from './dom.js';
-import { toast, promptDialog, showMenu } from './overlays.js';
+import { toast, promptDialog, showMenu, dialog } from './overlays.js';
 import { element, normalizeSymbol } from '../core/elements.js';
 import { elementColorHex } from '../render/colors.js';
-import { bondedFragment } from '../render/display.js';
+import { bondedFragment, storedImage } from '../render/display.js';
+import { inv3, cartToFrac, det3, cross, norm } from '../core/util.js';
 import { keyLabel } from './keys.js';
 import { atomInfoRows } from './atominfo.js';
 
@@ -64,12 +65,68 @@ export function geometryValue(P) {
   return (Math.atan2(vdot(m1, n2), vdot(n1, n2)) * 180) / Math.PI;
 }
 
-/** Points for the selected source atoms: drawn copies chained by proximity, else raw positions. */
-function selectionPoints(app, sel) {
-  const m = app.viewer.model, s = app.structure;
+/** Atom i's stored position (current frame) moved by whole cells I: r_i + I·cell. */
+function storedPoint(s, i, I) {
+  const p = s.pos(i), c = s.cell;
+  if (!c || !(I[0] || I[1] || I[2])) return p;
+  return [0, 1, 2].map((k) => p[k] + I[0] * c[0][k] + I[1] * c[1][k] + I[2] * c[2][k]);
+}
+
+/**
+ * The shortest periodic image of vector v over the periodic axes of `cell`. Rounding the fractional coordinates gives
+ * an image of length R; a shorter one differs from it by a lattice vector t with |t| ≤ 2R, whose coefficient along
+ * a_k is at most 2R / h_k (h_k: the distance of a_k from the span of the other periodic vectors), so the search below
+ * misses none, whatever the shape of the cell.
+ */
+function minimumImage(v, cell, pbc) {
+  const P = [0, 1, 2].filter((k) => pbc?.[k]);
+  if (!cell || !P.length) return v.slice();
+  let inv;
+  try { inv = inv3(cell); } catch { return v.slice(); }
+  const g = cartToFrac(v, inv), v0 = v.slice();
+  for (const k of P) { const n = -Math.floor(g[k] + 0.5); for (let c = 0; c < 3; c++) v0[c] += n * cell[k][c]; }
+  const R = norm(v0);
+  if (!(R > 0)) return v0;
+  const h = P.map((k) => {
+    const o = P.filter((j) => j !== k);
+    if (o.length === 2) return Math.abs(det3(cell)) / norm(cross(cell[o[0]], cell[o[1]]));
+    if (o.length === 1) return norm(cross(cell[k], cell[o[0]])) / norm(cell[o[0]]);
+    return norm(cell[k]);
+  });
+  const K = h.map((x) => Math.floor((2 * R) / x + 1e-9));
+  const sizes = K.map((x) => 2 * x + 1), total = sizes.reduce((a, b) => a * b, 1);
+  if (!Number.isFinite(total) || total > 1e6) return v0;
+  let best = v0, bestL = R * R;
+  for (let t = 0; t < total; t++) {
+    const w = v0.slice();
+    for (let a = 0, r = t; a < P.length; a++) {
+      const n = (r % sizes[a]) - K[a];
+      r = Math.floor(r / sizes[a]);
+      if (n) for (let c = 0; c < 3; c++) w[c] += n * cell[P[a]][c];
+    }
+    const L = w[0] * w[0] + w[1] * w[1] + w[2] * w[2];
+    if (L < bestL - 1e-12) { bestL = L; best = w; }
+  }
+  return best;
+}
+
+/**
+ * Float64 points for the selected source atoms: on the drawn copies chained by proximity, each the stored position
+ * plus that copy's stored image; when an atom has no drawn copy (hidden), a chain of shortest periodic images from the
+ * first atom (P_k+1 = P_k + the shortest image of r_k+1 − r_k). {ds: drawn indices | null, P}.
+ */
+export function selectionPoints(app, sel) {
+  const m = app.viewer?.model, s = app.structure;
   const ds = m ? chainDisplay(m, sel) : [];
-  if (ds.length === sel.length && ds.every((d) => d >= 0)) return { ds, P: ds.map((d) => [m.positions[3 * d], m.positions[3 * d + 1], m.positions[3 * d + 2]]) };
-  return { ds: null, P: sel.map((i) => s.pos(i)) };
+  if (ds.length === sel.length && ds.every((d) => d >= 0)) return { ds, P: ds.map((d, k) => storedPoint(s, sel[k], storedImage(m, d))) };
+  const P = [];
+  sel.forEach((i, k) => {
+    if (!k) { P.push(s.pos(i)); return; }
+    const a = s.pos(sel[k - 1]), b = s.pos(i), prev = P[k - 1];
+    const d = s.periodic ? minimumImage([b[0] - a[0], b[1] - a[1], b[2] - a[2]], s.cell, s.pbc) : [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    P.push([prev[0] + d[0], prev[1] + d[1], prev[2] + d[2]]);
+  });
+  return { ds: null, P };
 }
 
 /** Select every atom of the elements in the selection (or of `symbol`). */
@@ -106,8 +163,66 @@ export function selectFragment(app, srcs = null) {
   if (!m.bonds?.count && m.n > 1) toast('Bonds are hidden, so each atom is a fragment of its own.');
 }
 
-/** Select all atoms of the active structure. */
-export function selectAll(app) { if (app.structure) app.select(app.structure.symbols.map((_, i) => i)); }
+/**
+ * Select all atoms of the active structure. While visibility masks hide atoms (viewer.setVisibility), only the
+ * visible ones, and a toast says how many are hidden (selecting by index, through the API or a query, still reaches
+ * hidden atoms).
+ */
+export function selectAll(app) {
+  const s = app.structure;
+  if (!s) return;
+  const v = app.viewer, hidden = v?.hiddenCount ?? 0;
+  const all = s.symbols.map((_, i) => i);
+  if (!hidden) { app.select(all); return; }
+  const shown = all.filter((i) => v.isVisible(i));
+  app.select(shown);
+  toast(`Selected ${plural(shown.length, 'visible atom')} (${hidden} hidden).`);
+}
+
+/** The atoms of `sel` (source indices) that visibility masks hide. */
+export function hiddenInSelection(app, sel = app.selection) {
+  const v = app.viewer;
+  return (v?.hiddenCount ?? 0) > 0 ? sel.filter((i) => !v.isVisible(i)) : [];
+}
+
+/**
+ * Before a destructive action on the selection (`verb`: 'Delete' or 'Change'): when visibility masks hide some of its
+ * atoms, ask whether the action takes them too. Resolves to the atoms to act on: the whole selection, only its visible
+ * atoms, or null (cancelled); without hidden atoms, to `sel` at once.
+ */
+export function confirmHiddenSelection(app, verb = 'Delete', sel = app.selection) {
+  const hidden = hiddenInSelection(app, sel);
+  if (!hidden.length) return Promise.resolve(sel);
+  const gone = new Set(hidden), visible = sel.filter((i) => !gone.has(i));
+  const n = sel.length, k = hidden.length;
+  const message = k < n
+    ? `${k} of the ${n} selected atoms ${k === 1 ? 'is' : 'are'} hidden. ${verb} ${k === 1 ? 'it' : 'them'} too?`
+    : `${n === 1 ? 'The selected atom is' : `All ${n} selected atoms are`} hidden. ${verb} ${n === 1 ? 'it' : 'them'}?`;
+  return new Promise((resolve) => {
+    let done = false;
+    const pick = (atoms) => () => { done = true; resolve(atoms); };
+    dialog({
+      title: `${verb} hidden atoms?`,
+      body: h('p.hint', { style: { fontSize: '13.5px', color: 'var(--fg-2)' } }, message),
+      actions: [
+        { label: 'Cancel', run: pick(null) },
+        visible.length ? { label: `Only the ${visible.length} visible`, run: pick(visible) } : null,
+        { label: n === 1 ? verb : `${verb} all ${n}`, danger: verb === 'Delete', primary: verb !== 'Delete', run: pick(sel) },
+      ],
+      onClose: () => { if (!done) resolve(null); },
+    });
+  });
+}
+
+/** Delete the selected atoms (Delete key, selection card, menus), asking first when visibility masks hide some of them. */
+export async function deleteSelection(app) {
+  const sel = app.selection;
+  if (!sel.length || !app.structure) return;
+  const atoms = await confirmHiddenSelection(app, 'Delete', sel);
+  if (!atoms?.length) return;
+  if (atoms.length !== sel.length) app.select(atoms);
+  app.deleteSelected();
+}
 
 /** Centre the view on an atom (display index) or on the drawn atom nearest the selection's centre. */
 export function centreSelection(app, display = null) {
@@ -155,10 +270,28 @@ export function measureSelection(app, sel = app.selection) {
   if (sel.length < 2 || sel.length > 4) return;
   const ds = chainDisplay(m, sel);
   if (ds.some((d) => d < 0)) { toast('Show the hidden atoms first to measure them.', { type: 'error' }); return; }
-  app.viewer.addMeasurement(MEASURE[sel.length], ds);
-  const id = app.viewer.measurements.at(-1)?.id;
+  // the id stays for the session (edits, undo and redo keep it), so Remove still finds the measurement later
+  const { id } = app.viewer.addMeasurement(MEASURE[sel.length], ds);
   app.emit('measure');
   toast(`Added a ${MEASURE[sel.length]} measurement`, { action: { label: 'Remove', run: () => { app.viewer.removeMeasurement(id); app.emit('measure'); } } });
+}
+
+/** Change the element of the selected atoms (Replace…), asking first when visibility masks hide some of them. */
+async function replaceSelectionChecked(app) {
+  const sel = app.selection;
+  if (!sel.length) return;
+  const atoms = await confirmHiddenSelection(app, 'Change', sel);
+  if (!atoms?.length) return;
+  if (atoms.length !== sel.length) app.select(atoms);
+  await replaceSelection(app);
+}
+
+/** Negative numbers with a minus sign: (0, 0, −1). */
+const signed = (x) => (x < 0 ? `−${-x}` : String(x));
+/** Stored fractional coordinates of atom i (null without a usable cell). */
+function storedFrac(s, i) {
+  if (!s.cell) return null;
+  try { return cartToFrac(s.pos(i), inv3(s.cell)); } catch { return null; }
 }
 
 // ------------------------------------------------------------------ selection actions (card buttons, atom menus)
@@ -321,12 +454,12 @@ registerSelectionAction({
 registerSelectionAction({
   id: 'sel.replace', label: 'Replace…', short: 'Replace', icon: 'swap', order: 40, menu: false,
   tip: 'Change the element of the selected atoms',
-  run: (app) => replaceSelection(app),
+  run: (app) => replaceSelectionChecked(app),
 });
 registerSelectionAction({
   id: 'sel.delete', label: 'Delete', icon: 'trash', order: 50, menu: false, danger: true, kbd: 'Delete',
   tip: (app, sel) => (sel.length === 1 ? 'Delete this atom' : `Delete ${sel.length} atoms`),
-  run: (app) => app.deleteSelected(),
+  run: (app) => deleteSelection(app),
 });
 
 // ------------------------------------------------------------------ card
@@ -368,17 +501,23 @@ export class SelectionCard {
     const line = (r) => h('div.r', h('span.k', r.label), h('span.v', r.value));
     const rows = [];
     let title;
+    // atoms hidden by visibility masks are counted in the title, in words
+    const nHidden = hiddenInSelection(app, sel).length;
+    const hiddenNote = nHidden ? h('span.nm', `(${nHidden} hidden)`) : null;
     if (n === 1) {
       const i = sel[0], d = displayIndexOf(m, i), info = d >= 0 ? app.viewer.atomInfo(d) : null;
       const e = element(s.symbols[i]);
-      title = h('div.t', tag(i), h('span.nm', e.name));
+      title = h('div.t', tag(i), h('span.nm', e.name), hiddenNote);
       const f = (a) => a.map((x) => x.toFixed(3)).join('  ');
+      // stored coordinates, as files and the structure hold them, wherever the view draws the atom
+      const frac = info ? info.frac : storedFrac(s, i);
       rows.push(h('div.r', h('span.k', 'xyz'), h('span.v', `${f(info?.position ?? s.pos(i))} Å`)));
-      if (info?.frac) rows.push(h('div.r', h('span.k', 'frac'), h('span.v', f(info.frac))));
+      if (frac) rows.push(h('div.r', h('span.k', 'frac'), h('span.v', f(frac))));
+      if (info?.image.some(Boolean)) rows.push(h('div.r', h('span.k', ''), h('span.v.muted', { 'data-tip': 'The view draws this atom shifted by whole cell vectors from its stored position' }, `Drawn image (${info.image.map(signed).join(', ')})`)));
       if (info) rows.push(h('div.r', h('span.k', 'CN'), h('span.v', { 'data-tip': 'Coordination number: bonds drawn to this atom' }, String(info.cn))));
       rows.push(...atomInfoRows(app, i, 'card').map(line));
     } else if (n <= 4) {
-      title = h('div.t', ...sel.flatMap((i, k) => (k ? [h('span.dash', '–'), tag(i)] : [tag(i)])));
+      title = h('div.t', ...sel.flatMap((i, k) => (k ? [h('span.dash', '–'), tag(i)] : [tag(i)])), hiddenNote);
       const { P } = selectionPoints(app, sel);
       const val = geometryValue(P);
       const kind = MEASURE[n];
@@ -387,7 +526,7 @@ export class SelectionCard {
     } else {
       const comp = {};
       sel.forEach((i) => { comp[s.symbols[i]] = (comp[s.symbols[i]] ?? 0) + 1; });
-      title = h('div.t', h('b', plural(n, 'atom')), h('span.nm', `of ${s.length}`));
+      title = nHidden ? h('div.t', h('b', `${n} selected`), hiddenNote) : h('div.t', h('b', plural(n, 'atom')), h('span.nm', `of ${s.length}`));
       rows.push(h('div.r.comp', ...Object.entries(comp).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([sym, c]) => h('span.atom', dot(sym), h('b', sym), h('span.idx', `×${c}`)))));
     }
     const list = selectionActions(app, sel, 'card');
