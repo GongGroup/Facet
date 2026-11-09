@@ -212,6 +212,31 @@ input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 3px; }
 .triple { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .triple label { display: flex; align-items: center; gap: 4px; font: 500 11px var(--font-mono); color: var(--muted); min-width: 0; }
 .triple input { text-align: center; flex: 1; width: auto; min-width: 0; }
+.triple[data-n="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.triple[data-n="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.triple label.computed input { color: var(--muted); background: transparent; }
+/* compact number boxes of the vector, Miller and matrix controls: no spin buttons, so short numbers stay readable */
+.inp .triple input, .imatrix-grid > input { padding: 0 4px; -moz-appearance: textfield; appearance: textfield; }
+.inp .triple input::-webkit-inner-spin-button, .inp .triple input::-webkit-outer-spin-button,
+.imatrix-grid > input::-webkit-inner-spin-button, .imatrix-grid > input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+/* input controls (ui/inputs.js): a number with its unit, vectors, Miller indices, integer matrices */
+.inp { display: grid; gap: 4px; min-width: 0; }
+.num-in, .v3-row, .miller-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.num-in > input, .v3-row > .triple, .miller-row > .triple { flex: 1; min-width: 0; }
+.num-in .unit, .v3-row .unit { font: 500 11.5px var(--font-mono); color: var(--muted); white-space: nowrap; }
+.frame-seg, .notation-seg { width: auto; flex: none; }
+.frame-seg button, .notation-seg button { height: 22px; padding: 0 6px; font: 500 11px var(--font-mono); }
+.miller .readout { display: grid; gap: 2px; }
+.imatrix-row { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.imatrix-grid { display: grid; grid-template-columns: auto repeat(3, minmax(0, 1fr)); gap: 6px; align-items: center; flex: 1; min-width: 0; font-variant-numeric: tabular-nums; }
+.imatrix-grid[data-n="2"] { grid-template-columns: auto repeat(2, minmax(0, 1fr)); }
+.imatrix-grid > span { font: 500 11px var(--font-mono); color: var(--muted); text-align: center; }
+.imatrix-grid > input { text-align: center; width: auto; min-width: 0; }
+.imatrix-params { display: grid; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--panel-2); }
+.imatrix-param-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.imatrix-param { display: grid; gap: 2px; min-width: 90px; font-size: 11.5px; color: var(--fg-2); }
+.field-err { margin: 0; }
+.field-warn { color: var(--warn); }
 .sc-pending { display: flex; align-items: center; gap: 6px; padding: 6px 6px 6px 10px; border-radius: var(--r-sm); background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); }
 .sc-pending .sc-est { flex: 1; min-width: 0; font: 500 11.5px var(--font-mono); color: var(--fg-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hint { font-size: 12px; color: var(--muted); line-height: 1.45; margin: 0; }
@@ -701,7 +726,7 @@ input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 3px; }
 .pf-field { display: grid; gap: 4px; min-width: 0; }
 .pf-field > label { font-size: 11.5px; color: var(--fg-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pf-field.pf-wide { grid-column: 1 / -1; }
-.pf-field input.field[aria-invalid="true"] { border-color: var(--err); }
+input.field[aria-invalid="true"], select.field[aria-invalid="true"] { border-color: var(--err); }
 .pf-card { gap: 8px; }
 .pf-json {
   margin: 0; padding: 8px 10px; max-height: 220px; overflow: auto; border-radius: var(--r-sm); border: 1px solid var(--line);

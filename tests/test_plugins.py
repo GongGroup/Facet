@@ -46,7 +46,7 @@ def test_example_plugin_via_api(plugin_client):
     # custom builder and analysis
     r = c.post("/api/v1/build/custom/hello-chain", json={"element": "Ag", "n": 5, "spacing": 2.9})
     assert r.status_code == 200 and r.json()["structure"]["symbols"] == ["Ag"] * 5
-    assert c.post("/api/v1/build/custom/hello-chain", json={"n": 0}).status_code == 400
+    assert c.post("/api/v1/build/custom/hello-chain", json={"n": 0}).status_code == 422  # below the declared min: 1
     assert c.post("/api/v1/build/custom/missing", json={}).status_code == 404
     r = c.post("/api/v1/analysis/custom/hello-com", json={"structure": r.json()["structure"]})
     assert abs(r.json()["result"]["centerOfMass"][0] - 5.8) < 1e-6

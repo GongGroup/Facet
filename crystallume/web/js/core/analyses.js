@@ -11,6 +11,7 @@
  */
 import { rdf, coordinationStats } from './analysis.js';
 import { getPath } from './util.js';
+import { defaultParams } from './params.js';
 
 const registry = new Map();
 
@@ -39,20 +40,11 @@ export function paramOptions(p, structure) {
   return raw.map((o) => (Array.isArray(o) ? { value: o[0], label: o[1] ?? String(o[0]) } : typeof o === 'object' && o ? { value: o.value, label: o.label ?? String(o.value) } : { value: o, label: String(o) }));
 }
 
-/** {name: default} for a parameter schema. */
-export function defaultParams(params = [], structure = null) {
-  const out = {};
-  for (const p of params ?? []) {
-    if (!p?.name) continue;
-    let v = p.default;
-    if (v === undefined) {
-      v = p.type === 'bool' ? false : p.type === 'select' ? paramOptions(p, structure)[0]?.value
-        : p.type === 'int' || p.type === 'float' ? (p.min ?? 0) : p.type === 'element' ? 'C' : '';
-    }
-    out[p.name] = v;
-  }
-  return out;
-}
+/**
+ * {name: default} for a parameter schema: defaultParams(schema, structure) of core/params.js, which also has the
+ * defaults of the vector, miller and imatrix types and of required parameters (re-exported here, where it used to be).
+ */
+export { defaultParams };
 
 // ------------------------------------------------------------------ structure keys (cache keys)
 const serials = new WeakMap();

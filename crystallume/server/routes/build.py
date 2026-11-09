@@ -132,12 +132,29 @@ def run_custom_builder(
     plugins: PluginManager = Depends(get_plugins),
     settings: Settings = Depends(get_settings),
 ):
-    """Call the plugin builder ``name`` with the JSON body as keyword parameters."""
+    """Call the plugin builder ``name`` with the JSON body as keyword parameters.
+
+    When the builder declares ``params``, the body is checked against them first (``validate_params``, not strict:
+    keys and types it does not declare pass unchanged): a value that does not fit gives 422 with the message (e.g.
+    ``hkl: in (h k i l), i must be −(h + k) = -1.``), and the builder gets the normalized values (four Miller indices as
+    three, declared defaults for parameters not given).  Declared ``params`` that are themselves invalid (not a list,
+    a vector or imatrix whose size is not 2 or 3) are the plugin's fault: 500 naming the builder's schema.
+    """
+    from ...core.params import validate_params
+
     spec = plugins.builders.get(name)
     if spec is None:
         raise HTTPException(404, f"unknown builder {name!r}; available: {', '.join(plugins.builders) or 'none'}")
+    params = dict(params or {})
+    if spec.meta.get("params"):
+        try:
+            params, errors, _ = validate_params(spec.meta["params"], params, strict=False)
+        except TypeError as exc:
+            raise HTTPException(500, f"builder {name!r} declares invalid params: {exc}") from exc
+        if errors:
+            raise HTTPException(422, " ".join(errors))
     try:
-        result = spec.func(**(params or {}))
+        result = spec.func(**params)
     except (TypeError, ValueError) as exc:
         raise HTTPException(400, f"builder {name!r} failed: {exc}") from exc
     s = result if isinstance(result, Structure) else Structure.from_dict(result)
