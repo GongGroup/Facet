@@ -663,6 +663,28 @@ def test_argument_errors():
             axis_gaps(s, 2, exclude=bad)
 
 
+def test_non_finite_coordinates_raise():
+    """A NaN or infinite coordinate gives a clear error (the JS twin used to loop forever when an axis had at most one
+    finite fractional coordinate); an excluded atom does not count."""
+    two = Structure(["H", "H"], [[0, 0, 0], [0, 0, 1]], cell=[[5, 0, 0], [0, 5, 0], [0, 0, 20]])
+    two.positions[0, 0] = math.nan   # along a only one fractional coordinate is finite; NaN * 0 spoils every axis
+    one = Structure(["H"], [[0, 0, 0]], cell=[[5, 0, 0], [0, 5, 0], [0, 0, 20]])
+    one.positions[0, 2] = math.inf
+    for s in (two, one):
+        for fn in (lambda: find_vacuum_gap(s), lambda: find_vacuum_gap(s, 0), lambda: find_vacuum_gaps(s),
+                   lambda: find_vacuum_gap(s, 2, min_width=0), lambda: gap_cut(s, 2), lambda: axis_gaps(s, 2),
+                   lambda: surface_normal(s), lambda: display_cuts(s), lambda: vacuum_gap_hint(s)):
+            with pytest.raises(ValueError, match=r"^positions must be finite numbers$"):
+                fn()
+    slab = fcc111()
+    slab.positions[2, 2] = math.nan
+    with pytest.raises(ValueError, match=r"^positions must be finite numbers$"):
+        gap_cut(slab, 2)
+    assert gap_cut(slab, 2, exclude=[2]) is not None
+    slab.positions[2, 2] = 0.0
+    assert abs(find_vacuum_gap(slab)["width"] - 15.0) < 1e-9
+
+
 def test_exports():
     names = ["axis_gaps", "find_vacuum_gaps", "find_vacuum_gap", "gap_cut", "display_cuts", "unwrap_along_gap",
              "surface_normal", "find_surface_gap", "require_gap", "vacuum_axis", "vacuum_gap_hint", "contiguous_shifts",

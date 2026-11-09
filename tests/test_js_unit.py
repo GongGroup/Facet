@@ -99,6 +99,25 @@ def test_run_js_carries_numpy_and_non_finite_numbers(js):
     assert math.isnan(special[0]) and special[1:] == [math.inf, -math.inf, 1.5]
 
 
+def test_bridge_talks_utf8_whatever_the_locale(js, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    """Names carry "×" and "Å": the pipes to Node are UTF-8 even where the locale's encoding is not."""
+    from . import js_bridge
+
+    seen: list = []
+    real = subprocess.run
+
+    def spy(*args, **kw):
+        seen.append(kw.get("encoding"))
+        return real(*args, **kw)
+
+    monkeypatch.setattr(js_bridge.subprocess, "run", spy)
+    assert js("return input + ' ×2 Å';", "Pt(111) p(3×3)") == "Pt(111) p(3×3) ×2 Å"
+    (tmp_path / "u.test.mjs").write_text("import { test } from 'node:test';\ntest('× Å', () => {});\n",
+                                         encoding="utf-8")
+    assert "× Å" in run_node_tests([tmp_path / "u.test.mjs"]).stdout
+    assert seen == ["utf-8", "utf-8"]
+
+
 def test_run_js_imports_repository_modules(js):
     """``repo(rel)`` imports any module of the checkout (here the JS case helpers)."""
     got = js("const h = await repo('tests/js/helpers.mjs'); return [h.SCHEMA, h.REPO, h.WEB_JS];")

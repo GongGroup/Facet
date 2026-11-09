@@ -389,11 +389,11 @@ def test_inputs_resolve(registry, tmp_path: Path):
     assert inp.text.startswith("H2\n") and inp.structure is inp.structure and inp.structure.symbols == ["H", "H"]
     assert np.allclose(inp.structure.positions[1], [0, 0, 0.75])
 
-    doc = {"symbols": ["O"], "positions": [[0, 0, 0]], "props": {"tags": [[1]]}}
+    doc = {"symbols": ["O"], "positions": [[0, 0, 0]], "props": {"extra": [[1]]}}  # a key without a normalizer
     case = {"id": "b", "input": {"structure": doc}}
     s = resolve_input(case).structure
-    s.props["tags"][0].append(2)  # the case document is not touched
-    assert case["input"]["structure"]["props"]["tags"] == [[1]]
+    s.props["extra"][0].append(2)  # the case document is not touched
+    assert case["input"]["structure"]["props"]["extra"] == [[1]]
     with pytest.raises(ValueError, match="has no text"):
         resolve_input(case).text
 

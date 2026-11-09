@@ -190,7 +190,7 @@ def run_js(source: str, payload: Any = None, timeout: float = 30.0) -> Any:
     request = json.dumps({"source": source, "input": _encode(payload)}, allow_nan=False)
     try:
         proc = subprocess.run([node, "--input-type=module", "-e", _DRIVER], input=request, capture_output=True,
-                              text=True, timeout=timeout, env=_env(), cwd=REPO)
+                              text=True, encoding="utf-8", timeout=timeout, env=_env(), cwd=REPO)
     except subprocess.TimeoutExpired as exc:
         raise JSError(f"node did not finish within {timeout:g} s", _text(exc.stderr)) from None
     if proc.returncode != 0:
@@ -225,7 +225,7 @@ def run_node_tests(paths: Sequence[str | Path], *, timeout: float = 300.0) -> su
     node, _ = find_node()
     try:
         return subprocess.run([node, "--test", "--test-reporter=tap", *(str(f.resolve()) for f in files)],
-                              capture_output=True, text=True, timeout=timeout, env=_env(), cwd=REPO)
+                              capture_output=True, text=True, encoding="utf-8", timeout=timeout, env=_env(), cwd=REPO)
     except subprocess.TimeoutExpired as exc:
         raise JSError(f"node --test did not finish within {timeout:g} s", _text(exc.stderr)) from None
 

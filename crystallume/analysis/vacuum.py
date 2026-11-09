@@ -25,7 +25,8 @@ Terms (axis ``k`` = cell vector a, b or c):
 
 Ties: widths within ``SURFACE_DEFAULTS.position_tolerance`` (1e-5 Å) are equal, and threshold comparisons allow the
 same tolerance.  :func:`find_vacuum_gap` (a report) takes the gap that starts lowest, then axes c, b, a;
-:func:`gap_cut` the gap whose middle is nearest a cell face.
+:func:`gap_cut` the gap whose middle is nearest a cell face.  Every coordinate taking part must be finite
+(``ValueError``: ``positions must be finite numbers``; an excluded atom does not count).
 
 The JavaScript twin is ``crystallume/web/js/core/vacuum.js``; both languages give the same results on the shared
 cases ``tests/data/surface/gaps.json`` and ``tests/data/surface/f0d/vacuum.json``.  Frames: ``frame=None`` is
@@ -223,7 +224,10 @@ def _gaps(structure: Structure, k: int, pos: np.ndarray, cell: Any, keep: np.nda
     if n == 0:
         return None
     h = abs(d) / area
-    f = _fractions(p, m, d, k)
+    with np.errstate(invalid="ignore", over="ignore"):
+        f = _fractions(p, m, d, k)
+    if not np.all(np.isfinite(f)):  # NaN would leave no widest gap (and loops forever in a naive search)
+        raise ValueError("positions must be finite numbers")
     w = f - np.floor(f)
     w[w > 1.0 - SURFACE_DEFAULTS.gap_wrap_eps] = 0.0
     w.sort()
