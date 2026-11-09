@@ -2,8 +2,9 @@
  * CIF reader (with symmetry expansion) and P1 CIF writer.
  * Supports `_symmetry_equiv_pos_as_xyz`, `_space_group_symop_operation_xyz`,
  * fractional or Cartesian sites, uncertainties like 3.905(2), quoted and multi-line values, and
- * CIF2/mmCIF dotted tags (`_cell.length_a` reads as `_cell_length_a`), like the Python reader.
- *   readCIF(text)    → the first data block with atom sites (info.warning names the others)
+ * CIF2/mmCIF dotted tags (`_cell.length_a` reads as `_cell_length_a`), like the Python reader. The site labels are
+ * `props.labels` and the notes in `info.warnings` are worded as the Python reader words them.
+ *   readCIF(text)    → the first data block with atom sites (a note names the others)
  *   readCIFAll(text) → one Structure per data block with atom sites
  */
 import { Structure, fixDegenerateCell, addWarning } from '../core/structure.js';
@@ -76,6 +77,22 @@ export function parseCIF(text) {
     i++;
   }
   return blocks;
+}
+
+/** `s` quoted as Python's repr() quotes printable text, for notes worded like the Python reader's (`{sg!r}`). */
+function pyRepr(s) {
+  const q = s.includes("'") && !s.includes('"') ? '"' : "'";
+  let out = '';
+  for (const ch of s) {
+    const c = ch.codePointAt(0);
+    if (ch === '\\' || ch === q) out += `\\${ch}`;
+    else if (ch === '\n') out += '\\n';
+    else if (ch === '\r') out += '\\r';
+    else if (ch === '\t') out += '\\t';
+    else if (c < 0x20 || c === 0x7f) out += `\\x${c.toString(16).padStart(2, '0')}`;
+    else out += ch;
+  }
+  return q + out + q;
 }
 
 /** A CIF number without its standard uncertainty: "3.905(2)" → 3.905; "?" and "." → NaN. */
@@ -210,7 +227,7 @@ function blockToStructure(block, filename = '') {
     if (single && single !== '?') ops = [parseSymop(single)];
   }
   const sg = get('_symmetry_space_group_name_h-m', '_space_group_name_h-m_alt', '_space_group_name_h-m');
-  if (!symLoop && ops.length === 1 && sg && !/^p\s*1$/i.test(String(sg).trim())) addWarning(info, `no symmetry operations listed for ${String(sg).trim()}; atoms used as listed (P1)`);
+  if (!symLoop && ops.length === 1 && sg && !/^p\s*1$/i.test(String(sg).trim())) addWarning(info, `no symmetry operators found for space group ${pyRepr(String(sg))}; atoms used as listed (P1)`);
 
   const sites = siteLoop.rows.map((r) => {
     const label = iLabel >= 0 ? r[iLabel] : '';
@@ -236,10 +253,10 @@ function blockToStructure(block, filename = '') {
   info.spacegroup = sg; info.block = block.name;
   const sgn = get('_symmetry_int_tables_number', '_space_group_it_number');
   if (sgn && Number.isFinite(num(sgn))) info.spacegroupNumber = num(sgn);
-  const props = { label: labels };
+  const props = { labels };
   if (occ.some((o) => Number.isFinite(o) && Math.abs(o - 1) > 1e-6)) {
     props.occupancy = occ.map((o) => (Number.isFinite(o) ? o : 1));
-    addWarning(info, 'partially occupied sites (all kept)');
+    addWarning(info, 'structure contains partially occupied sites (all sites kept)');
   }
   return new Structure({ name: String(name).trim() || 'CIF structure', symbols, positions, cell, pbc: cell ? [true, true, true] : [false, false, false], info, props });
 }
@@ -251,7 +268,7 @@ export function readCIFAll(text, filename = '') {
   return blocks.map((b) => blockToStructure(b, filename));
 }
 
-/** The first data block with atom sites; info.warning says when the file holds more. */
+/** The first data block with atom sites; a note in info.warnings says when the file holds more. */
 export function readCIF(text, filename = '') {
   const all = parseCIF(text);
   if (!all.length) throw new Error('CIF: no data block found.');
