@@ -259,8 +259,8 @@ export async function replaceSelection(app) {
   if (!v) return;
   const sym = normalizeSymbol(v);
   if (sym === 'X') { toast(`“${v}” is not an element symbol. Try Fe, O or Ti.`, { type: 'error' }); return; }
-  const k = app.selection.length, r = app.replaceSelected(sym);   // the selection may have changed while the dialog was open
-  if (r) app.toastUndo(`Changed ${plural(k, 'atom')} to ${sym}`, { entry: r.entry });
+  const k = app.selection.length;   // the selection may have changed while the dialog was open
+  app.replaceSelected(sym, { toast: `Changed ${plural(k, 'atom')} to ${sym}` });
 }
 
 /** Keep the selected geometry as a measurement (2–4 atoms of `sel`) or start measuring from one atom. */

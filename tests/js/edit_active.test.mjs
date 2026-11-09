@@ -57,6 +57,8 @@ const { makeScene } = await import(web('render/settings.js'));
 const { structureKey, structureDigest } = await import(web('core/analyses.js'));
 const { leftPanels } = await import(web('ui/shell.js'));
 await import(web('ui/panels/structure.js'));
+const { createAPI } = await import(web('api/public.js'));
+const { defineApi } = await import(web('api/namespaces.js'));
 
 // ------------------------------------------------------------------ fixtures
 /** A Pt(111) slab of nx × nx atoms per layer and L layers, with constraints, tags, a space group and info.surface. */
@@ -73,6 +75,11 @@ function slab(nx = 2, L = 2, name = `Pt(111) p(${nx}×${nx}) ${L}L`) {
     info: { spacegroup: 'P-3m1', spacegroupNumber: 164, surface: { miller: [1, 1, 1], layers: L, axis: 2 } } });
 }
 const json = (s) => JSON.stringify(s.toJSON({ precision: 12 }));
+/** O Pt O Pt C Pt in a cubic cell, for edits that reorder (sortBySpecies). */
+const mix = () => new Structure({ name: 'mix', symbols: ['O', 'Pt', 'O', 'Pt', 'C', 'Pt'], positions: [[0, 0, 0], [2, 0, 0], [0, 2, 0], [2, 2, 0], [1, 1, 1], [3, 3, 3]], cell: [[6, 0, 0], [0, 6, 0], [0, 0, 6]], pbc: [true, true, true] });
+/** n Pt atoms in a row along a, 2.8 Å apart, in a cell n × 2.8 Å long. */
+const chain = (n = 6) => new Structure({ name: 'Pt chain', symbols: Array(n).fill('Pt'), positions: Array.from({ length: n }, (_, i) => [2.8 * i, 0, 0]), cell: [[2.8 * n, 0, 0], [0, 10, 0], [0, 0, 10]], pbc: [true, true, true] });
+const sorted = (xs) => [...xs].sort((a, b) => a - b);
 
 /** What editActive and friends use of the viewer; records the rebuilds, the remaps and camera turns. */
 function stubViewer() {
@@ -412,6 +419,205 @@ describe('editActive', () => {
   });
 });
 
+// ------------------------------------------------------------------ edits made inside an edit's fn
+describe('edits inside an edit’s fn (crystallume.edit.run and edit.* members)', () => {
+  /** crystallume for `app`, with an edit.* member that sorts by species: one editActive per call, as members are (L-F0-53). */
+  function apiWithSort(app, t) {
+    app.storage = { list: () => [] };
+    t.after(defineApi('edit.sortForTest', (order) => app.editActive('Sort atoms by species', (s) => { s.sortBySpecies(order); }, { toast: 'Sorted the atoms by species' }), { owner: 'test' }));
+    return createAPI(app, null);
+  }
+
+  test('a reordering and a deleting edit inside edit.run: each change is followed once, in order; one step, one redraw, one toast', (t) => {
+    const app = makeApp(), s = mix(), v = app.viewer;
+    const [e] = setup(app, s);
+    const api = apiWithSort(app, t);
+    e.measurements = [{ id: 'm', type: 'distance', refs: ['3:0,0,0', '5:0,0,0'] }];   // Pt3–Pt5
+    app._showMeasurements(e);
+    app.select([4]);   // the C atom
+    const j0 = json(s), builds = v.builds, from = elements.length;
+    const r = api.edit.run('Prepare', () => {
+      api.edit.sortForTest(['Pt', 'O', 'C']);   // Pt1 Pt3 Pt5 O0 O2 C4: the C is atom 5 now…
+      app.deleteSelected();                     // …and it is the atom deleted
+      return 'ready';
+    });
+    assert.equal(s.symbols.join(' '), 'Pt Pt Pt O O');
+    assert.deepEqual(e.measurements.map((m) => m.refs), [['1:0,0,0', '2:0,0,0']], 'still Pt3–Pt5, now atoms 1 and 2 (not O2–Pt0)');
+    assert.ok(e.measurements[0].refs.every((ref) => s.symbols[parseInt(ref, 10)] === 'Pt'));
+    assert.deepEqual(app.selection, []);
+    assert.deepEqual(v.remaps, [[[3, 0, 4, 1, 5, 2], 6], [[0, 1, 2, 3, 4, -1], 5]], 'masks and highlights: the sort, then the deletion, each once');
+    assert.equal(v.builds, builds + 1, 'drawn once, at the end');
+    assert.equal(app.history.length, 1);
+    assert.deepEqual(r, { entry: { id: app.history.top().id, label: 'Prepare' }, value: 'ready' });
+    assert.deepEqual(toastsSince(from).map((x) => [x.text, x.buttons]), [['Sorted the atoms by species. Deleted 1 atom.', ['Undo']]]);
+    app.undo();
+    assert.equal(json(app.structure), j0);
+    assert.deepEqual(app.selection, [4]);
+    assert.deepEqual(app.project.structures[0].measurements.map((m) => m.refs), [['3:0,0,0', '5:0,0,0']]);
+    // the same as making the two edits one after the other, except for the steps
+    api.edit.sortForTest(['Pt', 'O', 'C']);
+    app.deleteSelected();
+    assert.deepEqual([app.structure.symbols.join(' '), app.project.structures[0].measurements.map((m) => m.refs)], ['Pt Pt Pt O O', [['1:0,0,0', '2:0,0,0']]]);
+  });
+
+  test('an edit inside fn returns its own map and no step; deleteSelected and replaceSelected count the atoms as fn left them', () => {
+    const app = makeApp(), s = mix();
+    setup(app, s);
+    app.select([1]);   // Pt1
+    let inner;
+    const r = app.editActive('Sort and delete', (st) => {
+      st.sortBySpecies(['C', 'O', 'Pt']);   // fn's own change: C4 O0 O2 Pt1 Pt3 Pt5
+      inner = app.deleteSelected();
+    });
+    assert.equal(s.symbols.join(' '), 'C O O Pt Pt', 'the Pt selected went (atom 3 once sorted), not the atom at its old index');
+    assert.deepEqual([inner.entry, Array.from(inner.map)], [null, [0, 1, 2, -1, 3, 4]]);
+    assert.deepEqual(Array.from(r.map), [1, -1, 2, 3, 0, 4]);
+    app.select([0]);   // the C
+    app.editActive('Sort and replace', (st) => { st.sortBySpecies(['O', 'C', 'Pt']); app.replaceSelected('N'); });
+    assert.equal(app.structure.symbols.join(' '), 'O O N Pt Pt');
+    assert.equal(app.history.length, 2);
+  });
+
+  test('an edit given indexMap or src covers the edits inside its fn: they follow nothing, it follows its map once', () => {
+    const app = makeApp(), s = mix();
+    setup(app, s);
+    app.select([3]);
+    const r = app.editActive('Reverse', (st) => {
+      const inner = app.editActive('Swap the first two', (x) => { x.remap([1, 0, 2, 3, 4, 5]); });
+      assert.deepEqual([inner.entry, Array.from(inner.map)], [null, [1, 0, 2, 3, 4, 5]]);
+      st.remap([5, 4, 3, 2, 0, 1]);
+    }, { indexMap: [5, 4, 3, 2, 1, 0] });
+    assert.deepEqual(Array.from(r.map), [5, 4, 3, 2, 1, 0]);
+    assert.deepEqual(app.selection, [2]);
+    assert.deepEqual(app.viewer.remaps, [[[5, 4, 3, 2, 1, 0], 6]]);
+  });
+
+  test('an edit inside fn that fails keeps what it changed, followed as the rest; the step goes on, or is put back as a whole', () => {
+    const app = makeApp(), s = slab();
+    const [e] = setup(app, s);
+    e.measurements = [{ id: 'm', type: 'distance', refs: ['4:0,0,0', '6:0,0,0'] }];
+    app._showMeasurements(e);
+    app.select([5]);
+    const j0 = json(s);
+    let caught = null;
+    app.editActive('Batch', () => {
+      try { app.editActive('Half done', (x) => { x.deleteAtoms([0]); throw new Error('stopped half way'); }); } catch (err) { caught = err.message; }
+    });
+    assert.equal(caught, 'stopped half way');
+    assert.equal(app.structure.length, 7);
+    assert.deepEqual(app.selection, [4]);
+    assert.deepEqual(e.measurements.map((m) => m.refs), [['3:0,0,0', '5:0,0,0']]);
+    assert.deepEqual(app.viewer.remaps, [[[-1, 0, 1, 2, 3, 4, 5, 6], 7]]);
+    assert.equal(app.history.length, 1);
+    app.undo();
+    assert.equal(json(app.structure), j0);
+    // an error that leaves the outermost fn: everything goes back, the edit inside it too
+    assert.throws(() => app.editActive('Batch', () => { app.editActive('Delete', (x) => { x.deleteAtoms([0]); }); throw new Error('no'); }), /^Error: no$/);
+    assert.equal(json(app.structure), j0);
+    assert.deepEqual(app.selection, [5]);
+    assert.deepEqual(app.project.structures[0].measurements.map((m) => m.refs), [['4:0,0,0', '6:0,0,0']]);
+    assert.equal(app.history.redoLength, 1, 'no new step');
+    assert.equal(app._editScope, null);
+  });
+
+  test('replaceActiveStructure inside fn: the active structure takes the new content, so fn goes on editing it; whole-cell moves are kept', () => {
+    const app = makeApp();
+    const s = new Structure({ name: 'Pt chain', symbols: ['Pt', 'Pt', 'Pt'], positions: [[0, 0, 0], [2.8, 0, 0], [5.6 + 8.4, 0, 0]], cell: [[8.4, 0, 0], [0, 10, 0], [0, 0, 10]], pbc: [true, true, true] });
+    const [e] = setup(app, s);
+    e.measurements = [{ id: 'm', type: 'distance', refs: ['1:0,0,0', '2:0,0,0'] }];   // atom 2 lies one cell along a
+    app._showMeasurements(e);
+    const builds = app.viewer.builds;
+    app.editActive('Wrap and tag', (st) => {
+      const c = st.clone(); c.wrap();
+      const inner = app.replaceActiveStructure(c, { label: 'Wrap into cell' });
+      assert.deepEqual([inner.entry, Array.from(inner.map)], [null, [0, 1, 2]]);
+      assert.equal(app.structure, st, 'fn’s structure is still the active one');
+      st.setProp('tags', st.symbols.map(() => 1));
+    });
+    assert.equal(app.structure, s);
+    assert.ok(Math.abs(s.pos(2)[0] - 5.6) < 1e-9);
+    assert.deepEqual(s.props.tags, [1, 1, 1]);
+    assert.deepEqual(e.measurements.map((m) => m.refs), [['1:0,0,0', '2:1,0,0']], 'the same two points: atom 2 is one cell back');
+    assert.equal(app.viewer.builds, builds + 1);
+    assert.equal(app.history.length, 1);
+    app.undo();
+    assert.ok(Math.abs(app.structure.pos(2)[0] - 14) < 1e-9);
+    assert.equal(app.structure.props.tags, undefined);
+  });
+
+  test('the options of the edits inside fn count: {select}, latticeChanged, singleFrame, toasts in order after the outer message', () => {
+    const app = makeApp(), s = chain(5);
+    const shift = (dz) => ({ positions: Float64Array.from(s._base, (v, k) => (k % 3 === 2 ? v + dz : v)), cell: null });
+    s.frames = [shift(0.5)];
+    s.setFrame(1);
+    const [e] = setup(app, s);
+    e.measurements = [{ id: 'a', type: 'distance', refs: ['3:0,0,0', '4:1,0,0'] }, { id: 'b', type: 'distance', refs: ['1:0,0,0', '2:0,0,0'] }];
+    app._showMeasurements(e);
+    const from = elements.length;
+    const r = app.editActive('Outer', () => {
+      app.editActive('Middle', (x) => {
+        x.deleteAtoms([0]);
+        app.editActive('Inner', (y) => { y.writeFrame('current', { cell: y.cell.map((row) => row.map((c) => c * 1.01)) }); return { select: [0, 1] }; },
+          { latticeChanged: true, singleFrame: true, toast: 'Strained the cell' });
+        x.remap([1, 0, 2, 3]);
+      }, { toast: 'Rearranged' });
+    }, { toast: 'Prepared' });
+    assert.deepEqual(Array.from(r.map), [-1, 1, 0, 2, 3]);
+    assert.deepEqual(sorted(app.selection), [0, 1], 'Inner’s selection, through Middle’s swap');
+    assert.deepEqual(e.measurements.map((m) => m.refs), [['1:0,0,0', '0:0,0,0']], 'the one across cells went with the lattice');
+    assert.equal(app.structure.nFrames, 1);
+    assert.deepEqual(toastsSince(from).map((x) => [x.text, x.buttons]),
+      [['Prepared. Strained the cell. Rearranged. Kept frame 2 of 2 and dropped the others. 1 measurement was removed.', ['Undo']]]);
+    app.undo();
+    assert.deepEqual([app.structure.length, app.structure.nFrames, app.project.structures[0].measurements.length], [5, 2, 2]);
+  });
+
+  test('the outer imageShift counts fn’s atoms, also after an edit inside fn renumbered them', () => {
+    const app = makeApp(), s = chain(3);
+    const [e] = setup(app, s);
+    e.measurements = [{ id: 'm', type: 'distance', refs: ['0:0,0,0', '2:0,0,0'] }];
+    app._showMeasurements(e);
+    app.editActive('Move atom 2 by +a', (st) => {
+      app.editActive('Reverse', (x) => { x.remap([2, 1, 0]); });   // fn's atom 2 is atom 0 now
+      const p = st.pos(0);
+      st.setPositions({ indices: [0], positions: [[p[0] + st.cell[0][0], p[1], p[2]]] });
+    }, { imageShift: (i) => (i === 2 ? [1, 0, 0] : null) });
+    assert.deepEqual(e.measurements.map((m) => m.refs), [['2:0,0,0', '0:-1,0,0']], 'from the atom that stayed to the one moved one cell along a');
+  });
+
+  test("one redraw by the widest need: 'appearance' around an edit that deletes draws in full without a warning", (t) => {
+    const app = makeApp(), v = app.viewer;
+    setup(app, slab());
+    v.appearance = 0;
+    v.refreshAppearance = () => { v.appearance++; };
+    const warn = quiet(t);
+    let builds = v.builds;
+    app.editActive('Fix, then delete', () => { app.select([0]); app.deleteSelected(); }, { rebuild: 'appearance' });
+    assert.deepEqual([v.builds - builds, v.appearance, warn.mock.callCount()], [1, 0, 0]);
+    builds = v.builds;
+    app.editActive('Note', () => { app.editActive('Tag', (x) => { x.setProp('tags', x.symbols.map(() => 2)); }, { rebuild: 'appearance' }); }, { rebuild: 'none' });
+    assert.deepEqual([v.builds - builds, v.appearance, warn.mock.callCount()], [0, 1, 0], 'colours only');
+    app.editActive('Note', () => { app.editActive('Move', (x) => { x.translate([0, 0, 0.1]); }, { rebuild: 'none' }); }, { rebuild: 'none' });
+    assert.deepEqual(warn.mock.calls.map((c) => c.arguments[0]), ["editActive “Move”: rebuild 'none' changed positions, cell or elements; rebuilt in full."], 'the edit that broke its promise is named, once');
+  });
+
+  test('inside fn, edit.touch() draws nothing; fn that shows another structure is refused and put back', () => {
+    const app = makeApp(), a = slab(1, 1, 'A'), b = slab(1, 2, 'B');
+    setup(app, a, b);
+    const builds = app.viewer.builds;
+    let touched;
+    app.editActive('Direct', (st) => { st.translate([0, 0, 0.1]); touched = app.notifyStructureChanged(); assert.equal(app.viewer.builds, builds); });
+    assert.equal(touched, 'none', 'the edit draws when fn returns');
+    assert.equal(app.viewer.builds, builds + 1);
+    const j0 = json(a), steps = app.history.length;
+    assert.throws(() => app.editActive('Wander', () => { app.setActiveStructure(app.project.structures[1].id); }),
+      { message: 'editActive “Wander”: fn must change the structure it is given, not show or put in another one.' });
+    assert.throws(() => app.editActive('Outer', () => { app.setActiveStructure(app.project.structures[1].id); app.editActive('Inner', (x) => { x.deleteAtoms([0]); }); }),
+      { message: 'editActive “Inner”: “Outer” is editing another structure.' });
+    assert.deepEqual([app.structure.name, json(app.structure), app.project.structures[1].structure.length, app.history.length], ['A', j0, 2, steps]);
+  });
+});
+
 // ------------------------------------------------------------------ deleteSelected, replaceSelected, rev
 describe('deleteSelected and replaceSelected', () => {
   test('one step each through editActive; the space group goes (C7); Delete’s toast has an Undo for its step', () => {
@@ -432,7 +638,7 @@ describe('deleteSelected and replaceSelected', () => {
     assert.equal(app.structure.length, 8);
     assert.equal(app.structure.info.spacegroup, 'P-3m1');
     assert.deepEqual(app.selection, [0, 2]);
-    // Replace: the caller shows the toast with the returned entry
+    // Replace: no toast unless the caller gives its message
     const mark = elements.length;
     const c = app.replaceSelected('Au');
     assert.equal(c.entry.label, 'Change 2 atoms to Au');
@@ -442,6 +648,20 @@ describe('deleteSelected and replaceSelected', () => {
     assert.deepEqual(toastsSince(mark), []);
     app.clearSelection();
     assert.equal(app.replaceSelected('Au'), null);
+  });
+
+  test('replaceSelected({toast}): one toast with the message, the notes the change added and an Undo for it', () => {
+    const app = makeApp(), s = slab();
+    s.info.energy = -12.5;   // calculated results: setSymbols drops them with a note
+    setup(app, s);
+    app.select([1, 3]);
+    const from = elements.length;
+    const r = app.replaceSelected('Pd', { toast: 'Replaced 2 atoms with Pd' });
+    const shown = toastsSince(from);
+    assert.deepEqual(shown.map((x) => [x.text, x.buttons]), [['Replaced 2 atoms with Pd. Calculated results (energy) were removed because the structure changed.', ['Undo']]]);
+    assert.equal(r.entry, app.history.top());
+    press(shown[0].el, 'Undo');
+    assert.deepEqual([app.structure.symbols[1], app.structure.info.energy], ['Pt', -12.5]);
   });
 
   test('an edit of props only changes structureKey and the Structure panel signature (A4); the digest alone would not', () => {
@@ -562,6 +782,27 @@ describe('addStructure', () => {
     assert.throws(() => app.addStructure(slab(), { replaceProject: 'yes' }), { name: 'TypeError', message: "addStructure: replaceProject must be 'auto', true or false." });
   });
 
+  test("true starts from the default look, as newProject: true does; only 'auto' keeps a scratch project’s settings", () => {
+    const scenes = [{ newProject: true }, { replaceProject: true }].map((opts) => {
+      const app = makeApp();
+      setup(app, slab(1, 1, 'A'));
+      app.scene.display.labels = 'element';   // the user's own settings in the open project
+      app.scene.look = 'my-look';
+      const open = app.project.scene;
+      app.addStructure(slab(1, 1, 'B'), opts);
+      assert.notEqual(app.project.scene, open, `${JSON.stringify(opts)}: a scene of its own`);
+      assert.notEqual(app.project.scene.look, 'my-look');
+      assert.notEqual(app.project.scene.display.labels, 'element');
+      return app._sceneJSON();
+    });
+    assert.equal(scenes[1], scenes[0], 'the same scene');
+    // a pristine scratch project replaced by 'auto' keeps the settings chosen so far (as before)
+    const app = makeApp();
+    app.scene.display.labels = 'element';
+    app.addStructure(slab(1, 1, 'C'));
+    assert.equal(app.project.scene.display.labels, 'element');
+  });
+
   test('label, name and activate; inside a transaction the step is the transaction’s', () => {
     const app = makeApp(), a = slab(1, 1, 'A');
     setup(app, a);
@@ -625,7 +866,12 @@ describe('with the viewer’s visibility masks', async () => {
     Object.assign(v, { root: new THREE.Group(), selection: new Set(), measurements: [], settings: makeScene(), structure: null, _dirty: false, lights: { setBounds() {} } });
     v._updateFloor = () => {};
     v._cssTheme = () => ({ accent: '#e8a33d', accentStrong: '#c27c12', font: 'sans-serif' });
-    v.applySettings = function applySettings(settings) { this.settings = settings; this._buildModel(); this._buildMeasurements(); };
+    // failNext: the next redraw throws once (a lost graphics context), as a view that fails does
+    v.applySettings = function applySettings(settings) {
+      this.settings = settings;
+      if (this.failNext) { this.failNext = false; throw new Error('the viewer could not draw this'); }
+      this._buildModel(); this._buildMeasurements();
+    };
     v.resetView = () => {};
     v.overlays = { switched() {} };
     v._setupHalos();
@@ -645,5 +891,59 @@ describe('with the viewer’s visibility masks', async () => {
     assert.ok(!v.isVisible(0) && !v.isVisible(1) && v.isVisible(2));
     assert.deepEqual([...v._highlights.get('fixed').set].sort((a, b) => a - b), [0, 3]);
     assert.ok([...v.model.src].every((i) => i >= 2), 'the model was built with the remapped mask');
+  });
+
+  test('edits inside crystallume.edit.run: the mask and the highlight stay on their atoms through a sort and a deletion', () => {
+    const v = bareViewer(), app = makeApp(v), s = mix();
+    setup(app, s);
+    app.storage = { list: () => [] };
+    const api = createAPI(app, null);
+    v.setVisibility('layers', { hide: [3] });   // Pt3
+    v.setHighlight('fixed', [5, 0]);           // Pt5 and O0
+    app.select([4]);                           // C4
+    api.edit.run('Prepare', () => {
+      app.editActive('Sort atoms by species', (x) => { x.sortBySpecies(['Pt', 'O', 'C']); });   // Pt1 Pt3 Pt5 O0 O2 C4
+      app.deleteSelected();
+    });
+    assert.equal(s.symbols.join(' '), 'Pt Pt Pt O O');
+    assert.deepEqual([0, 1, 2, 3, 4].filter((i) => !v.isVisible(i)), [1], 'Pt3 is atom 1');
+    assert.deepEqual(sorted(v._highlights.get('fixed').set), [2, 3], 'Pt5 and O0 are atoms 2 and 3');
+    assert.deepEqual(sorted(new Set(v.model.src)), [0, 2, 3, 4], 'drawn with the mask');
+  });
+
+  test('a view that fails puts the masks and highlights back too: after a deletion, a reordering, edits inside fn (F0-A §3.2)', () => {
+    const cases = {
+      'a deletion': (app) => app.editActive('Delete atom 7', (x) => { x.deleteAtoms([7]); }),
+      'a reordering': (app) => app.editActive('Swap atoms 0 and 4', (x) => { x.remap([4, 1, 2, 3, 0, 5, 6, 7]); }),
+      'edits inside fn': (app) => app.editActive('Batch', () => { app.select([7]); app.deleteSelected(); app.editActive('Swap', (x) => { x.remap([4, 1, 2, 3, 0, 5, 6]); }); }),
+    };
+    for (const [what, edit] of Object.entries(cases)) {
+      const v = bareViewer(), app = makeApp(v), s = slab();
+      setup(app, s);
+      v.setVisibility('layers', { hide: [0, 1] });
+      v.setHighlight('fixed', [0]);
+      const j0 = json(s);
+      v.failNext = true;
+      assert.throws(() => edit(app), /could not draw/, what);
+      assert.equal(json(app.structure), j0, what);
+      assert.deepEqual([v.visibilityNames(), [...Array(8).keys()].filter((i) => !v.isVisible(i)), [...v._highlights.get('fixed').set]], [['layers'], [0, 1], [0]], `${what}: as before`);
+      assert.deepEqual(sorted(new Set(v.model.src)), [2, 3, 4, 5, 6, 7], `${what}: drawn again with the mask`);
+      assert.equal(app.history.length, 0);
+    }
+    // the same for a transaction whose fn throws after an edit
+    const v = bareViewer(), app = makeApp(v);
+    setup(app, slab());
+    v.setVisibility('layers', { hide: [0, 1] });
+    v.setHighlight('fixed', [0]);
+    assert.throws(() => app.transaction('Batch', () => { app.select([0]); app.deleteSelected(); throw new Error('a script error'); }), /a script error/);
+    assert.deepEqual([[...Array(8).keys()].filter((i) => !v.isVisible(i)), [...v._highlights.get('fixed').set]], [[0, 1], [0]]);
+  });
+
+  test('edit.touch() inside fn keeps the masks: nothing is drawn until fn returns', () => {
+    const v = bareViewer(), app = makeApp(v), s = slab();
+    setup(app, s);
+    v.setVisibility('layers', { hide: [7] });
+    app.editActive('Direct', (x) => { x.deleteAtoms([0]); app.notifyStructureChanged(); });
+    assert.deepEqual([v.visibilityNames(), [...Array(7).keys()].filter((i) => !v.isVisible(i))], [['layers'], [6]]);
   });
 });

@@ -48,7 +48,7 @@ export const EVENTS = [
   ['history', 'app', '—', 'The undo/redo stacks changed'],
   ['saveState', 'app', "'idle' | 'dirty' | 'saving' | 'saved' | 'error'", 'Save state of the open project'],
   ['saved', 'app', '—', 'The open project was stored'],
-  ['busy', 'app', '{busy, label}', 'A long task started or ended'],
+  ['busy', 'app', '{busy, label, cancel}', 'A long task started or ended (cancel: stops the newest task when it can be cancelled, else null)'],
   ['providers', 'app', '—', 'Storage providers or their sign-in state changed'],
   ['auth', 'app', 'user | null', 'The server account changed'],
   ['needAuth', 'app', '—', 'A save needs the user to sign in'],

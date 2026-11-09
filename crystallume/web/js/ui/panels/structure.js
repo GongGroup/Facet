@@ -156,8 +156,8 @@ registerLeftPanel({
           const atoms = await confirmHiddenSelection(app, 'Change', sel);   // hidden atoms change only when the user says so
           if (!atoms?.length) return;
           if (atoms.length !== sel.length) app.select(atoms);
-          const r = app.replaceSelected(sym);
-          if (r) app.toastUndo(`Replaced ${atoms.length} atom${atoms.length > 1 ? 's' : ''} with ${sym}`, { entry: r.entry });
+          // one toast: the message, the notes of the change (calculated results that went) and an Undo for it
+          app.replaceSelected(sym, { toast: `Replaced ${atoms.length} atom${atoms.length > 1 ? 's' : ''} with ${sym}` });
         } })));
     }
     el.append(selSec);

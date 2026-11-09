@@ -72,6 +72,7 @@ const { Shell, leftPanels } = await import(web('ui/shell.js'));
 const { replaceSelection } = await import(web('ui/selectioncard.js'));
 const { samples } = await import(web('build/samples.js'));
 await import(web('ui/panels/structure.js'));
+const { EVENTS } = await import(web('api/public.js'));
 
 // ------------------------------------------------------------------ the App
 const pt = (n = 6, name = 'Pt chain') => new Structure({ name, symbols: Array(n).fill('Pt'), positions: Array.from({ length: n }, (_, i) => [2.8 * i, 0, 0]), cell: [[2.8 * n, 0, 0], [0, 10, 0], [0, 0, 10]], pbc: [true, true, true] });
@@ -261,7 +262,8 @@ describe('the toasts of Delete, paste, Replace and adding a sample undo their ow
     press(t, 'Undo');
     assert.deepEqual(said(mark), [`Undo the later changes first (press ${keyLabel('mod+z')}).`]);
     assert.equal(app.project.structures.length, 2);
-    // a parse that waits (a format the server reads) while the user edits: still bound to the paste's own step
+    // a parse that waits (a format the server reads) while the user edits, and an edit after it: still bound to the
+    // paste's own step, so its Undo first says the later edit comes first, then removes the pasted structure
     let release;
     app._parse = () => new Promise((r) => { release = () => r(new Structure({ name: 'later', symbols: ['N', 'N'], positions: [[0, 0, 0], [1.1, 0, 0]] })); });
     const m2 = elements.length;
@@ -273,9 +275,17 @@ describe('the toasts of Delete, paste, Replace and adding a sample undo their ow
     await waiting;
     const [t2] = toastEls(m2);
     assert.equal(msgOf(t2), 'Pasted 2 atoms — N2');
+    app.select([0]);
+    app.replaceSelected('O');   // a step after the paste's
+    const m2b = elements.length;
+    press(t2, 'Undo');
+    assert.deepEqual(said(m2b), [`Undo the later changes first (press ${keyLabel('mod+z')}).`]);
+    assert.deepEqual([app.project.structures.length, app.structure.symbols[0]], [3, 'O'], 'nothing undone');
+    assert.equal(app.undo(), 'Change 1 atom to O');
     press(t2, 'Undo');
     assert.equal(app.project.structures.length, 2, 'the pasted structure is gone');
     assert.deepEqual(app.project.structures.map((e) => e.name), ['Pt chain', 'water']);
+    assert.equal(app.structure.symbols[1], 'Se', 'the edit made while the paste waited stays');
     // failures
     delete app._parse;
     const m3 = elements.length;
@@ -330,6 +340,51 @@ describe('the toasts of Delete, paste, Replace and adding a sample undo their ow
     assert.deepEqual([app.structure.symbols[1], app.structure.symbols[2]], ['Pt', 'Pt']);
   });
 
+  test('Replace on a structure with calculated results: one toast, the message then the note, one Undo (panel and card)', async () => {
+    const note = 'Calculated results (energy) were removed because the structure changed.';
+    const withEnergy = () => { const s = pt(); s.info.energy = -12.5; return s; };
+    // Structure panel › Selection › Replace with … Apply
+    const app = makeApp(withEnergy());
+    app.select([1, 2]);
+    const from = elements.length;
+    leftPanels.get('structure').render(app, document.createElement('div'), null);
+    const input = elements.slice(from).find((x) => x.tag === 'input' && x.attrs['aria-label'] === 'Replace with element');
+    input.value = 'Ni';
+    const mark = elements.length;
+    click(elements.slice(from).find((x) => x.tag === 'button' && x.textContent === 'Apply'));
+    await settle();
+    assert.deepEqual(toastEls(mark).map((t) => [msgOf(t), labelsOf(t)]), [[`Replaced 2 atoms with Ni. ${note}`, ['Undo']]]);
+    press(toastEls(mark)[0], 'Undo');
+    assert.deepEqual([app.structure.symbols[1], app.structure.info.energy], ['Pt', -12.5]);
+    // the selection card's Change…
+    const app2 = makeApp(withEnergy());
+    app2.select([0, 3]);
+    const f2 = elements.length;
+    const done = replaceSelection(app2);
+    elements.slice(f2).find((el) => el.tag === 'input').value = 'Au';
+    const m2 = elements.length;
+    click(elements.slice(f2).find((el) => el.tag === 'button' && el.textContent === 'Change'));
+    await done;
+    assert.deepEqual(toastEls(m2).map((t) => [msgOf(t), labelsOf(t)]), [[`Changed 2 atoms to Au. ${note}`, ['Undo']]]);
+  });
+
+  test('Structure panel › Tools › Duplicate: the copy goes next to the original, also in an untouched sample project; one step (E-45)', () => {
+    const app = makeApp(pt(4, 'SrTiO3'));
+    app.dirty = false;   // as an untouched sample: pristine, which adding with replaceProject 'auto' would replace
+    assert.equal(app.pristine, true);
+    const from = elements.length;
+    leftPanels.get('structure').render(app, document.createElement('div'), null);
+    const dup = elements.slice(from).find((x) => x.tag === 'button' && x.textContent === 'Duplicate');
+    assert.ok(dup, 'the Duplicate button');
+    click(dup);
+    assert.equal(app.project.id, 'p1', 'the same project');
+    assert.deepEqual(app.project.structures.map((e) => e.name), ['SrTiO3', 'SrTiO3 (copy)']);
+    assert.equal(app.structure.name, 'SrTiO3 (copy)');
+    assert.deepEqual([app.history.length, app.history.top().label], [1, 'Add SrTiO3 (copy)']);
+    app.undo();
+    assert.deepEqual(app.project.structures.map((e) => e.name), ['SrTiO3']);
+  });
+
   test('a sample added to the project: its toast undoes the addition and shows the new structure’s notes', () => {
     const app = makeApp(pt());
     const from = elements.length;
@@ -376,6 +431,18 @@ describe('startTask', () => {
     assert.equal(app.busy, false);
     assert.deepEqual(seen, [[true, 'Finding the primitive cell', null], [true, 'Finding the primitive cell 42%', null], [true, 'Reducing the cell', null], [true, 'Reducing the cell 100%', null], [false, '', null]]);
     assert.throws(() => app.startTask('X', { cancel: 'stop' }), { name: 'TypeError', message: 'startTask: cancel must be a function.' });
+  });
+
+  test("the 'busy' event carries the keys its EVENTS row lists (Help › Scripting & API › Reference)", () => {
+    const app = makeApp(pt());
+    let payload = null;
+    app.on('busy', (b) => { payload = b; });
+    const task = app.startTask('Searching translations', { cancel: () => {} });
+    const row = EVENTS.find((x) => x.name === 'busy');
+    assert.equal(row.payload, '{busy, label, cancel}');
+    assert.deepEqual(Object.keys(payload).sort(), ['busy', 'cancel', 'label']);
+    assert.equal(typeof payload.cancel, 'function');
+    task.end();
   });
 
   test('with cancel, the busy indicator has a Cancel button: it calls cancel once and sets cancelled; busy until end()', (t) => {
