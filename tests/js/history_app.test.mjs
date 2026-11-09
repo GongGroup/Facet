@@ -349,7 +349,8 @@ test('replaceActiveStructure is one step; when the viewer fails nothing is recor
   // a failure
   const n = app.history.length, cur = app.structure, jc = json(cur);
   app.viewer.failFor = (x) => x.length === 1;
-  assert.throws(() => app.replaceActiveStructure(new Structure({ name: 'one', symbols: ['H'], positions: [[0, 0, 0]] })), /could not draw/);
+  // (fewer atoms need a map — without one replaceActiveStructure refuses before anything changes — so the viewer is what fails)
+  assert.throws(() => app.replaceActiveStructure(new Structure({ name: 'one', symbols: ['H'], positions: [[0, 0, 0]] }), { indexMap: [0] }), /could not draw/);
   assert.equal(app.history.length, n);
   assert.equal(app.history.redoLength, 1);
   assert.equal(json(app.structure), jc);

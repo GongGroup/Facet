@@ -742,15 +742,19 @@ export class Shell {
     this.redoBtn.setAttribute('aria-label', this.redoBtn.dataset.tip);
   }
 
-  /** app 'busy' {busy, label}: a spinner toast, Export disabled and the stage marked busy. */
-  onBusy({ busy, label } = {}) {
+  /** app 'busy' {busy, label, cancel}: a spinner toast (with Cancel when the task can be cancelled), Export disabled and the stage marked busy. */
+  onBusy({ busy, label, cancel = null } = {}) {
     this.stage.setAttribute('aria-busy', String(!!busy));
     this.exportBtn.disabled = !!busy;
     this.cameraBtn.disabled = !!busy;
     if (busy) {
-      if (this._busyToast?.isConnected) this._busyToast.update(label || 'Working…');
-      else this._busyToast = toast(label || 'Working…', { timeout: 0, spinner: true });
-    } else { this._busyToast?.close(); this._busyToast = null; }
+      if (this._busyToast?.isConnected && this._busyCancel === cancel) this._busyToast.update(label || 'Working…');
+      else {
+        this._busyToast?.close();
+        this._busyToast = toast(label || 'Working…', { timeout: 0, spinner: true, actions: cancel ? [{ label: 'Cancel', run: cancel }] : [] });
+        this._busyCancel = cancel;
+      }
+    } else { this._busyToast?.close(); this._busyToast = null; this._busyCancel = null; }
   }
 
   // ------------------------------------------------------------------ menus
@@ -1055,14 +1059,20 @@ export class Shell {
     });
   }
 
-  /** Import pasted text as a structure; failures become a toast (never an unhandled rejection). */
-  pasteText(text, format = null) {
+  /**
+   * Import pasted text as a structure (app.importText's two steps); failures become a toast (never an unhandled
+   * rejection). Reading may wait (formats the server reads), so the toast's Undo is bound to the step that added this
+   * structure (addStructure's historyEntry), not to whatever step is newest by then.
+   */
+  async pasteText(text, format = null) {
     const app = this.app;
-    return Promise.resolve().then(() => app.importText(text, 'pasted', format)).then((st) => {
-      const undo = app.canUndo?.() ? { action: { label: 'Undo', run: () => app.undo() } } : {};
-      toast(`Pasted ${plural(st.length, 'atom')} — ${st.formula()}`, undo);
-      return st;
-    }, (err) => { toast(`Pasted text is not a structure file (${pasteReason(err)})`, { type: 'error' }); return null; });
+    let st, historyEntry;
+    try {
+      st = await app._parse(text, 'pasted', format);
+      ({ historyEntry } = app.addStructure(st));
+    } catch (err) { toast(`Pasted text is not a structure file (${pasteReason(err)})`, { type: 'error' }); return null; }
+    app.toastUndo(`Pasted ${plural(st.length, 'atom')} — ${st.formula()}`, { entry: historyEntry });
+    return st;
   }
 
   /** A dialog to paste structure-file text (works where clipboard events are not available, e.g. phones). */

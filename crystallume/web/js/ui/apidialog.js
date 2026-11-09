@@ -176,6 +176,10 @@ function referenceTab(api) {
     return s;
   };
   const regs = ref.registries.map((r) => section(r.label, r.count, r.ids.map((id) => item(id, r.example.replace('{id}', id)))));
+  // members of crystallume.edit, .build, … that the app and its modules define (defineApi), with their signatures
+  const byNs = {};
+  for (const m of ref.api ?? []) (byNs[m.path.includes('.') ? m.path.split('.')[0] : ''] ??= []).push(m);
+  const members = Object.entries(byNs).map(([ns, list]) => section(ns ? `crystallume.${ns}` : 'crystallume', list.length, list.map((m) => item(m.path, m.call ?? `crystallume.${m.path}()`, { sub: m.sig ?? '' })), 'api-rows'));
   const cmds = section('Commands', ref.commands.length, ref.commands.map((c) => item(c.id, `crystallume.command('${c.id}')`, { sub: `${c.title}${c.key ? ` · ${c.key}` : ''}` })), 'api-rows');
   const groups = {};
   for (const p of ref.scene) (groups[p.path.split('.')[0]] ??= []).push(p);
@@ -193,7 +197,8 @@ function referenceTab(api) {
     none.hidden = any;
   });
   return h('div.api-ref', h('div.api-ref-top', q, h('span.hint', 'Click an entry to copy a call.')), none,
-    h('div.api-group', h('div.sub-h', 'Registries'), ...regs), cmds, h('div.api-group', h('div.sub-h', 'Scene paths'), ...scene), events);
+    h('div.api-group', h('div.sub-h', 'Registries'), ...regs), members.length ? h('div.api-group', h('div.sub-h', 'Namespaces'), ...members) : null,
+    cmds, h('div.api-group', h('div.sub-h', 'Scene paths'), ...scene), events);
 }
 
 function pluginList(api) {

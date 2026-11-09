@@ -13,21 +13,46 @@ const attach = (el) => { const host = overlayHost(); if (el.parentNode !== host)
 
 // ------------------------------------------------------------------ toasts
 let toastHost;
+/** Time a toast stays at least once the pointer or focus leaves it (ms). */
+const TOAST_RESUME = 1500;
 /**
- * Show a toast. Options: type 'info'|'error', action {label, run}, timeout ms (0 = stays until closed),
- * spinner (a busy indicator). Returns the toast element with close() and update(message).
+ * Show a toast. Options: type 'info'|'error' (errors stay at least 6.5 s); actions [{label, run}], one button each,
+ * which closes the toast and then runs (`action`, one more of them, comes first); timeout ms (0 = the toast stays
+ * until closed: by one of its buttons, its close button or Esc); spinner (a busy indicator, which its owner closes).
+ * The countdown pauses while the pointer is over the toast or keyboard focus is in it, and Esc closes the toast that
+ * has focus. Returns the toast element with close() and update(message).
  */
-export function toast(message, { type = 'info', action, timeout = 3800, spinner = false } = {}) {
+export function toast(message, { type = 'info', action, actions = [], timeout = 3800, spinner = false } = {}) {
   toastHost ??= h('div.toasts', { role: 'status', 'aria-live': 'polite' });
   attach(toastHost);
   const text = h('span.msg', message);
   const t = h(`div.toast${type === 'error' ? '.err' : ''}${spinner ? '.busy' : ''}`, spinner ? h('span.spinner', { 'aria-hidden': 'true' }) : null, text);
-  let timer = 0;
-  t.close = () => { clearTimeout(timer); t.remove(); };
+  const ms = timeout > 0 ? (type === 'error' ? Math.max(timeout, 6500) : timeout) : 0;
+  let timer = 0, left = ms, since = 0, hovered = false, focused = false, closed = false;
+  const run = () => {   // count down what is left, unless the pointer or focus holds the toast
+    if (closed || !ms || timer || hovered || focused) return;
+    since = Date.now();
+    timer = setTimeout(t.close, left);
+  };
+  const hold = () => {
+    if (!timer) return;
+    clearTimeout(timer); timer = 0;
+    left = Math.max(TOAST_RESUME, left - (Date.now() - since));
+  };
+  t.close = () => { if (closed) return; closed = true; clearTimeout(timer); timer = 0; t.remove(); };
   t.update = (m) => { text.textContent = m; };
-  if (action) t.append(h('button', { type: 'button', on: { click: () => { t.close(); action.run(); } } }, action.label));
+  for (const a of [action, ...(actions ?? [])]) {
+    if (a?.label == null || typeof a.run !== 'function') continue;
+    t.append(h('button', { type: 'button', on: { click: () => { t.close(); a.run(); } } }, a.label));
+  }
+  if (!ms && !spinner) t.append(h('button.toast-close', { type: 'button', 'aria-label': 'Close', title: 'Close', on: { click: () => t.close() } }, '×'));
+  t.addEventListener('pointerenter', () => { hovered = true; hold(); });
+  t.addEventListener('pointerleave', () => { hovered = false; run(); });
+  t.addEventListener('focusin', () => { focused = true; hold(); });
+  t.addEventListener('focusout', (e) => { if (t.contains(e.relatedTarget)) return; focused = false; run(); });
+  t.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); t.close(); } });
   toastHost.append(t);
-  if (timeout > 0) timer = setTimeout(t.close, type === 'error' ? Math.max(timeout, 6500) : timeout);
+  run();
   return t;
 }
 

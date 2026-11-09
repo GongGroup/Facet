@@ -251,7 +251,7 @@ export function measureFrom(app, display) {
   app.emit('tool'); app.emit('selection');
 }
 
-/** Ask for an element and change the selected atoms to it. */
+/** Ask for an element and change the selected atoms to it; the toast's Undo reverts that change. */
 export async function replaceSelection(app) {
   const n = app.selection.length;
   if (!n) return;
@@ -259,8 +259,8 @@ export async function replaceSelection(app) {
   if (!v) return;
   const sym = normalizeSymbol(v);
   if (sym === 'X') { toast(`“${v}” is not an element symbol. Try Fe, O or Ti.`, { type: 'error' }); return; }
-  app.replaceSelected(sym);
-  toast(`Changed ${plural(n, 'atom')} to ${sym}`, { action: { label: 'Undo', run: () => app.undo() } });
+  const k = app.selection.length, r = app.replaceSelected(sym);   // the selection may have changed while the dialog was open
+  if (r) app.toastUndo(`Changed ${plural(k, 'atom')} to ${sym}`, { entry: r.entry });
 }
 
 /** Keep the selected geometry as a measurement (2–4 atoms of `sel`) or start measuring from one atom. */
