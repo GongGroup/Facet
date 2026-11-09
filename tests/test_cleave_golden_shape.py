@@ -7,6 +7,9 @@ the reason names the tasks that register it, that the shared recipe ``bulk`` is 
 both languages, that U2 and U4 hold (pbc T T T for every slab the cleave builds, the vacuum always given), that the
 expectations agree with their inputs, and that they still state the analytic results of M2 §0.3 and of the acceptance
 scenarios (and the names of ledger L-X-07, verbatim).
+
+It covers the files of :data:`FILES` (the ones the generator writes); files that later tasks add in their own
+subdirectories of ``cleave/`` (M2-T7b-lite's ``full/``) bring their own checks (README.md, "Files of later tasks").
 """
 
 from __future__ import annotations
@@ -21,16 +24,21 @@ import numpy as np
 import pytest
 
 from crystallume import Structure
+from crystallume.analysis.vacuum import surface_normal
 from crystallume.io import read
 
 from . import ops  # noqa: F401  (registers every op and recipe)
 from .cases import DATA, OPS, RECIPES, load_cases
 
 CLEAVE = DATA / "surface" / "cleave"
+#: The files the generator writes (README.md); only these are checked here.
 FILES = ("analysis/errors.json", "analysis/inputs.json", "analysis/metals.json", "analysis/oxides.json", "inputs.json",
          "recipes.json", "slab/errors.json", "slab/metals.json", "slab/oxides.json", "slab/vacuum.json",
          "tools/flip.json", "tools/set_vacuum.json", "tools/standardize.json")
-CASES: list[dict[str, Any]] = [c for c in load_cases() if c["_file"].startswith("surface/cleave/")]
+#: The subdirectories the generator writes; later tasks put their files in others (M2-T7b-lite: ``full/``).
+OWN_DIRS = ("analysis", "inputs", "slab", "tools")
+ALL_CLEAVE: list[dict[str, Any]] = [c for c in load_cases() if c["_file"].startswith("surface/cleave/")]
+CASES: list[dict[str, Any]] = [c for c in ALL_CLEAVE if c["_file"] in {f"surface/cleave/{f}" for f in FILES}]
 BY_ID = {c["id"]: c for c in CASES}
 README = (CLEAVE / "README.md").read_text(encoding="utf-8")
 
@@ -82,9 +90,37 @@ def close(a: float, b: float, tol: float = 1e-6) -> bool:
     return abs(a - b) <= tol
 
 
+def relabelling(s: Structure) -> list[int]:
+    """M2 §3.14 steps 1-3 (also the first steps of flip_slab and standardize_slab): new axis i is the input's axis
+    ``perm[i]``: the vacuum axis k of F0-D ``surface_normal`` moves to c by ``(a, b, c) <- (a_k+1, a_k+2, a_k)``, then
+    a left-handed cell swaps a and b.  pbc, the flag columns and the supercell record follow the axes."""
+    k = surface_normal(s)["axis"]
+    perm = [0, 1, 2] if k == 2 else [(k + 1) % 3, (k + 2) % 3, k]
+    if np.linalg.det(s.cell[perm]) < 0:
+        perm = [perm[1], perm[0], perm[2]]
+    return perm
+
+
+def reduced_gram(a: Any, b: Any) -> tuple[float, float, float]:
+    """``(|u|², |v|², |u·v|)`` of the Lagrange-reduced basis of the lattice spanned by a and b: the same numbers for
+    the same lattice in any basis and any orientation."""
+    u, v = np.array(a, float), np.array(b, float)
+    for _ in range(1000):
+        if u @ u > v @ v:
+            u, v = v, u
+        mu = round((u @ v) / (u @ u))
+        if mu == 0:
+            break
+        v = v - mu * u
+    return float(u @ u), float(v @ v), abs(float(u @ v))
+
+
 # ------------------------------------------------------------------------------------------------ the shell
 def test_files_load_with_the_shared_loader():
     assert sorted({c["_file"] for c in CASES}) == [f"surface/cleave/{f}" for f in FILES]
+    later = sorted({c["_file"] for c in ALL_CLEAVE} - {c["_file"] for c in CASES})
+    assert all(f.count("/") >= 3 and f.split("/")[2] not in OWN_DIRS for f in later), \
+        f"files of later tasks go to their own subdirectories of cleave/ (README.md): {later}"
     assert len(CASES) >= 150
     assert {c["op"] for c in CASES} == set(CONTRACT)
     for name in FILES:
@@ -207,11 +243,13 @@ def test_bulk_builds_what_acceptance_0_4_says():
 def test_every_cleaved_slab_is_periodic_in_three_dimensions():
     for c in of("surface"):
         assert c["expect"]["structure"]["pbc"] == [True, True, True], c["id"]
-    for c in of("setVacuum", "flipSlab", "standardizeSlab"):    # the tools keep the input's pbc
-        assert c["expect"]["structure"]["pbc"] == list(bulk_of(c).pbc), c["id"]
+    for c in of("setVacuum", "flipSlab", "standardizeSlab"):    # the tools keep the input's pbc, relabelled
+        s = bulk_of(c)
+        assert c["expect"]["structure"]["pbc"] == [bool(s.pbc[i]) for i in relabelling(s)], c["id"]
     kept = {c["id"] for c in of("setVacuum", "standardizeSlab")
             if c["expect"]["structure"]["pbc"] == [True, True, False]}
-    assert kept == {"m2-vacuum-graphene-20", "m2-vacuum-mos2-20", "m2-standardize-graphene"}
+    assert kept == {"m2-vacuum-graphene-20", "m2-vacuum-mos2-20", "m2-standardize-graphene", "m2-vacuum-along-a-pbc"}
+    assert list(bulk_of(BY_ID["m2-vacuum-along-a-pbc"]).pbc) == [False, True, True], "pbc F T T becomes T T F"
 
 
 def test_the_vacuum_is_always_given():
@@ -347,6 +385,13 @@ def test_tool_results_agree_with_their_input(case: dict[str, Any]):
         assert Counter(st["symbols"]) == Counter(s.symbols) and st["symbols"] == list(s.symbols), "no atom is reordered"
     cell = np.array(st["cell"])
     assert np.linalg.det(cell) > 0, "right-handed afterwards"
+    perm = relabelling(s)
+    sd = s.props.get("selective_dynamics")
+    if "selective_dynamics" in st.get("props", {}):      # M2 §3.14 steps 2-3: the flag columns follow the axes
+        assert sd is not None and st["props"]["selective_dynamics"] == [[bool(f[i]) for i in perm] for f in sd]
+    record = s.info.get("supercellMatrix")
+    if record is not None and case["op"] != "flipSlab":   # rows and columns of the supercell record too
+        assert st["info"]["supercellMatrix"] == [[record[i][j] for j in perm] for i in perm]
     thick = e["zRange"][1] - e["zRange"][0]
     if case["op"] == "setVacuum":
         v = case["args"]["vacuum"]
@@ -365,9 +410,39 @@ def test_tool_results_agree_with_their_input(case: dict[str, Any]):
     if case["op"] == "flipSlab":
         tags_in = list(s.props["tags"])
         assert st["props"]["tags"] == [max(tags_in) + 1 - t for t in tags_in], "tags reversed"
-        assert np.allclose(cell, s.cell, atol=1e-9), "these cells are their own reduced flips"
         z_in = s.positions[:, 2]
         assert np.allclose(np.sort(z_in.min() + z_in.max() - z_in), np.sort(np.array(st["positions"])[:, 2]), atol=1e-6)
+        _check_flip(s, st, cell)
+
+
+def _check_flip(s: Structure, st: dict[str, Any], cell: np.ndarray) -> None:
+    """M2 §3.15 and ledger L-M2-04 for these inputs (c along z, a no longer than b, the flipped pair a and -(R b) a
+    60° tie or obtuse, so that M1's reduction keeps a first): turned 180° about â (R = 2ââᵀ - I) and back into the
+    standard frame, i.e. R_total = Rz(-α)·R with α the angle of a; the same lattice; heights reflected."""
+    a, b, c = s.cell
+    assert np.allclose(c[:2], 0) and np.cross(a, b)[2] > 0 and np.linalg.norm(a) <= np.linalg.norm(b) + 1e-9
+    ah = a / np.linalg.norm(a)
+    R = 2.0 * np.outer(ah, ah) - np.eye(3)
+    x = (a @ -(R @ b)) / (a @ a)
+    assert -0.5 <= x <= 1e-9 or close(x, 0.5, 1e-9), "M1 §3.11.1 keeps a first (obtuse, or the 60° tie)"
+    assert np.allclose(cell[0][1:], 0, atol=1e-9) and cell[0][0] > 0 and abs(cell[1][2]) < 1e-9 and cell[1][1] > 0, \
+        "a along x, b in the xy plane (the standard frame)"
+    assert close(cell[0][0], float(np.linalg.norm(a))) and np.allclose(cell[2], c, atol=1e-6), "a and c kept"
+    assert np.allclose(reduced_gram(cell[0], cell[1]), reduced_gram(a, b), atol=1e-6), "the same lattice"
+    Rz = np.array([ah, np.cross([0.0, 0.0, 1.0], ah), [0.0, 0.0, 1.0]])
+    z = s.positions[:, 2]
+    want = s.positions @ (Rz @ R).T + [0.0, 0.0, z.min() + z.max()]
+    d = (np.array(st["positions"]) - want) @ np.linalg.inv(cell)
+    assert np.abs(d[:, 2]).max() < 1e-6 and np.abs(d[:, :2] - np.round(d[:, :2])).max() < 1e-6, \
+        "the positions are the input turned 180° about â (modulo the in-plane lattice)"
+    f = (np.array(st["positions"]) @ np.linalg.inv(cell))[:, :2]
+    assert f.min() > 1e-3 and f.max() < 1 - 1e-3, "wrapped in-plane, no atom on a cell face (README decision 8)"
+    if "info" in st and st["info"].get("supercellMatrix") is not None:   # the record refers to a 120° 1×1 mesh
+        one = np.linalg.inv(np.array(st["info"]["supercellMatrix"], float))[:2, :2] @ cell[:2, :2]
+        lengths = np.linalg.norm(one, axis=1)
+        old = np.linalg.inv(np.array(s.info["supercellMatrix"], float))[:2, :2] @ s.cell[:2, :2]
+        assert np.allclose(lengths, np.linalg.norm(old, axis=1), atol=1e-6)
+        assert close(math.degrees(math.acos(one[0] @ one[1] / (lengths[0] * lengths[1]))), 120.0, 1e-6)
 
 
 # ------------------------------------------------------------------------------------------------ analytic values
@@ -414,6 +489,18 @@ def test_other_lattices_have_their_textbook_values():
     assert close(zno["period"], 3.25 * SQ3 / 2)
     lafeo3 = BY_ID["m2-terms-lafeo3-001"]["expect"]   # K5: the merged gap 0.0392 c plus the 0.01 Å margin
     assert close(lafeo3["layerTolerance"], 0.0392 * 7.862 + 0.01) and lafeo3["layerGrouping"] == "merged"
+    # centred rectangular nets (2|u·v| = |u|²): M1's reduction keeps the short vector first (M1 §3.11.1 tie rule)
+    for cid, u, v in (("m2-terms-anatase-101", 3.785, math.hypot(3.785 / math.sqrt(2), 9.514 / 2)),   # [010], ½[11-1]
+                      ("m2-terms-zno-20-21", 3.25, math.hypot(3.25, 2 * 5.207))):                   # [010], [10-2]
+        e = BY_ID[cid]["expect"]
+        assert close(e["mesh.a"], u) and close(e["mesh.b"], v) and e["mesh.type"] == "centred-rectangular", cid
+        assert close(e["mesh.gamma"], math.degrees(math.acos(-u / (2 * v)))), cid
+    rut = BY_ID["m2-terms-tio2-111"]["expect"]        # rutile (111): [10-1] and [01-1], both √(a² + c²)
+    side = math.hypot(4.594, 2.959)
+    assert close(rut["mesh.a"], side) and close(rut["mesh.b"], side) and rut["mesh.type"] == "centred-rectangular"
+    assert close(rut["mesh.gamma"], math.degrees(math.acos(-2.959 ** 2 / side ** 2)))
+    for cid, period in (("m2-terms-sic-2h-0001", 2 * 2.513), ("m2-terms-sic-3c-0001", 2.513)):  # 3C: one bilayer
+        assert close(BY_ID[cid]["expect"]["period"], period), cid
 
 
 #: Values acceptance S1-S12 and M2 §0.3 quote (to their digits; A4: 1e-4 Å, 0.01°, 1e-3 Å²).
@@ -454,7 +541,20 @@ TERMINATIONS: dict[str, tuple[list[str], list[int], list[bool], int]] = {
 COUNTS = {"m2-terms-zno-0001": (2, 4, 3, "Zn", 1), "m2-terms-al2o3-0001": (3, 6, 2, "Al·O3", 6),
           "m2-terms-lafeo3-001": (2, 4, 3, "Fe2O4", 8), "m2-terms-anatase-001": (1, 2, 1, "TiO2", 2),
           "m2-terms-anatase-101": (4, 4, 2, "O·TiO", 2), "m2-terms-sic-4h-0001": (4, 8, 3, "Si-A", 1),
-          "m2-terms-sic-6h-0001": (6, 12, 3, "Si-A", 1), "m2-terms-la-dhcp-0001": (2, 4, 1, "La-A", 3)}
+          "m2-terms-sic-6h-0001": (6, 12, 3, "Si-A", 1), "m2-terms-la-dhcp-0001": (2, 4, 1, "La-A", 3),
+          "m2-terms-sic-2h-0001": (2, 4, 3, "Si", 1), "m2-terms-sic-3c-0001": (2, 2, 3, "Si", 1),
+          "m2-terms-tio2-111": (2, 2, 3, "TiO4", 5), "m2-terms-tio2-120": (2, 2, 3, "TiO4", 5),
+          "m2-terms-tio2-102": (3, 6, 2, "O·Ti", 10)}
+#: The K5 rows of M2 §0.3 as quoted: layers per period, τ_eff (as written: to its digits), grouping, the layers of
+#: one period (cyclic, from a top layer down), terminations, Tasker type.
+K5_ROWS = {"m2-terms-tio2-111": (2, "0.30", "merged", ["TiO4", "Ti"], 2, 3),
+           "m2-terms-tio2-120": (2, "0.30", "merged", ["TiO4", "Ti"], 2, 3),
+           "m2-terms-tio2-102": (6, "0.145", "planes", None, 3, 2),
+           "m2-terms-zno-20-21": (4, "0.216", "planes", ["Zn", "Zn", "O", "O"], 4, 3),
+           "m2-terms-lafeo3-001": (4, "0.318", "merged", ["La2O2", "Fe2O4", "La2O2", "Fe2O4"], 2, 3),
+           "m2-terms-anatase-001": (2, "0.409", "merged", ["TiO2", "TiO2"], 1, 1),
+           "m2-terms-pt543": (1, "0.267", "planes", ["Pt"], 1, 1),
+           "m2-terms-pt1-1-12": (1, "0.152", "planes", ["Pt"], 1, 1)}
 #: Slab values of acceptance S1-S12 and M2 §0.3 (Å; natoms exact).
 SLABS = {
     "m2-slab-pt111-p3x3-4l-fix2": {"natoms": 36, "a": 8.3156, "c": 21.7896, "thickness": 6.7896, "z0": 7.5,
@@ -527,6 +627,32 @@ def test_terminations_are_as_the_spec_lists_them():
     _quoted("Cr2O3 Cr-Cr gap", min(cr["gapsBelow"]), 0.385)
     _quoted("Cr2O3 mesh", cr["mesh.a"], 4.959)
     _quoted("Cr2O3 layer tolerance", cr["layerTolerance"], 0.30)
+
+
+def _composition(formula: str) -> dict[str, int]:
+    return {el: int(n or 1) for el, n in re.findall(r"([A-Z][a-z]?)(\d*)", formula)}
+
+
+def _same_cycle(a: list[Any], b: list[Any]) -> bool:
+    """*a* and *b* are the same cyclic sequence, read either way (the layers of one period)."""
+    return len(a) == len(b) and any(a[i:] + a[:i] in (b, b[::-1]) for i in range(len(a)))
+
+
+def test_the_k5_rows_are_as_quoted():
+    """M2 §0.3 and §7.1 (layers and merging, K5): the merged or kept planes, τ_eff, the terminations and the Tasker
+    type of the rows v1 got wrong (E7 at 0.3 Å for Pt(543), Pt(1 1 12) and rutile (102), one ZnO (2 0 -2 1)
+    termination instead of four) and of the merged LaFeO3 and anatase layers."""
+    for cid, (m, tau, grouping, layers, count, tasker) in K5_ROWS.items():
+        e = BY_ID[cid]["expect"]
+        assert (e["layersPerPeriod"], e["layerGrouping"], e["terminationCount"], e["tasker"]) == \
+            (m, grouping, count, tasker), cid
+        assert abs(e["layerTolerance"] - float(tau)) <= 0.5 * 10.0 ** -len(tau.split(".")[1]) + 1e-12, cid
+        if layers:
+            assert _same_cycle([dict(c) for c in e["stack"]], [_composition(f) for f in layers]), cid
+    zno = BY_ID["m2-terms-zno-20-21"]["expect"]
+    assert "labels" not in zno and "topIndices" not in zno, "Zn·O and Zn·Zn tie in the K7 key: no order between them"
+    assert (zno["terminations.0.label"], zno["terminations.3.label"]) == ("O·O", "O·Zn")
+    assert zno["brokenBonds"] == [5, 7, 7, 7] and zno["polar"] == [True] * 4 and zno["hkil"] == [2, 0, -2, 1]
 
 
 @pytest.mark.parametrize("cid", sorted(SLABS))
@@ -626,8 +752,14 @@ def test_the_contcar_results_follow_from_the_fixture():
         assert e["structure"]["props"]["selective_dynamics"] == flags
     std = BY_ID["m2-standardize-contcar"]["expect"]["structure"]
     assert np.allclose(std["positions"], cart - [0.0, 0.0, cart[:, 2].min()], atol=1e-8)
-    assert BY_ID["m2-vacuum-along-a"]["expect"]["structure"]["positions"] == \
-        BY_ID["m2-vacuum-contcar-15"]["expect"]["structure"]["positions"]
+    for cid in ("m2-vacuum-along-a", "m2-vacuum-along-a-pbc"):
+        assert BY_ID[cid]["expect"]["structure"]["positions"] == \
+            BY_ID["m2-vacuum-contcar-15"]["expect"]["structure"]["positions"], cid
+    pbc_input = bulk_of(BY_ID["m2-vacuum-along-a-pbc"])        # the along-a file moved 0.1 along a, a declared
+    along_a = read(CLEAVE / "inputs" / "contcar_pt111_vacuum_along_a.vasp")
+    shift = np.mod(pbc_input.frac_positions - along_a.frac_positions + 0.5, 1.0) - 0.5
+    assert np.allclose(shift, [0.1, 0.0, 0.0], atol=1e-12) and np.allclose(pbc_input.cell, along_a.cell)
+    assert pbc_input.props["selective_dynamics"] == along_a.props["selective_dynamics"]
 
 
 def test_the_input_files_are_what_the_readme_says():
@@ -647,6 +779,11 @@ def test_the_input_files_are_what_the_readme_says():
     assert math.isclose(hexa[0] @ hexa[1] / 4.759 ** 2, -0.5, abs_tol=1e-9)
     left = read(inp / "contcar_pt111_lefthanded_h.vasp")
     assert np.linalg.det(left.cell) < 0 and left.symbols[int(np.argmax(left.positions[:, 2]))] == "H"
+    by_height = {round(float(z), 3): [] for z in left.positions[:12, 2]}      # Pt layers: bottom, middle, top
+    for z, f in zip(left.positions[:12, 2], left.props["selective_dynamics"]):
+        by_height[round(float(z), 3)].append([bool(x) for x in f])
+    assert [rows[0] for _, rows in sorted(by_height.items())] == [[False] * 3, [True, False, True], [True] * 3], \
+        "the middle layer is fixed along the file's b (the right-handed a): the expected flags pin the swap"
     h2 = read(inp / "contcar_pt111_h2_floating.vasp")
     z = h2.positions[:, 2]
     zh = z[[i for i, e in enumerate(h2.symbols) if e == "H"]]
@@ -656,6 +793,21 @@ def test_the_input_files_are_what_the_readme_says():
     a = read(inp / "contcar_pt111_vacuum_along_a.vasp")
     fix = read(DATA / "surface" / "contcar_pt111.vasp")
     assert np.allclose(a.cell, fix.cell[[2, 0, 1]]) and np.allclose(a.positions, fix.positions, atol=1e-9)
+    f_c = fix.frac_positions[:, 2]          # the fixture's flags, but T T F on top and F T T on the third layer
+    want = [[True, True, False] if 0.3 < z < 0.5 else [False, True, True] if 0.2 < z < 0.3 else [bool(x) for x in row]
+            for z, row in zip(f_c, fix.props["selective_dynamics"])]
+    assert a.props["selective_dynamics"] == [[f[2], f[0], f[1]] for f in want], "flag columns as (c, a, b)"
+    for name, n, stacking in (("sic_2h.vasp", 4, "AB"), ("sic_3c.vasp", 6, "ACB")):
+        sic = read(inp / name)
+        assert len(sic) == n and math.isclose(sic.cell[2][2], 2.513 * len(stacking)), name
+        sites = sorted({(round(f[0] % 1, 6), round(f[1] % 1, 6)) for f in sic.frac_positions})
+        assert len(sites) == len(set(stacking)), name
+    rh = read(inp / "sic_3c.vasp")              # 3C in the hexagonal cell of its rhombohedral lattice (obverse)
+    f = rh.frac_positions
+    for t in ([2 / 3, 1 / 3, 1 / 3], [1 / 3, 2 / 3, 2 / 3]):
+        for fi, el in zip(f + t, rh.symbols):
+            off = np.abs(np.mod(f - fi + 0.5, 1.0) - 0.5).max(axis=1)
+            assert any(d < 1e-6 and e == el for d, e in zip(off, rh.symbols)), "R centring (2/3, 1/3, 1/3)"
 
 
 @pytest.mark.parametrize("name,ideal,sigma", [

@@ -2,7 +2,9 @@
 """Write the M2 golden cases (``tests/data/surface/cleave``) and their input files (``cleave/inputs/``).
 
 Development tool (M2-T7a): run it after changing a case table and commit what it writes; the tests never import
-it.  ``--check`` compares the files on disk with what it would write and exits with 1 on any difference.
+it.  ``--check`` compares the files on disk with what it would write and exits with 1 on any difference.  It keeps
+the run state of the files on disk (a skip that a later task removed by hand stays removed, an ``xfail`` stays;
+``--reset-skips`` writes every skip again) and leaves the subdirectories of other tasks (``full/``) alone.
 
     python tests/data/surface/cleave/make_cleave_cases.py            # from the repository root
     python tests/data/surface/cleave/make_cleave_cases.py --check
@@ -309,39 +311,63 @@ def plane_basis(hkl: tuple[int, int, int]) -> list[list[int]]:
     return [v1, v2, v3]
 
 
-def gauss_obtuse(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """M1 §3.11.1 Gauss reduction keeping the orientation, then the obtuse convention (60° ties -> 120°)."""
-    u, v = np.array(a, float), np.array(b, float)
-    tau = 1e-9
+def gauss_reduce_2d(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, np.ndarray, list[list[int]]]:
+    """M1 §3.11.1 ``gauss_reduce_2d(a, b, angle="obtuse")``, the frozen contract line by line: ``(u, v, M)`` with
+    ``[u; v] = M @ [a; b]`` and ``det M = +1``.  The tie ``|u·v| = |u|²/2`` (hexagonal 60° and every centred
+    rectangular net) keeps u and takes ``v - u``; any other acute pair becomes ``(v, -u)``; u then points along a."""
+    a, b = np.array(a, float), np.array(b, float)
+    u, v = a.copy(), b.copy()
+    M = [[1, 0], [0, 1]]
+    tau = 1e-9                                            # SURFACE_DEFAULTS.gauss_tolerance
     for _ in range(10000):
         if u @ u > (v @ v) * (1 + tau):
             u, v = v, -u
+            M = [M[1], [-M[0][0], -M[0][1]]]
         x = (u @ v) / (u @ u)
-        mu = math.copysign(math.floor(abs(x) + 0.5 - tau), x) if abs(x) > 0.5 + tau else 0
+        mu = int(math.copysign(math.floor(abs(x) + 0.5 - tau), x)) if abs(x) > 0.5 + tau else 0
         if mu == 0:
             break
         v = v - mu * u
-    cosg = (u @ v) / math.sqrt((u @ u) * (v @ v))
-    if cosg > 1e-9:
-        if abs(math.sqrt(u @ u) - math.sqrt(v @ v)) <= 1e-9 * math.sqrt(u @ u) and abs(cosg - 0.5) < 1e-9:
+        M = [M[0], [M[1][0] - mu * M[0][0], M[1][1] - mu * M[0][1]]]
+    d = u @ v
+    if d > tau * math.sqrt(u @ u) * math.sqrt(v @ v):
+        if abs(d) >= (u @ u) / 2 * (1 - 1e-6):
             v = v - u
+            M = [M[0], [M[1][0] - M[0][0], M[1][1] - M[0][1]]]
         else:
             u, v = v, -u
-    return u, v
+            M = [M[1], [-M[0][0], -M[0][1]]]
+    cu = (u @ a) / math.sqrt((u @ u) * (a @ a))
+    cv = (v @ b) / math.sqrt((v @ v) * (b @ b))
+    if cu < -tau or (abs(cu) <= tau and cv < -tau):
+        u, v = -u, -v
+        M = [[-M[0][0], -M[0][1]], [-M[1][0], -M[1][1]]]
+    return u, v, M
+
+
+def mesh_kind(u: np.ndarray, v: np.ndarray, rel: float, deg: float) -> str:
+    """One band of M1 §3.5.1 ``mesh_kind`` on a reduced pair (lengths within *rel*, angles within *deg*)."""
+    la, lb = float(np.linalg.norm(u)), float(np.linalg.norm(v))
+    gamma = math.degrees(math.acos(max(-1.0, min(1.0, (u @ v) / (la * lb)))))
+    same = abs(la - lb) <= rel * max(la, lb)
+    if same and abs(gamma - 120.0) <= deg:
+        return "hexagonal"
+    if abs(gamma - 90.0) <= deg:
+        return "square" if same else "rectangular"
+    if same or abs(2 * abs(u @ v) - la * la) <= rel * la * la:
+        return "centred-rectangular"
+    return "oblique"
 
 
 def mesh_type(u: np.ndarray, v: np.ndarray) -> str:
-    """M1 ``mesh_type`` (narrow tolerances 1e-3 relative, 0.1°) for the reduced obtuse meshes used here."""
-    la, lb = float(np.linalg.norm(u)), float(np.linalg.norm(v))
-    gamma = math.degrees(math.acos(max(-1.0, min(1.0, (u @ v) / (la * lb)))))
-    same = abs(la - lb) <= 1e-3 * max(la, lb)
-    if same and abs(gamma - 120.0) <= 0.1:
-        return "hexagonal"
-    if abs(gamma - 90.0) <= 0.1:
-        return "square" if same else "rectangular"
-    if same or abs(lb * math.cos(math.radians(gamma)) + la / 2) <= 1e-3 * la:
-        return "centred-rectangular"
-    return "oblique"
+    """M1 ``mesh_type`` (``classify_mesh(...)["kind"]``) of a pair reduced by :func:`gauss_reduce_2d`: the narrow
+    band (1e-3 relative, 0.1°), then for centred-rectangular and oblique the distorted band (3 %, 2°)."""
+    kind = mesh_kind(u, v, 1e-3, 0.1)
+    if kind in ("centred-rectangular", "oblique"):
+        wide = mesh_kind(u, v, 0.03, 2.0)
+        if wide in ("hexagonal", "square", "rectangular"):
+            return wide
+    return kind
 
 
 def lateral(v: np.ndarray, n: np.ndarray) -> np.ndarray:
@@ -445,7 +471,7 @@ class Analysis:
         self.period = 1.0 / float(np.linalg.norm(Gp))
         v1, v2, v3 = (np.array(v) @ self.Pm for v in plane_basis(self.hkl_p))
         assert np.cross(v1, v2) @ self.normal > 0
-        a1, b1 = gauss_obtuse(v1, v2)
+        a1, b1, _ = gauss_reduce_2d(v1, v2)
         self.a1, self.b1 = a1, b1
         # c0: the stacking vector with the smallest in-plane part (closest_in_plane; ties do not matter here)
         lat3 = lateral(v3, self.normal)
@@ -1118,11 +1144,11 @@ def analysis_cases() -> dict[str, list[dict]]:
         quote=lambda A: (quote_mesh("Pt(211)", A, 2.7719, 6.7896, 90.0, 18.820, 3, 0.8002),
                          quote_terms("Pt(211)", A, [("Pt", 10, False)], 1, 1, 1)))
     add(metals, "m2-terms-pt543", "Pt", (5, 4, 3),
-        "M2 §0.3: d = a0/(2√50) = 0.277 Å, so the layer tolerance is d - 0.01 Å (0.267); 28 bonds; oblique mesh "
-        "(lengths not compared)",
-        mesh=False, quote=lambda A: (check_quote("Pt(543) period", A.period, 0.277, 3),
-                                     check_quote("Pt(543) tau", A.tau, 0.267, 3),
-                                     quote_terms("Pt(543)", A, [("Pt", 28, False)], 1, 1, 1)))
+        "M2 §0.3: d = a0/(2√50) = 0.277 Å, so the layer tolerance is d - 0.01 Å (0.267); 28 bonds; the oblique "
+        "mesh 4.801 × 11.429 Å at 98.05° (M1 §3.11.1: the reduced pair is already obtuse, the short side first)",
+        quote=lambda A: (check_quote("Pt(543) period", A.period, 0.277, 3),
+                         check_quote("Pt(543) tau", A.tau, 0.267, 3),
+                         quote_terms("Pt(543)", A, [("Pt", 28, False)], 1, 1, 1)))
     add(metals, "m2-terms-pt1-1-12", "Pt", (1, 1, 12),
         "M2 §0.3: d = a0/(2√146) = 0.162 Å, layer tolerance 0.152 Å (v1 reported E7 at 0.3 Å), 50 bonds per cell",
         quote=lambda A: (check_quote("Pt(1 1 12) period", A.period, 0.162, 3),
@@ -1175,6 +1201,40 @@ def analysis_cases() -> dict[str, list[dict]]:
                          quote_terms("TiO2(110)", A, [("O·Ti2O2", 2, False), ("Ti2O2", 3, True), ("O·O", 3, True)], 2,
                                      3, 3)),
         extra={"charges": {"Ti": 4, "O": -2}})
+    # the K5 regression rows of M2 §0.3: merged rutile (111)/(120), rutile (102) (E7 in v1), ZnO (2 0 -2 1) (one
+    # termination in v1 at 0.3 Å)
+    for cid, hkl, what, m, tau, grouping, count, tasker, layers in [
+        ("m2-terms-tio2-111", (1, 1, 1), "(111)", 2, 0.30, "merged", 2, 3, ["Ti", "TiO4"]),
+        ("m2-terms-tio2-120", (1, 2, 0), "(120)", 2, 0.30, "merged", 2, 3, ["Ti", "TiO4"]),
+        ("m2-terms-tio2-102", (1, 0, 2), "(102)", 6, 0.145, "planes", 3, 2, None),
+    ]:
+        def quote(A, what=what, m=m, tau=tau, grouping=grouping, count=count, tasker=tasker, layers=layers):
+            check_quote(f"rutile {what} tau", A.tau, tau, 3 if tau < 0.3 else 2)
+            check_quote(f"rutile {what} grouping", A.grouping, grouping)
+            quote_terms(f"rutile {what}", A, None, tasker, count, m)
+            if layers:
+                check_quote(f"rutile {what} layers", sorted(formula(L["composition"]) for L in A.layers), layers)
+        merged = ("the Ti and TiO4 sub-planes (bonds tilted under 15°) merged into Ti | TiO4, two layers per "
+                  "period, layer tolerance 0.30 Å; TiO4 first, both polar, Tasker 3")
+        add(oxides, cid, "TiO2", hkl,
+            f"M2 §0.3 and §7.1 (layers and merging, K5): rutile {what}: "
+            + (merged if grouping == "merged" else
+               "six separate planes (0.155 Å apart at the closest, v1 reported E7), layer tolerance 0.145 Å; the "
+               "non-polar O·Ti cut first, Ti and O·O polar, Tasker 2"),
+            quote=quote, extra={"charges": {"Ti": 4, "O": -2}})
+    A = add(oxides, "m2-terms-zno-20-21", "ZnO", (2, 0, -2, 1),
+            "M2 §0.3 (K5): ZnO (2 0 -2 1): four separate planes Zn | Zn | O | O per 1.359 Å, layer tolerance 0.216 Å "
+            "(v1 found one termination at 0.3 Å), four terminations, all polar (Tasker 3); the centred-rectangular "
+            "mesh 3.25 × 10.909 Å; Zn·O and Zn·Zn tie in the K7 key, so only the first and last labels are compared",
+            quote=lambda A: (check_quote("ZnO(20-21) tau", A.tau, 0.216, 3),
+                             check_quote("ZnO(20-21) grouping", A.grouping, "planes"),
+                             check_quote("ZnO(20-21) layers", sorted(formula(L["composition"]) for L in A.layers),
+                                         ["O", "O", "Zn", "Zn"]),
+                             quote_terms("ZnO(20-21)", A, None, 3, 4, 4)))
+    e = oxides[-1]["expect"]
+    assert A.order_ties and "topIndices" not in e
+    labels = e.pop("labels")
+    e.update({"terminations.0.label": labels[0], "terminations.3.label": labels[3]})
     add(oxides, "m2-terms-ceo2-111", "CeO2", (1, 1, 1),
         "acceptance S10-1/S10-2: 3.8262 Å at 120°, 12.678 Å², period 3.1240 Å, O/Ce/O 0.7810 Å apart and 1.5620 Å "
         "between trilayers; O·Ce (2 bonds, non-polar) first, Ce and O·O (4, polar); Tasker 2",
@@ -1339,6 +1399,9 @@ class Inputs:
                  lafeo3())
         self.add("anatase.vasp", "TiO2 anatase I41/amd (a 3.785 c 9.514, O z 0.2081, origin choice 1)", anatase(),
                  lattice="I")
+        self.add("sic_2h.vasp", "SiC 2H (AB), ideal tetrahedra, a 3.073, bilayer 2.513", sic("AB"))
+        self.add("sic_3c.vasp", "SiC 3C (ACB), hexagonal cell of the rhombohedral lattice, ideal tetrahedra, a 3.073, "
+                 "bilayer 2.513", sic("ACB"), lattice="R")
         self.add("sic_4h.vasp", "SiC 4H (ABCB), ideal tetrahedra, a 3.073, bilayer 2.513", sic("ABCB"))
         self.add("sic_6h.vasp", "SiC 6H (ABCACB), ideal tetrahedra, a 3.073, bilayer 2.513", sic("ABCACB"))
         self.add("la_dhcp.vasp", "La double hcp (ABAC), a 3.77 c 12.16", la_dhcp())
@@ -1361,10 +1424,12 @@ class Inputs:
         sy, pos, cell, tags = slab_atoms(A, A.classes[0]["rep"], 3, [[2, 0], [0, 2]], 15.0, ["Pt"])
         top = int(np.argmax(pos[:, 2]))
         sy, pos = sy + ["H"], np.vstack([pos, pos[top] + [0.0, 0.0, 1.55]])
-        flags = [[False] * 3 if t == 3 else [True] * 3 for t in tags] + [[True] * 3]
+        # flags in the right-handed frame (the bottom layer F F F, the middle layer fixed along a only, so that the
+        # expected flags pin the a/b swap of W18), written with the columns of the left-handed cell (a and b swapped)
+        flags = [[False] * 3 if t == 3 else [False, True, True] if t == 2 else [True] * 3 for t in tags] + [[True] * 3]
         left = np.array([cell[1], cell[0], cell[2]])
         self.add("contcar_pt111_lefthanded_h.vasp", "Pt(111) p(2x2) 3L + H on top, left-handed cell (a and b swapped)",
-                 Crystal("left", sy, pos @ np.linalg.inv(left), left), flags)
+                 Crystal("left", sy, pos @ np.linalg.inv(left), left), [[f[1], f[0], f[2]] for f in flags])
         # floating H2: Pt(111) p(2x2) 3L, an H2 molecule (0.74 Å, parallel to the surface) 7.0 Å above the top layer,
         # 13 Å of vacuum above the molecule
         sy, pos, cell, tags = slab_atoms(A, A.classes[0]["rep"], 3, [[2, 0], [0, 2]], 20.0, ["Pt"])
@@ -1374,10 +1439,14 @@ class Inputs:
         flags = [[False] * 3 if t == 3 else [True] * 3 for t in tags] + [[True] * 3] * 2
         self.add("contcar_pt111_h2_floating.vasp", "Pt(111) p(2x2) 3L + H2 floating 7.0 A above the slab",
                  Crystal("h2", sy, pos @ np.linalg.inv(cell), cell), flags)
-        # the shared CONTCAR fixture with the vacuum along a: cell rows (c, a, b), flags permuted the same way
+        # the shared CONTCAR fixture with the vacuum along a: cell rows (c, a, b), flags permuted the same way; in the
+        # fixture's frame the top layer may only move in-plane (T T F) and the third layer is fixed along a (F T T),
+        # so that the expected flags pin the relabelling (W16)
         fixture, fl = read_poscar((DATA / "surface" / "contcar_pt111.vasp").read_text(encoding="utf-8"))
         cell = np.array([fixture.cell[2], fixture.cell[0], fixture.cell[1]])
         frac = fixture.frac[:, [2, 0, 1]]
+        fl = [[True, True, False] if 0.3 < f[2] < 0.5 else [False, True, True] if 0.2 < f[2] < 0.3 else row
+              for f, row in zip(fixture.frac, fl)]
         flags = [[f[2], f[0], f[1]] for f in fl]
         self.add("contcar_pt111_vacuum_along_a.vasp",
                  "Pt(111) p(3x3) 4L relaxed, cell vectors relabelled so the vacuum is along a",
@@ -1495,11 +1564,22 @@ def analysis_input_cases(out: list[dict]) -> None:
                          check_quote("anatase grouping", A.grouping, "merged"),
                          quote_terms("anatase(001)", A, [("TiO2", 2, False)], 1, 1, 2)))
     add("m2-terms-anatase-101", "anatase.vasp", (1, 0, 1),
-        "M2 §0.3: anatase (101): O | TiO | TiO | O per 3.517 Å, four terminations, O·TiO (2 bonds) first, Tasker 2 "
-        "(oblique mesh: area only)",
-        mesh=False, quote=lambda A: (check_quote("anatase(101) period", A.period, 3.517, 3),
-                                     check_quote("anatase(101) tau", A.tau, 0.30, 2),
-                                     quote_terms("anatase(101)", A, [("O·TiO", 2, False)], 2, 4, 4)))
+        "M2 §0.3: anatase (101): O | TiO | TiO | O per 3.517 Å, four terminations, O·TiO (2 bonds) first, Tasker 2; "
+        "the centred-rectangular mesh 3.785 × 5.458 Å at 110.29° (2|u·v| = |u|²: M1's reduction keeps the short "
+        "vector first, M1 §3.11.1)",
+        quote=lambda A: (check_quote("anatase(101) period", A.period, 3.517, 3),
+                         check_quote("anatase(101) tau", A.tau, 0.30, 2),
+                         check_quote("anatase(101) mesh type", A.mesh["type"], "centred-rectangular"),
+                         quote_terms("anatase(101)", A, [("O·TiO", 2, False)], 2, 4, 4)))
+    for name, seq, m in (("sic_2h.vasp", "2h", 4), ("sic_3c.vasp", "3c", 2)):
+        add(f"m2-terms-sic-{seq}-0001", name, (0, 0, 1),
+            f"M2 §0.3 and §7.1 (SiC 2H/3C/4H/6H: 2/2/4/6 classes): SiC {seq.upper()} (0001): {m} planes per period"
+            + (" (the hexagonal cell reduces to the rhombohedral primitive cell, one bilayer per period)"
+               if seq == "3c" else "")
+            + ", two terminations: Si on top (1 bond per cell) and C (3), both polar",
+            quote=lambda A, m=m: (check_quote("SiC tau", A.tau, 0.30, 2),
+                                  check_quote("SiC grouping", A.grouping, "planes"),
+                                  quote_terms("SiC", A, [("Si", 1, True), ("C", 3, True)], 3, 2, m)))
     for name, seq, count, m in (("sic_4h.vasp", "4h", 4, 8), ("sic_6h.vasp", "6h", 6, 12)):
         add(f"m2-terms-sic-{seq}-0001", name, (0, 0, 1),
             f"M2 §0.3: SiC {seq.upper()} (0001): {m} planes per period, {count} terminations (two cut types × "
@@ -1865,10 +1945,19 @@ def slab_cases() -> dict[str, list[dict]]:
         ("m2-slab-ceo2-111-3periods-v0", "CeO2", (1, 1, 1), {"periods": 3}, "CeO2(111) O·Ce-term 9L", 2.343,
          "M2 §0.3 (V = 0): CeO2(111) 3 periods, shortest distance 2.343 Å"),
         ("m2-slab-zno-0001-4periods-v0", "ZnO", (0, 0, 0, 1), {"periods": 4}, "ZnO(0001) Zn/O-term 16L", 1.974,
-         "M2 §0.3 (V = 0): ZnO(0001) 4 periods, shortest distance 1.974 Å"),
+         "M2 §0.3 (V = 0): ZnO(0001) 4 periods, shortest distance 1.974 Å; the polarity record as at 15 Å, the "
+         "warnings not compared (whether W9 applies to the bulk stacking is open, README decision 10)"),
     ]:
-        warn = {"equals": [W9_ZNO]} if bulk == "ZnO" else None
-        s = add(vac, cid, bulk, hkl, note, name=name, vacuum=0.0, warnings=warn, **kw)
+        s = add(vac, cid, bulk, hkl, note, name=name, vacuum=0.0, **kw)
+        # open for the lead (README decision 10): whether W8-W10 apply to the bulk stacking, which is 3D-periodic
+        # (it is oriented_cell).  Whole periods are stoichiometric and neutral, so only a polar stacking (ZnO) would
+        # warn: its warnings are left out, and the other V = 0 cases expect none either way.  position and offset
+        # have no effect at V = 0 and are not compared.
+        e = vac[-1]["expect"]
+        polar = abs(s.dipole) / s.A.area > POLAR_THRESHOLD
+        assert s.stoichiometric and abs(s.net_charge) < 1e-9 and polar == (bulk == "ZnO")
+        for key in ("surface.position", "surface.offset") + (("warnings",) if polar else ()):
+            del e[key]
         check_quote(f"{cid} shortest distance", s.A.d_min, dmin, 3, 1e-3)
         check_quote(f"{cid} volume", s.volume, s.L / s.A.m * abs(np.linalg.det(s.A.Pm)), 9)
     check_quote("S12-4 volume", vac[0]["expect"]["volume"], 179.41, 2)
@@ -1953,10 +2042,11 @@ E12D = ("a vacuum of 0 Å is only possible when cleaving (the slab then repeats 
 
 
 def structure_doc(name: str, symbols: list[str], cart: np.ndarray, cell: np.ndarray, pbc=(True, True, True),
-                  props: dict | None = None, info: dict | None = None) -> dict:
-    """A ``crystallume.structure/1`` input (10 decimals)."""
+                  props: dict | None = None, info: dict | None = None, exact: bool = False) -> dict:
+    """A ``crystallume.structure/1`` input (10 decimals, or every digit with *exact*)."""
+    num = (lambda x: float(x) + 0.0) if exact else r10      # noqa: E731
     return {"schema": "crystallume.structure/1", "name": name, "symbols": list(symbols),
-            "positions": [[r10(x) for x in r] for r in cart], "cell": [[r10(x) for x in r] for r in cell],
+            "positions": [[num(x) for x in r] for r in cart], "cell": [[num(x) for x in r] for r in cell],
             "pbc": list(pbc), "props": props or {}, "info": info or {}}
 
 
@@ -1994,17 +2084,76 @@ def placed(cart: np.ndarray, z0: float) -> np.ndarray:
     return out
 
 
-def flip_positions(cart: np.ndarray, cell: np.ndarray) -> np.ndarray:
-    """M2 §3.15 on a centred slab whose flipped cell is the same cell: 180° about a, re-centred, wrapped in-plane."""
-    zlo, zhi = cart[:, 2].min(), cart[:, 2].max()
-    out = cart * np.array([1.0, -1.0, -1.0])
-    out[:, 2] += zlo + zhi
-    M = np.array([[cell[0][0], cell[0][1]], [cell[1][0], cell[1][1]]])
-    f = out[:, :2] @ np.linalg.inv(M)
-    f = f - np.floor(f + 1e-12)
-    f[f >= 1 - 1e-12] = 0.0
-    out[:, :2] = f @ M
-    return out
+def standard_frame(cell: np.ndarray) -> np.ndarray:
+    """Ledger L-M1-04 ``standard_frame(cell, "a-x")``: the proper rotation R for which ``cell @ R.T`` has a along +x
+    and b in the xy plane with y >= 0."""
+    x = cell[0] / np.linalg.norm(cell[0])
+    z = np.cross(cell[0], cell[1])
+    z = z / np.linalg.norm(z)
+    return np.array([x, np.cross(z, x), z])
+
+
+def wrap_in_plane(cart: np.ndarray, cell: np.ndarray, eps: float = 1e-12) -> np.ndarray:
+    """F0-D ``wrap_fractional`` along a and b only: ``w = f - floor(f + eps)``, ``w >= 1 - eps`` becomes 0."""
+    f = cart @ np.linalg.inv(cell)
+    w = f[:, :2] - np.floor(f[:, :2] + eps)
+    f[:, :2] = np.where(w >= 1.0 - eps, 0.0, w)
+    return f @ cell
+
+
+def face_margin(cart: np.ndarray, cell: np.ndarray) -> float:
+    """The smallest distance of an in-plane fractional coordinate from a whole number (a cell face)."""
+    f = (cart @ np.linalg.inv(cell))[:, :2]
+    return float(np.abs(f - np.round(f)).min())
+
+
+#: In-plane shift (units of a and b) of the flip inputs: no atom lies on a cell face before or after the flip, so
+#: the in-plane wrap of the result cannot depend on the rounding of the stored input.
+FLIP_SHIFT = (0.137, 0.291)
+
+
+def flip_slab(doc: dict) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[list[int]]]:
+    """M2 §3.15 (ledger L-M2-04) on a stored input slab with c along the normal and the vacuum in one piece, from
+    the numbers as stored (what an implementation reads): the rotation R = 2ââᵀ - I by 180° about â, then
+    ``a1 = a``, ``b1 = -(R b)``, ``c1 = -(R c)``, the in-plane basis reduced by M1 ``gauss_reduce_2d`` (matrix M2),
+    the slab put back where it was along the normal (centred stays centred), turned into the standard frame
+    (a along x) and wrapped in-plane.  Returns positions, cell, R and M2."""
+    pos, cell = np.array(doc["positions"], float), np.array(doc["cell"], float)
+    a, b, c = cell
+    n_in = np.cross(a, b)
+    n_in = np.sign(c @ n_in) * n_in / np.linalg.norm(n_in)
+    ah = a / np.linalg.norm(a)
+    R = 2.0 * np.outer(ah, ah) - np.eye(3)
+    u, v, M2 = gauss_reduce_2d(a, -(R @ b))
+    new = np.array([u, v, -(R @ c)])
+    n = np.cross(u, v)
+    n = n / np.linalg.norm(n)
+    out = pos @ R.T
+    out = out + (float((pos @ n_in).min()) - float((out @ n).min())) * n     # the same heights as before
+    Rs = standard_frame(new)
+    out, new = out @ Rs.T, new @ Rs.T
+    new[np.abs(new) < 1e-12] = 0.0
+    out = wrap_in_plane(out, new)
+    assert face_margin(out, new) > 1e-3, "an atom of the flipped slab lies on a cell face: change FLIP_SHIFT"
+    return out, new, R, M2
+
+
+def flip_supercell(S_old: list[list[int]], cell: np.ndarray, R: np.ndarray,
+                   M2: list[list[int]]) -> tuple[list[list[int]], float]:
+    """M2 §3.15's supercell record of a flipped slab: the 1×1 mesh ``inv(S_old)·[a; b]`` turned by R and reduced
+    (``(p, q, M1x) = gauss_reduce_2d(R a₁, -R b₁)``), ``S_new = M2 · D · S_old · D · inv(M1x)`` with D = diag(1, -1);
+    returns S_new and the angle (°) of the 1×1 mesh it refers to."""
+    S = np.array(S_old, float)
+    one = np.linalg.inv(S) @ np.array(cell[:2])
+    p, q, M1x = gauss_reduce_2d(R @ one[0], -(R @ one[1]))
+    D = np.diag([1.0, -1.0])
+    S_new = np.array(M2, float) @ D @ S @ D @ np.linalg.inv(np.array(M1x, float))
+    ints = np.round(S_new).astype(int)
+    assert np.allclose(S_new, ints, atol=1e-9)
+    u, v, _ = gauss_reduce_2d(cell[0], -(R @ cell[1]))
+    assert np.allclose(ints @ np.array([p, q]), np.array([u, v]), atol=1e-8), "[u; v] = S_new [p; q]"
+    gamma = math.degrees(math.acos((p @ q) / (np.linalg.norm(p) * np.linalg.norm(q))))
+    return ints.tolist(), gamma
 
 
 def tool_cases() -> dict[str, list[dict]]:
@@ -2048,17 +2197,39 @@ def tool_cases() -> dict[str, list[dict]]:
     sv.append(tool_case("setVacuum", "m2-vacuum-contcar-zero", fixture, {"vacuum": 0}, {"error": E12D},
                         "lead decision L-13, M2 §3.20 E12d: 0 Å is only defined when cleaving; an existing structure "
                         "refuses it"))
-    # the vacuum along a: the same fixture with its cell vectors relabelled, gives the same result plus W16
-    e = slab_result(name, crys.symbols, placed(cart, 7.5), cell, flags_=flags, surface=None)
-    a_name = INPUTS.crystal["contcar_pt111_vacuum_along_a.vasp"].name
+    # the vacuum along a: the same fixture with its cell vectors relabelled, gives the same result plus W16; the
+    # flags of its top and third layers (T T F and F T T in the fixture's frame) follow the relabelling
+    a_file = "contcar_pt111_vacuum_along_a.vasp"
+    a_flags = [[f[1], f[2], f[0]] for f in INPUTS.flags[a_file]]      # (a, b, c) <- (a_1, a_2, a_0), M2 §3.14.2
+    e = slab_result(name, crys.symbols, placed(cart, 7.5), cell, flags_=a_flags, surface=None)
+    a_name = INPUTS.crystal[a_file].name
     e["structure"]["name"] = a_name
     e["surface"] = vacuum_block(a_name, t, 15.0)
     e["warnings"] = {"contains": ["the vacuum was along a; the cell vectors were relabelled"], "count": 1}
-    sv.append(tool_case("setVacuum", "m2-vacuum-along-a", INPUTS.file("contcar_pt111_vacuum_along_a.vasp"),
+    sv.append(tool_case("setVacuum", "m2-vacuum-along-a", INPUTS.file(a_file),
                         {"vacuum": 15},
                         e, "M2 §3.14 step 2 (W16): the vacuum along a is moved to c by a cyclic relabelling (cell, "
-                           "pbc, flags); "
-                        "the result is m2-vacuum-contcar-15 with axis 2"))
+                           "pbc, flags: the T T F and F T T flags of the input's top and third layers come back as "
+                           "they are in the fixture); the result is m2-vacuum-contcar-15 with axis 2"))
+    # the same with a declared: pbc F T T and a supercell record follow the relabelling too (M2 §7.1 "vacuum along
+    # a: pbc, SD and supercellMatrix permuted together"); the slab is moved 0.1 along a so that it does not cross
+    # the cell boundary (with pbc[a] false nothing is joined, step 5), and the positions keep every digit so that
+    # the in-plane wrap cannot depend on rounding
+    src = INPUTS.crystal[a_file]
+    f_pbc = src.frac.copy()
+    f_pbc[:, 0] = np.mod(f_pbc[:, 0] + 0.1, 1.0)
+    p_name = "Pt(111) p(3x3) 4L, vacuum along a (a not periodic)"
+    doc = structure_doc(p_name, src.symbols, f_pbc @ src.cell, src.cell, pbc=(False, True, True),
+                        props={"selective_dynamics": INPUTS.flags[a_file]},
+                        info={"supercellMatrix": [[1, 0, 0], [0, 3, 0], [0, 0, 3]]}, exact=True)
+    e = slab_result(p_name, crys.symbols, placed(cart, 7.5), cell, pbc=(True, True, False), flags_=a_flags,
+                    surface=vacuum_block(p_name, t, 15.0))
+    e["structure"]["info"] = {"supercellMatrix": [[3, 0, 0], [0, 3, 0], [0, 0, 1]]}
+    e["warnings"] = {"contains": ["the vacuum was along a; the cell vectors were relabelled"], "count": 1}
+    sv.append(tool_case("setVacuum", "m2-vacuum-along-a-pbc", {"structure": doc}, {"vacuum": 15}, e,
+                        "M2 §3.14 steps 2 and 11, §7.1 (vacuum along a: pbc, SD and supercellMatrix permuted "
+                        "together): pbc F T T becomes T T F, the supercell record diag(1, 3, 3) becomes diag(3, 3, 1), "
+                        "the flags as in m2-vacuum-along-a; the slab is the one of m2-vacuum-along-a"))
     # graphene and MoS2 (pbc T T F stays T T F, U2; acceptance S13-1)
     for key, rec, vac, z in (("graphene", recipe("graphene", ["C"], 2.46, 15.0, name="graphene"), 20.0, None),
                              ("mos2", recipe("mos2", ["Mo", "S"], 3.16, 18.0, name="MoS2"), 20.0, 3.17)):
@@ -2080,8 +2251,8 @@ def tool_cases() -> dict[str, list[dict]]:
     lcart = lh.cart
     lt = float(lcart[:, 2].max() - lcart[:, 2].min())
     rcell = np.array([lh.cell[1], lh.cell[0], [0.0, 0.0, lt + 15.0]])
-    e = slab_result(lh.name, lh.symbols, placed(lcart, 7.5), rcell,
-                    flags_=INPUTS.flags["contcar_pt111_lefthanded_h.vasp"],
+    l_flags = [[f[1], f[0], f[2]] for f in INPUTS.flags["contcar_pt111_lefthanded_h.vasp"]]   # M2 §3.14.3: a <-> b
+    e = slab_result(lh.name, lh.symbols, placed(lcart, 7.5), rcell, flags_=l_flags,
                     surface=vacuum_block(lh.name, lt, 15.0))
     e["warnings"] = {"equals": [W18]}
     check_quote("left-handed H on top", int(np.argmax(lcart[:, 2])), len(lh) - 1)
@@ -2089,7 +2260,8 @@ def tool_cases() -> dict[str, list[dict]]:
                         {"vacuum": 15},
                         e, "M2 §3.14 steps 3-4, review t10: a left-handed CONTCAR (a and b swapped) keeps the H on "
                            "top: a and b "
-                        "are swapped back (W18), the normal is on the side of c, nothing is mirrored"))
+                        "are swapped back (W18) with their flag columns (the middle layer's T F T becomes F T T), "
+                        "the normal is on the side of c, nothing is mirrored"))
     fh = INPUTS.crystal["contcar_pt111_h2_floating.vasp"]
     fcart = fh.cart
     ft = float(fcart[:, 2].max() - fcart[:, 2].min())
@@ -2134,14 +2306,18 @@ def tool_cases() -> dict[str, list[dict]]:
                         "M2 §3.14 step 7: a tilted c is made orthogonal ((t + V) n); the slab already had 15 Å along "
                         "the normal, so no atom moves; F F F and T T T flags are kept exactly (no W15)"))
     # ---------------------------------------------------------------------------------------------- flip_slab
+    # The inputs are shifted in-plane by FLIP_SHIFT (no atom on a cell face) and the expectations are computed from
+    # the stored numbers, so that the in-plane wrap of a correct implementation lands every atom where the case says.
     sA = Analysis(BULKS["SrTiO3"][1], (0, 0, 1))
     sy, pos, cell8, tags = slab_atoms(sA, sA.classes[0]["rep"], 8, [[1, 0], [0, 1]], 15.0, ["Sr", "Ti", "O"])
+    pos = wrap_in_plane(pos + FLIP_SHIFT[0] * cell8[0] + FLIP_SHIFT[1] * cell8[1], cell8)
     fl8 = [[True, True, False] if tg >= 7 else [True, True, True] for tg in tags]
     doc = structure_doc("SrTiO3 8L", sy, pos, cell8, props={"tags": tags, "selective_dynamics": fl8})
-    e = slab_result("SrTiO3 8L", sy, flip_positions(pos, cell8), cell8, flags_=fl8, surface=None)
+    fpos, fcell, _, _ = flip_slab(doc)
+    assert np.allclose(fcell, cell8, atol=1e-9), "the square cell is its own flip"
+    e = slab_result("SrTiO3 8L", sy, fpos, fcell, flags_=fl8, surface=None)
     e["structure"]["props"]["tags"] = [9 - tg for tg in tags]
-    z_after = flip_positions(pos, cell8)[:, 2]
-    top_after = [s for s, z in zip(sy, z_after) if abs(z - z_after.max()) < 1e-6]
+    top_after = [s for s, z in zip(sy, fpos[:, 2]) if abs(z - fpos[:, 2].max()) < 1e-6]
     check_quote("flipped SrTiO3 top", sorted(Counter(top_after).items()), [("O", 1), ("Sr", 1)])
     fl.append(tool_case("flipSlab", "m2-flip-srtio3-8l", {"structure": doc}, {}, e,
                         "M2 §7.1 flip row: an asymmetric SrTiO3 slab (TiO2 on top) turned over about a: SrO on top, "
@@ -2156,8 +2332,9 @@ def tool_cases() -> dict[str, list[dict]]:
         ("m2-flip-pt111-sqrt3-4l", "Pt", (1, 1, 1), 4, [[2, 1], [-1, 1]], "Pt(111) (√3×√3)R30° 4L",
          "Pt(-1-1-1) (√3×√3)R30° 4L",
          [[2, 1, 0], [-1, 1, 0], [0, 0, 1]], [[1, -1, 0], [1, 2, 0], [0, 0, 1]],
-         "M2 §3.15, §7.1 flip row: the supercell record of √3 becomes [[1, -1], [1, 2]] on the reduced flipped 1×1 "
-         "mesh (120°)"),
+         "M2 §3.15, ledger L-M2-04, §7.1 flip row: the input is the M1 make_supercell path, so a lies 30° from x; "
+         "the slab turns 180° about a (R = 2ââᵀ - I, not about x) and back into the standard frame (a along x); "
+         "the supercell record of √3 becomes [[1, -1], [1, 2]] on the reduced flipped 1×1 mesh (120°)"),
         ("m2-flip-pt111-p3x3-4l", "Pt", (1, 1, 1), 4, [[3, 0], [0, 3]], "Pt(111) p(3×3) 4L", "Pt(-1-1-1) p(3×3) 4L",
          [[3, 0, 0], [0, 3, 0], [0, 0, 1]], [[3, 0, 0], [0, 3, 0], [0, 0, 1]],
          "M2 §3.15, §7.1 flip row: p(3×3) stays diag(3, 3)"),
@@ -2170,6 +2347,7 @@ def tool_cases() -> dict[str, list[dict]]:
         check_quote(f"{cid} name", sl.name(sl.bulk_formula, hkil_of(An.miller) if bulk == "ZnO" else list(An.miller),
                                            "" if S is None else ("(√3×√3)R30°" if S[0][1] else "p(3×3)")), name0)
         sy, pos, cellx, tags = slab_atoms(An, k, L, Sx, 15.0, crys_b.symbols)
+        pos = wrap_in_plane(pos + FLIP_SHIFT[0] * cellx[0] + FLIP_SHIFT[1] * cellx[1], cellx)
         proto = inp["recipe"]["args"]["prototype"]
         miller = list(An.miller)
         rec = {"version": 2, "kind": "cleave", "autoName": name0,
@@ -2198,10 +2376,16 @@ def tool_cases() -> dict[str, list[dict]]:
         if sc0:
             info["supercellMatrix"] = sc0
         doc = structure_doc(name0, sy, pos, cellx, props={"tags": tags}, info=info)
-        e = slab_result(name1, sy, flip_positions(pos, cellx), cellx, surface=None)
+        fpos, fcell, R, M2 = flip_slab(doc)
+        if S is None or S[0][1] == 0:       # a along x already: the reduced flipped cell is the input cell
+            assert np.allclose(fcell, cellx, atol=1e-9)
+        e = slab_result(name1, sy, fpos, fcell, surface=None)
         del e["surface"]
         e["structure"]["props"] = {"tags": [L + 1 - tg for tg in tags]}
         if sc1:
+            S_new, gamma = flip_supercell(Sx, np.array(doc["cell"], float), R, M2)
+            check_quote(f"{cid} supercell record", embed(S_new), sc1)
+            check_quote(f"{cid} 1×1 mesh of the record", round(gamma, 9), 120.0)
             e["structure"]["info"] = {"supercellMatrix": sc1}
         neg = [-x for x in miller]
         e.update({"surface.kind": "cleave", "surface.autoName": name1, "surface.miller": neg,
@@ -2219,19 +2403,17 @@ def tool_cases() -> dict[str, list[dict]]:
                         "ledger L-M2-05: the CONTCAR fixture joined in one piece with its lowest atom at z = 0; the "
                         "gap "
                         "(c·n) unchanged, pbc unchanged, no record written, name kept"))
-    a_doc = INPUTS.file("contcar_pt111_vacuum_along_a.vasp")
-    e = slab_result(a_name, crys.symbols, placed(cart, 0.0), crys.cell, flags_=flags, surface=None)
+    a_doc = INPUTS.file(a_file)
+    e = slab_result(a_name, crys.symbols, placed(cart, 0.0), crys.cell, flags_=a_flags, surface=None)
     sd.append(tool_case("standardizeSlab", "m2-standardize-vacuum-along-a", a_doc, {}, e,
-                        "ledger L-M2-05 (R-F22): the vacuum along a is relabelled to c: the result of "
-                        "m2-standardize-contcar"))
+                        "ledger L-M2-05 (R-F22): the vacuum along a is relabelled to c (cell, pbc and flag columns): "
+                        "the result of m2-standardize-contcar, with the flags of m2-vacuum-along-a"))
     lcell = np.array([lh.cell[1], lh.cell[0], lh.cell[2]])
-    e = slab_result(lh.name, lh.symbols, placed(lcart, 0.0), lcell,
-                    flags_=INPUTS.flags["contcar_pt111_lefthanded_h.vasp"],
-                    surface=None)
+    e = slab_result(lh.name, lh.symbols, placed(lcart, 0.0), lcell, flags_=l_flags, surface=None)
     sd.append(tool_case("standardizeSlab", "m2-standardize-lefthanded-h",
                         INPUTS.file("contcar_pt111_lefthanded_h.vasp"), {},
-                        e, "ledger L-M2-05: a left-handed cell is relabelled (a and b swapped), the H stays on the "
-                           "top face"))
+                        e, "ledger L-M2-05: a left-handed cell is relabelled (a and b swapped, with their flag "
+                           "columns), the H stays on the top face"))
     sy, pos, cell4, _ = slab_atoms(A, A.classes[0]["rep"], 4, [[1, 0], [0, 1]], 15.0, ["Pt"])
     doc = structure_doc("Pt(111) 4L tilted c", sy, pos, tilted)
     e = slab_result("Pt(111) 4L tilted c", sy, placed(pos, 0.0), cell4, surface=None)
@@ -2327,10 +2509,10 @@ DESCRIPTIONS = {
                             "terminations of "
                             "acceptance S1-S7 and M2 §0.3.",
     "analysis/oxides.json": "Op terminations on oxides and halides: acceptance S8-S12 and M2 §0.3 (Tasker types, K7 "
-                            "order, K8 labels).",
+                            "order, K8 labels; the K5 rows rutile (111), (120), (102) and ZnO (2 0 -2 1)).",
     "analysis/inputs.json": "Op terminations on the real inputs of M2 §7.2: Materials Project primitive cells "
                             "(conventional-cell hints and indices), corundum, rumpled LaFeO3 and anatase layers, SiC "
-                            "polytypes, dhcp La, noisy bulks.",
+                            "2H/3C/4H/6H, dhcp La, noisy bulks.",
     "analysis/errors.json": "Op terminations: input errors (M2 §3.20).",
     "slab/metals.json": "Op surface (M2-T4, M2-T6b) on metals: acceptance S1-S7 (pbc T T T, U2; vacuum = total gap, "
                         "U4; names, L-19).",
@@ -2339,12 +2521,41 @@ DESCRIPTIONS = {
     "slab/vacuum.json": "Op surface with a vacuum of 0 Å (bulk stacking, U4) and small vacua (K11 contact check).",
     "slab/errors.json": "Op surface: errors (M2 §3.20; E12a for vacuum null, U4).",
     "tools/set_vacuum.json": "Op setVacuum (M2-T5): the CONTCAR fixture at 15 and 20 Å, 2D prototypes (pbc kept), "
-                             "vacuum along a, "
+                             "vacuum along a (cell, pbc, flags and supercell record relabelled), "
                              "left-handed cells, floating molecules, bulks, tilted c, and set_vacuum(0) (L-13).",
-    "tools/flip.json": "Op flipSlab (M2-T5): flipped slabs, their records and names (M2 §3.15).",
+    "tools/flip.json": "Op flipSlab (M2-T5): flipped slabs (180° about a, back in the standard frame), their records "
+                       "and names (M2 §3.15).",
     "tools/standardize.json": "Op standardizeSlab (M2-T5): the slab normalisation M6 uses (ledger L-M2-05).",
 }
-KEY_ORDER = ("id", "op", "args", "input", "expect", "tol", "skip", "note")
+KEY_ORDER = ("id", "op", "args", "input", "expect", "tol", "skip", "xfail", "note")
+#: The subdirectories this script writes (besides the files directly in cleave/); ``--check`` ignores the others,
+#: such as the full atom lists M2-T7b-lite adds under ``full/``.
+OWN_DIRS = ("analysis", "inputs", "slab", "tools")
+
+
+def keep_run_state(rel: str, cases: list[dict]) -> list[dict]:
+    """The cases with the run state the file on disk has: a language whose skip was removed (M2-T5, M2-T7c and
+    M2-T7b-lite remove them by hand once that language passes) stays without it, and an ``xfail`` on disk is kept.
+    A new case, or a language that still skips, gets the skip of its op."""
+    path = HERE / rel
+    if not path.is_file():
+        return cases
+    disk = {c.get("id"): c for c in json.loads(path.read_text(encoding="utf-8")).get("cases", [])}
+    out = []
+    for case in cases:
+        old = disk.get(case["id"])
+        if old is not None:
+            case = dict(case)
+            if "skip" in case:
+                kept = {lang: why for lang, why in case["skip"].items() if lang in old.get("skip", {})}
+                if kept:
+                    case["skip"] = kept
+                else:
+                    del case["skip"]
+            if "xfail" in old:
+                case["xfail"] = old["xfail"]
+        out.append(case)
+    return out
 
 
 def file_text(rel: str, cases: list[dict]) -> str:
@@ -2357,13 +2568,13 @@ def file_text(rel: str, cases: list[dict]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def all_files() -> dict[str, str]:
+def all_files(*, keep_state: bool = True) -> dict[str, str]:
     files: dict[str, str] = {}
-    files["recipes.json"] = file_text("recipes.json", recipe_cases())
-    files["inputs.json"] = file_text("inputs.json", input_cases())
+    groups: dict[str, list[dict]] = {"recipes.json": recipe_cases(), "inputs.json": input_cases()}
     for group in (analysis_cases(), slab_cases(), tool_cases()):
-        for rel, cases in group.items():
-            files[rel] = file_text(rel, cases)
+        groups.update(group)
+    for rel, cases in groups.items():
+        files[rel] = file_text(rel, keep_run_state(rel, cases) if keep_state else cases)
     for name, text in INPUTS.text.items():
         files[f"inputs/{name}"] = text
     return files
@@ -2379,10 +2590,12 @@ def check_radii() -> None:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--check", action="store_true", help="compare with the files on disk instead of writing")
+    ap.add_argument("--reset-skips", action="store_true",
+                    help="give every case the skip of its op again (by default a skip removed by hand stays removed)")
     opts = ap.parse_args(argv)
     sys.path.insert(0, str(REPO))
     check_radii()
-    files = all_files()
+    files = all_files(keep_state=not opts.reset_skips)
     stale = []
     for rel, text in sorted(files.items()):
         path = HERE / rel
@@ -2395,8 +2608,9 @@ def main(argv: list[str] | None = None) -> int:
     for slip in SLIPS:
         print(f"note: {slip}")
     if opts.check:
-        on_disk = {p.relative_to(HERE).as_posix() for p in HERE.rglob("*")
-                   if p.is_file() and p.suffix in (".json", ".vasp")}
+        on_disk = {rel for rel in (p.relative_to(HERE).as_posix() for p in HERE.rglob("*")
+                                   if p.is_file() and p.suffix in (".json", ".vasp"))
+                   if "/" not in rel or rel.split("/", 1)[0] in OWN_DIRS}
         extra = sorted(on_disk - set(files))
         if stale or extra:
             print("out of date: " + ", ".join(stale + [f"{x} (not written by this script)" for x in extra]))
