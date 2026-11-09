@@ -6,6 +6,7 @@ import { commands } from '../core/commands.js';
 import { relativeTime, debounce } from '../core/util.js';
 import { element } from '../core/elements.js';
 import { elementColorHex } from '../render/colors.js';
+import { tools, toolHint, genericHud, toolKeyProblems } from '../render/tools/index.js';
 import { formats } from '../io/index.js';
 import { samples } from '../build/samples.js';
 import { VERSION } from '../app.js';
@@ -498,9 +499,11 @@ export class Shell {
     this.statText = h('span.stat.pill');
     this.statusbar = h('div.float.statusbar', this.hintText, this.statText);
     if (typeof ResizeObserver === 'function') new ResizeObserver(() => this._fitHint()).observe(this.statusbar);   // panels opened or closed
-    // toolbar
-    this.selectBtn = btn('', { icon: 'pointer', cls: 'icon', tip: 'Select and inspect atoms', kbd: 'V', on: () => app.setTool('select') });
-    this.measureBtn = btn('', { icon: 'ruler', cls: 'icon', tip: 'Measure distance, angle or dihedral', kbd: 'M', on: (e) => this.measureMenu(e.currentTarget) });
+    // toolbar: Select and Measure (a menu), then the registered tools with toolbar: true (renderToolButtons); a tool's
+    // key is only shown here, its command binds it (M7 KC-03)
+    const toolKey = (id) => { const k = tools.get(id)?.key; return k ? keyLabel(k) : null; };
+    this.selectBtn = btn('', { icon: 'pointer', cls: 'icon', tip: 'Select and inspect atoms', kbd: toolKey('select'), on: () => app.setTool('select') });
+    this.measureBtn = btn('', { icon: 'ruler', cls: 'icon', tip: 'Measure distance, angle or dihedral', kbd: toolKey('measure'), on: (e) => this.measureMenu(e.currentTarget) });
     const viewBtn = btn('', { icon: 'axes', cls: 'icon', tip: 'View along an axis', kbd: 'A B C · X Y Z', on: (e) => this.viewMenu(e.currentTarget) });
     this.projBtn = btn('', { icon: 'projection', cls: 'icon', tip: 'Perspective / orthographic', kbd: 'P', on: () => commands.run('view.projection') });
     this.spinBtn = btn('', { icon: 'turntable', cls: 'icon', tip: 'Turntable (auto-rotate)', kbd: 'T', on: () => commands.run('view.turntable') });
@@ -538,14 +541,51 @@ export class Shell {
         btn('Paste text', { icon: 'clipboard', cls: 'desktop-only', on: () => this.runCommand('file.paste') })),
     ));
     this.drop = h('div.float.dropzone', { hidden: true }, h('div', h('b', 'Drop structure or project files to open them'), h('small', `CIF, POSCAR, XYZ, PDB or .crystallume.json · you can also paste file text with ${keyLabel('mod+v')}`)));
+    // the tool HUD (class kept from when only Measure had one): toolDef.hud(app, env), or the generic one
     this.measureHud = h('div.float.measure-hud', { hidden: true, role: 'status' });
     this.stage.append(this.infoCard, this.toolbar, this.revealBtn, this.statusbar, this.hover, this.trajbar, this.empty, this.drop, this.measureHud);
     this.selCard = new SelectionCard(this);
+    this.toolBtns = new Map();   // tool id → toolbar button, for the registered tools after Select and Measure
+    this.renderToolButtons();
+    // tools that come or go later (plugins): new buttons, and the app leaves a tool that went away
+    tools.onChange(() => { this.renderToolButtons(); app._toolsChanged?.(); this.updateHint(); this._checkToolKeysSoon(); });
+    this._checkToolKeysSoon();   // once the start-up has registered the commands
+  }
+
+  /** The toolbar buttons of the registered tools with toolbar: true (not Select and Measure), by order, after Measure. */
+  renderToolButtons() {
+    const app = this.app;
+    for (const b of this.toolBtns.values()) b.remove();
+    this.toolBtns.clear();
+    let after = this.measureBtn;
+    for (const t of tools.list()) {
+      if (!t.toolbar || t.id === 'select' || t.id === 'measure') continue;
+      const b = btn('', { icon: t.icon, cls: 'icon', tip: t.tip, kbd: t.key ? keyLabel(t.key) : null, on: () => app.setTool(t.id) });
+      b.dataset.tool = t.id;
+      b.setAttribute('aria-pressed', String(app.tool === t.id));
+      after.after(b);
+      after = b;
+      this.toolBtns.set(t.id, b);
+    }
+  }
+
+  /** Warn in the console (once each) about tools whose shown key is not the key of their command (M7 KC-03). */
+  _checkToolKeysSoon() {
+    if (this._toolKeyCheck) return;
+    this._toolKeyCheck = true;
+    queueMicrotask(() => {
+      this._toolKeyCheck = false;
+      this._toolKeyWarned ??= new Set();
+      for (const msg of toolKeyProblems(tools.list(), commands.list())) {
+        if (!this._toolKeyWarned.has(msg)) { this._toolKeyWarned.add(msg); console.warn(`Tool keys: ${msg}`); }
+      }
+    });
   }
 
   onHover({ index, x, y }) {
     const info = this.app.viewer.atomInfo(index);
-    if (!info) { this.hover.hidden = true; this.app.viewer.renderer.domElement.style.cursor = ''; return; }
+    // off an atom the canvas takes the tool's cursor again (a tool's own hover may set another one after this)
+    if (!info) { this.hover.hidden = true; this.app.viewer.renderer.domElement.style.cursor = this.app.toolDef?.cursor ?? ''; return; }
     this.app.viewer.renderer.domElement.style.cursor = 'pointer';
     const color = elementColorHex(info.symbol, this.app.scene.style);
     const f = (a) => a.map((v) => v.toFixed(3)).join('  ');
@@ -681,28 +721,45 @@ export class Shell {
   }
   _darkUI() { const t = document.documentElement.dataset.theme; return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; }
 
+  /**
+   * The status-bar hint, the tool HUD and the pressed state of the toolbar buttons. Select has the hint below (it
+   * follows the selection) and no HUD; every other tool its hint(app, env) and hud(app, env) (render/tools/index.js),
+   * or the generic "<b>Title</b> · <b>Esc</b> to finish" and "Title · Esc to finish" with Done.
+   */
   updateHint() {
     const app = this.app;
     const touch = isTouch();
-    let html;
-    if (app.tool === 'measure') {
-      const need = { distance: 2, angle: 3, dihedral: 4 }[app.measureType];
-      html = `<b>${app.measureType[0].toUpperCase() + app.measureType.slice(1)}</b> — ${touch ? 'tap' : 'click'} ${need} atoms (${app.measurePicks.length}/${need}) · <b>Esc</b> to finish`;
-      this.measureHud.hidden = false;
-      this.measureHud.replaceChildren(h('span', `${app.measureType[0].toUpperCase() + app.measureType.slice(1)}: ${touch ? 'tap' : 'click'} ${need} atoms (${app.measurePicks.length}/${need})`), h('button', { type: 'button', on: { click: () => app.setTool('select') } }, 'Done'));
+    const def = app.toolDef;
+    let parts;
+    if (def && def.id !== 'select') {
+      const env = { touch, mac: isMac, MOD, ALT };
+      parts = toolHint(def, app, env);
+      let hud;
+      if (typeof def.hud === 'function') {
+        try { hud = def.hud(app, env); } catch (e) { console.error(`The HUD of the ${def.title} failed`, e); hud = null; }
+      } else hud = [h('span', genericHud(def)), h('button', { type: 'button', on: { click: () => app.setTool('select') } }, 'Done')];
+      const nodes = [hud].flat().filter((x) => x != null);
+      this.measureHud.hidden = !nodes.length;
+      // a HUD that returns the nodes it already shows keeps them in place (and the focus in its controls)
+      const shown = this.measureHud.childNodes;
+      if (nodes.length !== shown.length || nodes.some((n, i) => shown[i] !== n)) this.measureHud.replaceChildren(...nodes);
     } else {
       this.measureHud.hidden = true;
+      this.measureHud.replaceChildren();
       const n = app.selection.length;
+      let html;
       if (!app.structure) html = touch ? 'Open a file or pick a sample' : `Open a file (<b>${keyLabel('mod+o')}</b>), drop one here, paste text, or pick a sample`;
       else if (touch) html = n ? `<b>${n}</b> selected · ${this.selCard?.multi ? 'tap atoms to add or remove · ' : ''}tap empty space to clear` :'One finger rotates, two fingers pan and pinch to zoom, tap an atom to select it';
       else html = n ? `<b>${n}</b> selected · <b>Del</b> delete · <b>Shift-click</b> add · <b>${MOD}-click</b> add/remove · <b>Drag</b> box select · <b>Double-click</b> fragment · <b>Esc</b> clear`
         : isMac ? '<b>⌃-drag</b> or <b>right-drag</b> rotate · <b>⌥-drag</b> or <b>middle-drag</b> pan · <b>Scroll</b> zoom · <b>Click</b> select · <b>Drag</b> box select · <b>Double-click</b> fragment · <b>⌃-click</b> atom menu'
           : '<b>Right-drag</b> rotate · <b>Middle-drag</b> or <b>Alt-drag</b> pan · <b>Scroll</b> zoom · <b>Click</b> select · <b>Drag</b> box select · <b>Double-click</b> fragment · <b>Right-click</b> atom menu';
+      parts = html.split(' · ');
     }
-    this._hintParts = html.split(' · ');
+    this._hintParts = parts;
     this._fitHint();
     this.selectBtn.setAttribute('aria-pressed', String(app.tool === 'select'));
     this.measureBtn.setAttribute('aria-pressed', String(app.tool === 'measure'));
+    for (const [id, b] of this.toolBtns) b.setAttribute('aria-pressed', String(app.tool === id));
     this.projBtn.setAttribute('aria-pressed', String(app.scene.display.projection === 'orthographic'));
     this.spinBtn.setAttribute('aria-pressed', String(!!app.scene.display.turntable));
   }
@@ -1117,7 +1174,8 @@ export class Shell {
     v.on('play', (p) => { this.playBtn.replaceChildren(ic(p ? 'pause' : 'play')); });
     v.on('model', () => { this.updateInfo(); });
     v.on('atomcontext', (e) => this.onAtomContext(e));
-    v.on('boxselect', ({ indices = [], add, mode } = {}) => { if (app.tool !== 'select' || !app.structure) return; app.select(indices, { mode: mode ?? (add ? 'add' : 'replace') }); });
+    // box and lasso selection, and the touch multi-select below, work with every tool that selects atoms (Select, Move)
+    v.on('boxselect', ({ indices = [], add, mode } = {}) => { if (!app.toolDef?.selects || !app.structure) return; app.select(indices, { mode: mode ?? (add ? 'add' : 'replace') }); });
     // multi-select (touch): a tap adds or removes an atom instead of replacing the selection
     // (both read at pointerdown: the app has already applied the plain click when 'atomclick' gets here)
     const cv = v.renderer.domElement;
@@ -1128,7 +1186,7 @@ export class Shell {
     cv.addEventListener('focus', () => { if (performance.now() - downAt > 1000) delete cv.dataset.pointerFocus; });
     cv.addEventListener('blur', () => { delete cv.dataset.pointerFocus; });
     v.on('atomclick', ({ index }) => {
-      if (!this._multiAtDown || app.tool !== 'select' || !v.model) return;
+      if (!this._multiAtDown || !app.toolDef?.selects || !v.model) return;
       const before = this._selAtDown ?? [];
       if (index < 0) {
         // a tap on empty space clears the selection as usual (which also ends multi-select); offer it back
@@ -1144,7 +1202,7 @@ export class Shell {
     });
     // multi-select (touch): a double tap adds the fragment (the app has just replaced the selection with it)
     v.on('atomdblclick', () => {
-      if (!this._multiAtDown || app.tool !== 'select') return;
+      if (!this._multiAtDown || !app.toolDef?.selects) return;
       app.select([...(this._selAtDown ?? []), ...app.selection], { mode: 'replace' });
     });
     // frame rate, measured only over continuous rendering (an idle view renders nothing)
@@ -1280,6 +1338,8 @@ export class Shell {
       ['Drag', `Box select (Shift adds, ${MOD} toggles)`], ['Q + drag', 'Lasso select'],
       ['Double-click', 'Select the bonded fragment'], [`${ALT} double-click`, 'Select all atoms of that element'], [isMac ? 'Right-click / ⌃ click' : 'Right-click', 'Atom menu'],
       ['Arrows', 'Rotate 45° (view focused)'], [`Shift or ${ALT} arrows`, 'Pan (view focused)'],
+      // then the rows of the registered tools (ToolDef.mouse), in tool order
+      ...tools.list().flatMap((t) => t.mouse),
     ];
     sections.push(h('section.sc-sec', h('h3.sub-h', 'Mouse'), h('div.shortcut-grid', mouse.map(([k, d]) => h('div', h('span', d), h('span.kbd', k))))));
     dialog({ title: 'Keyboard shortcuts', wide: true, className: 'shortcuts', body: h('div.sc-wrap', sections) });

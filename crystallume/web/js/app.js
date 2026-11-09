@@ -17,6 +17,9 @@ import { uid, deepClone, deepMerge, setPath, getPath, debounce, relativeTime } f
 import { parseStructure, exportStructure, formats, detectFormat } from './io/index.js';
 import { samples } from './build/samples.js';
 import { Viewer } from './render/viewer.js';
+import { tools } from './render/tools/index.js';
+import './render/tools/select.js';
+import './render/tools/measure.js';
 import { bondedFragment } from './render/display.js';
 import { makeScene, DEFAULT_SCENE } from './render/settings.js';
 import { colorExtrasFrom } from './render/colors.js';
@@ -829,11 +832,54 @@ export class App extends Emitter {
     return e;
   }
 
-  setTool(tool, measureType) {
-    this.tool = tool;
-    if (measureType) this.measureType = measureType;
+  /**
+   * Switch tools (F0-A §3.13.2): 'select' (the default), 'measure' or a tool registered with tools.register
+   * (render/tools/index.js); `opts` go to the tool, and setTool('measure', 'angle') still means
+   * setTool('measure', { measureType: 'angle' }). An unknown id falls back to Select (with a console warning); a tool
+   * whose when(app) is false stays off, a toast says why, and the result is false. A press of the old tool in the view
+   * is cancelled ('switch'), the old tool is deactivated, the new one gets a fresh handler, its cursor and activate(app,
+   * opts); 'tool' is emitted and the result is true. app.tool stays the tool's id; app.toolDef is its definition.
+   */
+  setTool(id = 'select', opts = {}) {
+    if (typeof opts === 'string') opts = { measureType: opts };
+    if (!opts || typeof opts !== 'object') opts = {};
+    let t = tools.get(id);
+    if (!t) { console.warn(`Unknown tool “${id}”; using Select.`); t = tools.get('select'); }
+    let ok = true;
+    try { ok = !t.when || !!t.when(this); } catch (e) { console.error(e); ok = false; }
+    if (!ok) {
+      let why = null;
+      try { why = t.whyNot?.(this) ?? null; } catch (e) { console.error(e); }
+      toast(why || `${t.title} is not available now.`);
+      return false;
+    }
+    const prev = this.toolDef;
+    this.viewer.cancelToolPress?.('switch');
+    if (prev && prev !== t) { try { prev.deactivate?.(this, 'switch'); } catch (e) { console.error(e); } }
+    this.tool = t.id; this._toolDef = t; this.toolOpts = opts;
+    if (opts.measureType) this.measureType = opts.measureType;
     this.measurePicks = [];
+    let handler = null;
+    try { handler = t.handler?.(this, this.viewer, opts) ?? null; } catch (e) { console.error(`${t.title}: its pointer handler failed to start`, e); }
+    this.viewer.toolHandler = handler;
+    const canvas = this.viewer.renderer?.domElement;
+    if (canvas) canvas.style.cursor = t.cursor ?? '';
+    try { t.activate?.(this, opts); } catch (e) { console.error(e); }
     this.emit('tool');
+    return true;
+  }
+
+  /** The active tool's definition: the one setTool switched on, else the registered one for app.tool (Select for an unknown id). */
+  get toolDef() {
+    const t = this._toolDef;
+    return t && t.id === this.tool ? t : (tools.get(this.tool) ?? tools.get('select'));
+  }
+
+  /** The tool registry changed (the shell passes it on): an active tool that went away gives way to Select, a replaced one restarts. */
+  _toolsChanged() {
+    const cur = tools.get(this.tool);
+    if (!cur) this.setTool('select');
+    else if (this._toolDef && this._toolDef.id === this.tool && cur !== this._toolDef) this.setTool(this.tool, this.toolOpts);
   }
 
   _onAtomClick({ index, shiftKey, mode }) {
@@ -852,6 +898,8 @@ export class App extends Emitter {
       this.emit('tool');
       return;
     }
+    // a tool that does not select atoms (Pick site…) leaves the selection alone; Select and Move select (ToolDef.selects)
+    if (!this.toolDef?.selects) return;
     // as in Materials Studio: a click replaces the selection (on empty space: clears it), Shift adds, Ctrl/⌘ toggles
     const m = mode ?? (shiftKey ? 'toggle' : 'replace');
     if (index < 0) { if (m === 'replace') this.clearSelection(); return; }
@@ -859,12 +907,12 @@ export class App extends Emitter {
   }
 
   /**
-   * Double-click on an atom with the Select tool: its bonded fragment (Alt: every atom of its element), replacing
-   * the selection, added with Shift, or with Ctrl/⌘ added — or removed when the atom was selected.
+   * Double-click on an atom with a tool that selects atoms (Select, Move): its bonded fragment (Alt: every atom of its
+   * element), replacing the selection, added with Shift, or with Ctrl/⌘ added — or removed when the atom was selected.
    */
   _onAtomDblClick({ index, mode = 'replace', altKey = false }) {
     const m = this.viewer.model;
-    if (this.tool !== 'select' || !m || index < 0 || index >= m.n) return;
+    if (!this.toolDef?.selects || !m || index < 0 || index >= m.n) return;
     const src = m.src[index];
     // the two clicks before this one toggled the atom twice: its state is what it was before the double-click
     const how = mode === 'toggle' ? (this.viewer.selection.has(src) ? 'remove' : 'add') : mode;

@@ -491,7 +491,8 @@ export class SelectionCard {
     // hidden under a tool that does not select atoms and while another structure is previewed; a drag preview keeps
     // the card with its actions greyed (F0-A §3.6.3)
     const session = app.session && app.session.active !== false ? app.session : null;
-    this.el.hidden = !sel.length || app.tool === 'measure' || app.toolDef?.selects === false || session?.kind === 'structure';
+    const selects = app.toolDef ? !!app.toolDef.selects : app.tool !== 'measure';   // ToolDef.selects (Measure, Pick site: no)
+    this.el.hidden = !sel.length || !selects || session?.kind === 'structure';
     if (this.el.hidden) return;
     const n = sel.length, m = app.viewer.model;
     // phones, tablets and narrow windows: fewer buttons, each an icon over a short label (touch gets no tooltips)

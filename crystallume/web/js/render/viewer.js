@@ -10,8 +10,8 @@
  *   'atomdblclick' {index, mode, altKey, x, y}        double-click on a displayed atom (Alt: the element)
  *   'atomcontext' {index, x, y, clientX, clientY}     right-click without drag (index −1: empty space);
  *                                                     x/y are relative to the viewport element
- *   'boxselect'   {indices, mode, add, shape}         a rectangle (drag) or lasso (Q+drag) finished with tool
- *                                                     'select'; indices are unique source (structure) indices,
+ *   'boxselect'   {indices, mode, add, shape}         a rectangle (drag) or lasso (Q+drag) finished with a tool
+ *                                                     that selects; indices are unique source (structure) indices,
  *                                                     add = mode is not 'replace', shape 'rect' | 'lasso'
  *   'frame' i | 'play' bool | 'selection' srcIndices | 'render' | 'measure' list | 'camera' | 'model' model | 'error' err
  *
@@ -23,7 +23,8 @@
  * pan, +/− zoom; those keys do not reach the global shortcuts. `holdKeys` (X, Y, Z, R, Q, E) change
  * what a drag does while held; `heldKeyUsed(k)` tells the shortcut router that a drag used one, so that
  * releasing it does not also run the key's own shortcut.
- * `tool` is the app's active tool ('select' | 'measure' | …); box and lasso selection run only with 'select'.
+ * `tool` is the app's active tool ('select' | 'measure' | …); box and lasso selection run only with a tool that
+ * selects atoms (toolSelects, render/tools/index.js), and `toolHandler` gets the left button (see _setupPointer).
  * The app keeps it current by setting `toolProvider = () => app.tool` (or by assigning `tool`).
  * `helpers` = the building blocks styles receive as ctx.helpers (buildAtoms, buildBonds, …).
  */
@@ -38,6 +39,7 @@ import { mergeGeometries } from '../../vendor/three/addons/utils/BufferGeometryU
 import { Emitter } from '../core/events.js';
 import { element } from '../core/elements.js';
 import { buildDisplayModel, modelBounds, refOf, storedImage } from './display.js';
+import { tools } from './tools/index.js';
 import { parseRef, normalizeRefs, measurementPoints, migrateMeasurementKeys, newMeasurementId } from '../core/measure.js';
 import { inv3, cartToFrac } from '../core/util.js';
 import { styles, atomRadius, segmentsFor, autoPolyhedraCenters, buildAtoms, buildBonds, buildLines, buildPolyhedra, writeAtomMatrices, writeBondMatrices } from './styles.js';
@@ -61,6 +63,8 @@ const cssVar = (name, fallback) => getComputedStyle(document.documentElement).ge
 const KEY_TURN = 45, KEY_PAN = 40, KEY_ZOOM = 1.2;
 /** A press that moves less than this (CSS px) is a click; two clicks this close in time and place are a double-click. */
 const CLICK_PX = 5, DOUBLE_MS = 450, DOUBLE_PX = 6;
+/** What _toolCall gives when a tool's handler method throws. */
+const TOOL_FAILED = Symbol('tool failed');
 /** Keys held down to change what a drag does: X/Y/Z + right-drag, R (zoom box), Q (lasso), E (rectangle) + left-drag. */
 const HOLD_KEYS = new Set(['x', 'y', 'z', 'r', 'q', 'e']);
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -265,6 +269,14 @@ export class Viewer extends Emitter {
    * over the atoms, the view sends 'overlayhover' {layer, index, item, x, y} (index −1 once the pointer leaves the
    * layer), 'overlayclick' and 'overlaydblclick' {layer, index, item, x, y, mode} and 'overlaycontext' {…, clientX,
    * clientY} instead of 'hover' on an atom, 'atomclick', 'atomdblclick' and 'atomcontext' (F0-A §3.11.5).
+   * Tools (render/tools/index.js, F0-A §3.13.3): the app sets `toolHandler` to the active tool's ToolHandler. A left
+   * press it claims with down() — or, with ToolDef.touch 'claim', a one-finger or pen-tip press it claims() and
+   * down()s — waits: once the pointer moves CLICK_PX it becomes the tool's drag (begin, move…, up), and without moving
+   * it is an ordinary click (selection, double-click, multi-select; handler.click first). Esc, losing the press, the
+   * browser cancelling it, a second finger or cancelToolPress() end it with handler.cancel(press, reason). The right
+   * and middle buttons, Alt, the wheel, both buttons together and R + drag never reach the tool. Whether clicks and
+   * drags on empty space select atoms follows the tool (toolSelects). While a preview locks the input (inputLocked),
+   * the tool gets no presses, clicks or hovers and clicks send no events.
    */
   _setupPointer() {
     const el = this.renderer.domElement;
@@ -281,7 +293,7 @@ export class Viewer extends Emitter {
       if (e.buttons) { dropPending(); this._clearHover(e); return; }
       if (!raf) raf = requestAnimationFrame(() => { raf = 0; this._hoverAt(lastMove); });
     });
-    el.addEventListener('pointerleave', (e) => { dropPending(); this._clearHover(e); });
+    el.addEventListener('pointerleave', (e) => { dropPending(); this._clearHover(e); this._toolLeave(e); });
     // a capture listener on the container runs before the camera controls (on the canvas) see a press;
     // moves and releases are followed on the window, in its capture phase, ahead of the controls too
     this.container.addEventListener('pointerdown', (e) => this._ptrDown(e), true);
@@ -300,11 +312,16 @@ export class Viewer extends Emitter {
     };
     addEventListener('keydown', (e) => {
       hold(e, true);
+      // Esc during a drag ends the drag, a tool's included (cancel('esc')), and does nothing else (M7 KC-05 ①)
       if (e.key === 'Escape' && this._cancelShapes()) { e.preventDefault(); e.stopPropagation(); }   // (not also clearing the selection)
     }, true);
     addEventListener('keyup', (e) => hold(e, false), true);
+    // losing the window ends every press (a tool's: cancel('lost'))
     addEventListener('blur', () => { this._held.clear(); for (const id of [...this._ptrs.keys()]) this._endPress(id); });
     this.renderer.domElement.addEventListener('keydown', (e) => {
+      // the active tool sees the view's keys first
+      const h = this.toolHandler;
+      if (typeof h?.keydown === 'function' && this._toolCall(h, 'keydown', e) === true) { e.preventDefault(); e.stopPropagation(); return; }
       if (e.ctrlKey || e.metaKey || !this.structure) return;
       const k = e.key;
       const arrow = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[k];
@@ -334,11 +351,23 @@ export class Viewer extends Emitter {
     this.emit('hover', { index: i, x: e.clientX - r.left, y: e.clientY - r.top });
   }
 
-  /** A pointer move without buttons (once a frame): one pick gives the hovered overlay item and the hovered atom. */
+  /**
+   * A pointer move without buttons (once a frame): one pick gives the hovered overlay item, the hovered atom and the
+   * active tool's hover(hit, e) — last, so that a cursor the tool sets wins over the one the hover card sets.
+   */
   _hoverAt(e) {
     const hit = this.pick(e.clientX, e.clientY);
     this._setOverlayHover(hit.kind === 'overlay' ? hit.overlay : null, e);
     this._setHover(hit.kind === 'atom' ? hit.atom.index : -1, e);
+    const h = this.toolHandler;
+    if (typeof h?.hover === 'function' && !this.inputLocked) this._toolCall(h, 'hover', hit, e);
+  }
+
+  /** The pointer left the view with no button down: the tool hovers nothing (a 'none' hit). */
+  _toolLeave(e) {
+    const h = this.toolHandler;
+    if (typeof h?.hover !== 'function' || this._ptrs.size || this.inputLocked) return;
+    this._toolCall(h, 'hover', { kind: 'none', t: Infinity, point: null, ray: this.ray(e.clientX, e.clientY), atom: null, overlay: null }, e);
   }
 
   /** The pointer left the view, or a button went down: no overlay item and no atom is hovered any more. */
@@ -370,9 +399,10 @@ export class Viewer extends Emitter {
   }
 
   /**
-   * A left press released without dragging, or a tap: the axis gizmo; else 'overlayclick' when an item of a pickable
-   * overlay layer is under the pointer (instead of 'atomclick', A-D8), or 'atomclick'. Returns the pick (null: the
-   * gizmo took the click).
+   * A left press released without dragging, or a tap: the axis gizmo; else the active tool's click(e, hit) — true
+   * means it handled the click, and no event follows; else 'overlayclick' when an item of a pickable overlay layer is
+   * under the pointer (instead of 'atomclick', A-D8), or 'atomclick'. Returns the pick (null: the gizmo took the click,
+   * or a preview locks the input: then no event at all, so the selection is not cleared either).
    */
   _click(e, mode = selectMode(e)) {
     const r = this.renderer.domElement.getBoundingClientRect();
@@ -382,7 +412,11 @@ export class Viewer extends Emitter {
       const hit = this.gizmo.pick(nx, ny);
       if (hit) { this.setViewDirection(hit.dir.toArray(), null, true); return null; }
     }
+    if (this.inputLocked) return null;
     const hit = this.pick(e.clientX, e.clientY);
+    const h = this.toolHandler;
+    // the pick is still returned: two handled clicks in a row make a double-click (Pick site: double-click places)
+    if (typeof h?.click === 'function' && this._toolCall(h, 'click', e, hit) === true) return hit;
     const x = e.clientX - r.left, y = e.clientY - r.top;
     if (hit.kind === 'overlay') {
       const { layer, index, item } = hit.overlay;
@@ -412,8 +446,12 @@ export class Viewer extends Emitter {
     } else this.emit('atomdblclick', { index: hit.atom.index, mode, altKey: e.altKey, x, y });
   }
 
-  /** A right click without dragging: 'overlaycontext' on an item of a pickable overlay layer (instead of 'atomcontext'), else 'atomcontext'. */
+  /**
+   * A right click without dragging: 'overlaycontext' on an item of a pickable overlay layer (instead of 'atomcontext'),
+   * else 'atomcontext'; nothing while a preview locks the input.
+   */
   _context(e) {
+    if (this.inputLocked) return;
     const r = this.container.getBoundingClientRect();
     const x = e.clientX - r.left, y = e.clientY - r.top;
     const hit = this.pick(e.clientX, e.clientY);
@@ -426,10 +464,11 @@ export class Viewer extends Emitter {
   }
 
   /**
-   * Start following a press on the canvas. Its `kind`: 'left' (selection, see _leftPress), 'axis' (X/Y/Z +
-   * right-drag), 'pan' (middle, or Alt with the left or right button), 'chord' (left and right together:
-   * zoom) or 'controls' (the camera controls drag; a release without moving is a tap, or the atom menu for
-   * the right button). `button` is the press's button, with a Mac's Control+left counted as the right one.
+   * Start following a press on the canvas. Its `kind`: 'left' (selection, see _leftPress), 'tool' (claimed by the
+   * active tool: see _toolPress), 'axis' (X/Y/Z + right-drag), 'pan' (middle, or Alt with the left or right button),
+   * 'chord' (left and right together: zoom) or 'controls' (the camera controls drag; a release without moving is a
+   * tap, or the atom menu for the right button). `button` is the press's button, with a Mac's Control+left counted as
+   * the right one.
    */
   _ptrDown(e) {
     if (e.target !== this.renderer.domElement) return;
@@ -443,8 +482,14 @@ export class Viewer extends Emitter {
     const p = { id: e.pointerId, type: e.pointerType, button, x0: e.clientX, y0: e.clientY, lx: e.clientX, ly: e.clientY, t0: performance.now(), far: false, kind: 'controls' };
     const held = (k) => this._held.has(k);
     if (touch) {
-      // a second finger makes both presses a pan or pinch, not taps
-      for (const q of this._ptrs.values()) if (q.type === 'touch') { q.far = true; p.far = true; }
+      // a second finger makes both presses a pan or pinch, not taps; it cancels a tool's drag, and the camera takes
+      // the rest of that gesture as a one-finger rotation (F0-A §3.13.4)
+      for (const q of this._ptrs.values()) {
+        if (q.type !== 'touch') continue;
+        q.far = true; p.far = true;
+        if (q.kind === 'tool') this._cancelTool(q, 'second-finger');
+      }
+      this._claimPress(e, p);
     } else if (button === 0 && e.altKey && !['r', 'q', 'e'].some(held)) {
       this._panPress(e, p);   // Alt/⌥+drag: a pan without a middle button (a click stays a click)
     } else if (button === 0 && (e.pointerType === 'mouse' || e.shiftKey || e.ctrlKey || e.metaKey || ['r', 'q', 'e'].some(held))) {
@@ -456,7 +501,7 @@ export class Viewer extends Emitter {
       this._capture(p);
     } else if (button === 1 || (button === 2 && e.altKey)) {
       this._panPress(e, p);
-    } else this._rotateWith(e);
+    } else if (!(e.pointerType === 'pen' && button === 0 && this._claimPress(e, p))) this._rotateWith(e);   // a pen tip without modifiers
     this._ptrs.set(e.pointerId, p);
     if (this._ptrs.size === 1) {
       addEventListener('pointermove', this._ptrMove, true);
@@ -465,16 +510,110 @@ export class Viewer extends Emitter {
     }
   }
 
-  /** Left press: a click, a selection rectangle (or a lasso with Q held) with the Select tool, a zoom box with R held. */
+  /**
+   * Left press: a zoom box with R held; else a press the active tool claims (handler.down → true: _toolPress); else a
+   * click, and a selection rectangle (a lasso with Q held) with a tool that selects atoms (toolSelects).
+   */
   _leftPress(e, p) {
     e.preventDefault();   // no text selection while dragging; the canvas still takes the focus for its keys
     this.renderer.domElement.focus?.({ preventScroll: true });
     p.kind = 'left';
     this._holdControls(p);
     this._capture(p);
-    const select = this.tool === 'select' && !!this.model?.n;
+    const h = this.toolHandler;
+    if (typeof h?.down === 'function' && !this._held.has('r') && this.model?.n && !this.inputLocked) {
+      const hit = this.pick(e.clientX, e.clientY);
+      if (this._toolCall(h, 'down', e, hit, p) === true) { this._toolPress(p, h); return; }
+    }
+    const select = this.toolSelects && !!this.model?.n && !this.inputLocked;
     p.shape = this._held.has('r') ? 'zoom' : !select ? null : this._held.has('q') ? 'lasso' : 'rect';
     p.pts = [[e.clientX, e.clientY]];
+  }
+
+  /**
+   * Whether clicks and drags on empty space select atoms under the active tool: its ToolDef.selects (from
+   * `toolDefProvider()` when set, else the registered tool of this.tool); true for Select without a registry entry.
+   */
+  get toolSelects() {
+    const d = this._activeToolDef();
+    return d ? !!d.selects : this.tool === 'select';
+  }
+
+  /** The active tool's ToolDef.touch: 'claim' (one-finger and pen-tip presses may belong to the tool) or 'none'. */
+  get toolTouch() { return this._activeToolDef()?.touch ?? 'none'; }
+
+  _activeToolDef() {
+    const d = typeof this.toolDefProvider === 'function' ? this.toolDefProvider() : null;
+    return d ?? tools.get(this.tool);
+  }
+
+  /**
+   * Make press p the tool's (handler h): it waits until the pointer moves CLICK_PX (then begin, move…, up) and
+   * without moving is an ordinary click (_ptrUp → _tap). The camera controls stay out of it, as for every left press.
+   */
+  _toolPress(p, h) {
+    p.kind = 'tool'; p.handler = h; p.started = false;
+    p.cancelled = false; p.done = false; p.cancelNotified = false;
+    p.shape = null;
+  }
+
+  /**
+   * Touch or a pen tip (no modifiers): a press the active tool claims — ToolDef.touch 'claim', handler.claims(hit, e)
+   * and handler.down(e, hit, p) === true — becomes a tool press; true when it did. Not for a second finger, a model
+   * without atoms or a locked input.
+   */
+  _claimPress(e, p) {
+    const h = this.toolHandler;
+    if (p.far || this.toolTouch !== 'claim' || typeof h?.claims !== 'function' || !this.model?.n || this.inputLocked) return false;
+    const hit = this.pick(e.clientX, e.clientY);
+    const claimed = this._toolCall(h, 'claims', hit, e);
+    if (!claimed || claimed === TOOL_FAILED || this._toolCall(h, 'down', e, hit, p) !== true) return false;
+    e.preventDefault();
+    this._toolPress(p, h);
+    this._holdControls(p);
+    this._capture(p);
+    return true;
+  }
+
+  /**
+   * Call method `name` of tool handler h with `args`. An error in it is logged (once per handler and method: hover and
+   * move run every frame) and gives TOOL_FAILED, so a broken tool cannot break the view's own handling.
+   */
+  _toolCall(h, name, ...args) {
+    try { return h[name](...args); } catch (err) {
+      const seen = (this._toolErrors ??= new WeakMap());
+      const names = seen.get(h) ?? new Set();
+      if (!names.has(name)) { names.add(name); seen.set(h, names); console.error(`A tool's ${name}() failed`, err); }
+      return TOOL_FAILED;
+    }
+  }
+
+  /**
+   * A claimed press ends without its drag finishing: handler.cancel(p, reason) once (CANCEL_REASONS in
+   * render/tools/index.js); the press stays followed until its release, and its later moves are ignored. A second
+   * finger also gives the camera controls back, so that they take the rest of the gesture.
+   */
+  _cancelTool(p, reason) {
+    if (p.done || p.cancelled) return;
+    p.cancelled = true;
+    if (reason === 'second-finger') { p.restore?.(); p.restore = null; }
+    this._notifyCancel(p, reason);
+  }
+
+  _notifyCancel(p, reason) {
+    if (p.cancelNotified) return;
+    p.cancelNotified = true;
+    if (typeof p.handler?.cancel === 'function') this._toolCall(p.handler, 'cancel', p, reason);
+  }
+
+  /**
+   * Cancel every press the tool claimed, with `reason` (app.setTool: 'switch'; a preview that ends: 'session'; the
+   * Esc command: 'esc'). True when there was one.
+   */
+  cancelToolPress(reason = 'switch') {
+    let any = false;
+    for (const p of this._ptrs.values()) if (p.kind === 'tool' && !p.done && !p.cancelled) { this._cancelTool(p, reason); any = true; }
+    return any;
   }
 
   /**
@@ -521,6 +660,17 @@ export class Viewer extends Emitter {
     if (!p.far && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) >= CLICK_PX) p.far = true;
     const dx = e.clientX - p.lx, dy = e.clientY - p.ly;
     p.lx = e.clientX; p.ly = e.clientY;
+    if (p.kind === 'tool') {
+      // a claimed press becomes the tool's drag once it has moved CLICK_PX; it never zooms with both buttons
+      if (p.cancelled || p.done) return;
+      if (!p.started) {
+        if (!p.far) return;
+        p.started = true;
+        if (typeof p.handler.begin === 'function' && this._toolCall(p.handler, 'begin', e, p) === TOOL_FAILED) { this._cancelTool(p, 'lost'); return; }
+      }
+      if (typeof p.handler.move === 'function' && this._toolCall(p.handler, 'move', e, p) === TOOL_FAILED) this._cancelTool(p, 'lost');
+      return;
+    }
     if (p.type === 'touch') {
       // the camera controls handle touch, except the trackball's two-finger pan: the model follows the fingers' midpoint
       if (this.controlsKind === 'trackball' && (dx || dy) && [...this._ptrs.values()].filter((q) => q.type === 'touch').length === 2) this.panBy(dx / 2, dy / 2);
@@ -549,6 +699,21 @@ export class Viewer extends Emitter {
   _ptrUp(e, cancelled = false) {
     const p = this._ptrs.get(e.pointerId);
     if (!p) return;
+    if (p.kind === 'tool') {
+      p.done = true;
+      this._endPress(e.pointerId);
+      if (cancelled || p.cancelled) { this._notifyCancel(p, cancelled ? 'pointercancel' : 'esc'); return; }
+      if (!p.started) {
+        // no drag: an ordinary click (selection, double-click, multi-select; handler.click first)
+        if (Math.hypot(e.clientX - p.x0, e.clientY - p.y0) < CLICK_PX) { this._tap(e); return; }
+        // released far away without a move in between: the drag happened at once
+        p.started = true;
+        if (typeof p.handler.begin === 'function' && this._toolCall(p.handler, 'begin', e, p) === TOOL_FAILED) { this._notifyCancel(p, 'lost'); return; }
+        if (typeof p.handler.move === 'function' && this._toolCall(p.handler, 'move', e, p) === TOOL_FAILED) { this._notifyCancel(p, 'lost'); return; }
+      }
+      if (typeof p.handler.up === 'function') this._toolCall(p.handler, 'up', e, p);
+      return;
+    }
     this._endPress(e.pointerId);
     if (cancelled || p.cancelled || p.kind === 'chord' || (p.kind === 'pan' && p.button === 1)) return;   // (Alt+right-click: the menu)
     if (!p.far && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) < CLICK_PX) {
@@ -563,7 +728,11 @@ export class Viewer extends Emitter {
     this.emit('boxselect', { indices, mode, add: mode !== 'replace', shape: p.shape });
   }
 
-  /** Stop following press `id`: give the controls back (before their own release handler runs) and remove its shape. */
+  /**
+   * Stop following press `id`: give the controls back (before their own release handler runs) and remove its shape.
+   * A tool press that ends here without its release (the window lost the focus, a release went missing) is cancelled
+   * with 'lost'.
+   */
   _endPress(id) {
     const p = this._ptrs.get(id);
     if (!p) return;
@@ -573,14 +742,15 @@ export class Viewer extends Emitter {
       removeEventListener('pointerup', this._ptrUp, true);
       removeEventListener('pointercancel', this._ptrCancel, true);
     }
+    if (p.kind === 'tool' && !p.done) { p.done = true; this._notifyCancel(p, 'lost'); }
     p.restore?.();
     this._removeShape(p);
     if (p.captured) { try { this.container.releasePointerCapture?.(id); } catch { /* already released */ } }
   }
 
-  /** Esc during a drag drops its rectangle, lasso or zoom box; true when there was one. */
+  /** Esc during a drag drops its rectangle, lasso or zoom box and cancels a tool's press (cancel('esc')); true when there was one. */
   _cancelShapes() {
-    let any = false;
+    let any = this.cancelToolPress('esc');
     for (const p of this._ptrs.values()) if (p.kind === 'left' && !p.cancelled && p.far && p.shape) { p.cancelled = true; this._removeShape(p); any = true; }
     return any;
   }
