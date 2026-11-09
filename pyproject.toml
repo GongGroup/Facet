@@ -59,7 +59,11 @@ crystallume = ["web/**/*", "data/*.json", "py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+addopts = "-q -m 'not slow'"
+markers = [
+    "js: needs Node.js >= 22 (skipped when it is missing; CRYSTALLUME_REQUIRE_NODE=1 makes that a failure)",
+    "slow: end-to-end browser tests (run with: pytest -m slow)",
+]
 filterwarnings = [
     "ignore::DeprecationWarning:anyio.*",
     "ignore::DeprecationWarning:starlette.*",
