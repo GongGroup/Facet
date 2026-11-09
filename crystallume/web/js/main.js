@@ -108,15 +108,22 @@ function registerCommands(app, shell) {
   R({ id: 'view.cell', title: 'Toggle unit cell', category: 'View', key: 'u', run: () => app.set('display.cell.show', !app.scene.display.cell.show) });
   R({ id: 'view.labels', title: 'Cycle atom labels', category: 'View', key: 'l', run: () => { const o = ['none', 'element', 'index', 'both']; app.set('display.labels', o[(o.indexOf(app.scene.display.labels) + 1) % 4]); toast(`Labels: ${app.scene.display.labels}`); } });
   R({ id: 'view.fullscreen', title: 'Full screen', category: 'View', key: 'shift+f', run: () => shell.fullscreen() });
-  R({ id: 'tool.measure', title: 'Measure distance', category: 'Tools', key: 'm', when: hasS, run: () => app.setTool('measure', 'distance') });
-  R({ id: 'tool.angle', title: 'Measure angle', category: 'Tools', when: hasS, run: () => app.setTool('measure', 'angle') });
-  R({ id: 'tool.dihedral', title: 'Measure dihedral', category: 'Tools', when: hasS, run: () => app.setTool('measure', 'dihedral') });
+  // tools (render/tools/): only these commands bind the keys; a ToolDef's key (V, M) is the same key, shown on the
+  // toolbar (M7 KC-03). A module's tool gets its command tool.<camelCase id> with its key in the module (tool.move: G).
+  R({ id: 'tool.measure', title: 'Measure distance', category: 'Tools', key: 'm', when: hasS, run: () => app.setTool('measure', { measureType: 'distance' }) });
+  R({ id: 'tool.angle', title: 'Measure angle', category: 'Tools', when: hasS, run: () => app.setTool('measure', { measureType: 'angle' }) });
+  R({ id: 'tool.dihedral', title: 'Measure dihedral', category: 'Tools', when: hasS, run: () => app.setTool('measure', { measureType: 'dihedral' }) });
   R({ id: 'tool.clearMeasurements', title: 'Clear measurements', category: 'Tools', when: () => (app.viewer.measurements?.length ?? 0) > 0, run: () => { app.viewer.clearMeasurements(); app.emit('measure'); } });
   R({ id: 'tool.select', title: 'Select tool', category: 'Tools', key: 'v', run: () => app.setTool('select') });
+  // Esc does the first of these that applies (M7 KC-05): ① cancel a tool's drag in the view (the view's own Esc
+  // handler gets there first while the button is down), ② close a floating card (M3), ③ cancel a preview,
+  // ④ go back to Select from another tool, ⑤ clear the selection, ⑥ leave the panel-less view used where full
+  // screen is blocked
   R({ id: 'sel.clear', title: 'Clear selection', category: 'Edit', key: 'Escape', keywords: 'deselect exit tool', run: () => {
-    // Esc with nothing to clear also leaves the panel-less view used where full screen is blocked
-    if (app.tool === 'select' && !app.selection.length && shell.root.dataset.fullscreen === 'focus') { shell.fullscreen(); return; }
-    app.setTool('select'); app.clearSelection();
+    if (app.viewer.cancelToolPress('esc')) return;
+    if (app.tool !== 'select') { app.setTool('select'); return; }
+    if (app.selection.length) { app.clearSelection(); return; }
+    if (shell.root.dataset.fullscreen === 'focus') shell.fullscreen();
   } });
   // while visibility masks hide atoms, Select all and Invert selection work on the visible atoms only (and say so)
   R({ id: 'sel.all', title: 'Select all atoms', category: 'Edit', key: 'mod+a', when: hasS, run: () => selectAll(app) });
