@@ -256,6 +256,8 @@ export function createAPI(app, shell) {
     select: (indices, opt) => app.select(indices, opt),
     get selection() { return app.selection; },
     clearSelection: () => app.clearSelection(),
+    /** A named halo around atoms (source indices; null clears it): opts {color, grow, opacity, strength, contrast, export}. */
+    highlight: (name, indices, opts) => app.viewer.setHighlight(name, indices, opts),
     /** Select every atom of the active structure. Returns the selection. */
     selectAll() { if (app.structure) app.select(app.structure.symbols.map((_, i) => i)); return app.selection; },
     /**

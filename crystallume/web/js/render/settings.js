@@ -1,6 +1,6 @@
 /** Default scene settings (the `scene` object stored in projects). */
 import { presetToSettings } from './lighting.js';
-import { deepClone, deepMerge } from '../core/util.js';
+import { deepClone, deepMerge, getPath } from '../core/util.js';
 
 export const DEFAULT_SCENE = {
   look: 'studio',
@@ -44,4 +44,14 @@ export const DEFAULT_SCENE = {
 
 export function makeScene(partial) {
   return deepMerge(deepClone(DEFAULT_SCENE), partial ?? {});
+}
+
+/**
+ * The values at dotted scene paths (['display.layers', …]), e.g. those a colour scheme declares in `dependsOn`:
+ * the viewer recomputes colours when they change. No list (or an empty one) gives null; a path that is not a
+ * string, or leads nowhere, reads as null.
+ */
+export function scenePathValues(scene, paths) {
+  if (!Array.isArray(paths) || !paths.length) return null;
+  return paths.map((p) => (typeof p === 'string' ? getPath(scene, p) ?? null : null));
 }

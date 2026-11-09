@@ -2,7 +2,7 @@
 import { h, ic, btn, slider, toggle, seg, select, colorInput, section, field } from '../dom.js';
 import { looks } from '../../render/looks.js';
 import { styles } from '../../render/styles.js';
-import { colorSchemes, elementColorHex } from '../../render/colors.js';
+import { colorSchemes, elementColorHex, offeredSchemes } from '../../render/colors.js';
 import { materials } from '../../render/materials.js';
 import { lightingPresets, presetToSettings, environmentMaps, DEFAULT_ENV_MAP } from '../../render/lighting.js';
 import { DEFAULT_SCENE, makeScene } from '../../render/settings.js';
@@ -121,7 +121,7 @@ registerInspectorTab({
 
     // colour (and per-element size)
     const groups = {};
-    for (const c of colorSchemes.list()) { if (c.available && !c.available(app.structure)) continue; (groups[c.group] ??= []).push({ value: c.id, label: c.name }); }
+    for (const c of offeredSchemes(app.structure, S.colorScheme)) (groups[c.group] ??= []).push({ value: c.id, label: c.name });
     const schemeSel = select({ options: Object.entries(groups).map(([g, options]) => ({ group: g === 'Element' ? 'By element' : g, options })), value: S.colorScheme, onChange: (v) => app.set('style.colorScheme', v), label: 'Colour scheme' });
     const colorSec = section('Colour & size per element', field('Scheme', schemeSel, colorSchemes.get(S.colorScheme)?.description));
     if (S.colorScheme === 'mono') colorSec.append(field('Colour', colorInput(S.monoColor, q('style.monoColor'))));

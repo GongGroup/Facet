@@ -19,6 +19,7 @@ import { samples } from './build/samples.js';
 import { Viewer, measureArity } from './render/viewer.js';
 import { bondedFragment } from './render/display.js';
 import { makeScene, DEFAULT_SCENE } from './render/settings.js';
+import { colorExtrasFrom } from './render/colors.js';
 import { looks } from './render/looks.js';
 import { styles } from './render/styles.js';
 import { presetToSettings, lightingPresets } from './render/lighting.js';
@@ -301,6 +302,7 @@ export class App extends Emitter {
   /** Show structure `sid`. The viewer is updated first; on failure the error is rethrown. */
   _activate(sid, { camera = null, resetCamera = true } = {}) {
     const entry = this.project.structures.find((s) => s.id === sid);
+    this._switchOverlays(entry);
     this.project.activeStructure = entry?.id ?? null;
     this.structure = entry?.structure ?? null;
     this.measurePicks = [];
@@ -1374,19 +1376,61 @@ export class App extends Emitter {
   }
 
   // ------------------------------------------------------------------ export
-  async exportImage({ scale = 2, transparent = false } = {}) {
+  /**
+   * Save a PNG of the view. `selection` keeps the selection halo and `markers` adds marker overlays (site markers,
+   * fixed-atom halos…); they default to the export menu's "Include selection highlight" (on) and "Include markers"
+   * (off) preferences. The hover halo is never in the picture.
+   */
+  async exportImage({ scale = 2, transparent = false, selection = this.prefs.exportSelection !== false, markers = this.prefs.exportMarkers === true } = {}) {
     if (!this.structure) throw new Error('Nothing to export yet.');
     if (this._exporting) return false;   // one image at a time
     this._exporting = true;
     const busy = this._busyStart(`Rendering ${scale}× image…`);
     try {
       await pause();   // let the busy indicator paint before the heavy render
-      const blob = await this.viewer.screenshot({ scale, transparent });
+      const blob = await this.viewer.screenshot({ scale, transparent, selection: !!selection, markers: !!markers });
       busy.set('Saving image…');
       const ok = await saveFile(`${slug(this.structure.name)}${transparent ? '-transparent' : ''}@${scale}x.png`, blob, 'image/png');
       if (ok) toast(`Image saved (${Math.round(this.viewer.width * scale)}×${Math.round(this.viewer.height * scale)} px)`);
       return ok;
     } finally { busy.end(); this._exporting = false; }
+  }
+
+  // ------------------------------------------------------------------ colour-scheme extras and overlays
+  /**
+   * Give colour schemes a value they cannot find in the scene settings, e.g. the layer parameters a structure
+   * entry keeps: before every viewer settings pass `provider(app)` runs and its JSON value (undefined: left
+   * out) appears as ctx.extras[key] in colorFor and legend; colours are recomputed when it changes. A later
+   * registration of the same key replaces the provider. Returns a function that removes it.
+   */
+  registerColorExtra(key, provider) {
+    if (typeof key !== 'string' || !key.trim()) throw new TypeError('registerColorExtra: key must be a non-empty string.');
+    if (typeof provider !== 'function') throw new TypeError('registerColorExtra: provider must be a function (app) → value.');
+    const fns = (this._colorExtraFns ??= new Map());
+    fns.set(key, provider);
+    this.viewer.extrasProvider = () => this.colorExtras();
+    this.viewer.applySettings(this.scene);
+    return () => {
+      if (fns.get(key) !== provider) return;
+      fns.delete(key);
+      this.viewer.applySettings(this.scene);
+    };
+  }
+
+  /** The current colour-scheme extras: {key: value} of the registered providers (see registerColorExtra). */
+  colorExtras() { return colorExtrasFrom(this._colorExtraFns, this); }
+
+  /**
+   * Overlay layers marked clearOnSwitch and named highlights belong to one structure: they go when another entry
+   * is shown, or another project document (opening the open project again gives new Structure objects under the
+   * same ids). Undo and redo keep the project object and the entry ids, so they keep the overlays.
+   */
+  _switchOverlays(entry) {
+    const project = entry ? this.project : null, id = entry?.id ?? null;
+    const was = this._overlayOwner;
+    if (was && was.project === project && was.id === id) return;
+    this._overlayOwner = { project, id };
+    this.viewer.structureSwitched?.();
   }
 
   async exportGLB() {

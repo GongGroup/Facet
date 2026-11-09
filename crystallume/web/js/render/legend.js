@@ -1,9 +1,11 @@
 /**
  * 2D overlay keys drawn by the viewer on its overlay canvas and into image exports:
- *   • a colour legend — element chips for element schemes, a colormap bar with min / max for
- *     per-atom schemes (the `legend` info attached by computeColors());
+ *   • a colour legend — element chips for element schemes, a colormap bar with min / max or category
+ *     chips for per-atom schemes (the `legend` info attached by computeColors());
+ *   • rows from overlay legend layers (viewer.overlays.add({tier: 'legend', items})): a swatch — a halo
+ *     ring, a dot or a line — and a label each, e.g. "Fixed (18)";
  *   • a length scale bar snapped to 1 / 2 / 5 × 10ⁿ Å.
- * Both stack in the bottom-right corner. All sizes are CSS pixels multiplied by `scale`.
+ * They stack in the bottom-right corner, scale bar lowest. All sizes are CSS pixels multiplied by `scale`.
  */
 import { COLORMAPS, rgbToHex } from './colors.js';
 
@@ -62,12 +64,14 @@ function colorBox(g, info, { scale: s, font, dark, x = 0, y = 0, draw = false, m
     g.textAlign = 'right'; g.fillText(formatValue(info.max, info.integer), bx + barW, by + barH + 3 * s);
     return { w, h };
   }
-  // element chips, wrapped into rows
-  const items = info.items ?? [];
+  // element chips (or a scheme's categories under its title), wrapped into rows
+  const categories = info.kind === 'categories';
+  const items = (info.items ?? []).map((it) => ({ text: String((categories ? it.label : it.symbol) ?? ''), color: it.color }));
+  const title = categories && info.label ? String(info.label) : '';
   const shown = items.slice(0, 16);
   g.font = `600 ${11 * s}px ${font}`;
   const chipH = 16 * s, gap = 6 * s, dot = 5 * s;
-  const widths = shown.map((it) => dot * 2 + 5 * s + g.measureText(it.symbol).width);
+  const widths = shown.map((it) => dot * 2 + 5 * s + g.measureText(it.text).width);
   const more = items.length - shown.length;
   if (more > 0) widths.push(g.measureText(`+${more}`).width);
   const inner = Math.min(maxWidth * s, Math.max(...widths, 10 * s) * 4 + gap * 3);
@@ -79,22 +83,81 @@ function colorBox(g, info, { scale: s, font, dark, x = 0, y = 0, draw = false, m
   });
   if (row.length) rows.push(row);
   const rowW = (r) => r.reduce((a, k, j) => a + widths[k] + (j ? gap : 0), 0);
-  const w = Math.max(...rows.map(rowW), 10 * s) + 2 * pad;
-  const h = rows.length * chipH + (rows.length - 1) * 2 * s + 2 * pad - 2 * s;
+  g.font = `500 ${11 * s}px ${font}`;
+  const titleW = title ? Math.min(maxWidth * s, g.measureText(title).width) : 0;
+  const titleH = title ? 15 * s : 0;
+  const w = Math.max(...rows.map(rowW), titleW, 10 * s) + 2 * pad;
+  const h = titleH + rows.length * chipH + (rows.length - 1) * 2 * s + 2 * pad - 2 * s;
   if (!draw) return { w, h };
   roundRect(g, x, y, w, h, 8 * s); g.fillStyle = t.panel; g.fill(); g.strokeStyle = t.line; g.lineWidth = 1 * s; g.stroke();
+  if (title) { g.textAlign = 'left'; g.textBaseline = 'top'; g.fillStyle = t.fg; g.fillText(fitText(g, title, w - 2 * pad), x + pad, y + pad); }
+  g.font = `600 ${11 * s}px ${font}`;
   g.textBaseline = 'middle'; g.textAlign = 'left';
   rows.forEach((r, ri) => {
     let cx = x + pad;
-    const cy = y + pad + ri * (chipH + 2 * s) + chipH / 2 - 1 * s;
+    const cy = y + pad + titleH + ri * (chipH + 2 * s) + chipH / 2 - 1 * s;
     for (const k of r) {
       if (k >= shown.length) { g.fillStyle = t.muted; g.fillText(`+${more}`, cx, cy); cx += widths[k] + gap; continue; }
       const it = shown[k];
       g.beginPath(); g.arc(cx + dot, cy, dot, 0, Math.PI * 2); g.fillStyle = it.color; g.fill();
       g.lineWidth = 1 * s; g.strokeStyle = t.chipEdge; g.stroke();
-      g.fillStyle = t.fg; g.fillText(it.symbol, cx + dot * 2 + 5 * s, cy);
+      g.fillStyle = t.fg; g.fillText(it.text, cx + dot * 2 + 5 * s, cy);
       cx += widths[k] + gap;
     }
+  });
+  return { w, h };
+}
+
+/** `text`, shortened with an ellipsis to fit `maxW` canvas pixels in the current font. */
+function fitText(g, text, maxW) {
+  if (g.measureText(text).width <= maxW) return text;
+  let lo = 0, hi = text.length;
+  while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); if (g.measureText(`${text.slice(0, mid)}…`).width <= maxW) lo = mid; else hi = mid - 1; }
+  return `${text.slice(0, lo)}…`;
+}
+
+/** A legend row's swatch centred at (cx, cy): a halo ring around a grey atom, a dot or a short line. */
+function drawSwatch(g, sw, cx, cy, s, t, dark) {
+  g.save();
+  g.globalAlpha = sw.opacity ?? 1;
+  if (sw.kind === 'line') {
+    g.strokeStyle = sw.color; g.lineWidth = 2.2 * s; g.lineCap = 'round';
+    if (sw.dashed) g.setLineDash([3 * s, 2.5 * s]);
+    g.beginPath(); g.moveTo(cx - 7 * s, cy); g.lineTo(cx + 7 * s, cy); g.stroke();
+  } else if (sw.kind === 'halo') {
+    // as a two-colour halo draws it: the atom, a dark inner line, the coloured ring
+    g.beginPath(); g.arc(cx, cy, 3.6 * s, 0, Math.PI * 2); g.fillStyle = dark ? '#5b636d' : '#c2c8cf'; g.fill();
+    g.beginPath(); g.arc(cx, cy, 4.4 * s, 0, Math.PI * 2); g.strokeStyle = dark ? '#000000' : '#14171b'; g.lineWidth = 1.1 * s; g.stroke();
+    g.beginPath(); g.arc(cx, cy, 5.9 * s, 0, Math.PI * 2); g.strokeStyle = sw.color; g.lineWidth = 2 * s; g.stroke();
+  } else {
+    g.beginPath(); g.arc(cx, cy, 5 * s, 0, Math.PI * 2); g.fillStyle = sw.color; g.fill();
+    g.lineWidth = 1 * s; g.strokeStyle = t.chipEdge; g.stroke();
+  }
+  g.restore();
+}
+
+/** Measure (and optionally draw) the box of overlay legend rows [{label, swatch}]; returns {w, h} (null without rows). */
+function rowsBox(g, items, { scale: s, font, dark, x = 0, y = 0, draw = false, maxWidth = 240, maxRows = 12 }) {
+  const shown = (items ?? []).slice(0, maxRows);
+  if (!shown.length) return null;
+  const t = theme(dark);
+  const pad = 8 * s, rowH = 18 * s, sw = 14 * s, gap = 6 * s;
+  const more = (items?.length ?? 0) - shown.length;
+  g.font = `500 ${11 * s}px ${font}`;
+  const maxText = maxWidth * s - sw - gap - 2 * pad;
+  const labels = shown.map((it) => fitText(g, it.label, maxText));
+  if (more > 0) labels.push(`+${more} more`);
+  const w = sw + gap + Math.max(...labels.map((l) => g.measureText(l).width), 10 * s) + 2 * pad;
+  const h = labels.length * rowH + 2 * pad - 4 * s;
+  if (!draw) return { w, h };
+  roundRect(g, x, y, w, h, 8 * s); g.fillStyle = t.panel; g.fill(); g.strokeStyle = t.line; g.lineWidth = 1 * s; g.stroke();
+  g.textAlign = 'left'; g.textBaseline = 'middle';
+  labels.forEach((label, k) => {
+    const cy = y + pad + k * rowH + rowH / 2 - 2 * s;
+    if (k < shown.length) drawSwatch(g, shown[k].swatch ?? {}, x + pad + sw / 2, cy, s, t, dark);
+    g.font = `500 ${11 * s}px ${font}`;
+    g.fillStyle = k < shown.length ? t.fg : t.muted;
+    g.fillText(label, x + pad + sw + gap, cy);
   });
   return { w, h };
 }
@@ -125,12 +188,13 @@ function scaleBox(g, pxPerA, { scale: s, font, dark, x = 0, y = 0, draw = false 
 }
 
 /**
- * Draw the colour legend and/or scale bar stacked in the bottom-right corner.
- * opts = { legend: info|null, pxPerAngstrom: number|null, width, height, scale, dark, font,
- *          right = 16, bottom = 16 (CSS px insets) }
+ * Draw the scale bar, the colour legend and the overlay legend rows stacked in the bottom-right corner
+ * (in that order, upwards).
+ * opts = { legend: info|null, items: [{label, swatch: {kind: 'halo'|'dot'|'line', color, opacity, dashed}}],
+ *          pxPerAngstrom: number|null, width, height, scale, dark, font, right = 16, bottom = 16 (CSS px insets) }
  * Returns the height used (in canvas pixels).
  */
-export function drawLegends(g, { legend = null, pxPerAngstrom = null, width, height, scale = 1, dark = false, font = 'system-ui, sans-serif', right = 16, bottom = 16 } = {}) {
+export function drawLegends(g, { legend = null, items = [], pxPerAngstrom = null, width, height, scale = 1, dark = false, font = 'system-ui, sans-serif', right = 16, bottom = 16 } = {}) {
   const s = scale;
   const opt = { scale: s, font, dark };
   g.save();
@@ -144,6 +208,11 @@ export function drawLegends(g, { legend = null, pxPerAngstrom = null, width, hei
   if (legend && (legend.kind === 'gradient' || legend.items?.length)) {
     const m = colorBox(g, legend, opt);
     if (yBottom - m.h > 0) colorBox(g, legend, { ...opt, draw: true, x: xRight - m.w, y: yBottom - m.h });
+    yBottom -= m.h + 8 * s;
+  }
+  const m = items?.length ? rowsBox(g, items, opt) : null;
+  if (m) {
+    if (yBottom - m.h > 0) rowsBox(g, items, { ...opt, draw: true, x: xRight - m.w, y: yBottom - m.h });
     yBottom -= m.h + 8 * s;
   }
   g.restore();

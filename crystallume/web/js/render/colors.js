@@ -1,8 +1,13 @@
 /**
  * Colour schemes. A scheme maps an atom to a CSS/hex colour:
  *   colorSchemes.register({ id, name, description, group?: 'Element'|'Per atom', colorFor(symbol, index, ctx),
- *                           legend?(ctx) => { colormap, min, max, label } })
- * ctx = { model, settings, cn (coordination numbers), zMin, zMax, n, nSrc, prop, propName, propMin, propMax }
+ *                           legend?(ctx) => { colormap, min, max, label } | { kind: 'categories', label?, items: [{ label, color }] },
+ *                           dependsOn?: ['display.layers', …] })
+ * ctx = { model, settings, cn (coordination numbers), zMin, zMax, n, nSrc, prop, propName, propMin, propMax,
+ *         srcIndex(i), z(i), structure, scene, extras }
+ * `structure` (the drawn structure), `scene` (all scene settings) and `extras` (values the app adds through
+ * app.registerColorExtra) are read-only. Colours are recomputed when the style settings, the values at the
+ * scheme's `dependsOn` scene paths or the extras change.
  * computeColors() returns the colours with a `legend` property describing them (see below).
  */
 import { element } from '../core/elements.js';
@@ -13,6 +18,18 @@ export const colorSchemes = {
   get: (id) => registry.get(id),
   list: () => [...registry.values()],
 };
+
+/**
+ * The schemes a scheme picker offers for `structure`: those without available() or whose available(structure)
+ * says yes (one that throws says no), and always the scheme in use (`active`), so the picker shows what the atoms
+ * are coloured with even when a script chose it, e.g. "Property" with style.property 'tags'.
+ */
+export function offeredSchemes(structure, active = null) {
+  return [...registry.values()].filter((c) => {
+    if (c.id === active || typeof c.available !== 'function') return true;
+    try { return !!c.available(structure); } catch { return false; }
+  });
+}
 
 // ---- colour maths -----------------------------------------------------------------
 export function hexToRgb(hex) {
@@ -169,7 +186,9 @@ colorSchemes.register({
 });
 colorSchemes.register({
   id: 'property', group: 'Per atom', name: 'Property (coolwarm)', description: 'Colour by a numeric per-atom property from the file (charges, forces…)',
-  available: (structure) => Object.entries(structure?.props ?? {}).some(([, v]) => Array.isArray(v) && typeof v[0] === 'number'),
+  // offered when it has a default property to colour by: a cleaved slab whose only numbers are layer tags would come
+  // out all grey (style.property can still name 'tags'; the picker then lists the scheme as the one in use)
+  available: (structure) => defaultPropertyName(structure?.props) != null,
   colorFor: (s, i, ctx) => {
     const v = ctx.prop?.[ctx.srcIndex(i)];
     if (!Number.isFinite(v)) return '#9aa0a6';
@@ -190,25 +209,69 @@ function finiteRange(arr) {
 }
 
 /**
+ * Per-atom properties the "Property" scheme passes over when no property is chosen (style.property): layer
+ * numbers written by cleaving and adsorbate groups are labels, not quantities to colour by.
+ */
+export const PROPERTY_SKIP = Object.freeze(['tags', 'adsorbate_id']);
+
+/** The property the "Property" scheme colours by when none is chosen: the first numeric one not in PROPERTY_SKIP (or undefined). */
+export function defaultPropertyName(props) {
+  return Object.keys(props ?? {}).find((k) => !PROPERTY_SKIP.includes(k) && Array.isArray(props[k]) && typeof props[k][0] === 'number');
+}
+
+/**
+ * Colour-scheme extras from registered providers ({key → provider(arg)}, a Map or an object): the JSON value of each
+ * provider that returns something other than undefined (a provider that throws, or returns something JSON cannot
+ * hold, is left out and logged). The values are copies, so schemes can only read them.
+ */
+export function colorExtrasFrom(providers, arg) {
+  const out = {};
+  for (const [key, fn] of providers instanceof Map ? providers : Object.entries(providers ?? {})) {
+    if (typeof fn !== 'function') continue;
+    try {
+      const v = fn(arg);
+      if (v === undefined) continue;
+      const json = JSON.stringify(v);
+      if (json !== undefined) out[key] = JSON.parse(json);
+    } catch (e) { console.error(`[crystallume] colour extra “${key}” failed`, e); }
+  }
+  return out;
+}
+
+/** A per-atom scheme's legend(ctx) result as the legend property describes it (null when it gives none). */
+function legendInfo(scheme, info, { zMin, zMax, propMin, propMax }) {
+  if (!info) return null;
+  if (info.kind === 'categories') {
+    const items = (Array.isArray(info.items) ? info.items : []).filter((it) => it && it.label != null && typeof it.color === 'string')
+      .map((it) => ({ label: String(it.label), color: it.color }));
+    return { kind: 'categories', scheme: scheme.id, label: info.label == null ? null : String(info.label), items };
+  }
+  return { kind: 'gradient', scheme: scheme.id, colormap: info.colormap ?? 'viridis', min: info.min ?? 0, max: info.max ?? 1, label: info.label ?? scheme.name, integer: !!info.integer, zMin, zMax, propMin, propMax };
+}
+
+/**
  * Compute linear-space colours (Float32Array 3n, sRGB → linear) for every displayed atom.
+ * `scene` (the whole scene settings) and `extras` (app.registerColorExtra) reach the scheme as ctx.scene and ctx.extras.
  * The array carries a `legend` property:
  *   per-atom schemes → { kind: 'gradient', scheme, colormap, min, max, label, integer?, zMin, zMax, propMin, propMax }
+ *                      or { kind: 'categories', scheme, label, items: [{ label, color }] }
  *   element schemes  → { kind: 'elements', scheme, items: [{ symbol, color }] }
  */
-export function computeColors(model, structure, styleSettings, cn) {
+export function computeColors(model, structure, styleSettings, cn, { scene = null, extras = null } = {}) {
   const scheme = registry.get(styleSettings.colorScheme) ?? registry.get('jmol');
   const n = model.n;
   let zMin = Infinity, zMax = -Infinity;
   for (let i = 0; i < n; i++) { const z = model.positions[3 * i + 2]; if (z < zMin) zMin = z; if (z > zMax) zMax = z; }
   if (!n) zMin = zMax = 0;
   const props = structure?.props ?? {};
-  const propName = styleSettings.property ?? Object.keys(props).find((k) => Array.isArray(props[k]) && typeof props[k][0] === 'number');
+  const propName = styleSettings.property ?? defaultPropertyName(props);
   const prop = propName && Array.isArray(props[propName]) ? props[propName] : null;
   const [propMin, propMax] = finiteRange(prop);
   const ctx = {
     model, settings: styleSettings, cn, n, nSrc: structure?.length ?? n, zMin, zMax, prop, propName: prop ? propName : null,
     propMin, propMax,
     srcIndex: (i) => model.src[i], z: (i) => model.positions[3 * i + 2],
+    structure: structure ?? null, scene, extras: Object.freeze({ ...(extras ?? {}) }),
   };
   const overrides = styleSettings.colorOverrides ?? {};
   const out = new Float32Array(3 * n);
@@ -229,7 +292,7 @@ export function computeColors(model, structure, styleSettings, cn) {
   if (perAtom) {
     let info = null;
     try { info = scheme.legend?.(ctx) ?? null; } catch { info = null; }
-    if (info) legend = { kind: 'gradient', scheme: scheme.id, colormap: info.colormap ?? 'viridis', min: info.min ?? 0, max: info.max ?? 1, label: info.label ?? scheme.name, integer: !!info.integer, zMin, zMax, propMin, propMax };
+    legend = legendInfo(scheme, info, { zMin, zMax, propMin, propMax });
   } else {
     legend = { kind: 'elements', scheme: scheme.id, items: [...cache].map(([symbol, color]) => ({ symbol, color })) };
   }
