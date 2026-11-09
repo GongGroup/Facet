@@ -2,9 +2,12 @@
 """Write the golden cases of the layer analysis (M3): ``tests/data/surface/layers/*.json``.
 
     python scripts/gen_layer_fixtures.py            # (re)write the case files
-    python scripts/gen_layer_fixtures.py --check    # rebuild them in memory; exit 1 if a file on disk differs
+    python scripts/gen_layer_fixtures.py --check    # rebuild them in memory; exit 1 if a case on disk differs
 
 A development tool: the tests read the JSON files and never import this script (nor ASE or pymatgen).
+Skips are not written by hand here: each case skips a language until the ops it runs are registered there
+(``tests/ops`` in Python, ``tests/js/ops`` listed through Node.js), so regenerating after a task registered its
+ops puts no stale skip back.  An ``xfail`` marker a task added to a case is kept (matched by case id).
 
 The structures of the M3 test plan (§7.1) are built analytically: fcc, bcc and hcp faces plane by plane from the
 lattice (the primitive cell of the Bravais lattice turned into the surface frame), oxides from the repository's
@@ -23,6 +26,7 @@ The op contracts and the decisions behind the expectations are in ``tests/data/s
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import math
 import sys
@@ -80,7 +84,8 @@ A_BCC = {"Fe": 2.866, "Mo": 3.147, "W": 3.165}
 VAC = 15.0      # the vacuum of every built slab (Å, total gap between the slab and its periodic image)
 DIGITS = 10     # positions and cells are written with 10 decimals; expectations are computed from those values
 
-#: Why each op is skipped until its task registers it (``tests/test_layers_golden_shape.py`` checks the form).
+#: The task that registers each op (ledger L-M3-01, L-M3-03…05; ``group="units"`` comes with findLayers in
+#: M3-T1); the skips name it, and ``tests/test_layers_golden_shape.py`` checks them against the same table.
 REGISTERED_BY = {
     "findLayers": "M3-T1",
     "findAdsorbates": "M3-T3a",
@@ -643,7 +648,7 @@ def ref_layers(s: Structure, direction: Any = None, tolerance: float | None = No
             f = np.asarray(s.frac_positions[:, axis], float)
             offset = np.rint(f - unwrap_along_gap(f, sn["cut"])).astype(int)
             u = h - offset * P
-            vacuum = float(sn["cut"]["empty"])
+            vacuum = float(sn["cut"]["width"])        # the width of the gap that is cut (M3 §3.3 gap.width)
         else:
             u, offset, spans = ring_cut(h, P, C, tol)
     elif kind == "irrational":
@@ -1154,14 +1159,38 @@ TOL_LAYERS = {"heights": 1e-6, "period": 1e-6, "vacuum": 1e-6}
 TOL_SURFACE = {"radius": 1e-6, "exposure": 1e-6}
 
 
-def skip_for(op: str, args: dict[str, Any]) -> dict[str, str]:
-    parts = [f"op {op} is registered by {REGISTERED_BY[op]}"]
-    if op == "findLayers" and args.get("group") == "units":
-        parts.append('group "units" comes with M3-T5 (wave 2)')
+def skip_parts(op: str, args: dict[str, Any]) -> list[tuple[str, str]]:
+    """``(op, reason part)`` for every op a case runs: its own, and findAdsorbates for ``skipAdsorbates``."""
+    parts = [(op, f"op {op} is registered by {REGISTERED_BY[op]}")]
     if op == "findLayers" and args.get("skipAdsorbates"):
-        parts.append("skipAdsorbates needs op findAdsorbates (M3-T3a)")
-    reason = "; ".join(parts)
-    return {"py": reason, "js": reason}
+        parts.append(("findAdsorbates", f"skipAdsorbates needs op findAdsorbates ({REGISTERED_BY['findAdsorbates']})"))
+    return parts
+
+
+@functools.lru_cache(maxsize=1)
+def registered_ops() -> dict[str, frozenset[str]]:
+    """The case ops registered now in each language: ``tests/ops`` and ``tests/js/ops`` (listed through Node)."""
+    import tests.ops  # noqa: F401  (registers every Python op)
+    from tests.cases import OPS
+    from tests.js_bridge import JSError, NodeUnavailable, run_js
+
+    try:
+        js = run_js("const { OPS, loadOps } = await repo('tests/js/cases.mjs'); await loadOps(); "
+                    "return [...OPS.keys()];")
+    except (NodeUnavailable, JSError) as exc:
+        raise SystemExit(f"the skips follow the ops each language registers; listing tests/js/ops needs "
+                         f"Node.js: {exc}") from None
+    return {"py": frozenset(OPS), "js": frozenset(js)}
+
+
+def skip_for(op: str, args: dict[str, Any], registered: dict[str, frozenset[str]]) -> dict[str, str]:
+    """The case's ``skip``: per language, the parts of the ops not registered there yet (README.md, "Skips")."""
+    out = {}
+    for lang in ("py", "js"):
+        reason = "; ".join(part for name, part in skip_parts(op, args) if name not in registered[lang])
+        if reason:
+            out[lang] = reason
+    return out
 
 
 def _clean(x: Any) -> Any:
@@ -1201,8 +1230,7 @@ def case(cid: str, op: str, inp: Structure | dict, expect: dict[str, Any], *, ar
         out["tol"] = {k: v for k, v in tol.items() if k in expect}
         if not out["tol"]:
             del out["tol"]
-    out["skip"] = skip_for(op, args or {})
-    return out
+    return out                                    # render() adds the skip and keeps an xfail from the disk
 
 
 def py_layer_args(args: dict[str, Any]) -> dict[str, Any]:
@@ -1503,16 +1531,22 @@ def family_pt111() -> list[dict[str, Any]]:
         for tag, base in (("centred", centred), ("bottom-at-0", placements["bottom-at-0"])):
             s = wrap_c(co_upright(base, hgt))
 
+            def gap_above_co(L: dict, hgt: int = hgt) -> None:
+                # the cut lies in the gap between the O (hgt + 1.15 Å up) and the slab's image: that is the vacuum
+                need(approx(L["vacuum"], VAC - hgt - 1.15), f"vacuum {L['vacuum']}")
+
             def above(L: dict) -> None:
                 need(L["count"] == 6 and L["compositions"][-2:] == [{"C": 1}, {"O": 1}])
+                gap_above_co(L)
 
             cid = f"pt111-co-{hgt}a-{tag}"
             out.append(layers_case(cid, s, check=above, note=(
                 "the ledger's cut (L-F0-16, the display's) keeps the floating CO above the slab at 6, 7 and 8 Å; "
-                "M3 §7.1 put it below the slab at 7 and 8 Å under the old widest-gap cut")
+                "M3 §7.1 put it below the slab at 7 and 8 Å under the old widest-gap cut. vacuum is the width of "
+                "the cut gap, from the O to the slab's image (6.85 Å), as M2 measures it from a floating group")
                 if (hgt, tag) == (7, "centred") else None))
             out.append(layers_case(cid + "-skip", s, {"skipAdsorbates": True},
-                                   check=lambda L: assert_spacing(L, D111, {"Pt": 9})))
+                                   check=lambda L: (assert_spacing(L, D111, {"Pt": 9}), gap_above_co(L))))
             out.append(ads_case(cid, s, [n0, n0 + 1], "geometry"))
     # vacuum along a (cell rows c, a, b)
     c = centred.cell
@@ -1542,7 +1576,8 @@ def family_pt111() -> list[dict[str, Any]]:
     out.append(layers_case("bulk-pt-c-tolerance-2", bulk, {"direction": "c", "tolerance": 2},
                            check=lambda L: need(L["coords"] == "wrapped" and L["count"] == 1),
                            note="the period (3.92 Å) is below 2 × tolerance, so the direction counts as irrational "
-                                "(M3 §3.2)"))
+                                "(M3 §3.2) and gets the 'wrapped' warning of M3 §3.5, worded for every wrapped "
+                                "result (README decision 9)"))
     out.append(error_case("layers-error-normal-without-surface", "findLayers", bulk, {"direction": "normal"},
                           "direction 'normal' needs a vacuum gap or a non-periodic axis; use 'c'",
                           lambda: ref_layers(bulk, "normal")))
@@ -1727,15 +1762,32 @@ def family_oxides() -> list[dict[str, Any]]:
                 "Ti6c (under the O_br rows) +0.12, Ti5c -0.19, O3c +0.17, O_br -0.02 Å: at 0.3 Å the Ti2O2 plane "
                 "splits 0.31 Å apart (M3 §3.5 quotes 0.36 Å from a prototype that moved every Ti by -0.19)")
                 if (tag, tol) == ("set1", 0.3) else None))
-    # ZnO(10-10): ideal and the top Zn moved in by 0.25 / 0.35 Å (the top O by 0.03 Å)
+    # ZnO(10-10): ideal and the top Zn moved in by 0.25 / 0.35 Å (the top O by 0.03 Å), at 0.3 and 0.5 Å
     z = zno_1010()
     out.append(layers_case("zno-1010-2x2-6l", z, check=lambda L: need(
         L["count"] == 6 and all(c_ == {"Zn": 4, "O": 4} for c_ in L["compositions"]) and L["warnings"] == [])))
+    zno_rows = {  # (Zn moved in, tolerance) -> (rows, warnings); M3 §3.5 states the 0.3 Å results
+        (0.25, 0.3): (6, ["Layer 1 has a 0.22 Å step, close to the 0.3 Å tolerance: it may split after relaxation."]),
+        (0.35, 0.3): (7, ["Layers 1 and 2 are only 0.32 Å apart, close to the 0.3 Å tolerance: they may merge after "
+                          "relaxation."]),
+        (0.25, 0.5): (6, []),
+        (0.35, 0.5): (6, ["Layers 1 and 2 are only 0.59 Å apart, close to the 0.5 Å tolerance: they may merge after "
+                          "relaxation."]),
+    }
     for dzn in (0.25, 0.35):
         def inward(k: int, sym: str, idx: int, dzn: float = dzn) -> float:
             return (-dzn if sym == "Zn" else -0.03) if k == 5 else 0.0
         s = zno_1010(dz=inward, name=f"ZnO(10-10) 2x2 6L, top Zn -{dzn:g} Å, top O -0.03 Å")
-        out.append(layers_case(f"zno-1010-top-zn-in-{dzn:g}", s, check=lambda L: need(len(L["warnings"]) == 1)))
+        for tol in (0.3, 0.5):
+            def zno_check(L: dict, want: tuple = zno_rows[dzn, tol]) -> None:
+                need((L["count"], L["warnings"]) == want, f"{L['count']} {L['warnings']}")
+            cid = f"zno-1010-top-zn-in-{dzn:g}" + ("" if tol == 0.3 else f"-tol-{tol:g}")
+            out.append(layers_case(cid, s, None if tol == 0.3 else {"tolerance": tol}, check=zno_check, note={
+                (0.25, 0.3): "M3 §3.5: at the default 0.3 Å the top row has a 0.22 Å step; with the Zn 0.35 Å in "
+                             "it splits 0.32 Å apart",
+                (0.35, 0.5): "M3 §7.1 (D3(e)): the displaced slabs at 0.3 and 0.5 Å; at 0.5 Å the split top row "
+                             "is one row again, 0.59 Å above the next",
+            }.get((dzn, tol))))
     # other surfaces of M3 §1.3
     for cid, top in (("srtio3-001-tio2-7l", "TiO2"), ("srtio3-001-sro-7l", "SrO")):
         out.append(layers_case(cid, perovskite_001(7, top),
@@ -1754,7 +1806,7 @@ def family_oxides() -> list[dict[str, Any]]:
     out.append(layers_case("al2o3-0001-tol-0.6", al, {"tolerance": 0.6}, check=lambda L: need(
         L["count"] == 13 and L["warnings"][-1] == "… and 2 more"),
         note="0.6 Å merges the 0.493 Å Al pairs: 18 -> 13 rows, five step warnings"))
-    # stoichiometric units (M3 §3.6; M3-T5)
+    # stoichiometric units (M3 §3.6; group="units" comes with find_layers in M3-T1, ledger L-M3-01)
     keep = [i for i in range(len(t)) if i not in rows_by_z(t)[-1]]
     t_vac = make([t.symbols[i] for i in keep], t.positions[keep], t.cell, t.pbc,
                  name="TiO2(110) 2x1 3TL without the top bridging O, bulk formula given",
@@ -1784,7 +1836,8 @@ def family_oxides() -> list[dict[str, Any]]:
                 need(L["count"] == want[0] and L["stoichiometric"] == want[1], f"{L['count']} {L['stoichiometric']}")
         out.append(layers_case(cid, s, {"group": "units"}, check=check, note={
             "tio2-110-no-top-obr-units": "ties go to the split points nearest the top (M3 §3.6 rule 3): the "
-                                         "incomplete unit is the top one, as M3 §0.3 and §3.6 state",
+                                         "incomplete unit is the top one, as M3 §0.3, §3.6 and the M3-T1 tests "
+                                         "state; the v2 prototype leaves it at the bottom (README decision 3)",
             "srtio3-001-tio2-7l-units": "without info.surface.bulk the target is the slab's own formula: no unit",
             "tio2-110-no-top-obr-units-no-bulk-formula": "the target is the slab's own formula (Ti6O11): no unit",
         }.get(cid)))
@@ -2104,9 +2157,9 @@ FILES: dict[str, tuple[Callable[[], list[dict[str, Any]]], str]] = {
         "Pt(332).")),
     "oxides.json": (family_oxides, (
         "M3 layer analysis (findLayers) on oxides from the bulk prototypes: TiO2(110) ideal and with LEED-size "
-        "displacements at 0.3 and 0.5 Å, ZnO(10-10) ideal and with the top Zn moved in, SrTiO3(001) both "
-        "terminations, CeO2(111), NaCl(100), Al2O3(0001) at 0.3 and 0.6 Å, stoichiometric units (group "
-        "\"units\", M3 §3.6) and bulk wurtzite along four-index directions.")),
+        "displacements, ZnO(10-10) ideal and with the top Zn moved in (the displaced slabs at 0.3 and 0.5 Å), "
+        "SrTiO3(001) both terminations, CeO2(111), NaCl(100), Al2O3(0001) at 0.3 and 0.6 Å, stoichiometric units "
+        "(group \"units\", M3 §3.6) and bulk wurtzite along four-index directions.")),
     "adsorbates.json": (family_adsorbates, (
         "M3 adsorbate recognition (findAdsorbates, markAdsorbates; findLayers with skipAdsorbates): the sources "
         "adsorbate_id, tags (OC20 and ASE) and geometry on 2D materials, TiO2(110), thin Pt(111) slabs with upright "
@@ -2125,9 +2178,24 @@ HEADER = ("Generated by scripts/gen_layer_fixtures.py (M3-T2a); the op contracts
           "expectations are in tests/data/surface/layers/README.md. ")
 
 
+def on_disk(name: str) -> dict[str, Any] | None:
+    """The case file *name* as it is on disk (None when there is none)."""
+    path = OUT / name
+    return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
+
+
 def render(name: str) -> str:
+    """The case file *name*: the cases with their skips (from the ops registered now) and any xfail on disk."""
     fn, description = FILES[name]
+    old = on_disk(name)
+    xfail = {c["id"]: c["xfail"] for c in (old or {}).get("cases", []) if isinstance(c, dict) and "xfail" in c}
     cases = fn()
+    for c in cases:
+        skip = skip_for(c["op"], c.get("args", {}), registered_ops())
+        if skip:
+            c["skip"] = skip
+        if c["id"] in xfail:
+            c["xfail"] = xfail[c["id"]]
     lines = ["{", f'  "schema": {json.dumps(SCHEMA)},',
              f'  "description": {json.dumps(HEADER + description, ensure_ascii=False)},', '  "cases": [']
     body = [json.dumps(c, ensure_ascii=False, separators=(", ", ": ")) for c in cases]
@@ -2136,9 +2204,23 @@ def render(name: str) -> str:
     return "\n".join(lines) + "\n"
 
 
+def differences(old: dict[str, Any], new: dict[str, Any]) -> list[str]:
+    """What differs between two case files as data: other top-level keys, then the ids of changed, new and
+    removed cases, then ``(order)`` when only the order of the cases differs."""
+    out = [k for k in sorted(set(old) | set(new)) if k != "cases" and old.get(k) != new.get(k)]
+    a = {c.get("id"): c for c in old.get("cases", []) if isinstance(c, dict)}
+    b = {c["id"]: c for c in new["cases"]}
+    out += [i if i in a else f"{i} (new)" for i in b if a.get(i) != b[i]]
+    out += [f"{i} (removed)" for i in a if i not in b]
+    if not out and list(a) != list(b):
+        out.append("(order)")
+    return out
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--check", action="store_true", help="compare with the files on disk instead of writing them")
+    ap.add_argument("--check", action="store_true",
+                    help="compare the cases with the files on disk instead of writing them (layout aside)")
     ap.add_argument("--only", metavar="FILE", action="append", help="limit to these files (e.g. pt111.json)")
     opts = ap.parse_args(argv)
     names = opts.only or list(FILES)
@@ -2152,9 +2234,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             ids.add(c["id"])
         path = OUT / name
         if opts.check:
-            if not path.is_file() or path.read_text(encoding="utf-8") != text:
-                print(f"{path.relative_to(ROOT)}: differs from the generator")
+            old = on_disk(name)
+            diff = ["(missing)"] if old is None else differences(old, json.loads(text))
+            if diff:
+                more = f" and {len(diff) - 8} more" if len(diff) > 8 else ""
+                print(f"{path.relative_to(ROOT)}: differs from the generator: {', '.join(diff[:8])}{more}")
                 status = 1
+            elif path.read_text(encoding="utf-8") != text:
+                print(f"{path.relative_to(ROOT)}: the same cases in another layout (rewrite it to normalise)")
             continue
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
