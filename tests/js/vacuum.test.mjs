@@ -360,6 +360,32 @@ describe('arguments', () => {
     }
   });
 
+  test('a NaN or infinite coordinate throws instead of looping forever', () => {
+    const NOT_FINITE = /^Error: positions must be finite numbers$/;
+    // two atoms, one of them NaN: along a only one fractional coordinate is finite (the case that never returned)
+    const two = new Structure({ symbols: ['H', 'H'], positions: [[0, 0, 0], [0, 0, 1]], cell: [[5, 0, 0], [0, 5, 0], [0, 0, 20]] });
+    two.positions[0] = NaN;
+    two.touch();
+    assert.throws(() => findVacuumGap(two, 0), NOT_FINITE);
+    assert.throws(() => findVacuumGap(two), NOT_FINITE);
+    assert.throws(() => findVacuumGaps(two), NOT_FINITE);
+    assert.throws(() => findVacuumGap(two, 2, { minWidth: 0 }), NOT_FINITE);   // NaN · 0 is NaN: every axis of that atom
+    const one = new Structure({ symbols: ['H'], positions: [[0, 0, 0]], cell: [[5, 0, 0], [0, 5, 0], [0, 0, 20]] });
+    one.positions[2] = Infinity;
+    one.touch();
+    for (const fn of [() => findVacuumGap(one, 2), () => findVacuumGaps(one), () => gapCut(one, 2), () => axisGaps(one, 2),
+      () => surfaceNormal(one), () => displayCuts(one), () => vacuumGapHint(one)]) assert.throws(fn, NOT_FINITE);
+    // an excluded atom does not count, and a repaired coordinate works again after touch()
+    const s = fcc111();
+    s.positions[2] = NaN;
+    s.touch();
+    assert.throws(() => gapCut(s, 2), NOT_FINITE);
+    assert.ok(gapCut(s, 2, { exclude: [0] }));
+    s.positions[2] = 0;
+    s.touch();
+    assert.ok(close(findVacuumGap(s).width, 15, 1e-9));
+  });
+
   test('the read-only functions leave the structure alone', () => {
     const s = withCO(4, { vac: 10 });
     s.info.surface = { axis: 2 };

@@ -18,6 +18,9 @@
  * - surface (`surfaceNormal`): the vacuum axis (a checked `info.surface.axis` first, then the widest vacuum, then the
  *   only non-periodic axis), its normal pointing to the +a_k side (the top) and whether surface tools apply.
  *
+ * Every analysed coordinate must be finite: an atom with a NaN or infinite fractional coordinate along an axis the
+ * gaps are computed for throws Error('positions must be finite numbers').
+ *
  * Widths within `positionTolerance` (1e-5 Å) tie and thresholds allow the same tolerance. The Python twin is
  * `crystallume/analysis/vacuum.py`; both give the same results on tests/data/surface/gaps.json and
  * tests/data/surface/f0d/vacuum.json. `frame` defaults to the current frame (frame 0 in Python).
@@ -37,6 +40,8 @@ const CENTER_TIE = 1e-9;
 /** A cell with |det| < 1e-12, or an axis whose two other vectors span ≤ 1e-12 Å², has no gaps. */
 const SINGULAR = 1e-12;
 const BAD_CUT = 'pass a cut from gapCut() or findSurfaceGap(), a window start, or null';
+/** The error for an atom whose coordinate along the analysed axis is NaN or infinite (same text as the Python twin). */
+const NOT_FINITE = 'positions must be finite numbers';
 
 // ------------------------------------------------------------------------------------------------- arguments
 /** A value in an error message, written like the Python twin does (numbers plainly, other values as JSON). */
@@ -156,6 +161,7 @@ function computeGaps(s, k, f, keep) {
   for (let a = 0, o = 0; a < natoms; a++) {
     if (keep && !keep[a]) continue;
     const x = pos[3 * a] * i0 + pos[3 * a + 1] * i1 + pos[3 * a + 2] * i2;
+    if (!Number.isFinite(x)) throw new Error(NOT_FINITE);   // the gaps of NaN are NaN: nothing would ever be widest
     let v = x - Math.floor(x);
     if (v > top) v = 0;
     w[o++] = v;
