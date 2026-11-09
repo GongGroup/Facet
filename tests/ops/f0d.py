@@ -30,6 +30,19 @@ Vacuum gaps (``crystallume.analysis.vacuum`` / ``web/js/core/vacuum.js``; result
   axis, hint on ``info.surface.axis``), ``displayCuts``, ``normal``, ``surfaceGap``, ``vacuumAxis``, ``hint``
   (``vacuumGapHint``) and ``shifts`` (``contiguousShifts`` along the vacuum axis, or null).
 
+Constraint flags (``crystallume.core.constraints`` / ``web/js/core/constraints.js``; ``value`` holds the JS-shaped result):
+
+- ``transformMoveFlags`` (``flags``, ``oldVectors``, then ``newVectors`` or ``matrix``, ``tol``): ``{flags, tightened}``;
+  ``matrix`` P gives the new vectors ``P @ oldVectors`` (a supercell), summed in the same order on both sides.
+- ``latticeToCartesianMask`` (``flags``, ``cell``, ``tol``): ``{mask, tightened}``; ``cartesianToLatticeFlags``
+  (``mask``, ``cell``, ``tol``): ``{flags, tightened}``.
+- ``axisLabels`` (``cell``), ``cartesianName`` (``cell``, ``flags``), and ``axisNames`` (``cell``, ``patterns``):
+  ``{labels, names}``, the labels of the cell and the name of each pattern.  No input.
+- ``moveFlags``, ``constraintSummary``, ``nextAdsorbateId``: the function of the input structure as ``value``.
+- ``setMoveFlags`` (``flags``) and ``clearConstraints``: the edited copy of the input as ``structure``.
+- ``applyBasisChange`` (``oldVectors``, default the input's cell; ``newVectors`` or ``matrix``): the number of atoms
+  tightened as ``value`` and the edited copy as ``structure``.
+
 Argument errors use the same messages as the JS side.
 """
 
@@ -43,6 +56,7 @@ import numpy as np
 from crystallume import Structure, build
 from crystallume.analysis import vacuum
 from crystallume.build.crystal import PROTOTYPES
+from crystallume.core import constraints
 from crystallume.core.lattice import wrap_fractional
 from crystallume.io import parse_text, to_text
 
@@ -216,3 +230,105 @@ def vacuum_report_op(inp: CaseInput, args: dict[str, Any]) -> dict[str, Any]:
         "hint": vacuum.vacuum_gap_hint(s, frame=frame, exclude=exclude),
         "shifts": None if axis is None or not s.pbc[axis] else vacuum.contiguous_shifts(s, axis, frame=frame),
     })
+
+
+# ------------------------------------------------------------------------------- constraint flags (F0-D T3)
+def _times(matrix: Any, old: Any) -> list[list[float]]:
+    """``matrix @ old`` (``old=None``: the identity) in plain floats, summed in the same order as the JS op."""
+    a = np.eye(3).tolist() if old is None else np.asarray(old, dtype=float).tolist()
+    p = [[float(x) for x in row] for row in matrix]
+    return [[p[i][0] * a[0][k] + p[i][1] * a[1][k] + p[i][2] * a[2][k] for k in range(3)] for i in range(3)]
+
+
+def _new_vectors(args: dict[str, Any], name: str, old: Any) -> Any:
+    if ("newVectors" in args) == ("matrix" in args):
+        raise ValueError(f"{name}: give exactly one of newVectors or matrix")
+    return args["newVectors"] if "newVectors" in args else _times(args["matrix"], old)
+
+
+@op("transformMoveFlags")
+def transform_move_flags_op(inp: CaseInput, args: dict[str, Any]) -> dict[str, Any]:
+    """``transform_move_flags`` on the literal arguments."""
+    name = "transformMoveFlags"
+    _args(args, name, ("flags", "oldVectors", "newVectors", "matrix", "tol"), ("flags", "oldVectors"))
+    new = _new_vectors(args, name, args["oldVectors"])
+    flags, tightened = constraints.transform_move_flags(args["flags"], args["oldVectors"], new, args.get("tol"))
+    return {"value": {"flags": flags, "tightened": tightened}}
+
+
+@op("latticeToCartesianMask")
+def lattice_to_cartesian_mask_op(inp: CaseInput, args: dict[str, Any]) -> dict[str, Any]:
+    _args(args, "latticeToCartesianMask", ("flags", "cell", "tol"), ("flags", "cell"))
+    mask, tightened = constraints.lattice_to_cartesian_mask(args["flags"], args["cell"], args.get("tol"))
+    return {"value": {"mask": mask, "tightened": tightened}}
+
+
+@op("cartesianToLatticeFlags")
+def cartesian_to_lattice_flags_op(inp: CaseInput, args: dict[str, Any]) -> dict[str, Any]:
+    _args(args, "cartesianToLatticeFlags", ("mask", "cell", "tol"), ("mask", "cell"))
+    flags, tightened = constraints.cartesian_to_lattice_flags(args["mask"], args["cell"], args.get("tol"))
+    return {"value": {"flags": flags, "tightened": tightened}}
+
+
+@op("axisLabels")
+def axis_labels_op(inp: CaseInput, args: dict[str, Any]) -> dict[str, Any]:
+    _args(args, "axisLabels", ("cell",), ("cell",))
+    return {"value": constraints.axis_labels(args["cell"])}
+
+
+@op("cartesianName")
+def cartesian_name_op(inp: CaseInput, args: dict[str, Any]) -> dict[str, Any]:
+    _args(args, "cartesianName", ("cell", "flags"), ("cell", "flags"))
+    return {"value": constraints.cartesian_name(args["cell"], args["flags"])}
+
+
+@op("axisNames")
+def axis_names_op(inp: CaseInput, args: dict[str, Any]) -> dict[str, Any]:
+    """The labels of ``cell`` and the Cartesian name of each of ``patterns``."""
+    _args(args, "axisNames", ("cell", "patterns"), ("cell", "patterns"))
+    cell = args["cell"]
+    return {"value": {"labels": constraints.axis_labels(cell),
+                      "names": [constraints.cartesian_name(cell, f) for f in args["patterns"]]}}
+
+
+@op("moveFlags")
+def move_flags_op(inp: CaseInput, args: dict[str, Any]) -> dict[str, Any]:
+    _args(args, "moveFlags", ())
+    return {"value": constraints.move_flags(inp.structure)}
+
+
+@op("constraintSummary")
+def constraint_summary_op(inp: CaseInput, args: dict[str, Any]) -> dict[str, Any]:
+    _args(args, "constraintSummary", ())
+    return {"value": constraints.constraint_summary(inp.structure)}
+
+
+@op("nextAdsorbateId")
+def next_adsorbate_id_op(inp: CaseInput, args: dict[str, Any]) -> dict[str, Any]:
+    _args(args, "nextAdsorbateId", ())
+    return {"value": constraints.next_adsorbate_id(inp.structure)}
+
+
+@op("setMoveFlags")
+def set_move_flags_op(inp: CaseInput, args: dict[str, Any]) -> dict[str, Any]:
+    _args(args, "setMoveFlags", ("flags",), ("flags",))
+    s = inp.structure.copy()
+    return {"structure": constraints.set_move_flags(s, args["flags"])}
+
+
+@op("clearConstraints")
+def clear_constraints_op(inp: CaseInput, args: dict[str, Any]) -> dict[str, Any]:
+    _args(args, "clearConstraints", ())
+    return {"structure": constraints.clear_constraints(inp.structure.copy())}
+
+
+@op("applyBasisChange")
+def apply_basis_change_op(inp: CaseInput, args: dict[str, Any]) -> dict[str, Any]:
+    """``apply_basis_change`` on a copy of the input; the old vectors default to the input's own cell."""
+    name = "applyBasisChange"
+    _args(args, name, ("oldVectors", "newVectors", "matrix"))
+    src = inp.structure
+    old = args["oldVectors"] if "oldVectors" in args else (None if src.cell is None else src.cell.tolist())
+    new = _new_vectors(args, name, old)
+    s = src.copy()
+    return {"value": constraints.apply_basis_change(s, old, new), "structure": s}

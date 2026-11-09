@@ -5,6 +5,7 @@ import { exportStructure, parseStructure } from '../../../crystallume/web/js/io/
 import { buildCrystal, prototypes } from '../../../crystallume/web/js/build/crystal.js';
 import * as vacuum from '../../../crystallume/web/js/core/vacuum.js';
 import { wrapFractional } from '../../../crystallume/web/js/core/lattice.js';
+import * as constraints from '../../../crystallume/web/js/core/constraints.js';
 
 function take(args, name, allowed, required = []) {
   const unknown = Object.keys(args).filter((k) => !allowed.includes(k)).sort();
@@ -129,4 +130,82 @@ op('vacuumReport', (inp, args) => {
     hint: vacuum.vacuumGapHint(s, { frame, exclude }),
     shifts: axis === null || !s.pbc[axis] ? null : vacuum.contiguousShifts(s, axis, { frame }),
   });
+});
+
+// ------------------------------------------------------------------------- constraint flags (F0-D T3)
+/** P · old (null: the identity), summed in the same order as the Python op. */
+function times(p, old) {
+  const a = old ?? [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+  return [0, 1, 2].map((i) => [0, 1, 2].map((k) => p[i][0] * a[0][k] + p[i][1] * a[1][k] + p[i][2] * a[2][k]));
+}
+
+function newVectors(args, name, old) {
+  if (('newVectors' in args) === ('matrix' in args)) throw new Error(`${name}: give exactly one of newVectors or matrix`);
+  return 'newVectors' in args ? args.newVectors : times(args.matrix, old);
+}
+
+op('transformMoveFlags', (inp, args) => {
+  const name = 'transformMoveFlags';
+  take(args, name, ['flags', 'oldVectors', 'newVectors', 'matrix', 'tol'], ['flags', 'oldVectors']);
+  return { value: constraints.transformMoveFlags(args.flags, args.oldVectors, newVectors(args, name, args.oldVectors), args.tol) };
+});
+
+op('latticeToCartesianMask', (inp, args) => {
+  take(args, 'latticeToCartesianMask', ['flags', 'cell', 'tol'], ['flags', 'cell']);
+  return { value: constraints.latticeToCartesianMask(args.flags, args.cell, args.tol) };
+});
+
+op('cartesianToLatticeFlags', (inp, args) => {
+  take(args, 'cartesianToLatticeFlags', ['mask', 'cell', 'tol'], ['mask', 'cell']);
+  return { value: constraints.cartesianToLatticeFlags(args.mask, args.cell, args.tol) };
+});
+
+op('axisLabels', (inp, args) => {
+  take(args, 'axisLabels', ['cell'], ['cell']);
+  return { value: constraints.axisLabels(args.cell) };
+});
+
+op('cartesianName', (inp, args) => {
+  take(args, 'cartesianName', ['cell', 'flags'], ['cell', 'flags']);
+  return { value: constraints.cartesianName(args.cell, args.flags) };
+});
+
+op('axisNames', (inp, args) => {
+  take(args, 'axisNames', ['cell', 'patterns'], ['cell', 'patterns']);
+  return { value: { labels: constraints.axisLabels(args.cell), names: args.patterns.map((f) => constraints.cartesianName(args.cell, f)) } };
+});
+
+op('moveFlags', (inp, args) => {
+  take(args, 'moveFlags', []);
+  return { value: constraints.moveFlags(inp.structure) };
+});
+
+op('constraintSummary', (inp, args) => {
+  take(args, 'constraintSummary', []);
+  return { value: constraints.constraintSummary(inp.structure) };
+});
+
+op('nextAdsorbateId', (inp, args) => {
+  take(args, 'nextAdsorbateId', []);
+  return { value: constraints.nextAdsorbateId(inp.structure) };
+});
+
+op('setMoveFlags', (inp, args) => {
+  take(args, 'setMoveFlags', ['flags'], ['flags']);
+  return { structure: constraints.setMoveFlags(inp.structure.clone(), args.flags) };
+});
+
+op('clearConstraints', (inp, args) => {
+  take(args, 'clearConstraints', []);
+  return { structure: constraints.clearConstraints(inp.structure.clone()) };
+});
+
+op('applyBasisChange', (inp, args) => {
+  const name = 'applyBasisChange';
+  take(args, name, ['oldVectors', 'newVectors', 'matrix']);
+  const src = inp.structure;
+  const old = 'oldVectors' in args ? args.oldVectors : (src.cell ?? null);   // the input's cell at full precision
+  const nv = newVectors(args, name, old);
+  const s = src.clone();
+  return { value: constraints.applyBasisChange(s, old, nv), structure: s };
 });
