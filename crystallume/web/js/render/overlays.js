@@ -8,7 +8,8 @@
  *            depth: 'atoms' they hide behind the drawn atoms (a depth pre-pass).
  *   'canvas' (C) draw(g, ctx) on the 2D overlay canvas, after the measurement values and before the legends.
  *   'dom'    (C) an element placed in the viewer's container (never part of an image).
- *   'legend'     rows for the legend stack in the bottom-right corner: items() → [{label, swatch}].
+ *   'legend'     rows for the legend stack in the bottom-right corner: items() → [{label, swatch}]; a swatch
+ *            colour may be given as a highlight's is ({light, dark}, 'var(--token)'), so it matches the halo.
  * Each layer has an export policy: 'never' (the default), 'marker' (in PNG exports only with "Include
  * markers") or 'always'. Thumbnails carry no layers and no halos at all; glTF exports never do.
  *
@@ -272,14 +273,23 @@ export function disposeObject(obj) {
   obj?.parent?.remove(obj);
 }
 
-/** Legend rows as overlays give them: [{label, swatch: {kind, color, opacity}}], cleaned (unknown kinds become 'dot'). */
-export function legendRows(list) {
+/** Swatch colour of a legend row whose colour is missing or cannot be read. */
+export const LEGEND_FALLBACK_COLOR = '#9aa0a6';
+
+/**
+ * Legend rows as overlays give them: [{label, swatch: {kind, color, opacity, dashed}}], cleaned (unknown kinds
+ * become 'dot'). A swatch colour may be any highlight colour (a CSS colour, {light, dark} or 'var(--token)', so a
+ * row can take the spec its halo was given): it is resolved to a plain colour with `dark` (the background) and
+ * `css(name)` (the page's value of a custom property), as resolveColor does; what cannot be read is grey.
+ */
+export function legendRows(list, { dark = false, css = null } = {}) {
   const out = [];
   for (const it of Array.isArray(list) ? list : []) {
     if (!it || it.label == null || it.label === '') continue;
     const sw = it.swatch ?? {};
     const opacity = Number.isFinite(sw.opacity) ? Math.min(1, Math.max(0, sw.opacity)) : 1;
-    out.push({ label: String(it.label), swatch: { kind: SWATCH_KINDS.has(sw.kind) ? sw.kind : 'dot', color: isPlainColor(sw.color) ? sw.color.trim() : '#9aa0a6', opacity, dashed: !!sw.dashed } });
+    const color = resolveColor(sw.color, { dark, css, fallback: LEGEND_FALLBACK_COLOR });
+    out.push({ label: String(it.label), swatch: { kind: SWATCH_KINDS.has(sw.kind) ? sw.kind : 'dot', color, opacity, dashed: !!sw.dashed } });
   }
   return out;
 }
@@ -583,14 +593,17 @@ export class Overlays {
     }
   }
 
-  /** Legend rows of the visible legend layers, in layer order. */
-  legendItems() {
+  /**
+   * Legend rows of the visible legend layers, in layer order, swatch colours resolved (legendRows) for the
+   * background (`dark`, default: the viewer's) and the page's CSS tokens (`css`, default: the viewer's reader).
+   */
+  legendItems({ dark = !!this.viewer?.overlayDark, css = (name) => this.viewer?._cssToken?.(name) ?? '' } = {}) {
     const out = [];
     for (const rec of this._sorted()) {
       if (rec.tier !== 'legend' || !this._visible(rec)) continue;
       let list = null;
       try { list = rec.items(); } catch (e) { console.error(`[crystallume] overlay “${rec.id}” items failed`, e); }
-      out.push(...legendRows(list));
+      out.push(...legendRows(list, { dark, css }));
     }
     return out;
   }

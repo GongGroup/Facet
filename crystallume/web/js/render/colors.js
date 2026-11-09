@@ -19,6 +19,18 @@ export const colorSchemes = {
   list: () => [...registry.values()],
 };
 
+/**
+ * The schemes a scheme picker offers for `structure`: those without available() or whose available(structure)
+ * says yes (one that throws says no), and always the scheme in use (`active`), so the picker shows what the atoms
+ * are coloured with even when a script chose it, e.g. "Property" with style.property 'tags'.
+ */
+export function offeredSchemes(structure, active = null) {
+  return [...registry.values()].filter((c) => {
+    if (c.id === active || typeof c.available !== 'function') return true;
+    try { return !!c.available(structure); } catch { return false; }
+  });
+}
+
 // ---- colour maths -----------------------------------------------------------------
 export function hexToRgb(hex) {
   let h = String(hex).replace('#', '');
@@ -174,6 +186,8 @@ colorSchemes.register({
 });
 colorSchemes.register({
   id: 'property', group: 'Per atom', name: 'Property (coolwarm)', description: 'Colour by a numeric per-atom property from the file (charges, forces…)',
+  // offered when it has a default property to colour by: a cleaved slab whose only numbers are layer tags would come
+  // out all grey (style.property can still name 'tags'; the picker then lists the scheme as the one in use)
   available: (structure) => defaultPropertyName(structure?.props) != null,
   colorFor: (s, i, ctx) => {
     const v = ctx.prop?.[ctx.srcIndex(i)];

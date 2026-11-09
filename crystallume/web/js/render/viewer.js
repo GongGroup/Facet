@@ -180,13 +180,7 @@ export class Viewer extends Emitter {
     this._lastTap = null;
     this.helpers = { buildAtoms, buildBonds, buildLines, buildPolyhedra, atomRadius, segmentsFor };
 
-    // shared halo resources: one geometry, one material and one growable instanced mesh per kind; the selection and
-    // hover halos take the theme's accent colour, named highlights (setHighlight) keep their own
-    this._haloGeo = new THREE.SphereGeometry(1, 32, 20);
-    this._halo = { select: this._makeHalo(rimMaterial(2.0), { name: 'select', themed: true, grow: 1.25 }), hover: this._makeHalo(rimMaterial(0.9), { name: 'hover', themed: true, grow: 1.32 }) };
-    this._haloHidden = new Set();   // halo kinds an export leaves out (overlays.exportScope)
-    this._highlights = new Map();   // name → { set (source indices), color, grow, opacity, strength, contrast, export }
-    this._orderHalos();
+    this._setupHalos();
     // overlay layers (render/overlays.js): tier A under the root next to the halos, tier B in a scene of its own
     this.overlays = new Overlays(this);
     this.overlayGroup = this.overlays.sceneGroup;
@@ -841,6 +835,22 @@ export class Viewer extends Emitter {
   }
 
   /**
+   * Shared halo resources: one geometry, and one material and growable instanced mesh per kind. The selection and
+   * hover halos take the theme's accent colour; named highlights (setHighlight) keep their own and are made when
+   * first used. `_halo` has no prototype, so a highlight may have any name ('constructor', '__proto__'…).
+   */
+  _setupHalos() {
+    this._haloGeo = new THREE.SphereGeometry(1, 32, 20);
+    this._halo = Object.assign(Object.create(null), {
+      select: this._makeHalo(rimMaterial(2.0), { name: 'select', themed: true, grow: 1.25 }),
+      hover: this._makeHalo(rimMaterial(0.9), { name: 'hover', themed: true, grow: 1.32 }),
+    });
+    this._haloHidden = new Set();   // halo kinds an export leaves out (overlays.exportScope)
+    this._highlights = new Map();   // name → { set (source indices), color, grow, opacity, strength, contrast, export }
+    this._orderHalos();
+  }
+
+  /**
    * A halo kind: one growable instanced mesh with its own material. opts: name, themed (takes the theme's accent:
    * the selection and hover halos), grow (halo radius ÷ atom radius, about), export (policy, named highlights).
    */
@@ -968,8 +978,22 @@ export class Viewer extends Emitter {
     if (!h || !mesh) return;
     const dark = !!this.overlayDark;
     const fallback = dark ? DEFAULT_HIGHLIGHT_COLOR.dark : DEFAULT_HIGHLIGHT_COLOR.light;
-    mesh.material.uniforms.color.value.set(resolveColor(h.color, { dark, css: (token) => cssVar(token, ''), fallback }));
+    mesh.material.uniforms.color.value.set(resolveColor(h.color, { dark, css: (token) => this._cssToken(token), fallback }));
     mesh.material.uniforms.edge.value.set(dark ? HALO_EDGE.dark : HALO_EDGE.light);
+  }
+
+  /**
+   * The page's value of CSS custom property `name` ('' when it has none), read once per theme: _updateHalos forgets
+   * the values, so named highlights and overlay legend swatches given 'var(--token)' change together.
+   */
+  _cssToken(name) {
+    const seen = (this._cssTokens ??= new Map());
+    if (!seen.has(name)) {
+      let v = '';
+      try { v = cssVar(name, ''); } catch { v = ''; }   // no page (node tests, workers)
+      seen.set(name, v);
+    }
+    return seen.get(name);
   }
 
   /** The background turned dark or light, or the theme changed: named highlights and overlay building blocks follow. */
@@ -983,6 +1007,7 @@ export class Viewer extends Emitter {
   /** Re-read theme colours (accent, fonts, CSS tokens) and refresh the halos; the shell calls this on theme changes. */
   _updateHalos() {
     this._css = null;
+    this._cssTokens = null;
     this._cssTheme();        // the accent of the selection and hover halos
     this._themeOverlays();   // 'var(--token)' colours of named highlights
     this._writeHalos();
@@ -1783,7 +1808,8 @@ export class Viewer extends Emitter {
     const info = this.colors?.legend;
     // element chips only with 'always'; a colour bar or category chips also with 'auto'
     const legend = info && mode !== 'none' && (info.kind !== 'elements' || mode === 'always') ? info : null;
-    const items = mode !== 'none' ? this.overlays.legendItems() : [];
+    // overlay legend rows, their swatch colours resolved as the halos' are ({light, dark}, 'var(--token)')
+    const items = mode !== 'none' ? this.overlays.legendItems({ dark: !!dark, css: (t) => this._cssToken(t) }) : [];
     const ppa = d.scaleBar ? this.pixelsPerAngstrom(h) : null;
     if (legend || ppa || items.length) {
       const traj = !opt.export && (this.structure?.nFrames ?? 1) > 1;

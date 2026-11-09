@@ -1330,12 +1330,17 @@ export class App extends Emitter {
   /** The current colour-scheme extras: {key: value} of the registered providers (see registerColorExtra). */
   colorExtras() { return colorExtrasFrom(this._colorExtraFns, this); }
 
-  /** Overlay layers marked clearOnSwitch and named highlights belong to one structure: they go when another entry (or project) is shown. */
+  /**
+   * Overlay layers marked clearOnSwitch and named highlights belong to one structure: they go when another entry
+   * is shown, or another project document (opening the open project again gives new Structure objects under the
+   * same ids). Undo and redo keep the project object and the entry ids, so they keep the overlays.
+   */
   _switchOverlays(entry) {
-    const key = entry ? `${this.project.id}/${entry.id}` : null;
-    if (key === this._overlayEntry) return;
-    this._overlayEntry = key;
-    this.viewer.structureSwitched();
+    const project = entry ? this.project : null, id = entry?.id ?? null;
+    const was = this._overlayOwner;
+    if (was && was.project === project && was.id === id) return;
+    this._overlayOwner = { project, id };
+    this.viewer.structureSwitched?.();
   }
 
   async exportGLB() {

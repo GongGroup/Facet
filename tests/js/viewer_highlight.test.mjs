@@ -4,7 +4,8 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from '../../crystallume/web/vendor/three/three.module.js';
 import { Viewer } from '../../crystallume/web/js/render/viewer.js';
-import { Overlays, haloMaterial, cellOutlineLayer, HALO_ORDER_BASE } from '../../crystallume/web/js/render/overlays.js';
+import { Overlays, cellOutlineLayer, HALO_ORDER_BASE } from '../../crystallume/web/js/render/overlays.js';
+import { fake2d } from './fake2d.mjs';
 import { colorSchemes } from '../../crystallume/web/js/render/colors.js';
 import { makeScene } from '../../crystallume/web/js/render/settings.js';
 import { buildAtoms, buildBonds, buildLines, buildPolyhedra, atomRadius, segmentsFor } from '../../crystallume/web/js/render/styles.js';
@@ -18,18 +19,31 @@ function bareViewer() {
   const v = Object.create(Viewer.prototype);
   v._h = new Map();   // Emitter
   Object.assign(v, {
-    root: new THREE.Group(), _haloGeo: new THREE.SphereGeometry(1, 8, 6), selection: new Set(), hoverIndex: -1, overlayDark: false, _dirty: false,
+    root: new THREE.Group(), selection: new Set(), hoverIndex: -1, overlayDark: false, _dirty: false,
     model: { n: 5, src: Int32Array.from([0, 1, 2, 0, 0]), positions: Float32Array.from([0, 0, 0, 1, 0, 0, 2, 0, 0, 3, 0, 0, 0, 3, 0]), symbols: ['O', 'Pt', 'Pt', 'O', 'O'] },
     radii: Float32Array.from([0.5, 1, 1, 0.5, 0.5]),
     settings: makeScene(), resolution: new THREE.Vector2(400, 300), container: { appendChild() {} },
     helpers: { buildAtoms, buildBonds, buildLines, buildPolyhedra, atomRadius, segmentsFor },
   });
-  v._halo = { select: v._makeHalo(haloMaterial({ contrast: false }), { name: 'select', themed: true, grow: 1.25 }), hover: v._makeHalo(haloMaterial({ contrast: false }), { name: 'hover', themed: true, grow: 1.32 }) };
-  v._haloHidden = new Set();
-  v._highlights = new Map();
+  v._setupHalos();   // as the constructor does
   v.overlays = new Overlays(v);
-  v._orderHalos();
   return v;
+}
+
+/**
+ * The page's CSS custom properties for cssVar (getComputedStyle on <html>), from `vars`, which the test may change;
+ * the globals are put back after the test.
+ */
+function fakePageCss(t, vars) {
+  const had = { document: Object.getOwnPropertyDescriptor(globalThis, 'document'), getComputedStyle: Object.getOwnPropertyDescriptor(globalThis, 'getComputedStyle') };
+  globalThis.document = { documentElement: {} };
+  globalThis.getComputedStyle = (el) => {
+    assert.equal(el, globalThis.document.documentElement);
+    return { getPropertyValue: (name) => vars[name] ?? '' };
+  };
+  t.after(() => {
+    for (const [k, d] of Object.entries(had)) { if (d) Object.defineProperty(globalThis, k, d); else delete globalThis[k]; }
+  });
 }
 const shown = (mesh) => {
   const out = [], m = new THREE.Matrix4();
@@ -37,6 +51,25 @@ const shown = (mesh) => {
   return out;
 };
 const hex = (mesh, u = 'color') => `#${mesh.material.uniforms[u].value.getHexString()}`;
+
+/**
+ * Draw the overlay canvas as the view does (drawOverlay, 400 × 300) and give each overlay legend row's ring colour:
+ * label → the colour of the last stroke before the label (a 'halo' swatch strokes the dark inner line, then the ring).
+ */
+function legendRings(v) {
+  if (!v.camera) { v.camera = new THREE.PerspectiveCamera(30, 4 / 3, 0.1, 100); v.camera.position.set(0, 0, 20); }
+  Object.assign(v, { width: 400, height: 300, measurements: v.measurements ?? [] });
+  const g = fake2d();
+  g.canvas = { width: 400, height: 300 };
+  v.drawOverlay(g, 1, 400, 300);
+  const out = {};
+  let ring = null;
+  for (const c of g.calls) {
+    if (c[0] === 'stroke') ring = c[1];
+    else if (c[0] === 'fillText') { out[c[1]] = ring; ring = null; }
+  }
+  return out;
+}
 
 describe('named highlights', () => {
   test('a halo around every drawn image of the atoms, its own colour, never the accent', () => {
@@ -162,6 +195,30 @@ describe('named highlights', () => {
     assert.deepEqual(v.overlays.list().map((l) => l.id), ['keep']);
   });
 
+  test('any name works, Object.prototype keys too: the halo table has no prototype', () => {
+    const v = bareViewer();
+    assert.equal(Object.getPrototypeOf(v._halo), null);
+    const names = ['constructor', 'toString', '__proto__', 'hasOwnProperty'];
+    names.forEach((name, k) => v.setHighlight(name, [k % 3], { color: '#0f9d8a', export: 'always' }));
+    assert.deepEqual(v.highlightNames(), names);
+    names.forEach((name, k) => {
+      const mesh = v._halo[name];
+      assert.ok(mesh?.isInstancedMesh, `${name}: a halo of its own`);
+      assert.equal(mesh.userData.highlight, name);
+      assert.equal(hex(mesh), '#0f9d8a');
+      assert.equal(shown(mesh).length, k % 3 === 0 ? 3 : 1, `${name}: every drawn image of atom ${k % 3}`);
+    });
+    assert.deepEqual(Object.keys(v._halo).sort(), ['__proto__', 'constructor', 'hasOwnProperty', 'hover', 'select', 'toString']);
+    const restore = v.overlays.exportScope('png');
+    assert.deepEqual([...v._haloHidden], ['hover']);
+    restore();
+    v.setHighlight('constructor', [1]);   // set again: the same halo
+    assert.equal(shown(v._halo.constructor).length, 1);
+    for (const name of names) v.clearHighlight(name);
+    assert.deepEqual(v.highlightNames(), []);
+    for (const name of names) assert.deepEqual(shown(v._halo[name]), [], `${name} cleared`);
+  });
+
   test('export scopes read the halo policies', () => {
     const v = bareViewer();
     v.setHighlight('fixed', [0]);                          // marker
@@ -174,6 +231,74 @@ describe('named highlights', () => {
     assert.deepEqual([...v._haloHidden].sort(), ['hover', 'quiet', 'select']);
     restore();
     assert.equal(v._haloHidden.size, 0);
+  });
+});
+
+describe('theme changes', () => {
+  const kinds = ['select', 'hover', 'fixed', 'plain', 'pair'];
+
+  test('only the selection and hover halos take the accent; tokens are read again, other colours stay', (t) => {
+    const vars = { '--accent': '#e8a33d', '--constraint': '#2563eb' };
+    fakePageCss(t, vars);
+    const v = bareViewer();
+    v._updateHalos();   // the shell's first theme pass
+    v.setHighlight('fixed', [0], { color: 'var(--constraint)' });
+    v.setHighlight('plain', [1], { color: '#0f9d8a' });
+    v.setHighlight('pair', [2], { color: { light: '#d97706', dark: '#fbbf24' } });
+    const colors = () => Object.fromEntries(kinds.map((k) => [k, hex(v._halo[k])]));
+    assert.deepEqual(colors(), { select: '#e8a33d', hover: '#e8a33d', fixed: '#2563eb', plain: '#0f9d8a', pair: '#d97706' });
+
+    // another theme: a new accent and a new value of the token
+    Object.assign(vars, { '--accent': '#3b82f6', '--constraint': '#dc2626' });
+    v._updateHalos();
+    const after = { select: '#3b82f6', hover: '#3b82f6', fixed: '#dc2626', plain: '#0f9d8a', pair: '#d97706' };
+    assert.deepEqual(colors(), after);
+    v._updateHalos();
+    assert.deepEqual(colors(), after, 'a second pass changes nothing');
+    assert.equal(shown(v._halo.fixed).length, 3, 'the halos are written again, still around every image');
+
+    // the theme cache read afresh (as drawOverlay does after _updateHalos) recolours the themed kinds only
+    v._css = null;
+    vars['--accent'] = '#16a34a';
+    v._cssTheme();
+    assert.deepEqual(colors(), { ...after, select: '#16a34a', hover: '#16a34a' });
+
+    // a dark background: {light, dark} takes its dark colour, the inner lines turn black; tokens and plain colours stay
+    v.overlayDark = true;
+    v._themeOverlays();
+    assert.deepEqual(colors(), { ...after, select: '#16a34a', hover: '#16a34a', pair: '#fbbf24' });
+    for (const k of ['fixed', 'plain', 'pair']) assert.equal(hex(v._halo[k], 'edge'), '#000000');
+  });
+
+  test('legend rows given a highlight’s colour spec draw the colour its halo has', (t) => {
+    const vars = { '--accent': '#e8a33d', '--constraint': '#2563eb' };
+    fakePageCss(t, vars);
+    const v = bareViewer();
+    v._updateHalos();
+    const PAIR = { light: '#7c3aed', dark: '#c4b5fd' };
+    v.setHighlight('fixed', [0], { color: 'var(--constraint)' });
+    v.setHighlight('pair', [1], { color: PAIR });
+    v.overlays.add({
+      id: 'key', tier: 'legend', items: () => [
+        { label: 'Fixed (1)', swatch: { kind: 'halo', color: 'var(--constraint)' } },
+        { label: 'Pair (1)', swatch: { kind: 'halo', color: PAIR } },
+        { label: 'Unset', swatch: { kind: 'halo', color: 'var(--nothing)' } },
+      ],
+    });
+    const rings = () => legendRings(v);
+    assert.deepEqual(rings(), { 'Fixed (1)': hex(v._halo.fixed), 'Pair (1)': hex(v._halo.pair), Unset: '#9aa0a6' });
+    assert.deepEqual(rings(), { 'Fixed (1)': '#2563eb', 'Pair (1)': '#7c3aed', Unset: '#9aa0a6' });
+    // a token changed without a theme pass is read by neither; the next pass gives both the new value
+    vars['--constraint'] = '#dc2626';
+    assert.equal(rings()['Fixed (1)'], '#2563eb');
+    v._updateHalos();
+    assert.equal(hex(v._halo.fixed), '#dc2626');
+    assert.equal(rings()['Fixed (1)'], '#dc2626');
+    // a dark background: the {light, dark} row and its halo both take the dark colour
+    v.overlayDark = true;
+    v._themeOverlays();
+    assert.equal(hex(v._halo.pair), '#c4b5fd');
+    assert.equal(rings()['Pair (1)'], '#c4b5fd');
   });
 });
 

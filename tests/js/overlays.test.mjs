@@ -9,7 +9,7 @@ import { LineMaterial } from '../../crystallume/web/vendor/three/addons/lines/Li
 import {
   Overlays, TIERS, EXPORT_POLICIES, haloExported, layerExported, isPlainColor, isColorSpec, resolveColor, normalizeHighlight,
   checkHighlightName, highlightIndexSet, haloOrder, remapIndices, unionBounds, pointsBounds, pickSpheres, cellEdges,
-  triangulatePolygon, legendRows, haloMaterial, prepareObject, disposeObject, DEFAULT_HIGHLIGHT_COLOR, HALO_ORDER_BASE,
+  triangulatePolygon, legendRows, haloMaterial, prepareObject, disposeObject, DEFAULT_HIGHLIGHT_COLOR, HALO_ORDER_BASE, LEGEND_FALLBACK_COLOR,
 } from '../../crystallume/web/js/render/overlays.js';
 import { fake2d, quietErrors } from './fake2d.mjs';
 
@@ -511,10 +511,39 @@ describe('geometry helpers', () => {
 
   test('legendRows cleans swatches', () => {
     assert.deepEqual(legendRows([{ label: 7, swatch: { kind: 'star', color: 'bad', opacity: -1 } }, { label: 'L', swatch: { kind: 'line', color: '#fff', dashed: 1 } }]), [
-      { label: '7', swatch: { kind: 'dot', color: '#9aa0a6', opacity: 0, dashed: false } },
+      { label: '7', swatch: { kind: 'dot', color: LEGEND_FALLBACK_COLOR, opacity: 0, dashed: false } },
       { label: 'L', swatch: { kind: 'line', color: '#fff', opacity: 1, dashed: true } },
     ]);
     assert.deepEqual(legendRows('nope'), []);
+    assert.equal(LEGEND_FALLBACK_COLOR, '#9aa0a6');
+  });
+
+  test('legendRows takes the colour specs highlights take: {light, dark} by the background, tokens through css', () => {
+    const css = (name) => ({ '--constraint': '#2563eb' })[name] ?? '';
+    const colors = (opts) => legendRows([
+      { label: 'Fixed', swatch: { kind: 'halo', color: { light: '#2563eb', dark: '#7aa2ff' } } },
+      { label: 'Token', swatch: { kind: 'halo', color: ' var(--constraint) ' } },
+      { label: 'Token with a fallback', swatch: { kind: 'dot', color: 'var(--unset, #0f9d8a)' } },
+      { label: 'Both', swatch: { kind: 'line', color: { light: 'var(--constraint)', dark: '#ffffff' } } },
+      { label: 'No colour', swatch: { kind: 'line' } },
+    ], opts).map((r) => r.swatch.color);
+    assert.deepEqual(colors(), ['#2563eb', '#9aa0a6', '#0f9d8a', '#9aa0a6', '#9aa0a6'], 'without a css reader tokens cannot be read');
+    assert.deepEqual(colors({ css }), ['#2563eb', '#2563eb', '#0f9d8a', '#2563eb', '#9aa0a6']);
+    assert.deepEqual(colors({ dark: true, css }), ['#7aa2ff', '#2563eb', '#0f9d8a', '#ffffff', '#9aa0a6']);
+  });
+
+  test('legend layers resolve swatch colours with the viewer’s background and CSS reader unless given others', () => {
+    const v = stubViewer();
+    v._cssToken = (name) => (name === '--constraint' ? '#2563eb' : '');
+    const ov = new Overlays(v);
+    ov.add({ id: 'k', tier: 'legend', items: () => [{ label: 'Fixed (2)', swatch: { kind: 'halo', color: { light: 'var(--constraint)', dark: '#7aa2ff' } } }] });
+    const color = (opts) => ov.legendItems(opts)[0].swatch.color;
+    assert.equal(color(), '#2563eb');
+    v.overlayDark = true;
+    assert.equal(color(), '#7aa2ff');
+    assert.equal(color({ dark: false, css: () => '#123456' }), '#123456');
+    delete v._cssToken;
+    assert.equal(color({ dark: false }), LEGEND_FALLBACK_COLOR, 'no reader: the fallback');
   });
 
   test('prepareObject and disposeObject', () => {

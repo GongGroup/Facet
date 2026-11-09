@@ -2,7 +2,7 @@
 // category legends, app.registerColorExtra's values, the "Property" scheme's default property, overlay legend rows.
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { colorSchemes, computeColors, defaultPropertyName, PROPERTY_SKIP, colorExtrasFrom, srgbToLinear, hexToRgb } from '../../crystallume/web/js/render/colors.js';
+import { colorSchemes, computeColors, defaultPropertyName, PROPERTY_SKIP, colorExtrasFrom, offeredSchemes, srgbToLinear, hexToRgb } from '../../crystallume/web/js/render/colors.js';
 import { drawLegends } from '../../crystallume/web/js/render/legend.js';
 import { scenePathValues, makeScene } from '../../crystallume/web/js/render/settings.js';
 import { fake2d, quietErrors } from './fake2d.mjs';
@@ -40,6 +40,23 @@ describe('"Property" colours', () => {
     assert.equal(scheme.available({ props: { tags: [1, 2], adsorbate_id: [0, 1] } }), false);
     assert.equal(scheme.available({ props: { tags: [1, 2], magmom: [0.6, 0.6] } }), true);
     assert.equal(scheme.available(null), false);
+  });
+
+  test('a scheme picker always lists the scheme in use, e.g. "Property" a script set to colour by tags', (t) => {
+    const ids = (s, active) => offeredSchemes(s, active).map((c) => c.id);
+    const slab = { props: { tags: [1, 2] } };
+    const all = colorSchemes.list().map((c) => c.id);
+    assert.deepEqual(ids(slab, 'jmol'), all.filter((id) => id !== 'property'), 'a cleaved slab: nothing to colour by by default');
+    assert.deepEqual(ids(slab, 'property'), all, 'the scheme in use stays listed, in its place');
+    assert.deepEqual(ids({ props: { charges: [0.1, -0.1] } }), all);
+    assert.ok(ids(null).includes('jmol'), 'schemes without available() are always offered');
+    const off = colorSchemes.register({ id: 'test-broken', name: 'Broken', group: 'Per atom', available() { throw new Error('no'); }, colorFor: () => '#ffffff' });
+    t.after(off);
+    assert.ok(!ids(slab, 'jmol').includes('test-broken'), 'an available() that throws: not offered');
+    assert.ok(ids(slab, 'test-broken').includes('test-broken'));
+    // what the atoms then look like: tags on the coolwarm map and their legend
+    const c = computeColors(model(['Pt', 'Pt']), { length: 2, ...slab }, { colorScheme: 'property', property: 'tags' }, null);
+    assert.equal(c.legend.label, 'tags');
   });
 });
 
