@@ -1308,11 +1308,11 @@ class Structure:
         return self.positions.min(axis=0), self.positions.max(axis=0)
 
     def _vector(self, i: int, j: int, mic: bool) -> np.ndarray:
-        from ..analysis.geometry import minimum_image_vectors
+        from ..analysis.geometry import mic_vector
 
         d = self.positions[j] - self.positions[i]
         if mic and self.cell is not None and any(self.pbc):
-            d = minimum_image_vectors(d[None, :], self.cell, self.pbc)[0]
+            d = mic_vector(d, self.cell, self.pbc)[0]
         return d
 
     def get_distance(self, i: int, j: int, mic: bool = False, vector: bool = False) -> float | np.ndarray:

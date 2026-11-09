@@ -41,6 +41,7 @@ import { element } from '../core/elements.js';
 import { buildDisplayModel, modelBounds, refOf, storedImage } from './display.js';
 import { tools } from './tools/index.js';
 import { parseRef, normalizeRefs, measurementPoints, migrateMeasurementKeys, newMeasurementId } from '../core/measure.js';
+import { dihedralFromVectors, signedAngle } from '../core/geometry.js';
 import { inv3, cartToFrac } from '../core/util.js';
 import { styles, atomRadius, segmentsFor, autoPolyhedraCenters, buildAtoms, buildBonds, buildLines, buildPolyhedra, writeAtomMatrices, writeBondMatrices } from './styles.js';
 import { computeColors, colorSchemes } from './colors.js';
@@ -2821,7 +2822,10 @@ export const MEASURE_ARITY = Object.freeze(Object.assign(Object.create(null), { 
 /** Arity of a measurement type; undefined for anything that is not exactly one of the type names (arrays, objects, symbols…). */
 export const measureArity = (type) => (typeof type === 'string' ? MEASURE_ARITY[type] : undefined);
 
-/** Distance (Å) or angle / dihedral (°) of points P; NaN for an unknown type or the wrong number of points. */
+/**
+ * Distance (Å) or angle / dihedral (°) of points P; NaN for an unknown type or the wrong number of points. A dihedral
+ * has the IUPAC sign of Python's get_dihedral, in (−180°, 180°] (core/geometry.js).
+ */
 export function measureValue(type, P) {
   if (measureArity(type) !== P?.length) return NaN;
   if (type === 'distance') return P[0].distanceTo(P[1]);
@@ -2829,8 +2833,6 @@ export function measureValue(type, P) {
     const a = P[0].clone().sub(P[1]), b = P[2].clone().sub(P[1]);
     return (a.angleTo(b) * 180) / Math.PI;
   }
-  const b1 = P[1].clone().sub(P[0]), b2 = P[2].clone().sub(P[1]), b3 = P[3].clone().sub(P[2]);
-  const n1 = b1.clone().cross(b2), n2 = b2.clone().cross(b3);
-  const m1 = n1.clone().cross(b2.clone().normalize());
-  return (Math.atan2(m1.dot(n2), n1.dot(n2)) * 180) / Math.PI;
+  const bond = (u, v) => [v.x - u.x, v.y - u.y, v.z - u.z];
+  return signedAngle(dihedralFromVectors(bond(P[0], P[1]), bond(P[1], P[2]), bond(P[2], P[3])));
 }
