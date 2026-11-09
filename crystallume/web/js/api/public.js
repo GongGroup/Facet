@@ -34,6 +34,7 @@ import { analysisContext } from '../ui/paramform.js';
 import { sceneScript } from '../ui/apidialog.js';
 import { findBonds, findPeriodicNeighbors } from '../core/bonds.js';
 import { syncRegistryCommands, refreshShell } from './extensions.js';
+import { attachApi, apiMembers } from './namespaces.js';
 import { VERSION } from '../app.js';
 
 /** Events reachable through crystallume.on(name, fn): [name, source, payload, description]. */
@@ -47,7 +48,7 @@ export const EVENTS = [
   ['history', 'app', '—', 'The undo/redo stacks changed'],
   ['saveState', 'app', "'idle' | 'dirty' | 'saving' | 'saved' | 'error'", 'Save state of the open project'],
   ['saved', 'app', '—', 'The open project was stored'],
-  ['busy', 'app', '{busy, label}', 'A long task started or ended'],
+  ['busy', 'app', '{busy, label, cancel}', 'A long task started or ended (cancel: stops the newest task when it can be cancelled, else null)'],
   ['providers', 'app', '—', 'Storage providers or their sign-in state changed'],
   ['auth', 'app', 'user | null', 'The server account changed'],
   ['needAuth', 'app', '—', 'A save needs the user to sign in'],
@@ -113,6 +114,14 @@ export function scenePaths(o = DEFAULT_SCENE, pre = '') {
 
 /** The structure to work on, or a clear error when none is loaded (instead of a TypeError further in). */
 const need = (s) => { if (!s) throw new Error('Load a structure first.'); return s; };
+
+/** The app's own members of crystallume.edit, for reference() (modules add theirs with defineApi, api/namespaces.js). */
+const EDIT_MEMBERS = Object.freeze([
+  { path: 'edit.run', owner: null, sig: '(label, fn(structure), opts) → { entry, value }: one undo step', call: "crystallume.edit.run('My edit', (s) => { /* change s */ })" },
+  { path: 'edit.begin', owner: null, sig: '(label, opts) → a preview session to apply or cancel', call: "crystallume.edit.begin('My preview')" },
+  { path: 'edit.touch', owner: null, sig: '() → redraw after changing crystallume.structure directly (no undo step)', call: 'crystallume.edit.touch()' },
+  { path: 'edit.session', owner: null, sig: 'the open preview session, or null', call: 'crystallume.edit.session' },
+]);
 
 export function createAPI(app, shell) {
   const records = [];          // frontend plugins: {name, url, status, error, source}
@@ -216,6 +225,19 @@ export function createAPI(app, shell) {
       return app.loadProjectJSON({ ...doc, id: uid('p'), importedFrom: doc.id ?? doc.importedFrom ?? null }, null);
     },
 
+    /**
+     * Edits of the active structure, one undo step per call; modules add members (edit.fix, edit.setVacuum, …) with
+     * defineApi. run = app.editActive; begin = app.beginStructureEdit; touch = app.notifyStructureChanged.
+     */
+    edit: {
+      run(label, fn, opts) {
+        const { entry, value } = app.editActive(label, fn, opts);
+        return { entry: entry ? { id: entry.id, label: entry.label ?? null } : null, value };
+      },
+      begin: (label, opts) => app.beginStructureEdit(label, opts),
+      touch: () => app.notifyStructureChanged(),
+      get session() { return app.session ?? null; },
+    },
     build: {
       crystal: (prototype, params) => buildCrystal(prototype, params),
       cluster: (kind, params) => buildCluster(kind, params),
@@ -438,6 +460,8 @@ export function createAPI(app, shell) {
         commands: commands.list().filter((c) => !c.hidden).map((c) => ({ id: c.id, title: c.title, category: c.category, key: c.key == null ? '' : [].concat(c.key).join(' / ') })),
         scene: scenePaths().map(([path, def]) => ({ path, type: typeOf(def), default: def, current: app.get(path) })),
         events: EVENTS,
+        // namespace members: the app's crystallume.edit, then what modules added with defineApi ({path, owner, sig, call})
+        api: [...EDIT_MEMBERS.map((m) => ({ ...m })), ...apiMembers().map((m) => ({ ...m, call: `crystallume.${m.path}()` }))],
       };
     },
     /**
@@ -464,5 +488,6 @@ export function createAPI(app, shell) {
       return ref;
     },
   };
-  return api;
+  // crystallume.edit, .surface, .lattice, … with the members modules defined (api/namespaces.js); later ones follow
+  return attachApi(api);
 }

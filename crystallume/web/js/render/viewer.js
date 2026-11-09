@@ -1008,6 +1008,27 @@ export class Viewer extends Emitter {
     this._remapHighlights?.(map);
   }
 
+  /** A copy of what remapIndexed changes (the visibility masks, the atoms of the named highlights), for restoreIndexedState. */
+  indexedState() {
+    return {
+      vis: [...(this._vis ?? [])].map(([name, mask]) => [name, mask.slice()]),
+      highlights: [...(this._highlights ?? [])].map(([name, h]) => [name, new Set(h.set)]),
+    };
+  }
+
+  /**
+   * Put back the masks (all of them) and the atoms of the named highlights (those still shown) that indexedState()
+   * copied: an edit that failed after remapIndexed is undone. The redraw of the restored structure draws them.
+   */
+  restoreIndexedState(state) {
+    if (!state) return;
+    this._vis = new Map(state.vis.map(([name, mask]) => [name, mask.slice()]));
+    this._visRev = (this._visRev ?? 0) + 1;
+    this._visMask = undefined;
+    for (const [name, set] of state.highlights) { const h = this._highlights?.get(name); if (h) h.set = new Set(set); }
+    this.emit('visibility', { hidden: this._combinedMask(state.vis[0]?.[1].length ?? 0).hidden, names: this.visibilityNames() });
+  }
+
   /** Drop masks whose length is not the shown structure's (setStructure). True when one was dropped. */
   _fitVisibility() {
     const vis = this._vis, n = this.structure?.length ?? 0;

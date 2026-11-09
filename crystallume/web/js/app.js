@@ -7,12 +7,14 @@
  *   'saveState' state            — 'idle' | 'dirty' | 'saving' | 'saved' | 'error' (detail in app.saveDetail)
  *   'saved'                      — the open project was stored
  *   'history'                    — undo/redo stacks changed (see undoLabel(), redoLabel(), canUndo())
- *   'busy' {busy, label}         — a long task started or ended (export, import, explicit save)
+ *   'busy' {busy, label, cancel} — a long task started or ended (export, import, explicit save, startTask);
+ *                                  cancel stops the newest task (startTask with cancel), else null
  *   'auth' user|null             — the server account changed (sign in, sign out, expired session)
  *   'needAuth'                   — a save needs the user to sign in (again)
  */
 import { Emitter } from './core/events.js';
-import { Structure } from './core/structure.js';
+import { Structure, getWarnings, newWarnings, invertSourceMap, composeSourceMaps } from './core/structure.js';
+import { structureDigest } from './core/analyses.js';
 import { uid, deepClone, deepMerge, setPath, getPath, debounce, relativeTime } from './core/util.js';
 import { parseStructure, exportStructure, formats, detectFormat } from './io/index.js';
 import { samples } from './build/samples.js';
@@ -33,10 +35,11 @@ import { ClaudeCloudStore } from './storage/claude.js';
 import { FolderStore } from './storage/folder.js';
 import { saveFile, readText, slug, isArtifact } from './storage/files.js';
 import { toast, dialog } from './ui/overlays.js';
+import { keyLabel } from './ui/keys.js';
 import { h } from './ui/dom.js';
 import { makeZip } from './core/zip.js';
 import { HistoryStore, historyBudget, snapStructure, snapPositions, structureFromSnap, applyPositionsSnap, patchPositions, mergePositions, BUDGET_NOTICE, INCONSISTENT, HistoryError } from './core/history.js';
-import { cleanMeasurementList, remapMeasurementList, migrateMeasurementKeys, newMeasurementId, wholeCellShifts } from './core/measure.js';
+import { cleanMeasurementList, remapMeasurementList, migrateMeasurementKeys, newMeasurementId, wholeCellShifts, measurementsRemovedNote } from './core/measure.js';
 
 export const VERSION = '0.3.1';
 const PREF_KEY = 'atomscope.prefs';   // key from the app's former name, kept so saved preferences survive the rename
@@ -113,8 +116,74 @@ const cleanMeasurements = (list, structure = null, scene = null, { newIds = fals
 const measurementRecord = (m) => ({ id: m.id, type: m.type, refs: Array.isArray(m.refs) ? m.refs.slice() : m.refs });
 const toStructure = (s) => (s instanceof Structure ? s : Structure.fromJSON(s));
 const pause = (ms = 30) => new Promise((r) => setTimeout(r, ms));
-/** Bump the structure's change counter (Structure.touch() once the data layer provides it). */
-const bumpRev = (s) => { if (typeof s.touch === 'function') s.touch(); else s.rev = (s.rev ?? 0) + 1; };
+
+// ------------------------------------------------------------------ edit helpers (editActive, replaceActiveStructure)
+/** How an edit redraws: everything, colours and halos only (atoms, positions, cell and elements unchanged), or nothing (info only). */
+const REBUILDS = Object.freeze(['full', 'appearance', 'none']);
+const sameList = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+/** A note as a sentence for the interface: first letter upper case, ending in a full stop (ledger-F0 §0.3). */
+const sentence = (t) => { const s = String(t).trim(); return s ? `${s[0].toUpperCase()}${s.slice(1)}${/[.!?…]$/.test(s) ? '' : '.'}` : s; };
+/** An edit's toast text: the caller's message as given, then the notes (dropped frames, removed measurements…) as sentences. */
+function editToastText(message, notes) {
+  const extra = notes.filter((n) => typeof n === 'string' && n.trim()).map(sentence);
+  if (!message) return extra.join(' ');
+  return extra.length ? [sentence(message), ...extra].join(' ') : String(message);
+}
+/** The rebuild modes by how much they draw: an edit with edits inside its fn draws as much as the widest of them. */
+const REBUILD_RANK = Object.freeze({ none: 0, appearance: 1, full: 2 });
+const widerRebuild = (a, b) => (REBUILD_RANK[b] > REBUILD_RANK[a] ? b : a);
+
+/**
+ * The source map (new → old) of a change the change tracker could not follow (an edit that lost the lineage): the same
+ * atoms, or the extra ones appended at the end. Fewer atoms are refused, as resolveIndexMap refuses them — unless
+ * `guess` (an edit that failed inside another one, whose step goes on): then the first atoms count as the ones kept.
+ */
+function untrackedSource(n0, n1, label, { guess = false } = {}) {
+  if (n1 < n0 && !guess) throw new Error(`editActive “${label}”: atoms were removed, so pass indexMap or src.`);
+  const out = new Int32Array(n1);
+  for (let j = 0; j < n1; j++) out[j] = j < n0 ? j : -1;
+  return out;
+}
+
+/** The source map (new → old) of an old → new map onto n1 atoms: each comes from the first old atom mapped to it (−1: none). */
+function sourceOfMap(map, n1) {
+  const out = new Int32Array(n1).fill(-1);
+  for (let i = 0; i < map.length; i++) { const j = map[i]; if (j >= 0 && j < n1 && out[j] < 0) out[j] = i; }
+  return out;
+}
+
+/** Two changes in a row as one source map (new → old); `first` null: nothing changed before `second`. */
+const chainSources = (first, second) => (first ? composeSourceMaps(first, second) : Int32Array.from(second, (v) => v ?? -1));
+
+/**
+ * The old → new atom map of an edit (F0-A §3.2) as {map: Int32Array(n0), changed}. From `indexMap` (old → new: a list,
+ * an Int32Array or a function; values that are not whole numbers in [0, n1) become −1), else from `src` (new → old, one
+ * entry per new atom, −1 or null for a new atom; an old atom with several new ones maps to the first), else by the
+ * fallback rule: the same number of atoms keeps every atom, more atoms count as appended at the end, fewer throw
+ * `<what> “<label>”: atoms were removed, so pass indexMap or src.` `changed`: not the identity on the same atoms.
+ */
+export function resolveIndexMap({ indexMap = null, src = null, n0, n1, label = 'Edit structure', what = 'editActive' } = {}) {
+  const map = new Int32Array(n0);
+  if (indexMap != null) {
+    const fn = typeof indexMap === 'function' ? indexMap : null;
+    if (!fn && !Array.isArray(indexMap) && !ArrayBuffer.isView(indexMap)) throw new TypeError(`${what}: indexMap must be a list, an Int32Array or a function (old index → new index).`);
+    for (let i = 0; i < n0; i++) {
+      const j = fn ? fn(i) : indexMap[i];
+      map[i] = Number.isInteger(j) && j >= 0 && j < n1 ? j : -1;
+    }
+  } else if (src != null) {
+    if (!Array.isArray(src) && !ArrayBuffer.isView(src)) throw new TypeError(`${what}: src must be a list or an Int32Array (new index → old index).`);
+    if (src.length !== n1) throw new RangeError(`${what} “${label}”: src has ${src.length} entries for ${n1} atoms.`);
+    map.set(invertSourceMap(src, n0));
+  } else if (n1 < n0) {
+    throw new Error(`${what} “${label}”: atoms were removed, so pass indexMap or src.`);
+  } else {
+    for (let i = 0; i < n0; i++) map[i] = i;
+  }
+  let changed = n0 !== n1;
+  for (let i = 0; i < n0 && !changed; i++) changed = map[i] !== i;
+  return { map, changed };
+}
 
 export function loadPrefs() { try { return JSON.parse(localStorage.getItem(PREF_KEY)) ?? {}; } catch { return {}; } }
 export function savePrefs(p) { try { localStorage.setItem(PREF_KEY, JSON.stringify(p)); } catch { /* storage blocked */ } }
@@ -145,6 +214,7 @@ export class App extends Emitter {
     this._authUser = null;
     this._rev = 0;               // bumped on every edit; tells a finished save whether newer edits exist
     this._sceneBefore = null; this._sceneLabel = null; this._tx = null;
+    this._editScope = null;      // the editActive whose fn is running (edits made inside it join it)
     this._saving = null; this._savingFor = null; this._again = null; this._retry = null; this._recovery = null;
     this._busyOps = [];
     this._measGuard = 0;
@@ -351,17 +421,25 @@ export class App extends Emitter {
   setActiveStructure(sid) { this._activate(sid); this.markDirty(); }
 
   /**
-   * Add a structure to the project. A pristine scratch project (or newProject:true) is replaced by a new
-   * project holding the structure; `look` only applies then — adding to existing work keeps the user's look.
-   * Adding to existing work is one undo step. If the viewer cannot show the structure, nothing changes and
-   * the error is rethrown.
+   * Add a structure to the project (F0-A §3.3). replaceProject: 'auto' (the default) replaces a pristine scratch project
+   * (an empty one or an untouched sample) by a new project holding the structure, as opening a file does; true always
+   * replaces (newProject: true is the same); false always adds to the open project, as one undo step — the choice of
+   * tools that make a new structure next to the one they start from (Duplicate, cleaving), which must not lose it.
+   * `look` only applies to a new project: adding to existing work keeps the user's look. `name` names a new project
+   * (and a structure without a name), `label` the undo step (default "Add <name>"), `activate: false` adds it to the
+   * open project without showing it (a new project always shows it). If the viewer cannot show the structure, nothing
+   * changes and the error is rethrown.
+   * Returns {entry, historyEntry}: the project entry, and the undo step (null when the project was replaced, or inside
+   * an open transaction, whose step it joins) — for app.toastUndo, also after an await.
    */
-  addStructure(structure, { look = null, scene = null, newProject = false, name = null } = {}) {
-    if (newProject || this.pristine) {
+  addStructure(structure, { look = null, scene = null, newProject = false, replaceProject = newProject ? true : 'auto', name = null, label = null, activate = true } = {}) {
+    if (replaceProject !== 'auto' && replaceProject !== true && replaceProject !== false) throw new TypeError("addStructure: replaceProject must be 'auto', true or false.");
+    if (replaceProject === true || (replaceProject === 'auto' && this.pristine)) {
       const prev = { project: this.project, history: this.history.detach(), dirty: this.dirty, state: this.saveState, camera: this.structure ? this.viewer.getCameraState() : null, selection: this.selection, scene: JSON.stringify(this.project.scene) };
       const proj = this._blankProject(name ?? structure.name ?? 'Untitled project');
-      // an empty scratch project keeps the settings chosen so far; an untouched sample's settings are not the user's
-      if (!newProject && !this.project._fromSample) proj.scene = this.project.scene;
+      // replacing a pristine scratch project keeps the settings chosen so far (an untouched sample's are not the
+      // user's); a new project asked for (true, or newProject: true) starts from the default look
+      if (replaceProject === 'auto' && !this.project._fromSample) proj.scene = this.project.scene;
       this._switchProject(proj);
       const entry = this._newEntry(structure);
       proj.structures.push(entry);
@@ -376,19 +454,21 @@ export class App extends Emitter {
       }
       this.markDirty();
       this.emit('project');
-      return entry;
+      return { entry, historyEntry: null };   // a new project starts with an empty history
     }
+    if (name && !structure.name) structure.name = name;
     let entry;
-    this.transaction(`Add ${structure.name || name || 'structure'}`, () => {
+    this.transaction(label ?? `Add ${structure.name || 'structure'}`, () => {
       this._pushStructureHistory(null, null);   // the layout only: no existing structure changes
       entry = this._newEntry(structure);
       this.project.structures.push(entry);
       if (scene) deepMerge(this.scene, deepClone(scene));
-      this._activate(entry.id);
+      if (activate) this._activate(entry.id);
     });
+    const historyEntry = this._tx ? null : this.history.lastRecorded?.entry ?? null;
     this.markDirty();
     this.emit('project');
-    return entry;
+    return { entry, historyEntry };
   }
 
   removeStructure(sid) {
@@ -518,14 +598,15 @@ export class App extends Emitter {
 
   /**
    * Run fn as one undo step: scene and structure changes made inside are recorded together under `label`.
-   * Nested transactions join the outer one. If fn throws, its changes are rolled back and the error rethrown.
+   * Nested transactions join the outer one. If fn throws, its changes are rolled back and the error rethrown
+   * (with the visibility masks and named highlights its edits renumbered: tx.indexed, _followAtoms).
    * fn must be synchronous: the step closes when fn returns, so other edits made while a returned Promise
    * is pending are never folded into it (changes made after an await are recorded as their own steps).
    */
   transaction(label, fn) {
     if (this._tx) return fn();
     this._commitScene.flush();
-    const tx = this._tx = { label, sceneBefore: this._sceneJSON(), snap: null, selBefore: null };
+    const tx = this._tx = { label, sceneBefore: this._sceneJSON(), snap: null, selBefore: null, indexed: undefined };
     const finish = () => {
       this._tx = null;
       const sceneAfter = this._sceneJSON();
@@ -539,6 +620,8 @@ export class App extends Emitter {
       this._tx = null;
       try {
         if (this._sceneJSON() !== tx.sceneBefore) this._restoreScene(tx.sceneBefore);
+        // before the structures are rebuilt: masks of the restored atoms count are kept by setStructure
+        if (tx.indexed) this.viewer.restoreIndexedState?.(tx.indexed);
         if (tx.snap) this._applySnap(tx.snap, tx.selBefore);
       } catch (e) { console.error('rollback failed', e); }
       throw err;
@@ -673,7 +756,7 @@ export class App extends Emitter {
       const cur = live.get(id), name = snap.names[id] ?? cur.name;
       if (es?.positions) {
         applyPositionsSnap(cur.structure, es.positions);
-        bumpRev(cur.structure);
+        cur.structure.touch();
         cur.measurements = cleanMeasurements(es.meas, cur.structure, this.scene);
       }
       // renaming is not an undo step, but a step taken before a rename puts the old name back (as it always has)
@@ -771,65 +854,367 @@ export class App extends Emitter {
   }
   clearSelection() { this.viewer.setSelection([]); this.measurePicks = []; this.emit('selection'); }
 
+  /**
+   * Delete the selected atoms (in every frame) as one undo step, with a toast whose Undo reverts that step.
+   * Returns the EditResult of editActive, or null when nothing is selected.
+   */
   deleteSelected() {
+    this._flushEdit();   // inside an edit's fn: the selection counts the atoms as they are now
     const sel = this.selection;
-    if (!sel.length || !this.structure) return;
-    const label = `Delete ${plural(sel.length, 'atom')}`;
-    this._pushStructureHistory(label);
+    if (!sel.length || !this.structure) return null;
     const n = this.structure.length, gone = new Set(sel), map = new Int32Array(n);
     for (let i = 0, k = 0; i < n; i++) map[i] = gone.has(i) ? -1 : k++;
-    this.structure.deleteAtoms(sel);
-    this.viewer.setSelection([]);
-    this._remapMeasurements(map);
-    this._measGuard++;
-    try { this.viewer.setStructure(this.structure, { resetCamera: false }); } finally { this._measGuard--; }
-    this._showMeasurements(this._activeEntry());
-    this.markDirty();
-    this.emit('structure'); this.emit('selection'); this.emit('measure');
-    toast(`Deleted ${plural(sel.length, 'atom')}`, { action: { label: 'Undo', run: () => this.undo() } });
-  }
-
-  replaceSelected(symbol) {
-    const sel = this.selection;
-    if (!sel.length) return;
-    this._pushStructureHistory(`Change ${plural(sel.length, 'atom')} to ${symbol}`);
-    this.structure.setSymbols(sel, symbol);
-    this._measGuard++;
-    try { this.viewer.setStructure(this.structure, { resetCamera: false }); } finally { this._measGuard--; }
-    this._showMeasurements(this._activeEntry());
-    this.viewer.setSelection(sel);
-    this.markDirty();
-    this.emit('structure');
+    const what = plural(sel.length, 'atom');
+    // deleteAtoms marks the edit 'atoms': the space group and calculated results go (brief C7)
+    return this.editActive(`Delete ${what}`, (s) => { s.deleteAtoms(sel); }, { indexMap: map, toast: `Deleted ${what}` });
   }
 
   /**
-   * Replace the active structure in place (e.g. wrap, supercell bake) with undo.
-   * indexMap (Int32Array or function old→new, -1 = removed) keeps measurements and the selection on the
-   * same atoms; by default atom i stays atom i while it exists.
+   * Change the selected atoms to element `symbol` as one undo step (the space group goes, C7). `toast`: the message of
+   * the toast, which has an Undo for this step and the notes the change added (calculated results that went), as
+   * Delete's has; without it no toast is shown. Returns the EditResult, or null when nothing is selected.
    */
-  replaceActiveStructure(newStructure, { resetCamera = false, label = 'Edit structure', indexMap = null } = {}) {
+  replaceSelected(symbol, opts = {}) {
+    const { toast: message = null } = opts ?? {};
+    this._flushEdit();
+    const sel = this.selection;
+    if (!sel.length || !this.structure) return null;
+    return this.editActive(`Change ${plural(sel.length, 'atom')} to ${symbol}`, (s) => { s.setSymbols(sel, symbol); }, { toast: message });
+  }
+
+  /**
+   * Edit the active structure in place as one undo step (F0-A §3.2, ledger L-F0-30): fn(structure, {app, entry}) runs
+   * synchronously on the structure itself, after a snapshot for undo. Options:
+   * - indexMap (old → new) or src (new → old, −1 for a new atom): how atoms were renumbered; without either, the
+   *   structure's change tracker works it out from the edit (deleteAtoms, addAtom, extend, remap…). The selection,
+   *   measurements, visibility masks and named highlights follow the atoms.
+   * - imageShift(oldIndex) → [ka, kb, kc] | null: stored positions moved by whole cell vectors (wrapping, centring);
+   *   latticeChanged: the cell changed (measurements across cells are dropped).
+   * - rebuild: 'full' (default), 'appearance' (colours and halos only: same atoms, positions, cell and elements — an
+   *   edit that changes them is redrawn in full, with a console warning) or 'none' (info only); refit (default true).
+   * - singleFrame: keep only the current frame first (brief C11; the toast says so); snapshot: 'full' (default) or
+   *   {positions: indices} for an edit that only moves those atoms; cameraTransform: a 3×3 rotation (r' = r @ Rᵀ)
+   *   the camera turns with.
+   * - toast: a message shown with an Undo button bound to this step; notes the edit added to info.warnings, dropped
+   *   frames and removed measurements are appended (and shown even without a message).
+   * fn may return {select: indices}, which becomes the selection. If fn throws, returns a Promise or the view cannot
+   * show the result, everything is put back, no undo step is left and the error is rethrown.
+   * Edits made inside fn (an edit.* member called in crystallume.edit.run, deleteSelected…) are part of this one: they
+   * change the structure and return their map ({entry: null, value, map}), and the selection, measurements, masks and
+   * highlights follow each change once, in order; this edit makes the one undo step, draws once and shows one toast
+   * (its message, then theirs, then the notes). An edit given indexMap or src covers the edits inside its fn with that
+   * map. Inside fn, replaceActiveStructure puts the new structure's content into this one, which stays fn's and the
+   * active structure. An edit inside fn that throws keeps what it changed (followed as the rest): the step goes on, or
+   * is put back as a whole when the error leaves the outermost fn.
+   * Returns {entry, value, map}: the undo step (null inside an open transaction, whose step it joins), fn's return
+   * value and the old → new map (Int32Array, −1 = removed).
+   */
+  editActive(label, fn, opts = {}) {
+    const { indexMap = null, src = null, imageShift = null, rebuild = 'full', refit = true, latticeChanged = false,
+      singleFrame = false, snapshot = 'full', toast: message = null, cameraTransform = null } = opts ?? {};
     const e = this._activeEntry();
-    if (!e) return this.addStructure(newStructure);
-    const n = e.structure.length, m = newStructure.length;
-    const map = new Int32Array(n);
-    for (let i = 0; i < n; i++) map[i] = typeof indexMap === 'function' ? indexMap(i) : indexMap ? (indexMap[i] ?? -1) : (i < m ? i : -1);
-    const sel = this.selection.map((i) => (i < n ? map[i] : -1)).filter((i) => i >= 0 && i < m);
-    // if the viewer cannot show the new structure, the transaction puts back the structure, its measurements and
-    // the selection, and the failed step leaves no undo entry
+    if (!e) throw new Error('Load a structure first.');
+    if (typeof fn !== 'function') throw new TypeError('editActive: fn must be a function.');
+    if (!REBUILDS.includes(rebuild)) throw new TypeError("editActive: rebuild must be 'full', 'appearance' or 'none'.");
+    const parent = this._editScope ?? null;
+    if (parent && parent.e !== e) throw new Error(`editActive “${label}”: “${parent.label}” is editing another structure.`);
+    if (parent) this._pauseEdit(parent);   // what the enclosing edit changed so far is followed first
+    const s = e.structure, n0 = s.length, frames0 = s.nFrames, frame0 = s.frame, selBefore = this.selection, name0 = s.name;
+    const explicit = indexMap != null || src != null;
+    // the edit being made: the outermost one (root) draws, the ones inside its fn only follow their atoms
+    const scope = { parent, e, s, label, explicit, quiet: !!parent && (parent.quiet || parent.explicit), tracker: null, nPiece: n0, src: null, last: null, need: 'none' };
+    const root = scope.root = parent ? parent.root : Object.assign(scope, { messages: [], cameras: [], removed: 0, measure: false, resetCamera: false });
+    const notes0 = parent ? null : getWarnings(s.info);
+    let value, map, done = false;
+    try {
+      this.transaction(label, () => {
+        this._pushStructureHistory(label, { id: e.id, how: singleFrame && frames0 > 1 ? 'full' : snapshot });
+        if (singleFrame && s.nFrames > 1) s.keepFrame();
+        const before = rebuild === 'full' ? null : structureDigest(s);
+        if (!explicit || parent) this._beginPiece(scope);   // an explicit edit inside another one: only if fn fails
+        this._editScope = scope;   // edits made in fn join this one
+        try { value = fn(s, { app: this, entry: e }); } finally { this._editScope = parent; scope.last = this._stopPiece(scope); }
+        if (value && typeof value.then === 'function') throw new Error('editActive: fn must not be async.');
+        if (this._activeEntry() !== e || e.structure !== s) throw new Error(`editActive “${label}”: fn must change the structure it is given, not show or put in another one.`);
+        s.touch();
+        // the map of the whole edit, and `rest`: the part after the last edit made inside fn (not followed yet)
+        let rest, prior = null, whole = null;
+        if (explicit) map = rest = resolveIndexMap({ indexMap, src, n0, n1: s.length, label });
+        else {
+          const piece = scope.last ?? untrackedSource(scope.nPiece, s.length, label);
+          prior = scope.src;
+          whole = chainSources(prior, piece);
+          map = resolveIndexMap({ src: whole, n0, n1: s.length, label });
+          rest = prior ? resolveIndexMap({ src: piece, n0: scope.nPiece, n1: s.length, label }) : map;
+        }
+        // 'appearance' and 'none' promise the same geometry: checked every time (cheap next to a redraw)
+        let mode = widerRebuild(s.nFrames !== frames0 ? 'full' : rebuild, scope.need), digest = null;
+        if (mode !== 'full') {
+          digest = structureDigest(s);
+          if (digest !== before) { console.warn(`editActive “${label}”: rebuild '${rebuild}' changed positions, cell or elements; rebuilt in full.`); mode = 'full'; }
+        }
+        // imageShift counts fn's atoms: through the edits made inside fn to the atoms `rest` starts from
+        const shift = imageShift && prior ? (k) => (prior[k] >= 0 ? imageShift(prior[k]) : null) : imageShift;
+        this._followScope(scope, rest, s.length, { imageShift: shift, latticeChanged, select: value?.select });
+        if (whole) scope.src = whole;
+        if (cameraTransform) root.cameras.push(cameraTransform);
+        if (parent) {
+          parent.need = widerRebuild(parent.need, mode);
+          if (message) root.messages.push(message);
+          return;
+        }
+        if (s.name !== name0) e.name = s.name;   // an edit that renames (an automatic name) renames the entry too
+        this._showEdit(e, { rebuild: mode, refit, resetCamera: root.resetCamera, digest, cameras: root.cameras });
+      });
+      done = true;
+    } finally {
+      if (parent) this._endInnerEdit(scope, done, done && explicit ? (src ?? sourceOfMap(map.map, s.length)) : null);
+    }
+    if (parent) return { entry: null, value, map: map.map };
+    const entry = this._tx ? null : this.history.lastRecorded?.entry ?? null;
+    this.markDirty();
+    if (s.name !== name0) this.emit('project');
+    this.emit('structure');
+    if (!sameList(selBefore, this.selection)) this.emit('selection');
+    if (root.measure) this.emit('measure');
+    const dropped = s.nFrames < frames0 ? `Kept frame ${frame0 + 1} of ${frames0} and dropped the others.` : null;
+    const [lead = null, ...more] = [message, ...root.messages].filter((t) => t && String(t).trim());
+    const text = editToastText(lead, [...more, dropped, measurementsRemovedNote(root.removed), ...newWarnings(notes0, getWarnings(s.info))]);
+    if (text) this.toastUndo(text, { entry });
+    return { entry, value, map: map.map };
+  }
+
+  // -- edits inside an edit's fn. An edit follows its atoms in pieces (the structure's change tracker), split where an
+  //    edit made inside its fn begins and ends: each change is followed once, in the order made (_followScope).
+  /** Start following scope's atoms from here (closed by _stopPiece). */
+  _beginPiece(scope) { scope.nPiece = scope.s.length; scope.tracker = scope.s.trackChanges(); }
+
+  /** Close the piece being followed: its change (new → old), or null when the tracker lost the lineage or none was open. */
+  _stopPiece(scope) {
+    const t = scope.tracker;
+    scope.tracker = null;
+    return t ? t.stop(scope.s) : null;
+  }
+
+  /**
+   * An edit begins inside `scope`'s fn (or reads the selection there): what scope changed so far is followed now. An
+   * edit given indexMap or src follows its whole fn by that map when it ends instead. Throws as resolveIndexMap does
+   * when scope removed atoms the tracker could not follow.
+   */
+  _pauseEdit(scope) {
+    if (scope.explicit) return;
+    const n1 = scope.s.length;
+    const piece = this._stopPiece(scope) ?? untrackedSource(scope.nPiece, n1, scope.label);
+    if (!scope.quiet) this._followScope(scope, resolveIndexMap({ src: piece, n0: scope.nPiece, n1, label: scope.label }), n1);
+    scope.src = chainSources(scope.src, piece);
+  }
+
+  /** The edit made inside scope's fn ended, having changed the atoms by `change` (new → old; null: not at all). */
+  _resumeEdit(scope, change) {
+    if (scope.explicit) return;
+    if (change) scope.src = chainSources(scope.src, change);
+    this._beginPiece(scope);
+  }
+
+  /**
+   * End of an edit made inside another one's fn (scope.parent's): the parent follows its atoms again, counting this
+   * edit's change (`change` for an edit given indexMap or src, else its pieces). An edit that failed keeps what its fn
+   * changed so far, which is followed now (the step goes on from there, or is put back as a whole).
+   */
+  _endInnerEdit(scope, done, change = null) {
+    if (done) { this._resumeEdit(scope.parent, change ?? scope.src); return; }
+    const n1 = scope.s.length;
+    const piece = this._stopPiece(scope) ?? scope.last ?? untrackedSource(scope.nPiece, n1, scope.label, { guess: true });
+    try {
+      if (!scope.quiet) this._followScope(scope, resolveIndexMap({ src: piece, n0: scope.nPiece, n1, label: scope.label }), n1);
+    } catch (err) { console.error(`editActive “${scope.label}”: the atoms could not be followed after it failed`, err); }
+    scope.parent.need = 'full';
+    this._resumeEdit(scope.parent, chainSources(scope.src, piece));
+  }
+
+  /** Follow the atoms through `m` ({map, changed}; n1 atoms now) unless scope is quiet; counted on the outermost edit. */
+  _followScope(scope, m, n1, opts = {}) {
+    if (scope.quiet) return;
+    const removed = this._followAtoms(m, n1, opts), root = scope.root;
+    root.removed += removed;
+    if (m.changed || opts.latticeChanged || opts.imageShift || removed) root.measure = true;
+  }
+
+  /** Inside an edit's fn: follow what it changed so far now, so the selection counts the atoms as they are. */
+  _flushEdit() {
+    const scope = this._editScope;
+    if (!scope || scope.explicit || scope.quiet) return;
+    this._pauseEdit(scope);
+    this._resumeEdit(scope, null);
+  }
+
+  /**
+   * The atoms of the active structure changed by `m` ({map: old → new, −1 = removed; changed}; n1 atoms now): the
+   * selection (`select`, else the current one through the map), the measurements (imageShift, latticeChanged; else
+   * whole-cell moves read off `before` → `after`), visibility masks and named highlights follow. The data only: the
+   * caller draws. The step's masks and highlights are kept first (tx.indexed), so a step that fails puts them back.
+   * Returns the number of measurements removed.
+   */
+  _followAtoms({ map, changed }, n1, { imageShift = null, latticeChanged = false, select = null, before, after } = {}) {
+    const v = this.viewer;
+    // first: imageShift is the caller's, and if it throws nothing has changed yet
+    const removed = this._remapMeasurements(map, { imageShift, latticeChanged, before, after });
+    const sel = Array.isArray(select) || ArrayBuffer.isView(select)
+      ? [...new Set(Array.from(select).filter((i) => Number.isInteger(i) && i >= 0 && i < n1))]
+      : [...v.selection].map((i) => (i < map.length ? map[i] : -1)).filter((j) => j >= 0);
+    v.selection = new Set(sel);
+    if (changed) {
+      if (this._tx && this._tx.indexed === undefined) this._tx.indexed = v.indexedState?.() ?? null;
+      v.remapIndexed?.(map, n1);
+    }
+    return removed;
+  }
+
+  /** Draw edited entry `e` (the active one) again, turn the camera, show its measurements and the selection's halos. */
+  _showEdit(e, { rebuild = 'full', refit = true, resetCamera = false, digest = null, cameras = [] } = {}) {
+    const v = this.viewer, sel = [...v.selection];   // a redraw that resets the camera clears the viewer's selection
+    this._redraw(e.structure, rebuild, { refit, resetCamera, digest });
+    for (const R of cameras) v.transformCamera?.(R);
+    this._showMeasurements(e);
+    v.setSelection(sel);
+  }
+
+  /**
+   * The common end of a change of entry `e` (the active one) inside its transaction: the atoms are followed by `m`
+   * (_followAtoms: the selection is set before the view is rebuilt, which 'model' listeners read), then the view is
+   * redrawn (`rebuild`) and the camera turned. Returns the number of measurements removed.
+   */
+  _afterEdit(e, m, { rebuild = 'full', refit = true, latticeChanged = false, imageShift = null, cameraTransform = null, select = null, resetCamera = false, digest = null } = {}) {
+    const removed = this._followAtoms(m, e.structure.length, { imageShift, latticeChanged, select });
+    this._showEdit(e, { rebuild, refit, resetCamera, digest, cameras: cameraTransform ? [cameraTransform] : [] });
+    return removed;
+  }
+
+  /**
+   * Draw structure `s` again: 'full' rebuilds the view's model (bonds and all), 'appearance' only its colours and halos
+   * (the viewer's refreshAppearance, a full rebuild where the viewer has none), 'none' nothing. Remembers the content
+   * digest the model was built from (`digest`, computed when not given) for notifyStructureChanged.
+   */
+  _redraw(s, mode, { refit = true, resetCamera = false, digest = null } = {}) {
+    if (mode === 'none') return;
+    const v = this.viewer;
+    if (mode === 'appearance' && typeof v.refreshAppearance === 'function') v.refreshAppearance();
+    else {
+      this._measGuard++;
+      try { v.setStructure(s, { resetCamera, refit }); } finally { this._measGuard--; }
+    }
+    if (v.model) (this._drawnDigests ??= new WeakMap()).set(v.model, digest ?? structureDigest(s));
+  }
+
+  /** {entry, label, at} of the step recorded last; null once it is undone, or after the history was cleared or swapped. */
+  get lastEdit() { return this.history.lastRecorded; }
+
+  /**
+   * A toast whose Undo reverts history step `entry` — that step, not whatever is on top when the button is pressed
+   * (F0-A §3.4). Without `entry`, the step recorded last: only reliable in the same synchronous step as the edit, so
+   * asynchronous callers (paste, import, server replies) pass the entry their edit returned; null shows no Undo.
+   * `actions` [{label, run}] come after Undo. Returns the toast element.
+   */
+  toastUndo(message, { entry, actions = [], timeout, type } = {}) {
+    const e = entry === undefined ? this.lastEdit?.entry ?? null : entry;
+    const acts = [...(e ? [{ label: 'Undo', run: () => this.undoEntry(e) }] : []), ...(actions ?? [])];
+    return toast(message, { timeout, type, actions: acts });
+  }
+
+  /**
+   * Undo history step `entry` if it is the latest one; otherwise say why not (a later step comes first, it is already
+   * undone, or the history no longer holds it). Pending scene changes are recorded first, as their own step.
+   * Returns the label undone, or null.
+   */
+  undoEntry(entry) {
+    if (this.session) this.session.cancel('undo');   // a preview (F0-A §3.6) ends before the history changes
+    this._commitScene.flush();
+    const where = this.history.has(entry);
+    if (where === 'undo' && this.history.top() === entry) return this.undo();
+    if (where === 'redo') toast('That change is already undone.');
+    else if (where === 'undo') toast(`Undo the later changes first (press ${keyLabel('mod+z')}).`);
+    else toast('That change can no longer be undone.');
+    return null;
+  }
+
+  /**
+   * After a script changed the active structure directly (crystallume.edit.touch()): count the change (touch()) and
+   * redraw — in full when positions, the cell, the elements or the number of atoms differ from what the view was last
+   * built from, else only colours and halos — then mark the project unsaved and emit 'structure'. Not an undo step:
+   * scripts that want one use editActive. Returns the redraw done, 'full' or 'appearance'; inside an edit's fn 'none'
+   * (only the count: the edit draws when its fn returns).
+   */
+  notifyStructureChanged() {
+    const e = this._activeEntry();
+    if (!e) throw new Error('Load a structure first.');
+    if (this._editScope) { e.structure.touch(); return 'none'; }
+    const s = e.structure, v = this.viewer, selBefore = this.selection;
+    s.touch();
+    const digest = structureDigest(s);
+    const mode = v.model && this._drawnDigests?.get(v.model) === digest ? 'appearance' : 'full';
+    const sel = selBefore.filter((i) => i < s.length);
+    v.selection = new Set(sel);
+    this._redraw(s, mode, { digest });
+    this._showMeasurements(e);
+    v.setSelection(sel);
+    this.markDirty();
+    this.emit('structure');
+    if (!sameList(selBefore, sel)) this.emit('selection');
+    return mode;
+  }
+
+  /**
+   * Put structure `newStructure` in place of the active one (Wrap into cell, a supercell, a preview's result) as one
+   * undo step, like editActive: the selection, measurements, masks and highlights follow the atoms by `indexMap`
+   * (old → new), else `src` (new → old, e.g. a builder's r.sourceMap — never read from the structure by itself, whose
+   * lineage need not be the active structure's), else atom i stays atom i (more atoms: appended; fewer: an error).
+   * imageShift, latticeChanged and refit as for editActive; resetCamera frames the new structure. Without an active
+   * structure it is added (addStructure). If the view cannot show it, everything is put back and the error rethrown.
+   * Inside an editActive fn the active structure takes the new one's content instead (Structure._adopt: `newStructure`
+   * must not be used afterwards), so fn's structure stays the active one, and the edit draws when fn returns.
+   * Returns {entry, value: undefined, map}.
+   */
+  replaceActiveStructure(newStructure, { resetCamera = false, label = 'Edit structure', indexMap = null, src = null, imageShift = null, refit = true, latticeChanged = false } = {}) {
+    const e = this._activeEntry();
+    if (!e) {
+      const { historyEntry } = this.addStructure(newStructure);
+      return { entry: historyEntry, value: undefined, map: new Int32Array(0) };
+    }
+    const map = resolveIndexMap({ indexMap, src, n0: e.structure.length, n1: newStructure.length, label, what: 'replaceActiveStructure' });
+    const parent = this._editScope ?? null;
+    if (parent) return this._replaceInEdit(parent, e, newStructure, map, { label, src, imageShift, latticeChanged, resetCamera });
+    let removed = 0;
     this.transaction(label, () => {
       this._pushStructureHistory(label, { id: e.id, how: 'full' });
       e.structure = newStructure; e.name = newStructure.name;
       this.structure = newStructure;
-      this._remapMeasurements(map);
-      this.viewer.selection = new Set(sel);   // no old indices past the end while the viewer rebuilds ('model' listeners read it)
-      this._measGuard++;
-      try { this.viewer.setStructure(newStructure, { resetCamera }); } finally { this._measGuard--; }
+      removed = this._afterEdit(e, map, { refit, latticeChanged, imageShift, resetCamera });
     });
-    this._showMeasurements(e);
-    this.viewer.setSelection(sel);
+    const entry = this._tx ? null : this.history.lastRecorded?.entry ?? null;
     this.markDirty();
     this.emit('structure'); this.emit('project'); this.emit('selection');
-    return e;
+    if (map.changed || latticeChanged || imageShift || removed) this.emit('measure');
+    return { entry, value: undefined, map: map.map };
+  }
+
+  /** replaceActiveStructure inside the fn of edit `parent`: the active structure takes `next`'s content in place. */
+  _replaceInEdit(parent, e, next, m, { label, src, imageShift, latticeChanged, resetCamera }) {
+    if (parent.e !== e) throw new Error(`replaceActiveStructure “${label}”: “${parent.label}” is editing another structure.`);
+    const s = e.structure, n1 = next.length, change = src ?? sourceOfMap(m.map, n1);
+    this._pauseEdit(parent);
+    let done = false;
+    try {
+      this.transaction(label, () => {
+        this._pushStructureHistory(label, { id: e.id, how: 'full' });
+        // whole-cell moves are read off the two structures, before the active one takes the new content
+        this._followScope({ root: parent.root, quiet: parent.quiet || parent.explicit }, m, n1, { imageShift, latticeChanged, before: s, after: next });
+        s._adopt(next, { src: change });
+      });
+      done = true;
+    } finally { this._resumeEdit(parent, done ? change : null); }
+    parent.need = 'full';
+    if (resetCamera) parent.root.resetCamera = true;
+    return { entry: null, value: undefined, map: m.map };
   }
 
   /**
@@ -964,13 +1349,14 @@ export class App extends Emitter {
    * Measurements after an edit (F0-A §3.9.4, core/measure.js remapMeasurementList): atom indices through `map`
    * (map[old] = new, −1 = removed: a measurement on a removed atom is dropped); `latticeChanged` (a supercell, a
    * redefined lattice) drops those with a non-zero image; `imageShift(oldIndex) → [ka, kb, kc]` rewrites the images of
-   * atoms whose stored positions the edit moved by whole cells (wrapping into the cell). Without it, while the viewer
-   * still shows the structure from before the edit (a structure swapped in, as Wrap into cell does), whole-cell moves
-   * are read off the two structures (wholeCellShifts). Atoms moved any other way need nothing: references follow the
-   * stored positions. Returns the number of measurements dropped (for the toast: measurementsRemovedNote).
+   * atoms whose stored positions the edit moved by whole cells (wrapping into the cell). Without it, when the edit put
+   * another structure in place of the one before (`before`, by default the one the viewer still shows; `after`, by
+   * default the active one), as Wrap into cell does, whole-cell moves are read off the two (wholeCellShifts). Atoms
+   * moved any other way need nothing: references follow the stored positions. Returns the number of measurements
+   * dropped (for the toast: measurementsRemovedNote).
    */
-  _remapMeasurements(map, { imageShift = null, latticeChanged = false } = {}) {
-    const shift = imageShift ?? (latticeChanged ? null : wholeCellShifts(this.viewer.structure, this.structure, map));
+  _remapMeasurements(map, { imageShift = null, latticeChanged = false, before = this.viewer.structure, after = this.structure } = {}) {
+    const shift = imageShift ?? (latticeChanged ? null : wholeCellShifts(before, after, map));
     const { list, removed } = remapMeasurementList(this.viewer.measurements ?? [], map, { imageShift: shift, latticeChanged });
     this.viewer.measurements = list;
     const e = this._activeEntry();
@@ -1020,8 +1406,9 @@ export class App extends Emitter {
 
   _addSample(s) {
     const structure = s.build();
-    this.addStructure(structure, { newProject: false });
-    toast(`Added ${s.name} to this project (${plural(this.project.structures.length, 'structure')})`, { action: { label: 'Undo', run: () => this.undo() } });
+    const { historyEntry } = this.addStructure(structure, { replaceProject: false });
+    // a new structure's notes are all new (ledger L-F0-32)
+    this.toastUndo(editToastText(`Added ${s.name} to this project (${plural(this.project.structures.length, 'structure')})`, getWarnings(structure.info)), { entry: historyEntry });
     return structure;
   }
 
@@ -1449,22 +1836,53 @@ export class App extends Emitter {
   }
 
   // ------------------------------------------------------------------ busy state
-  /** Mark a long task; returns {set(label), end()}. Emits 'busy' {busy, label}. */
-  _busyStart(label) {
-    const tok = { label };
+  /**
+   * Mark a long task; returns {set(label), end()}. Emits 'busy' {busy, label, cancel}: the newest task's label and, when
+   * it was started with `cancel`, a function that cancels it (else null) — the busy indicator shows it as a Cancel
+   * button. Cancelling runs `cancel` once; the task stays busy until it ends.
+   */
+  _busyStart(label, { cancel = null } = {}) {
+    const tok = { label, cancel: null };
+    if (typeof cancel === 'function') tok.cancel = () => { if (!tok.cancel) return; tok.cancel = null; this._emitBusy(); cancel(); };
     this._busyOps.push(tok);
     this._emitBusy();
     let ended = false;
     return {
       set: (l) => { tok.label = l; this._emitBusy(); },
-      end: () => { if (ended) return; ended = true; const i = this._busyOps.indexOf(tok); if (i >= 0) this._busyOps.splice(i, 1); this._emitBusy(); },
+      end: () => { if (ended) return; ended = true; tok.cancel = null; const i = this._busyOps.indexOf(tok); if (i >= 0) this._busyOps.splice(i, 1); this._emitBusy(); },
     };
   }
   _emitBusy() {
     const top = this._busyOps.at(-1);
     this.busy = !!top;
     this.busyLabel = top?.label ?? '';
-    this.emit('busy', { busy: this.busy, label: this.busyLabel });
+    this.emit('busy', { busy: this.busy, label: this.busyLabel, cancel: top?.cancel ?? null });
+  }
+
+  /**
+   * Show progress of a task the user started and waits for (ledger L-F0-54): until end(), app.busy is true (edits and
+   * exports wait) and the busy indicator shows `label`. set(0.42) shows "<label> 42%", set('Text') changes the label;
+   * with `cancel`, the indicator has a Cancel button that calls cancel() once and makes `cancelled` true (the task
+   * checks it and ends). Returns {set(labelOrFraction), end(), cancelled}.
+   */
+  startTask(label, { cancel = null } = {}) {
+    if (cancel != null && typeof cancel !== 'function') throw new TypeError('startTask: cancel must be a function.');
+    let text = String(label ?? '').trim() || 'Working…', cancelled = false, ended = false;
+    const stop = cancel && (() => {
+      cancelled = true;
+      try { cancel(); } catch (err) { console.error('startTask: cancel failed', err); }
+    });
+    const busy = this._busyStart(text, { cancel: stop });
+    return {
+      set: (v) => {
+        if (ended) return;
+        if (typeof v === 'number' && Number.isFinite(v)) { busy.set(`${text} ${Math.round(Math.min(1, Math.max(0, v)) * 100)}%`); return; }
+        text = String(v ?? '').trim() || text;
+        busy.set(text);
+      },
+      end: () => { ended = true; busy.end(); },
+      get cancelled() { return cancelled; },
+    };
   }
 
   // ------------------------------------------------------------------ export

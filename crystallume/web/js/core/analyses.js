@@ -90,12 +90,14 @@ export function structureDigest(s) {
 /**
  * A key that changes whenever the active structure is switched, replaced (undo, redo, reopen) or
  * edited in place, or stepped to another frame — read straight from the structure, so it is already
- * current inside any 'structure' listener.
+ * current inside any 'structure' listener. `rev` (Structure.touch(), counted by every editing method)
+ * makes edits of props and info visible too (fixed atoms, tags, notes), which the content digest
+ * does not see; the digest still catches coordinates written directly by a script.
  */
 export function structureKey(app) {
   const s = app.structure;
   if (!s) return 'none';
-  return `${app.project?.activeStructure ?? ''}:${serialOf(s)}:${s.length}:${s.frame ?? 0}:${structureDigest(s)}`;
+  return `${app.project?.activeStructure ?? ''}:${serialOf(s)}:${s.length}:${s.frame ?? 0}:${s.rev ?? 0}:${structureDigest(s)}`;
 }
 
 /**

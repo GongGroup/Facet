@@ -156,7 +156,8 @@ registerLeftPanel({
           const atoms = await confirmHiddenSelection(app, 'Change', sel);   // hidden atoms change only when the user says so
           if (!atoms?.length) return;
           if (atoms.length !== sel.length) app.select(atoms);
-          app.replaceSelected(sym); toast(`Replaced ${atoms.length} atom${atoms.length > 1 ? 's' : ''} with ${sym}`);
+          // one toast: the message, the notes of the change (calculated results that went) and an Undo for it
+          app.replaceSelected(sym, { toast: `Replaced ${atoms.length} atom${atoms.length > 1 ? 's' : ''} with ${sym}` });
         } })));
     }
     el.append(selSec);
@@ -203,7 +204,8 @@ registerLeftPanel({
         } }));
       }
     }
-    row.append(btn('Duplicate', { cls: 'small', tip: 'Add a copy of this structure to the project', on: () => { const c = s.clone(); c.name = `${s.name} (copy)`; app.addStructure(c); } }));
+    // always next to the original, even in an untouched sample project (which adding would otherwise replace)
+    row.append(btn('Duplicate', { cls: 'small', tip: 'Add a copy of this structure to the project', on: () => { const c = s.clone(); c.name = `${s.name} (copy)`; app.addStructure(c, { replaceProject: false }); } }));
     tools.append(row);
     el.append(tools);
   },
