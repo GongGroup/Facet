@@ -1,7 +1,9 @@
 // Interaction math of the Move tool (render/tools/movemath.js), M4 §7.2 items 1 and 2: axis, plane, centre and direct
 // drags, the height of an atom dragged along the surface (D9), the edge-on fallbacks, ring angles and their
 // accumulation past ±180°, fine and snapped increments with contravariant components in a hexagonal Lattice frame
-// (D19), snap targets, and the screen-space hit test of the handles with its priority and hidden handles.
+// (D19), snap targets, and the screen-space hit test of the handles with its priority and hidden handles; in
+// perspective views the line-of-sight rules follow the line of sight at the pivot or grab point, not the camera's
+// forward vector.
 // The viewer's geometry (L-F0-40) comes from a synthetic camera with the formulas of render/viewer.js.
 // Run: node --test tests/js/movemath.test.mjs (or through pytest: tests/test_js_unit.py).
 import { test, describe } from 'node:test';
@@ -35,7 +37,8 @@ function near(actual, expected, tol = 1e-9, msg = '') {
 /**
  * A synthetic camera with the viewer's ray geometry (L-F0-40, the formulas of render/viewer.js): the pick ray through
  * a pixel, the projection (pixels right and down from the top-left corner), pointOnPlane (null when |n·d| < 1e-6 or
- * behind the camera), pointOnLine ({point, s}, null when parallel) and worldPerPixel. It is the drag view as well.
+ * behind the camera), pointOnLine ({point, s}, null when parallel) and worldPerPixel. It is the drag view as well:
+ * viewDir is the forward vector, lineOfSight(p) the direction from the camera through p (viewDir when orthographic).
  */
 function camera({ eye, target = [0, 0, 0], up = [0, 0, 1], fov = 30, ortho = false, halfHeight = 6, width = 800, height = 600 }) {
   const f = unit(sub(target, eye));
@@ -53,6 +56,7 @@ function camera({ eye, target = [0, 0, 0], up = [0, 0, 1], fov = 30, ortho = fal
       if (ortho) return { origin: comb(eye, [nx * halfHeight * aspect, r], [ny * halfHeight, u]), direction: f };
       return { origin: eye.slice(), direction: unit(comb(f, [nx * tan * aspect, r], [ny * tan, u])) };
     },
+    lineOfSight(p) { return ortho ? f.slice() : unit(sub(p, eye)); },
     project(x, y, z) {
       const d = sub([x, y, z], eye), depth = dot(d, f);
       const sx = ortho ? halfHeight * aspect : depth * tan * aspect, sy = ortho ? halfHeight : depth * tan;
@@ -92,6 +96,7 @@ function swappable(cam) {
   return {
     cam,
     get viewDir() { return this.cam.viewDir; },
+    lineOfSight(p) { return this.cam.lineOfSight(p); },
     pointOnPlane(...a) { return this.cam.pointOnPlane(...a); },
     pointOnLine(...a) { return this.cam.pointOnLine(...a); },
     project(...a) { return this.cam.project(...a); },
@@ -117,6 +122,11 @@ describe('module', () => {
   });
 
   test('MOVE_TOOL holds the handle sizes and tolerances of M4 §3.11.1, deeply frozen', () => {
+    // pixel sizes and the spec's view thresholds only: whether a drag moved is judged with positionTolerance
+    assert.deepEqual(Object.keys(MOVE_TOOL), [
+      'arrow', 'square', 'ring', 'center', 'labelGap', 'hoverScale', 'hideArrowCos', 'hideSquareCos', 'axisParallelCos',
+      'edgeOnCos', 'snapRadius',
+    ]);
     assert.deepEqual(MOVE_TOOL.arrow, { from: 14, shaftTo: 72, to: 88, shaftRadius: 1.5, coneRadius: 5, pick: 8, pickTouch: 16 });
     assert.deepEqual(MOVE_TOOL.square, { size: 14, offset: 24, pick: 3, pickTouch: 8 });
     assert.deepEqual(MOVE_TOOL.ring, { radius: 60, tube: 1.5, segments: 64, pick: 7, pickTouch: 14 });
@@ -320,7 +330,7 @@ describe('axis drags (M4 §7.2-1)', () => {
     assert.equal(axisParam(cam, [400, 300], [0, 0, 0], Z), null);
     assert.equal(axisParam(cam, [400, 300], [0, 0, 0], [0.05, 0, -1]), null, 'within about 5°');
     assert.ok(axisParam(cam, [400, 300], [0, 0, 0], [0.2, 0, -1]) !== null);
-    assert.equal(handleVisibility(CART, cam.viewDir).axis[2], false, 'and its arrow is hidden');
+    assert.equal(handleVisibility(CART, cam.lineOfSight([0, 0, 0])).axis[2], false, 'and its arrow is hidden');
     const view = swappable(topView(C));
     const st = beginDrag({ kind: 'axis', axis: 0, pointer: scr(view.cam, C), view, axes: CART, pivot: C });
     near(dragTo(st, scr(view.cam, add(C, [1, 0, 0]))).delta, [1, 0, 0], 1e-9);
@@ -365,7 +375,7 @@ describe('plane and centre drags', () => {
     const cam = oblique();
     const wpp = cam.worldPerPixel(C);
     const mid = comb(C, [24 * wpp, [1, 0, 0]], [24 * wpp, [0, 1, 0]]);
-    const hit = hitHandle(scr(cam, mid), { pivot: C, axes: CART, viewDir: cam.viewDir, worldPerPixel: wpp, project: cam.project });
+    const hit = hitHandle(scr(cam, mid), { pivot: C, axes: CART, lineOfSight: cam.lineOfSight(C), worldPerPixel: wpp, project: cam.project });
     assert.equal(hit.kind, 'plane');
     assert.equal(hit.plane, 2);
     const view = { ...cam, pointOnPlane: (...a) => { const p = cam.pointOnPlane(...a); return p && { x: p[0], y: p[1], z: p[2] }; } };
@@ -432,10 +442,17 @@ describe('direct drags of a selected atom (D9, U1)', () => {
       assert.equal(st.mode, 'screen');
       assert.equal(st.edgeOn, false);
     }
-    assert.deepEqual(directDragPlane({ surface: SURFACE, viewDir: [0, 0, -1] }), { mode: 'surface', normal: Z, edgeOn: false });
-    assert.deepEqual(directDragPlane({ surface: SURFACE, viewDir: [0, 0, -1], screenPlane: true }), { mode: 'screen', normal: [-0, -0, 1], edgeOn: false });
-    assert.deepEqual(directDragPlane({ surface: SURFACE, viewDir: [1, 0, 0] }), { mode: 'screen', normal: [-1, -0, -0], edgeOn: true });
-    assert.equal(directDragPlane({ surface: { surface: true, normal: [0, 0, 3] }, viewDir: unit([0, 1, -0.25]) }).mode, 'surface');
+    const down = { viewDir: [0, 0, -1], lineOfSight: [0, 0, -1] };
+    assert.deepEqual(directDragPlane({ surface: SURFACE, ...down }), { mode: 'surface', normal: Z, edgeOn: false });
+    assert.deepEqual(directDragPlane({ surface: SURFACE, ...down, screenPlane: true }), { mode: 'screen', normal: [-0, -0, 1], edgeOn: false });
+    assert.deepEqual(directDragPlane({ surface: SURFACE, viewDir: [1, 0, 0], lineOfSight: [1, 0, 0] }), { mode: 'screen', normal: [-1, -0, -0], edgeOn: true });
+    const s = unit([0, 1, -0.25]);
+    assert.equal(directDragPlane({ surface: { surface: true, normal: [0, 0, 3] }, viewDir: s, lineOfSight: s }).mode, 'surface');
+    // the edge-on test takes the line of sight at the grab point; the screen plane stays normal to viewDir
+    assert.deepEqual(directDragPlane({ surface: SURFACE, viewDir: [0, 1, 0], lineOfSight: unit([0, 1, -0.3]) }), { mode: 'surface', normal: Z, edgeOn: false });
+    const e = directDragPlane({ surface: SURFACE, viewDir: unit([0, 1, -0.3]), lineOfSight: [0, 1, 0] });
+    assert.deepEqual([e.mode, e.edgeOn], ['screen', true]);
+    near(e.normal, scale(unit([0, 1, -0.3]), -1), 1e-15);
   });
 
   test('a press the view cannot place starts from the first reading; non-finite points count as none', () => {
@@ -481,7 +498,9 @@ describe('ring drags', () => {
     const st = beginDrag({ kind: 'ring', axis: 2, pointer: scr(cam, onRing(0)), view: cam, axes: CART, pivot: C });
     for (let t = 30; t <= 360; t += 30) dragTo(st, scr(cam, onRing(t)));
     near(st.result.angle, 360, 1e-9);
+    assert.equal(st.result.moved, false, 'a full turn moves nothing: cancel on release');
     near(dragTo(st, scr(cam, onRing(390))).angle, 390, 1e-9);
+    assert.equal(st.result.moved, true);
     for (let t = 360; t >= -200; t -= 40) dragTo(st, scr(cam, onRing(t)));
     near(st.result.angle, -200, 1e-9);
   });
@@ -499,6 +518,28 @@ describe('ring drags', () => {
     assert.throws(() => dragTo(small, scr(cam, onRing(2)), { snap: [5, 5, 5] }), /a ring drag snaps to one angle step/);
   });
 
+  test('moved: the farthest atom (the lever arm) turns along a chord longer than positionTolerance', () => {
+    const cam = persp();
+    const tol = SURFACE_DEFAULTS.positionTolerance;
+    const drag = (deg, extra = {}) => {
+      const st = beginDrag({ kind: 'ring', axis: 2, pointer: scr(cam, onRing(0)), view: cam, axes: CART, pivot: C, ...extra });
+      return dragTo(st, scr(cam, onRing(deg)));
+    };
+    // every atom on the axis (an upright CO turned about the normal through it): nothing moves at any angle
+    const still = drag(30, { leverArm: 0 });
+    near(still.angle, 30, 1e-9);
+    assert.equal(still.moved, false);
+    // an atom 2 Å from the axis moves 2·2·sin(θ/2): just under and just over the tolerance
+    const limit = (r) => (2 * Math.asin(tol / (2 * r))) / DEG;
+    assert.equal(drag(0.8 * limit(2), { leverArm: 2 }).moved, false);
+    assert.equal(drag(1.25 * limit(2), { leverArm: 2 }).moved, true);
+    // without a lever arm, the ring itself: 60 px at the pivot
+    const ring = 60 * cam.worldPerPixel(C);
+    assert.equal(drag(0.8 * limit(ring)).moved, false);
+    assert.equal(drag(1.25 * limit(ring)).moved, true);
+    assert.ok(limit(ring) > limit(2), 'the ring (about 1 Å here) is shorter than the 2 Å lever arm');
+  });
+
   test('an edge-on ring uses the screen tangent: 60 px along it is 1 rad', () => {
     // ring about x seen almost edge-on (|x̂·d̂| = 0.1 ≤ 0.2); grab its lower front point
     const P0 = [0, 0, 0];
@@ -506,7 +547,7 @@ describe('ring drags', () => {
     const cam = camera({ eye: sub(P0, scale(f, 30)), target: P0, up: [0, 1, 0], ortho: true });
     const wpp = cam.worldPerPixel(P0), R = 60 * wpp;
     const front = [0, -R * Math.SQRT1_2, R * Math.SQRT1_2];
-    const opts = { pivot: P0, axes: CART, viewDir: cam.viewDir, worldPerPixel: wpp, project: cam.project };
+    const opts = { pivot: P0, axes: CART, lineOfSight: cam.lineOfSight(P0), worldPerPixel: wpp, project: cam.project };
     const hit = hitHandle(scr(cam, front), opts);
     assert.equal(hit.kind, 'ring');
     assert.equal(hit.axis, 0);
@@ -542,6 +583,38 @@ describe('fine and snapped increments (M4 §3.11.2–3.11.3, D19)', () => {
     near(dragTo(st, at(cam, 100), { fine: 0.1 }).delta, [1.1, 0, 0], 1e-12);
     near(dragTo(st, at(cam, 150)).delta, [2.1, 0, 0], 1e-12, 'released');
     near(dragTo(st, at(cam, 100), { fine: SURFACE_DEFAULTS.fineFactor ?? 0.1 }).delta, [2.0, 0, 0], 1e-12);
+  });
+
+  test('Shift on a vector drag: the a–b square in the hexagonal Lattice frame, then snapped', () => {
+    const cam = topView();
+    const st = beginDrag({ kind: 'plane', plane: 2, pointer: scr(cam, C), view: cam, axes: HEX_AXES, pivot: C });
+    const p1 = comb(C, [1.0, HEX_AXES[0]], [0.5, HEX_AXES[1]]);
+    near(frameComponents(dragTo(st, scr(cam, p1)).delta, HEX_AXES), [1.0, 0.5, 0], 1e-12);
+    const p2 = comb(p1, [1.0, HEX_AXES[0]], [-2.0, HEX_AXES[1]]);
+    near(frameComponents(dragTo(st, scr(cam, p2), { fine: 0.1 }).delta, HEX_AXES), [1.1, 0.3, 0], 1e-12, 'a tenth of the second step');
+    const s = dragTo(st, scr(cam, p2), { fine: 0.1, snap: 0.25 });
+    assert.ok(s.snapped);
+    near(frameComponents(s.delta, HEX_AXES), [1.0, 0.25, 0], 1e-12, 'then snapped on a and b');
+    near(frameComponents(dragTo(st, scr(cam, p2)).delta, HEX_AXES), [1.1, 0.3, 0], 1e-12, 'snapping left the accumulated value alone');
+  });
+
+  test('Shift on an atom dragged along the surface keeps its height exactly', () => {
+    const G = [0.3, 0.2, 7.5];
+    const cam = tiltedView(40, G);
+    const [gx, gy] = scr(cam, G);
+    const press = () => beginDrag({ kind: 'direct', pointer: [gx, gy], view: cam, axes: HEX_AXES, grab: G, surface: SURFACE });
+    const st = press();
+    const first = dragTo(st, [gx + 30, gy]).delta;
+    const fine = dragTo(st, [gx + 80, gy - 40], { fine: 0.1 });
+    assert.equal(st.mode, 'surface');
+    assert.equal(fine.delta[2], 0, 'height unchanged');
+    // the same pointer path at full speed: fine adds a tenth of its second step
+    const full = press();
+    dragTo(full, [gx + 30, gy]);
+    const second = dragTo(full, [gx + 80, gy - 40]).delta;
+    near(fine.delta, add(first, scale(sub(second, first), 0.1)), 1e-12);
+    assert.ok(norm(sub(second, first)) > 1, 'a real second step');
+    assert.equal(dragTo(st, [gx + 80, gy - 40], { fine: 0.1, snap: 0.1 }).delta[2], 0, 'and with snapping');
   });
 
   test('snapping filters the output: on the arrow, per axis, and to zero', () => {
@@ -655,13 +728,14 @@ describe('handles: screen-space hit test (M4 §7.2-2)', () => {
   // top view, pivot at the origin on screen (400, 300), 0.02 Å per px; px(dx, dy) is dx right, dy up
   const cam = topView();
   const px = (dx, dy = 0) => [400 + dx, 300 - dy];
-  const opts = (extra = {}) => ({ pivot: [0, 0, 0], axes: CART, viewDir: cam.viewDir, worldPerPixel: cam.worldPerPixel([0, 0, 0]), project: cam.project, ...extra });
+  const sight = cam.lineOfSight([0, 0, 0]);
+  const opts = (extra = {}) => ({ pivot: [0, 0, 0], axes: CART, lineOfSight: sight, worldPerPixel: cam.worldPerPixel([0, 0, 0]), project: cam.project, ...extra });
   const kindOf = (h) => (h ? `${h.kind}${h.kind === 'center' ? '' : h.kind === 'plane' ? h.plane : h.axis}` : null);
 
   test('visibility: arrows along the line of sight and edge-on squares hide; rings never do', () => {
-    assert.deepEqual(handleVisibility(CART, cam.viewDir), { center: true, axis: [true, true, false], plane: [false, false, true], ring: [true, true, true] });
-    assert.deepEqual(handleVisibility(CART, cam.viewDir, 'move'), { center: true, axis: [true, true, false], plane: [false, false, true], ring: [false, false, false] });
-    assert.deepEqual(handleVisibility(CART, cam.viewDir, 'rotate'), { center: false, axis: [false, false, false], plane: [false, false, false], ring: [true, true, true] });
+    assert.deepEqual(handleVisibility(CART, sight), { center: true, axis: [true, true, false], plane: [false, false, true], ring: [true, true, true] });
+    assert.deepEqual(handleVisibility(CART, sight, 'move'), { center: true, axis: [true, true, false], plane: [false, false, true], ring: [false, false, false] });
+    assert.deepEqual(handleVisibility(CART, sight, 'rotate'), { center: false, axis: [false, false, false], plane: [false, false, false], ring: [true, true, true] });
     const along = (deg) => [Math.sin(deg * DEG), 0, -Math.cos(deg * DEG)];
     assert.equal(handleVisibility(CART, along(7.9)).axis[2], false, 'z within 8° of the line of sight');
     assert.equal(handleVisibility(CART, along(8.2)).axis[2], true);
@@ -718,8 +792,8 @@ describe('handles: screen-space hit test (M4 §7.2-2)', () => {
     const C = [0.5, -0.2, 1];
     const pc = camera({ eye: add(C, [7, 9, 12]), target: C });
     const wpp = pc.worldPerPixel(C);
-    const o = { pivot: C, axes: CART, viewDir: pc.viewDir, worldPerPixel: wpp, project: pc.project };
-    const vis = handleVisibility(CART, pc.viewDir);
+    const o = { pivot: C, axes: CART, lineOfSight: pc.lineOfSight(C), worldPerPixel: wpp, project: pc.project };
+    const vis = handleVisibility(CART, pc.lineOfSight(C));
     assert.deepEqual(vis, { center: true, axis: [true, true, true], plane: [true, true, true], ring: [true, true, true] });
     assert.equal(kindOf(hitHandle(scr(pc, C), o)), 'center');
     for (const k of [0, 1, 2]) assert.equal(kindOf(hitHandle(scr(pc, add(C, scale(CART[k], 80 * wpp))), o)), `axis${k}`);
@@ -744,6 +818,154 @@ describe('handles: screen-space hit test (M4 §7.2-2)', () => {
   });
 });
 
+describe('perspective views: the rules use the line of sight at the pivot or grab point (M4 §2.1, §3.11.1–3.11.2)', () => {
+  // 1280 × 720 at 30°, 12 Å above the origin looking down −z: off the screen centre the line of sight to a point is
+  // about 20° from the forward vector at these pivots, so a rule tested on the forward vector gives other answers
+  const wide = () => camera({ eye: [0, 0, 12], up: [0, 1, 0], width: 1280, height: 720 });
+  const angle = (a, b) => Math.acos(Math.min(1, Math.abs(dot(unit(a), unit(b))))) / DEG;
+  const kindOf = (h) => (h ? `${h.kind}${h.kind === 'center' ? '' : h.kind === 'plane' ? h.plane : h.axis}` : null);
+  const RIGHT = [4.5, 0, 0];                               // 1144 px across, on the horizontal midline
+  /** A right-handed orthonormal frame whose first axis is `deg` from the line of sight `los` (los ⟂ y), tilted to +y. */
+  function tiltedFrame(los, deg) {
+    const e0 = comb([0, 0, 0], [Math.cos(deg * DEG), los], [Math.sin(deg * DEG), [0, 1, 0]]);
+    const side = unit(cross(los, [0, 1, 0]));
+    const e1 = unit(cross(e0, unit(add([0, 1, 0], side))));
+    return [e0, e1, cross(e0, e1)];
+  }
+
+  test('an arrow 7° from the line of sight at an off-centre pivot is hidden and never hit; at 9° it shows', () => {
+    const cam = wide();
+    const los = cam.lineOfSight(RIGHT), wpp = cam.worldPerPixel(RIGHT);
+    near(angle(los, cam.viewDir), 20.56, 0.01, 'the line of sight is 20.6° from the forward vector');
+    const c0 = scr(cam, RIGHT);
+    for (const [deg, shows] of [[7, false], [9, true]]) {
+      const axes = tiltedFrame(los, deg);
+      near(angle(axes[0], los), deg, 1e-9);
+      assert.ok(angle(axes[0], cam.viewDir) > 21, 'and more than 21° from the forward vector');
+      assert.equal(handleVisibility(axes, los).axis[0], shows, `${deg}°`);
+      assert.equal(handleVisibility(axes, cam.viewDir).axis[0], true, 'the forward vector would show it');
+      // presses on the arrow's projection 10.5–13 px from the pivot (its tip is 10–13 px out), beyond the centre
+      // disc: a visible arrow is hit there, a hidden one never is
+      const tip = scr(cam, add(RIGHT, scale(axes[0], 88 * wpp)));
+      const L = Math.hypot(tip[0] - c0[0], tip[1] - c0[1]);
+      assert.ok(L > 9 && L < 14, `the arrow is short on screen (${L.toFixed(1)} px)`);
+      const along = (r) => [c0[0] + (r * (tip[0] - c0[0])) / L, c0[1] + (r * (tip[1] - c0[1])) / L];
+      const opts = { pivot: RIGHT, axes, lineOfSight: los, worldPerPixel: wpp, project: cam.project };
+      const kinds = [10.5, 11, 12, 13].map((r) => kindOf(hitHandle(along(r), opts)));
+      if (shows) assert.ok(kinds.includes('axis0'), kinds.join());
+      else assert.ok(!kinds.includes('axis0'), kinds.join());
+      // the presses are within reach: tested on the forward vector, the 7° arrow would be handed out there
+      if (!shows) assert.equal(kindOf(hitHandle(along(13), { ...opts, lineOfSight: cam.viewDir })), 'axis0');
+    }
+  });
+
+  test('the forward axis and the side squares at an off-centre pivot show and work', () => {
+    const cam = wide();
+    const C = [3.6, 2.4, 0];                               // up and to the right
+    const los = cam.lineOfSight(C), wpp = cam.worldPerPixel(C);
+    near(angle(Z, los), 19.83, 0.01, 'z is 19.8° from the line of sight but along the forward vector');
+    assert.deepEqual(handleVisibility(CART, los), { center: true, axis: [true, true, true], plane: [true, true, true], ring: [true, true, true] });
+    assert.deepEqual(handleVisibility(CART, cam.viewDir).axis, [true, true, false], 'not what the forward vector says');
+    assert.deepEqual(handleVisibility(CART, cam.viewDir).plane, [false, false, true]);
+    const opts = { pivot: C, axes: CART, lineOfSight: los, worldPerPixel: wpp, project: cam.project };
+    // the z arrow points away from the screen centre, about 29 px long; press halfway along it and drag 0.4 Å up z
+    const a = scr(cam, add(C, scale(Z, 14 * wpp))), b = scr(cam, add(C, scale(Z, 88 * wpp)));
+    const press = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const hit = hitHandle(press, opts);
+    assert.equal(kindOf(hit), 'axis2');
+    const st = beginDrag({ hit, pointer: press, view: cam, axes: CART, pivot: C });
+    const p0 = cam.pointOnLine(press[0], press[1], C, Z).point;
+    const r = dragTo(st, scr(cam, add(p0, [0, 0, 0.4])));
+    assert.equal(r.kept, false);
+    near(r.delta, [0, 0, 0.4], 1e-9);
+    // the y–z and x–z squares, edge-on to the forward vector, have their normals 74° and 79° from the line of sight
+    // (they hide beyond 82°)
+    near([angle([1, 0, 0], los), angle([0, 1, 0], los)], [73.6, 79.2], 0.1);
+    for (const [k, [i, j]] of PLANE_AXES.entries()) {
+      assert.equal(kindOf(hitHandle(scr(cam, comb(C, [24 * wpp, CART[i]], [24 * wpp, CART[j]])), opts)), `plane${k}`);
+    }
+  });
+
+  test('axisParam is null within about 5° of the ray through the pointer, whatever the forward vector', () => {
+    const cam = wide();
+    const los = cam.lineOfSight(RIGHT);
+    const at = scr(cam, RIGHT);                            // the ray through the pivot's pixel is its line of sight
+    near(unit(cam.ray(...at).direction), los, 1e-12);
+    assert.equal(axisParam(cam, at, RIGHT, tiltedFrame(los, 4)[0]), null, '4° from the ray');
+    assert.equal(typeof axisParam(cam, at, RIGHT, tiltedFrame(los, 6)[0]), 'number', '6° from the ray');
+    assert.equal(axisParam(cam, at, RIGHT, los), null, 'along the ray');
+    for (const deg of [4, 6]) assert.ok(angle(tiltedFrame(los, deg)[0], cam.viewDir) > 20, 'both far from the forward vector');
+    // the z axis is along the forward vector but 20.6° from the ray: a reading
+    near(axisParam(cam, at, RIGHT, Z), 0, 1e-9);
+    const up = cam.pointOnLine(at[0] + 10, at[1], RIGHT, Z).s;
+    near(axisParam(cam, [at[0] + 10, at[1]], RIGHT, Z), up, 1e-12);
+    assert.ok(up > 0.1, '10 px out from the screen centre is up z here');
+  });
+
+  test("a ring's plane or tangent method comes from the line of sight at the pivot", () => {
+    const cam = wide();
+    const los = cam.lineOfSight(RIGHT), wpp = cam.worldPerPixel(RIGHT);
+    // the ring about x, edge-on to the forward vector, is seen as an ellipse here (|x̂·d̂| = 0.35): plane method
+    near(Math.abs(dot([1, 0, 0], los)), 0.351, 1e-3);
+    const R = 60 * wpp;
+    const onX = (t) => add(RIGHT, [0, R * Math.cos(t * DEG), R * Math.sin(t * DEG)]);
+    const st = beginDrag({ kind: 'ring', axis: 0, pointer: scr(cam, onX(0)), view: cam, axes: CART, pivot: RIGHT });
+    assert.equal(st.mode, 'plane');
+    near(dragTo(st, scr(cam, onX(30))).angle, 30, 1e-9, 'exactly 30°');
+    // an axis 84° from the line of sight but 64° from the forward vector: edge-on, tangent method
+    const side = unit(cross(los, [0, 1, 0]));
+    const u = comb([0, 0, 0], [0.1, los], [-Math.sqrt(0.99), side]);
+    near([angle(u, los), angle(u, cam.viewDir)], [84.26, 63.71], 0.01);
+    assert.ok(Math.abs(dot(u, cam.viewDir)) > MOVE_TOOL.edgeOnCos && Math.abs(dot(u, los)) < MOVE_TOOL.edgeOnCos);
+    const axes = [u, [0, 1, 0], cross(u, [0, 1, 0])];
+    const edge = beginDrag({ kind: 'ring', axis: 0, pointer: scr(cam, add(RIGHT, [0, R, 0])), view: cam, axes, pivot: RIGHT });
+    assert.equal(edge.mode, 'tangent');
+  });
+
+  test("an atom drag falls back to the screen plane where the grab point's line of sight is edge-on", () => {
+    const n = Z;
+    // a slab seen 12.7° from edge-on through the screen centre (|n·forward| = 0.22): the far part of it is more
+    // nearly edge-on than the centre, the near part less
+    const cam = camera({ eye: [0, -30, 30 * Math.tan(12.7 * DEG)], target: [0, 0, 0], width: 1280, height: 720 });
+    near(Math.abs(dot(n, cam.viewDir)), 0.2198, 1e-4);
+    const grab = (G, c = cam) => beginDrag({ kind: 'direct', pointer: scr(c, G), view: c, axes: CART, grab: G, surface: SURFACE });
+    const centre = grab([0, 0, 0]);
+    assert.deepEqual([centre.mode, centre.edgeOn], ['surface', false]);
+    const far = [0, 12, 0];
+    near(Math.abs(dot(n, cam.lineOfSight(far))), 0.1589, 1e-4);
+    near(360 - scr(cam, far)[1], 83.5, 0.1, 'on screen, 83.5 px above the centre');
+    const st = grab(far);
+    assert.deepEqual([st.mode, st.edgeOn], ['screen', true]);
+    near(st.normal, scale(cam.viewDir, -1), 1e-15, 'the screen plane is normal to the forward vector');
+    const [x, y] = scr(cam, far);
+    const r = dragTo(st, [x, y - 10]);
+    near(norm(r.delta), 10 * cam.worldPerPixel(far), 1e-9, '10 px are 10 px at its depth, not 2 Å along a grazing plane');
+    near(scr(cam, add(far, r.delta)), [x, y - 10], 1e-6, 'under the pointer');
+    // seen 10° from edge-on through the centre (|n·forward| = 0.17): a grab point low on the screen is 15° from
+    // edge-on, so it moves along the surface and keeps its height
+    const low = camera({ eye: [0, -30, 30 * Math.tan(10 * DEG)], target: [0, 0, 0], width: 1280, height: 720 });
+    assert.ok(Math.abs(dot(n, low.viewDir)) < MOVE_TOOL.edgeOnCos);
+    const front = [0, -10, 0];
+    near(Math.abs(dot(n, low.lineOfSight(front))), 0.2557, 1e-4);
+    near(scr(low, front)[1] - 360, 113.2, 0.1, 'on screen, 113 px below the centre');
+    const s2 = grab(front, low);
+    assert.deepEqual([s2.mode, s2.edgeOn], ['surface', false]);
+    const [x2, y2] = scr(low, front);
+    assert.equal(dragTo(s2, [x2 + 15, y2 - 20]).delta[2], 0, 'height unchanged');
+    assert.equal(grab([0, 0, 0], low).edgeOn, true, 'while the screen centre is edge-on');
+  });
+
+  test('the centre disc drags in the screen plane, normal to the forward vector, at an off-centre pivot too', () => {
+    const cam = wide();
+    const st = beginDrag({ kind: 'center', pointer: scr(cam, RIGHT), view: cam, axes: CART, pivot: RIGHT });
+    near(st.normal, scale(cam.viewDir, -1), 1e-15);
+    const [x, y] = scr(cam, RIGHT);
+    const r = dragTo(st, [x - 40, y + 25]);
+    near(dot(r.delta, cam.viewDir), 0, 1e-12, 'the depth stays');
+    near(scr(cam, add(RIGHT, r.delta)), [x - 40, y + 25], 1e-6, 'under the pointer');
+  });
+});
+
 describe('errors', () => {
   const cam = topView();
   const base = { pointer: [400, 300], view: cam, axes: CART, pivot: [0, 0, 0] };
@@ -753,6 +975,13 @@ describe('errors', () => {
       && e.message === `kind must be one of 'axis', 'plane', 'center', 'direct', 'ring' (got "move")`);
     assert.throws(() => beginDrag({ ...base, kind: 'axis', axis: 3 }), /^RangeError: axis must be 0, 1 or 2 \(got 3\)$/);
     assert.throws(() => beginDrag({ ...base, kind: 'center', view: null }), /^TypeError: view must have pointOnPlane/);
+    assert.throws(() => beginDrag({ ...base, kind: 'axis', axis: 0, view: { ...cam, lineOfSight: undefined } }),
+      /^TypeError: view must have pointOnPlane\(x, y, point, normal\), pointOnLine\(x, y, origin, dir\) and lineOfSight\(point\)$/);
+    assert.throws(() => beginDrag({ ...base, kind: 'ring', axis: 0, view: { ...cam, lineOfSight: () => [0, 0, 0] } }),
+      /^RangeError: view\.lineOfSight\(point\) must not be a zero vector$/);
+    assert.throws(() => beginDrag({ ...base, kind: 'ring', axis: 0, view: { ...cam, worldPerPixel: undefined } }),
+      /^TypeError: view must have worldPerPixel\(point\) for a ring drag$/);
+    assert.throws(() => beginDrag({ ...base, kind: 'ring', axis: 0, leverArm: -1 }), /^RangeError: leverArm must be a non-negative number \(got -1\)$/);
     assert.throws(() => beginDrag({ ...base, kind: 'direct' }), /^TypeError: grab must be a finite 3-vector \(got undefined\)$/);
     assert.throws(() => beginDrag({ ...base, kind: 'center', pivot: [0, NaN, 0] }), /pivot must be a finite 3-vector/);
     assert.throws(() => beginDrag({ ...base, kind: 'center', axes: [[1, 0, 0], [0, 1, 0], [1, 1, 0]] }), /axes must not be coplanar/);
@@ -768,11 +997,13 @@ describe('errors', () => {
   test('bad frames, hit tests and values', () => {
     assert.throws(() => frameAxes('polar'), /^RangeError: frame must be one of 'auto', 'surface', 'cartesian', 'lattice' \(got "polar"\)$/);
     assert.throws(() => frameAxes('auto', { cell: [[1, 0, 0]] }), /cell must be three 3-vectors/);
-    const o = { pivot: [0, 0, 0], axes: CART, viewDir: cam.viewDir, worldPerPixel: 0.02, project: cam.project };
+    const o = { pivot: [0, 0, 0], axes: CART, lineOfSight: cam.lineOfSight([0, 0, 0]), worldPerPixel: 0.02, project: cam.project };
     assert.throws(() => hitHandle([400, 300], { ...o, worldPerPixel: 0 }), /worldPerPixel must be a positive number \(got 0\)/);
     assert.throws(() => hitHandle([400, 300], { ...o, project: null }), /project must be a function/);
     assert.throws(() => hitHandle([400, 300], { ...o, show: 'all' }), /show must be one of 'both', 'move', 'rotate'/);
-    assert.throws(() => hitHandle([400, 300], { ...o, viewDir: [0, 0, 0] }), /viewDir must not be a zero vector/);
+    assert.throws(() => hitHandle([400, 300], { ...o, lineOfSight: [0, 0, 0] }), /^RangeError: lineOfSight must not be a zero vector$/);
+    assert.throws(() => hitHandle([400, 300], { ...o, lineOfSight: undefined, viewDir: cam.viewDir }), /^TypeError: lineOfSight must be a finite 3-vector \(got undefined\)$/);
+    assert.throws(() => directDragPlane({ surface: SURFACE, viewDir: [0, 0, -1] }), /^TypeError: lineOfSight must be a finite 3-vector \(got undefined\)$/);
     assert.throws(() => snapToStep(Number.NaN, 0.1), /value must be a finite number/);
     assert.throws(() => snapToTarget([0, 0, 0], [0, 0, 0], [], { project: cam.project, mode: 'line' }), /mode must be 'point' or 'plane'/);
     assert.throws(() => angleAbout([1, 0, 0], [0, 1, 0], [0, 0, 0]), /axis must not be a zero vector/);

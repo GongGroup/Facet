@@ -9,19 +9,29 @@
  *   must be in one space (the pointer context's `x, y` and `project`, both relative to the canvas);
  * - `worldPerPixel`: Å per CSS px at the pivot (`viewer.worldPerPixel(pivot)`). The handles keep a constant screen
  *   size, so L px of a handle are L · worldPerPixel Å in the scene;
- * - for drags, a view `{ viewDir, pointOnPlane(x, y, point, normal), pointOnLine(x, y, origin, dir), project,
- *   worldPerPixel }`: `viewDir` is the unit vector from the camera into the scene; the two functions are the viewer's
- *   (null when the ray is parallel to the plane or line, or meets the plane behind the camera). They get the drag
- *   pointer as given (client coordinates for the viewer's) and plain arrays, and may return arrays or {x, y, z}
- *   objects (THREE.Vector3); `pointOnLine` returns `{ point, s }`. Drags use `project` only for snap targets and for
- *   an edge-on ring started without its `hit` (the ring point nearest the press pointer, so that pointer must then be
- *   in `project`'s space); everything else depends on pointer differences only.
+ * - `lineOfSight`: the line of sight d̂ at the pivot, the unit vector from the camera through it
+ *   (`view.lineOfSight(pivot)`, below);
+ * - for drags, a view `{ viewDir, lineOfSight(point), pointOnPlane(x, y, point, normal), pointOnLine(x, y, origin,
+ *   dir), project, worldPerPixel(point) }`. `viewDir` is the camera's forward vector (unit, the same for every pixel):
+ *   the screen plane is the plane normal to it (−viewDir, M4 §3.11.2), and that is all it is used for.
+ *   `lineOfSight(point)` gives the line of sight through a drawn point (perspective: unit(point − camera position);
+ *   orthographic: viewDir). Every line-of-sight rule of M4 §2.1 and §3.11.1–3.11.2 (|û·d̂|, |n̂·d̂|) uses it: at the
+ *   pivot for the hidden arrows and squares, the axis guard and a ring's plane or tangent method, at the grab point
+ *   for the edge-on fallback of an atom drag. Off the centre of a perspective view the two directions differ (by
+ *   about 25° at the side edges of a 30° view at 16:9), so viewDir must not stand in for it. `pointOnPlane` and
+ *   `pointOnLine` are the viewer's (null when the ray is parallel to the plane or line, or meets the plane behind
+ *   the camera). They get the drag pointer as given (client coordinates for the viewer's) and plain arrays, and may
+ *   return arrays or {x, y, z} objects (THREE.Vector3), as may `lineOfSight`; `pointOnLine` returns `{ point, s }`.
+ *   Drags use `project` only for snap targets and for an edge-on ring started without its `hit` (the ring point
+ *   nearest the press pointer, so that pointer must then be in `project`'s space), and `worldPerPixel` only for rings
+ *   (their radius in Å); everything else depends on pointer differences only.
  *
  * Positions are the drawn (Float64) ones of the pivot and the grab point. A translation Δ is the same vector in the
  * stored coordinates; a rotation is an angle (degrees, right-handed) about a frame axis, which the tool applies about
  * its own pivot in the editing frame (M4 §3.7.2). The snap step and the fine factor come from the caller
- * (`SURFACE_DEFAULTS.snapTranslate`, `snapRotate`, `fineFactor`, or the HUD), never from literals here; pixel sizes and
- * thresholds exist only on the web side and live in MOVE_TOOL (M4 §3.1), which render/tools/move.js re-exports.
+ * (`SURFACE_DEFAULTS.snapTranslate`, `snapRotate`, `fineFactor`, or the HUD), never from literals here, and whether a
+ * drag moved anything is decided with `SURFACE_DEFAULTS.positionTolerance`; pixel sizes and thresholds exist only on
+ * the web side and live in MOVE_TOOL (M4 §3.1), which render/tools/move.js re-exports (it does not define its own).
  */
 import { SURFACE_DEFAULTS as D } from '../../core/defaults.js';
 
@@ -34,7 +44,10 @@ const IN_PLANE = 1e-6;
 const PARALLEL = 1e-6;
 /** The edge-on ring tangent is measured over ± this fraction of the ring radius. */
 const TANGENT_STEP = 1e-3;
-/** A projected tangent or quadrilateral this many times smaller than the face-on one is degenerate. */
+/**
+ * Relative degeneracy: a projected ring tangent or square this many times smaller than seen face-on (its length in
+ * px, its area in px²), or a triple product of unit axes this many times smaller than for orthonormal ones, is degenerate.
+ */
 const DEGENERATE = 1e-9;
 /** A snap step whose reciprocal is within this of an integer k is 1/k (0.1, 0.05, 0.25 …). */
 const RECIPROCAL_TIE = 1e-12;
@@ -50,10 +63,10 @@ function deepFreeze(o) {
 /**
  * Pixel sizes (CSS px) and thresholds of the Move tool's handles, M4 §3.11.1. `pick` / `pickTouch` are the hit
  * tolerances for the mouse and for touch and pen. The cosines are of the angle between a direction and the line of
- * sight: an arrow hides when its axis is within 8° of it (|û·d̂| > hideArrowCos), a square when its normal is more than
- * 82° from it (|n̂·d̂| < hideSquareCos); an axis drag keeps its last value above axisParallelCos; below edgeOnCos a
- * direct drag falls back to the screen plane and a ring to the tangent method. snapRadius is the snap-target radius;
- * rotations below minAngle (degrees) count as no rotation.
+ * sight d̂ (at the pivot, or at the grab point of an atom drag; never the camera's forward vector): an arrow hides when
+ * its axis is within 8° of it (|û·d̂| > hideArrowCos), a square when its normal is more than 82° from it
+ * (|n̂·d̂| < hideSquareCos); an axis drag keeps its last value above axisParallelCos; below edgeOnCos a direct drag
+ * falls back to the screen plane and a ring to the tangent method. snapRadius is the snap-target radius.
  */
 export const MOVE_TOOL = deepFreeze({
   arrow: { from: 14, shaftTo: 72, to: 88, shaftRadius: 1.5, coneRadius: 5, pick: 8, pickTouch: 16 },
@@ -67,7 +80,6 @@ export const MOVE_TOOL = deepFreeze({
   axisParallelCos: 0.996,
   edgeOnCos: 0.2,
   snapRadius: 12,
-  minAngle: 1e-6,
 });
 
 /** Frame choices (HUD `Frame`, preference `moveFrame`); 'auto' = Surface when there is a surface, else Cartesian. */
@@ -160,6 +172,11 @@ function axisIndex(k, what) {
 function positive(x, what) {
   if (typeof x === 'number' && Number.isFinite(x) && x > 0) return x;
   throw new RangeError(`${what} must be a positive number (got ${repr(x)})`);
+}
+
+function nonNegative(x, what) {
+  if (typeof x === 'number' && Number.isFinite(x) && x >= 0) return x;
+  throw new RangeError(`${what} must be a non-negative number (got ${repr(x)})`);
 }
 
 /** A projection wrapper: p → [sx, sy], or null when the projection gives nothing finite. */
@@ -370,15 +387,17 @@ export function accumulateAngle(total, prevRaw, raw) {
 // -------------------------------------------------------------------------------------------------- handles
 
 /**
- * Which handles show for these frame axes and view direction (M4 §3.11.1): an arrow hides when its axis is within 8°
- * of the line of sight, a square when its normal is more than 82° from it (edge-on); rings always show (edge-on as a
- * line). `show` is the HUD's Handles choice. Drawing and hitHandle use the same rule.
+ * Which handles show for these frame axes (M4 §3.11.1): an arrow hides when its axis is within 8° of the line of
+ * sight, a square when its normal is more than 82° from it (edge-on); rings always show (edge-on as a line).
+ * `lineOfSight` is the line of sight at the pivot (`view.lineOfSight(pivot)`: in a perspective view, not the camera's
+ * forward vector unless the pivot is at the centre of the screen); `show` is the HUD's Handles choice. Drawing and
+ * hitHandle use the same rule.
  * @returns {{ center: boolean, axis: boolean[], plane: boolean[], ring: boolean[] }}
  */
-export function handleVisibility(axes, viewDir, show = 'both') {
+export function handleVisibility(axes, lineOfSight, show = 'both') {
   if (!HANDLE_SETS.includes(show)) throw new RangeError(`show must be one of ${quote(HANDLE_SETS)} (got ${repr(show)})`);
   const E = axesOf(axes);
-  const d = unit(vec(viewDir, 'viewDir'), 'viewDir');
+  const d = unit(vec(lineOfSight, 'lineOfSight'), 'lineOfSight');
   const move = show !== 'rotate', rotate = show !== 'move';
   return {
     center: move,
@@ -395,18 +414,21 @@ function segmentDistance(m, a, b) {
   return { distance: Math.hypot(m[0] - a[0] - f * dx, m[1] - a[1] - f * dy), f };
 }
 
-/** Distance from m to a convex screen quadrilateral: 0 inside, else to its nearest edge. */
-function quadDistance(m, quad) {
-  let pos = false, neg = false, edge = Infinity, area = 0;
+/**
+ * Distance from m to a convex screen quadrilateral: 0 inside, else to its nearest edge. `faceOn` is its area in px²
+ * seen face-on; one projected DEGENERATE times smaller than that is a line, which nothing is inside.
+ */
+function quadDistance(m, quad, faceOn) {
+  let pos = false, neg = false, edge = Infinity, area2 = 0;
   for (let i = 0; i < quad.length; i++) {
     const a = quad[i], b = quad[(i + 1) % quad.length];
     const z = (b[0] - a[0]) * (m[1] - a[1]) - (b[1] - a[1]) * (m[0] - a[0]);
     if (z > 0) pos = true;
     else if (z < 0) neg = true;
-    area += a[0] * b[1] - b[0] * a[1];
+    area2 += a[0] * b[1] - b[0] * a[1];
     edge = Math.min(edge, segmentDistance(m, a, b).distance);
   }
-  return pos && neg ? edge : Math.abs(area) > DEGENERATE ? 0 : edge;
+  return pos && neg ? edge : Math.abs(area2) / 2 > DEGENERATE * faceOn ? 0 : edge;
 }
 
 /** e1, e2 spanning the plane of ring k, with e1 × e2 = ê_k (so +θ runs from e1 to e2). */
@@ -463,18 +485,18 @@ function ringNearest(m, C, E, k, wpp, at) {
  * ones left out (handleVisibility). Priority: centre > squares > arrows > rings; within a kind the nearest wins
  * (of squares the pointer is inside, the one whose centre is nearer), ties the lower index.
  *
- * `pointer` and `project` share one CSS-px space; `pivot` is the drawn pivot, `axes` the frame axes,
- * `worldPerPixel` Å per px at the pivot.
+ * `pointer` and `project` share one CSS-px space; `pivot` is the drawn pivot, `axes` the frame axes, `lineOfSight`
+ * the line of sight at the pivot (`view.lineOfSight(pivot)`), `worldPerPixel` Å per px at the pivot.
  * @returns {null | { kind: 'center', distance } | { kind: 'plane', plane, axes: [i, j], distance }
  *   | { kind: 'axis', axis, distance } | { kind: 'ring', axis, distance, point, tangent }}
  */
-export function hitHandle(pointer, { pivot, axes, viewDir, worldPerPixel, project, show = 'both', touch = false } = {}) {
+export function hitHandle(pointer, { pivot, axes, lineOfSight, worldPerPixel, project, show = 'both', touch = false } = {}) {
   const m = vec2(pointer, 'pointer');
   const C = vec(pivot, 'pivot');
   const E = axesOf(axes);
   const wpp = positive(worldPerPixel, 'worldPerPixel');
   const at = projector(project);
-  const vis = handleVisibility(E, viewDir, show);
+  const vis = handleVisibility(E, lineOfSight, show);
   const tol = (h) => (touch ? h.pickTouch : h.pick);
   const T = MOVE_TOOL;
   const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
@@ -492,7 +514,7 @@ export function hitHandle(pointer, { pivot, axes, viewDir, worldPerPixel, projec
     const corner = (a, b) => at(axpy(axpy(C, a * wpp, E[i]), b * wpp, E[j]));
     const quad = [corner(o - h, o - h), corner(o + h, o - h), corner(o + h, o + h), corner(o - h, o + h)];
     if (quad.some((p) => !p)) return;
-    const distance = quadDistance(m, quad);
+    const distance = quadDistance(m, quad, T.square.size ** 2);
     if (distance > tol(T.square)) return;
     const mid = corner(o, o);
     const centre = mid ? dist(m, mid) : Infinity;
@@ -538,40 +560,52 @@ export function pressTarget(handle, hit, selected) {
 // ---------------------------------------------------------------------------------------------------- drags
 
 function viewOf(view) {
-  if (!view || typeof view.pointOnPlane !== 'function' || typeof view.pointOnLine !== 'function') {
-    throw new TypeError('view must have pointOnPlane(x, y, point, normal) and pointOnLine(x, y, origin, dir)');
+  if (!view || typeof view.pointOnPlane !== 'function' || typeof view.pointOnLine !== 'function' || typeof view.lineOfSight !== 'function') {
+    throw new TypeError('view must have pointOnPlane(x, y, point, normal), pointOnLine(x, y, origin, dir) and lineOfSight(point)');
   }
   return view;
 }
 
 const viewDirOf = (view) => unit(vec(view.viewDir, 'view.viewDir'), 'view.viewDir');
 
+/** The line of sight through drawn point p, made unit (the view's `lineOfSight`). */
+const sightAt = (view, p) => unit(vec(view.lineOfSight(p), 'view.lineOfSight(point)'), 'view.lineOfSight(point)');
+
+/** Å per px at p (the view's `worldPerPixel`), which ring drags need for the ring's radius. */
+function worldPerPixelAt(view, p) {
+  if (typeof view.worldPerPixel !== 'function') throw new TypeError('view must have worldPerPixel(point) for a ring drag');
+  return positive(view.worldPerPixel(p), 'worldPerPixel');
+}
+
 /**
  * The plane a selected atom is dragged in (M4 §3.11.2, D9): through the grab point and along the surface (normal n̂,
  * the height stays) when there is a surface (`surface` = `surfaceNormal(s)` with `surface: true`, U1), the HUD's
- * `Screen plane` is off and the view is not edge-on (|n̂·d̂| ≥ MOVE_TOOL.edgeOnCos); otherwise the screen plane
- * (normal −d̂). `edgeOn` marks the automatic fallback (HUD: `Edge-on view: dragging in the screen plane`).
+ * `Screen plane` is off and the view is not edge-on there (|n̂·d̂| ≥ MOVE_TOOL.edgeOnCos, `lineOfSight` = d̂ at the
+ * grab point); otherwise the screen plane (normal −viewDir, the camera's forward vector). `edgeOn` marks the
+ * automatic fallback (HUD: `Edge-on view: dragging in the screen plane`).
  * @returns {{ mode: 'surface' | 'screen', normal: number[], edgeOn: boolean }}
  */
-export function directDragPlane({ surface = null, viewDir, screenPlane = false } = {}) {
-  const d = unit(vec(viewDir, 'viewDir'), 'viewDir');
+export function directDragPlane({ surface = null, viewDir, lineOfSight, screenPlane = false } = {}) {
+  const screen = scale(unit(vec(viewDir, 'viewDir'), 'viewDir'), -1);
+  const d = unit(vec(lineOfSight, 'lineOfSight'), 'lineOfSight');
   const n = surfaceNormalOf(surface);
   if (n && !screenPlane) {
     if (Math.abs(dot(n, d)) >= MOVE_TOOL.edgeOnCos) return { mode: 'surface', normal: n, edgeOn: false };
-    return { mode: 'screen', normal: scale(d, -1), edgeOn: true };
+    return { mode: 'screen', normal: screen, edgeOn: true };
   }
-  return { mode: 'screen', normal: scale(d, -1), edgeOn: false };
+  return { mode: 'screen', normal: screen, edgeOn: false };
 }
 
 /**
  * Where the pointer is along the line origin + s·axis (Å from origin, axis made unit): `view.pointOnLine` of the
- * viewer. Null when the axis is within about 5° of the line of sight (|û·d̂| > MOVE_TOOL.axisParallelCos), where the
- * reading is unstable, or when the view gives no point; an axis drag then keeps its last value.
+ * viewer. Null when the axis is within about 5° of the line of sight at the origin (|û·d̂| >
+ * MOVE_TOOL.axisParallelCos, d̂ = `view.lineOfSight(origin)`), where the reading is unstable, or when the view gives
+ * no point; an axis drag then keeps its last value.
  */
 export function axisParam(view, pointer, origin, axis) {
   viewOf(view);
   const m = vec2(pointer, 'pointer'), O = vec(origin, 'origin'), u = unit(vec(axis, 'axis'), 'axis');
-  if (Math.abs(dot(u, viewDirOf(view))) > MOVE_TOOL.axisParallelCos) return null;
+  if (Math.abs(dot(u, sightAt(view, O))) > MOVE_TOOL.axisParallelCos) return null;
   const q = view.pointOnLine(m[0], m[1], O, u);
   if (!q) return null;
   const p = viewPoint(q.point);
@@ -593,11 +627,15 @@ function planePoint(view, m, point, normal) {
  * - `grab`: the drawn position of the pressed atom's copy ('direct');
  * - `surface`: the `surfaceNormal(s)` result ('direct'; also tells which square is the surface plane for targets);
  * - `screenPlane`: the HUD's `Screen plane` toggle ('direct');
- * - `ref`: the point that snaps to targets (default the pivot, else the grab point).
+ * - `ref`: the point that snaps to targets (default the pivot, else the grab point);
+ * - `leverArm` (rings): the largest distance (Å) of a turned atom from the axis it turns about, so that `moved` tells
+ *   whether an atom moves by more than `SURFACE_DEFAULTS.positionTolerance`; 0 when every atom is on the axis (an
+ *   upright CO turned about the normal through it). Default: the ring's own radius at C (MOVE_TOOL.ring.radius px).
  * The drag plane, the mode and the edge-on fallbacks are fixed here: arrows read `pointOnLine` through C; squares the
- * plane through C spanned by their two axes; the centre the screen plane through C; a selected atom the
- * directDragPlane through the grab point; a ring the plane through C normal to its axis (|û·d̂| > edgeOnCos), else the
- * tangent method (the ring's screen tangent τ at the grab point and its screen radius ρ = MOVE_TOOL.ring.radius).
+ * plane through C spanned by their two axes; the centre the screen plane through C (normal −viewDir); a selected
+ * atom the directDragPlane through the grab point (with the line of sight there); a ring the plane through C normal
+ * to its axis when |û·d̂| > edgeOnCos for the line of sight d̂ at C, else the tangent method (the ring's screen tangent
+ * τ at the grab point and its screen radius ρ = MOVE_TOOL.ring.radius).
  * Returns the drag state for dragTo: `kind`, `mode` ('surface'|'screen' for atoms, 'plane'|'tangent' for rings),
  * `edgeOn`, `normal` (the drag plane's), `axis` (unit, arrows and rings), `pivot`, `result` (the latest dragTo
  * result); fields starting with `_` are private.
@@ -614,7 +652,7 @@ export function beginDrag(spec = {}) {
   const st = {
     kind, mode: null, edgeOn: false, normal: null, axis: null, axisIndex: null, plane: null, pivot: C, result: null,
     _view: view, _axes: E, _pointer: m0, _origin: C, _zero: null, _last: 0, _eff: 0,
-    _inPlane: null, _keepHeight: false, _target: null, _ref: null, _tangent: null,
+    _inPlane: null, _keepHeight: false, _target: null, _ref: null, _tangent: null, _leverArm: null,
   };
   const surfaceN = surfaceNormalOf(spec.surface ?? null);
   if (kind === 'axis' || kind === 'ring') {
@@ -625,7 +663,10 @@ export function beginDrag(spec = {}) {
   if (kind === 'axis') {
     st._zero = axisParam(view, m0, C, st.axis);
   } else if (kind === 'ring') {
-    if (Math.abs(dot(st.axis, d)) > MOVE_TOOL.edgeOnCos) {
+    let wpp = null;
+    const wppAtC = () => (wpp ??= worldPerPixelAt(view, C));
+    st._leverArm = spec.leverArm == null ? MOVE_TOOL.ring.radius * wppAtC() : nonNegative(spec.leverArm, 'leverArm');
+    if (Math.abs(dot(st.axis, sightAt(view, C))) > MOVE_TOOL.edgeOnCos) {
       st.mode = 'plane';
       const q = planePoint(view, m0, C, st.axis);
       st._zero = q && norm(reject(sub(q, C), st.axis)) > TINY ? sub(q, C) : null;
@@ -634,8 +675,7 @@ export function beginDrag(spec = {}) {
       st._zero = m0;
       if (hit?.kind === 'ring' && hit.tangent) st._tangent = vec2(hit.tangent, 'hit.tangent');
       else {
-        if (typeof view.worldPerPixel !== 'function') throw new TypeError('view must have worldPerPixel(point) for an edge-on ring');
-        const near = ringNearest(m0, C, E, st.axisIndex, positive(view.worldPerPixel(C), 'worldPerPixel'), projector(view.project));
+        const near = ringNearest(m0, C, E, st.axisIndex, wppAtC(), projector(view.project));
         st._tangent = near ? near.tangent : [1, 0];
       }
       const L = Math.hypot(st._tangent[0], st._tangent[1]);
@@ -656,7 +696,9 @@ export function beginDrag(spec = {}) {
       st._target = { mode: 'point' };
     } else {
       st._origin = vec(spec.grab, 'grab');
-      const plane = directDragPlane({ surface: spec.surface ?? null, viewDir: d, screenPlane: !!spec.screenPlane });
+      const plane = directDragPlane({
+        surface: spec.surface ?? null, viewDir: d, lineOfSight: sightAt(view, st._origin), screenPlane: !!spec.screenPlane,
+      });
       st.mode = plane.mode;
       st.edgeOn = plane.edgeOn;
       st.normal = plane.normal;
@@ -705,7 +747,9 @@ function output(st, snap, targets, snapRadius, kept) {
     if (Array.isArray(snap)) throw new TypeError(`a ring drag snaps to one angle step in degrees (got ${repr(snap)})`);
     const step = snap == null || snap === false ? 0 : snap;
     const angle = snapToStep(st._eff, step);
-    return { kind: 'ring', angle, axis: st.axis.slice(), pivot: st.pivot.slice(), moved: Math.abs(angle) > MOVE_TOOL.minAngle, snapped: step > 0, target: null, kept };
+    // the farthest atom moves along a chord of 2·r·|sin(θ/2)|: nothing moves for θ = 0, a full turn or r = 0
+    const moved = 2 * st._leverArm * Math.abs(Math.sin((angle * DEG) / 2)) > D.positionTolerance;
+    return { kind: 'ring', angle, axis: st.axis.slice(), pivot: st.pivot.slice(), moved, snapped: step > 0, target: null, kept };
   }
   const steps = stepsOf(snap);
   const E = st._axes;
@@ -749,7 +793,8 @@ function output(st, snap, targets, snapRadius, kept) {
  * held): screen-plane drags snap to the nearest target point, drags in the surface plane to its in-plane position
  * (snapToTarget); arrows, other squares and rings have no targets.
  * The result (also kept as `state.result`): `{ kind, delta }` for translations or `{ kind: 'ring', angle, axis,
- * pivot }`, plus `moved` (false: nothing to apply, cancel on release), `snapped`, `target` (index or null) and
+ * pivot }`, plus `moved` (false: no atom moves by more than `SURFACE_DEFAULTS.positionTolerance`, |Δ| or a rotation's
+ * chord at the `leverArm`, so there is nothing to apply: cancel on release), `snapped`, `target` (index or null) and
  * `kept` (the pointer gave no reading, e.g. an arrow along the line of sight, so the last value stands).
  */
 export function dragTo(state, pointer, { fine = 1, snap = 0, targets = null, snapRadius = MOVE_TOOL.snapRadius } = {}) {
