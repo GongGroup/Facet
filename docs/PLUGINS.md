@@ -284,7 +284,7 @@ The palette command **Copy current scene as script** copies the scene as a `crys
 | `scene` | app | — | scene settings changed |
 | `tool` | app | — | the tool changed (`app.tool`: `select` / `measure`) |
 | `measure` | app + viewer | viewer: measurement list | a measurement was added or removed |
-| `history` | app | — | undo/redo stacks changed (`app.undoLabel()`, `app.canUndo()`) |
+| `history` | app | — | undo/redo steps changed (`app.undoLabel()`, `app.canUndo()`, `app.history`) |
 | `saveState` | app | `'idle' \| 'dirty' \| 'saving' \| 'saved' \| 'error'` | save state of the open project |
 | `saved` | app | — | the open project was stored |
 | `busy` | app | `{busy, label}` | a long task started or ended |
@@ -305,6 +305,10 @@ The palette command **Copy current scene as script** copies the scene as a `crys
 | `model` | viewer | display model | the drawn model was rebuilt |
 | `render` | viewer | — | a frame was rendered |
 | `error` | viewer | `Error` | drawing failed or the WebGL context was lost |
+
+Undo steps are kept in `app.history` (`length`, `redoLength`, `bytes`, `top()`, `has(step)`): up to 80 steps within
+64 MiB (24 MiB on narrow screens and devices with 4 GB of memory or less). `app.undoStack` and `app.redoStack`
+are deprecated read-only copies of its steps.
 
 The storage manager, `crystallume.registry.storage`, has its own `change` event
 (`registry.storage.on('change', fn)`) for providers being added or removed.

@@ -53,7 +53,7 @@ async function boot() {
   }
   if (!opened) {
     app.loadSample('perovskite');
-    app.dirty = false; app.setSaveState('idle'); app.undoStack = [];
+    app.dirty = false; app.setSaveState('idle'); app.history.clear();
   }
   if (!embedded) {
     app.on('saved', () => app.setPref('last', app.project.location));
