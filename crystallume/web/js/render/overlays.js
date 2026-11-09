@@ -19,6 +19,13 @@
  * `onTheme({dark})` (the background turned dark or light), `set(patch)` for its own fields and other methods
  * (setPoints…), which the handle forwards.
  *
+ * Picking (viewer.pick, F0-A §3.12.2): visible 'scene' and 'top' layers with pickable: true and a
+ * pick(ray, ctx) → {t, index, item} | null take part, under the tools named in pickIn (null: every tool).
+ * `ray` is a THREE.Ray in drawn coordinates with a unit direction, t the distance along it (Å). What wins over
+ * the atoms is decided by Overlays.pick; the viewer then sends 'overlayhover', 'overlayclick',
+ * 'overlaydblclick' and 'overlaycontext' with {layer: id, index, item, …} instead of the atom events, and a
+ * building block with `onHover(index)` hears when the pointer moves onto one of its items (−1: off the layer).
+ *
  * Building blocks: markerLayer, planeLayer, cellOutlineLayer, ghostLayer, textLayer. The pure helpers
  * (export policy, colour specs, halo order, index remapping, bounds, ray–sphere picking) are exported for
  * the viewer and for tests.
@@ -39,13 +46,18 @@ export const DEFAULT_HIGHLIGHT_COLOR = Object.freeze({ light: '#7a4fd6', dark: '
 export const HALO_EDGE = Object.freeze({ light: '#14171b', dark: '#000000', alpha: 0.65 });
 /** Halos are drawn after the atoms, the smaller (lower grow) first; measurement lines (20) come after them. */
 export const HALO_ORDER_BASE = 10;
+/**
+ * How far (Å) behind the front of the nearest atom an overlay hit may lie and still win a pick: a marker on an
+ * atom's surface beats the atom, and a 'top' layer with depth 'atoms' counts as hidden only beyond this (F0-A §3.12.2).
+ */
+export const PICK_SLACK = 0.05;
 
 /** Layer fields every tier has, and those of one tier (another tier's name, e.g. textLayer's items, belongs to the building block). */
 const COMMON_FIELDS = ['id', 'owner', 'tier', 'export', 'pickable', 'pick', 'pickIn', 'onModel', 'beforeRender', 'bounds', 'clearOnSwitch', 'order', 'visible', 'dispose'];
 const TIER_FIELDS = { scene: ['object'], top: ['object', 'depth'], canvas: ['draw'], dom: ['el'], legend: ['items'] };
 const FIELDS_OF = Object.fromEntries(Object.entries(TIER_FIELDS).map(([t, f]) => [t, new Set([...COMMON_FIELDS, ...f])]));
 /** Building-block hooks: called by Overlays, never forwarded by the handle. */
-const HOOKS = new Set(['attach', 'detach', 'onTheme', 'set']);
+const HOOKS = new Set(['attach', 'detach', 'onTheme', 'onHover', 'set']);
 const SWATCH_KINDS = new Set(['halo', 'dot', 'line']);
 
 // ------------------------------------------------------------------ pure helpers
@@ -197,7 +209,7 @@ export function pickSpheres(ray, points, radius, scale = null) {
     const thc = Math.sqrt(rr * rr - d2);
     let t = tca - thc;
     if (t < 0) t = tca + thc;   // the origin is inside the sphere
-    if (t < 0) continue;
+    if (!(t >= 0)) continue;    // behind the origin (or a ray or point that is not a number)
     if (!best || t < best.t) best = { t, index: i };
   }
   return best;
@@ -401,6 +413,7 @@ export class Overlays {
       owner: layer.owner ?? null, object: null, draw: null, items: null, el: null,
       export: 'never', pickable: false, pick: null, pickIn: null, onModel: null, beforeRender: null, bounds: null,
       depth: 'none', clearOnSwitch: true, order: 0, visible: true, dispose: null,
+      pickFailed: false,   // its pick() threw (reported once, until another pick() is set)
     };
     this._assign(rec, layer, true);
     return rec;
@@ -423,6 +436,7 @@ export class Overlays {
     if (has('el') && !(patch.el && typeof patch.el === 'object' && 'hidden' in patch.el)) throw new TypeError(`${who}: el must be an element.`);
     if (!creating && has('el') && rec.el && rec.el !== patch.el) rec.el.remove?.();
     for (const k of ['owner', 'draw', 'items', 'el', 'export', 'pick', 'onModel', 'beforeRender', 'bounds', 'depth', 'order', 'dispose']) if (has(k)) rec[k] = patch[k];
+    if (has('pick')) rec.pickFailed = false;
     if (has('pickIn')) rec.pickIn = patch.pickIn ? [...patch.pickIn] : null;
     if (has('pickable')) rec.pickable = !!patch.pickable;
     if (has('clearOnSwitch')) rec.clearOnSwitch = patch.clearOnSwitch !== false;
@@ -608,10 +622,66 @@ export class Overlays {
     return out;
   }
 
+  /** Whether layer `rec` takes part in picks under tool `tool`: visible, pickable, with a pick(), and pickIn null or naming the tool. */
+  _pickableIn(rec, tool) {
+    return this._visible(rec) && rec.pickable && typeof rec.pick === 'function' && (rec.pickIn == null || rec.pickIn.includes(tool));
+  }
+
   /** The visible, pickable layers for tool `tool` (pickIn null = every tool), in drawing order. */
   pickables(tool) {
-    return this._sorted().filter((r) => this._visible(r) && r.pickable && typeof r.pick === 'function' && (r.pickIn == null || r.pickIn.includes(tool)))
+    return this._sorted().filter((r) => this._pickableIn(r, tool))
       .map((r) => ({ id: r.id, tier: r.tier, depth: r.depth, pick: r.pick, handle: r.handle }));
+  }
+
+  /**
+   * The overlay hit that a pick along `ray` returns instead of the atom hit `atom` ({t} or null), F0-A §3.12.2;
+   * null when the atom (or nothing) is hit. Only the 'scene' and 'top' layers pickable under `tool` are asked,
+   * each with layer.pick(ray, ctx).
+   *   1. Tier B ('top') first, the nearest hit (smallest t). A layer with depth 'atoms' counts only where an atom
+   *      does not hide it (t ≤ atom.t + PICK_SLACK); layers with depth 'none' are drawn over everything, depth
+   *      'atoms' layers included, so their hits come before those of depth 'atoms' layers.
+   *   2. Else the nearest tier A ('scene') hit, when it lies no farther than atom.t + PICK_SLACK (a marker on an
+   *      atom's surface wins) or there is no atom hit.
+   * Returns {layer: id, index, item, t, tier}.
+   */
+  pick(ray, { tool = null, atom = null, ctx = {} } = {}) {
+    let free = null, behind = null, scene = null;
+    const limit = atom ? atom.t + PICK_SLACK : Infinity;
+    for (const rec of this._sorted()) {
+      if ((rec.tier !== 'top' && rec.tier !== 'scene') || !this._pickableIn(rec, tool)) continue;
+      const hit = this._layerHit(rec, ray, ctx);
+      if (!hit) continue;
+      if (rec.tier === 'scene') { if (!scene || hit.t < scene.t) scene = hit; }
+      else if (rec.depth === 'atoms') { if (hit.t <= limit && (!behind || hit.t < behind.t)) behind = hit; }
+      else if (!free || hit.t < free.t) free = hit;
+    }
+    return free ?? behind ?? (scene && scene.t <= limit ? scene : null);
+  }
+
+  /**
+   * Layer `rec`'s hit on `ray`, checked: {layer, index, item, t, tier}, or null when it reports none, a t that is not
+   * a number ≥ 0, or throws (reported once). index defaults to 0 (a layer with a single item), item to null.
+   */
+  _layerHit(rec, ray, ctx) {
+    let res;
+    try { res = rec.pick(ray, ctx); } catch (e) {
+      if (!rec.pickFailed) { rec.pickFailed = true; console.error(`[crystallume] overlay “${rec.id}” pick failed`, e); }
+      return null;
+    }
+    const t = res && typeof res.t === 'number' ? res.t : NaN;
+    if (!(t >= 0 && t < Infinity)) return null;
+    return { layer: rec.id, index: Number.isInteger(res.index) && res.index >= 0 ? res.index : 0, item: res.item ?? null, t, tier: rec.tier };
+  }
+
+  /**
+   * The pointer moved onto item `index` of layer `id` (−1: off the layer), as the viewer's pick finds it: a building
+   * block with onHover(index) shows it (markerLayer enlarges that marker).
+   */
+  hover(id, index) {
+    const rec = this._layers.get(id);
+    if (typeof rec?.spec.onHover !== 'function') return;
+    try { rec.spec.onHover(index); } catch (e) { console.error(`[crystallume] overlay “${id}” onHover failed`, e); }
+    this._render();
   }
 
   /**
@@ -700,7 +770,8 @@ const _mtx = new THREE.Matrix4(), _col = new THREE.Color();
 /**
  * Small spheres with a thin outline, e.g. adsorption sites (F0-A §3.11.4): tier 'top' (default) or 'scene',
  * export 'marker'. points: [[x, y, z], …] in drawn (display) coordinates; colors: one CSS colour, one per point,
- * or null. setPoints(points, colors) replaces them; setActive(i) enlarges marker i 1.3× (−1: none).
+ * or null. setPoints(points, colors) replaces them; setActive(i) enlarges marker i 1.3× (−1: none), which the
+ * viewer does for the marker under the pointer while the layer is pickable (onHover).
  * pick(ray) → {t, index, item: [x, y, z]} | null, on spheres of max(radius, 0.25) Å.
  */
 export function markerLayer({ id, points = [], colors = null, radius = 0.32, tier = 'top', export: exp = 'marker', pickable = true, pickIn = null, ...more } = {}) {
@@ -769,6 +840,7 @@ export function markerLayer({ id, points = [], colors = null, radius = 0.32, tie
     },
     bounds() { return box; },
     onTheme({ dark }) { edgeMat.color.set(dark ? MARKER_EDGE.dark : MARKER_EDGE.light); },
+    onHover(i) { layer.setActive(i); },
     attach(v) { viewer = v; },
     dispose() {
       for (const m of [fill, edge]) m?.dispose();
