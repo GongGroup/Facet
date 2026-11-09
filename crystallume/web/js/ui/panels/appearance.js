@@ -8,7 +8,7 @@ import { lightingPresets, presetToSettings, environmentMaps, DEFAULT_ENV_MAP } f
 import { DEFAULT_SCENE, makeScene } from '../../render/settings.js';
 import { deepClone, deepMerge, getPath } from '../../core/util.js';
 import { LOOK_KEYS, DARK_BG, DARK_CELL } from '../../app.js';
-import { element } from '../../core/elements.js';
+import { element, METALS } from '../../core/elements.js';
 import { candidatePairs, bondPairStats } from '../../core/bonds.js';
 import { smartPairDefault, estimateDisplayCount, MAX_DISPLAY_ATOMS } from '../../render/display.js';
 import { AO_MAX_RADIUS } from '../../render/post.js';
@@ -378,9 +378,18 @@ registerInspectorTab({
 });
 
 // ------------------------------------------------------------------ Scene
+/**
+ * About how many atoms the view would draw with repeat N: the visible atoms (visibility masks applied), boundary copies
+ * only along axes without a vacuum-gap cut (the cuts of the drawn model, so nothing is sorted again).
+ */
+function shownCount(app, s, N) {
+  const v = app.viewer, same = v?.structure === s;
+  return estimateDisplayCount(s, N, app.scene.display, same ? v.visibleMask?.() ?? null : null, { cuts: same ? v.model?.cuts : undefined });
+}
+
 /** Ask (or refuse) before showing a very large supercell. Resolves true when it may be applied. */
 async function supercellAllowed(app, N, structure) {
-  const total = estimateDisplayCount(structure, N, app.scene.display);   // visible atoms × repeats + boundary images
+  const total = shownCount(app, structure, N);   // visible atoms × repeats + boundary images
   if (total > SUPERCELL_HARD) {
     await new Promise((resolve) => dialog({
       title: 'Too many atoms to show',
@@ -399,7 +408,7 @@ async function supercellAllowed(app, N, structure) {
     return confirmDialog({ title: 'Large supercell', message: `This shows about ${fmtInt(total)} atoms and may freeze the tab. Continue?`, confirm: 'Show anyway', danger: true });
   }
   if (total > SUPERCELL_ASK) {
-    const light = /wire|line|point/i.test(app.scene.style?.representation ?? '');
+    const light = /wire|line|point/i.test(app.scene.style?.rep ?? '');
     return confirmDialog({ title: 'Show a large supercell?', message: `${N.join(' × ')} repeats show about ${fmtInt(total)} atoms. The view may turn slow${light ? '' : ', especially with bonds and effects on; the Wireframe style is lighter'}.`, confirm: 'Show supercell' });
   }
   return true;
@@ -446,7 +455,7 @@ registerInspectorTab({
         const changed = v.some((x, k) => x !== cur[k]);
         stagedSupercell = changed ? { structure: s, v } : null;
         pending.hidden = !changed;
-        if (changed) est.textContent = `${v.join(' × ')} · about ${fmtInt(estimateDisplayCount(s, v, app.scene.display))} atoms`;
+        if (changed) est.textContent = `${v.join(' × ')} · about ${fmtInt(shownCount(app, s, v))} atoms`;
       };
       const revert = () => { stagedSupercell = null; cur = curOf(); inputs.forEach((inp, k) => { inp.value = cur[k]; }); sync(); };
       let asking = false;
@@ -500,7 +509,7 @@ registerInspectorTab({
     const bondSec = section('Bonds',
       toggle({ label: 'Show bonds', checked: B.show !== false, onChange: (v) => app.set('display.bonds.show', v) }),
       slider({ label: 'Tolerance', value: B.tolerance ?? 1.15, min: 0.8, max: 1.6, step: 0.01, fmt: (v) => `×${f2(v)}`, onInput: q('display.bonds.tolerance'), tip: 'Bond if distance < tolerance × (r₁ + r₂), covalent radii' }),
-      toggle({ label: 'Chemistry-aware defaults', sub: 'No metal–metal bonds in ionic solids', checked: B.smart !== false, onChange: (v) => app.set('display.bonds.smart', v) }));
+      toggle({ label: 'Chemistry-aware defaults', sub: 'No metal–metal bonds where both metals bond to a non-metal', checked: B.smart !== false, onChange: (v) => app.set('display.bonds.smart', v) }));
     if (s) {
       const m = app.viewer.model;
       const stats = m ? Object.fromEntries(bondPairStats(m.symbols, m.bonds).map((x) => [x.pair, x])) : {};
@@ -515,7 +524,11 @@ registerInspectorTab({
           const id = `pair-${p.pair}`;
           const cb = h('input', { type: 'checkbox', id, checked: on });
           cb.addEventListener('change', () => app.set('display.bonds.pairOverrides', { ...B.pairOverrides, [p.pair]: cb.checked }));
-          list.append(h('label.row', { for: id, style: { fontSize: '12.5px', cursor: 'pointer', padding: '2px 0' } }, cb, h('b', { style: { fontWeight: 500, minWidth: '54px' } }, p.pair.replace('-', '–')),
+          // a metal–metal pair left at its default: smart bonds may still leave out some of its bonds (pairOverrides true keeps them all)
+          const [ea, eb] = p.pair.split('-');
+          const smartTip = B.smart !== false && B.pairOverrides?.[p.pair] === undefined && METALS.has(ea) && METALS.has(eb)
+            ? 'Smart bonds hide metal–metal bonds where both metals bond to a non-metal' : null;
+          list.append(h('label.row', { for: id, 'data-tip': smartTip, style: { fontSize: '12.5px', cursor: 'pointer', padding: '2px 0' } }, cb, h('b', { style: { fontWeight: 500, minWidth: '54px' } }, p.pair.replace('-', '–')),
             h('span.muted.num', { style: { fontSize: '11.5px', marginLeft: 'auto' } }, st ? `${st.count} × ${st.min.toFixed(2)}${st.max - st.min > 0.01 ? `–${st.max.toFixed(2)}` : ''} Å` : `≤ ${p.cutoff.toFixed(2)} Å`)));
         }
         bondSec.append(h('div.sub-h', 'Element pairs'), list);

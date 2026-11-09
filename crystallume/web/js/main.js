@@ -12,6 +12,7 @@ import { samples } from './build/samples.js';
 import { pickFiles, probeDownloads, canDownload, NO_DOWNLOADS, isArtifact } from './storage/files.js';
 import { toast } from './ui/overlays.js';
 import { selectAll, selectNeighbours, selectSameElement, selectFragment } from './ui/selectioncard.js';
+import { deleteSelection } from './ui/selectioncard.js';
 import { createAPI } from './api/public.js';
 import { installEmbedAPI } from './api/embed.js';
 import { installExtensions, syncRegistryCommands } from './api/extensions.js';
@@ -117,13 +118,16 @@ function registerCommands(app, shell) {
     if (app.tool === 'select' && !app.selection.length && shell.root.dataset.fullscreen === 'focus') { shell.fullscreen(); return; }
     app.setTool('select'); app.clearSelection();
   } });
+  // while visibility masks hide atoms, Select all and Invert selection work on the visible atoms only (and say so)
   R({ id: 'sel.all', title: 'Select all atoms', category: 'Edit', key: 'mod+a', when: hasS, run: () => selectAll(app) });
   R({ id: 'sel.sameElement', title: 'Select same element', category: 'Edit', keywords: 'species all atoms of element', when: hasSel, run: () => selectSameElement(app) });
   R({ id: 'sel.grow', title: 'Select bonded neighbours', category: 'Edit', keywords: 'grow expand neighbors shell', when: hasSel, run: () => selectNeighbours(app) });
   R({ id: 'sel.fragment', title: 'Select bonded fragment', category: 'Edit', keywords: 'molecule connected double-click', when: hasSel, run: () => selectFragment(app) });
-  R({ id: 'sel.delete', title: 'Delete selected atoms', category: 'Edit', key: 'Delete', when: hasSel, run: () => app.deleteSelected() });
-  R({ id: 'sel.delete2', title: 'Delete selected atoms', category: 'Edit', key: 'Backspace', when: hasSel, run: () => app.deleteSelected(), hidden: true });
+  // a selection with hidden atoms asks first whether they go too (deleteSelection)
+  R({ id: 'sel.delete', title: 'Delete selected atoms', category: 'Edit', key: 'Delete', when: hasSel, run: () => deleteSelection(app) });
+  R({ id: 'sel.delete2', title: 'Delete selected atoms', category: 'Edit', key: 'Backspace', when: hasSel, run: () => deleteSelection(app), hidden: true });
   R({ id: 'sel.invert', title: 'Invert selection', category: 'Edit', when: hasS, run: () => app.invertSelection() });
+  R({ id: 'view.showAll', title: 'Show all atoms', category: 'View', aliases: ['Unhide'], keywords: 'unhide hidden atoms visibility', when: () => (app.viewer.hiddenCount ?? 0) > 0, whyNot: () => 'No atoms are hidden.', run: () => app.viewer.showAll() });
   R({ id: 'edit.undo', title: 'Undo', category: 'Edit', kbd: 'mod+z', run: () => app.undo() });
   R({ id: 'edit.redo', title: 'Redo', category: 'Edit', kbd: 'mod+shift+z', run: () => app.redo() });
   R({ id: 'traj.play', title: 'Play / pause trajectory', category: 'Trajectory', key: ' ', when: () => (app.structure?.nFrames ?? 1) > 1, run: () => app.viewer.play() });

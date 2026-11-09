@@ -234,23 +234,24 @@ test('positions steps store only the moved atoms; two moves in one step are both
   assert.equal(app.structure, s);
 });
 
-test('a positions snapshot keeps the measurements: undo puts back keys an image shift rewrote', () => {
+test('a positions snapshot keeps the measurements: undo puts back refs an image shift rewrote', () => {
   const app = makeApp(), s = slab(2, 2);
   const [e] = setup(app, s);
-  const keys0 = ['0:0,0,0', '1:0,0,0'], keys1 = ['0:-1,0,0', '1:0,0,0'];
-  app.viewer.measurements = [{ id: 'm1', type: 'distance', keys: keys0.slice() }];
-  e.measurements = [{ type: 'distance', keys: keys0.slice() }];
+  // atom 0 moves by +a (r' = r + a): its reference image becomes −a, normalised so that atom 0 is at 0,0,0
+  const refs0 = ['0:0,0,0', '1:0,0,0'], refs1 = ['0:0,0,0', '1:1,0,0'];
+  app.viewer.measurements = [{ id: 'm1', type: 'distance', refs: refs0.slice() }];
+  e.measurements = [{ id: 'm1', type: 'distance', refs: refs0.slice() }];
   app._pushStructureHistory('Wrap atom 0', { id: e.id, how: { positions: [0] } });
   s._base[0] += s.cell[0][0];
-  app.viewer.measurements = [{ id: 'm1', type: 'distance', keys: keys1.slice() }];
-  e.measurements = [{ type: 'distance', keys: keys1.slice() }];
-  assert.deepEqual(app.history.top().snap.before.entries[e.id].meas, [{ type: 'distance', keys: keys0 }]);
+  assert.equal(app._remapMeasurements(Int32Array.from(s.symbols.keys()), { imageShift: (i) => (i === 0 ? [1, 0, 0] : null) }), 0);
+  assert.deepEqual(e.measurements, [{ id: 'm1', type: 'distance', refs: refs1 }]);
+  assert.deepEqual(app.history.top().snap.before.entries[e.id].meas, [{ id: 'm1', type: 'distance', refs: refs0 }]);
   app.undo();
-  assert.deepEqual(app.project.structures[0].measurements, [{ type: 'distance', keys: keys0 }]);
-  assert.deepEqual(app.viewer.measurements.map((m) => m.keys), [keys0]);
+  assert.deepEqual(app.project.structures[0].measurements, [{ id: 'm1', type: 'distance', refs: refs0 }]);
+  assert.deepEqual(app.viewer.measurements.map((m) => [m.id, m.refs]), [['m1', refs0]], 'the id stays through undo');
   app.redo();
-  assert.deepEqual(app.project.structures[0].measurements, [{ type: 'distance', keys: keys1 }]);
-  assert.deepEqual(app.viewer.measurements.map((m) => m.keys), [keys1]);
+  assert.deepEqual(app.project.structures[0].measurements, [{ id: 'm1', type: 'distance', refs: refs1 }]);
+  assert.deepEqual(app.viewer.measurements.map((m) => [m.id, m.refs]), [['m1', refs1]]);
 });
 
 test('View toggles merge into one step, which disappears when toggled back', () => {
@@ -332,8 +333,8 @@ test('replaceActiveStructure is one step; when the viewer fails nothing is recor
   const app = makeApp(), s = slab(2, 2);
   const [e] = setup(app, s);
   const j0 = json(s);
-  app.viewer.measurements = [{ id: 'm', type: 'distance', keys: ['0:0,0,0', '7:0,0,0'] }];
-  e.measurements = [{ type: 'distance', keys: ['0:0,0,0', '7:0,0,0'] }];
+  app.viewer.measurements = [{ id: 'm', type: 'distance', refs: ['0:0,0,0', '7:0,0,0'] }];
+  e.measurements = [{ id: 'm', type: 'distance', refs: ['0:0,0,0', '7:0,0,0'] }];
   app.select([1, 7]);
   const bigger = s.repeat(2, 1, 1);
   app.replaceActiveStructure(bigger, { label: 'Make supercell' });
@@ -352,7 +353,7 @@ test('replaceActiveStructure is one step; when the viewer fails nothing is recor
   assert.equal(app.history.length, n);
   assert.equal(app.history.redoLength, 1);
   assert.equal(json(app.structure), jc);
-  assert.deepEqual(app.project.structures[0].measurements, [{ type: 'distance', keys: ['0:0,0,0', '7:0,0,0'] }]);
+  assert.deepEqual(app.project.structures[0].measurements, [{ id: 'm', type: 'distance', refs: ['0:0,0,0', '7:0,0,0'] }]);
   assert.deepEqual(app.selection, [1, 7]);
 });
 

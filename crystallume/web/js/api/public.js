@@ -258,6 +258,8 @@ export function createAPI(app, shell) {
     clearSelection: () => app.clearSelection(),
     /** A named halo around atoms (source indices; null clears it): opts {color, grow, opacity, strength, contrast, export}. */
     highlight: (name, indices, opts) => app.viewer.setHighlight(name, indices, opts),
+    /** Hide atoms under a name: spec null (remove), {hide: indices}, {show: indices} or a Uint8Array (1 = drawn). Returns the number hidden. */
+    setVisibility: (name, spec) => app.viewer.setVisibility(name, spec),
     /** Select every atom of the active structure. Returns the selection. */
     selectAll() { if (app.structure) app.select(app.structure.symbols.map((_, i) => i)); return app.selection; },
     /**

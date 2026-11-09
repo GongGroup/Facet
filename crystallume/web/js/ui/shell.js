@@ -11,7 +11,7 @@ import { samples } from '../build/samples.js';
 import { VERSION } from '../app.js';
 import { keyLabel, matchKey, parseKey, hasMod, isMac, MOD, ALT } from './keys.js';
 import { canDownload, NO_DOWNLOADS } from '../storage/files.js';
-import { SelectionCard, selectSameElement, selectNeighbours, selectFragment, selectAll, measureFrom, selectionActions, actionMenuItems, menuTarget } from './selectioncard.js';
+import { SelectionCard, selectSameElement, selectNeighbours, selectFragment, selectAll, measureFrom, selectionActions, actionMenuItems, menuTarget, deleteSelection } from './selectioncard.js';
 import { attachSections, openSection } from './sections.js';
 import { atomInfoRows } from './atominfo.js';
 
@@ -553,7 +553,8 @@ export class Shell {
     const extra = atomInfoRows(this.app, info.index, 'hover').flatMap((r) => [h('br'), `${r.label}  ${r.value}`]);
     this.hover.replaceChildren(
       h('div.h', h('span.dot', { style: { background: color } }), `${info.symbol}`, h('small', `#${info.index} · ${info.name}`)),
-      h('div.m', `xyz  ${f(info.position)} Å`, info.frac ? h('br') : null, info.frac ? `frac ${f(info.frac)}` : null, h('br'), `bonds ${info.cn}${info.image.some(Boolean) ? `  ·  image ${info.image.join(',')}` : ''}`, ...extra),
+      h('div.m', `xyz  ${f(info.position)} Å`, info.frac ? h('br') : null, info.frac ? `frac ${f(info.frac)}` : null, h('br'), `bonds ${info.cn}`,
+        info.image.some(Boolean) ? [h('br'), `Drawn image (${info.image.map((v) => (v < 0 ? `−${-v}` : v)).join(', ')})`] : null, ...extra),
     );
     this.hover.hidden = false;
     const W = this.stage.clientWidth, H = this.stage.clientHeight;
@@ -629,6 +630,8 @@ export class Shell {
   _updateStats() {
     const m = this.app.viewer.model, s = this.app.structure;
     const st = this.statText;
+    const hidden = m && s ? this.app.viewer.hiddenCount ?? 0 : 0;
+    this._updateHiddenPill(hidden);
     if (!m || !s) { st.textContent = ''; st.hidden = true; delete st.dataset.tip; return; }
     st.hidden = false;
     const n = s.length, drawn = m.n;
@@ -636,8 +639,26 @@ export class Shell {
     const showFps = this.fps != null && (this.fps < 30 || this.app.prefs.debug);
     st.textContent = [atoms, m.bondsSkipped ? 'bonds off (too many atoms)' : plural(m.bonds?.count ?? 0, 'bond'), showFps ? `${this.fps} fps` : null].filter(Boolean).join(' · ');
     if (drawn > n) st.dataset.tip = 'Includes boundary and periodic image atoms (Scene → Repeat & boundaries)';
-    else if (drawn < n) st.dataset.tip = 'Hidden elements are not drawn (Style → Colour & size per element)';
+    else if (drawn < n && !hidden) st.dataset.tip = 'Hidden elements are not drawn (Style → Colour & size per element)';
+    else if (drawn < n) st.dataset.tip = 'Hidden atoms are not drawn';
     else delete st.dataset.tip;
+  }
+
+  /** "216 hidden · Show all" after the stats while visibility masks hide atoms (view.showAll brings them back). */
+  _updateHiddenPill(hidden) {
+    let pill = this._hiddenPill;
+    if (!hidden) { pill?.remove(); return; }
+    if (!pill) {
+      const count = h('span.n');
+      const show = h('button', { type: 'button', style: { border: 0, padding: 0, background: 'none', color: 'var(--accent-strong)', font: 'inherit', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }, on: { click: () => this.runCommand('view.showAll') } }, 'Show all');
+      pill = this._hiddenPill = h('span.pill.hidden-atoms', {
+        'data-tip': 'Atoms hidden by surface tools (Surface › Layers). Show all brings them back.',
+        style: { pointerEvents: 'auto', flex: 'none', whiteSpace: 'nowrap', display: 'inline-flex', gap: '6px', alignItems: 'center' },
+      }, count, h('span', { 'aria-hidden': 'true' }, '·'), show);
+      pill._count = count;
+    }
+    pill._count.textContent = `${hidden.toLocaleString()} hidden`;
+    if (pill.previousElementSibling !== this.statText) this.statText.after(pill);
   }
 
   updateTraj() {
@@ -879,7 +900,7 @@ export class Shell {
       ...(extra.length ? [{ separator: true }, ...extra] : []),
       { separator: true },
       { label: `Hide ${el.name}`, icon: 'eyeOff', run: () => this.hideElement(sym) },
-      { label: inSel && sel.length > 1 ? `Delete ${sel.length} selected atoms` : 'Delete atom', icon: 'trash', kbd: keyLabel('Delete'), run: () => { if (!inSel) app.select([src]); app.deleteSelected(); } },
+      { label: inSel && sel.length > 1 ? `Delete ${sel.length} selected atoms` : 'Delete atom', icon: 'trash', kbd: keyLabel('Delete'), run: () => { if (!inSel) app.select([src]); deleteSelection(app); } },
     ], { label: `Atom ${sym} ${src}` });
   }
 

@@ -16,7 +16,7 @@ import { Structure } from './core/structure.js';
 import { uid, deepClone, deepMerge, setPath, getPath, debounce, relativeTime } from './core/util.js';
 import { parseStructure, exportStructure, formats, detectFormat } from './io/index.js';
 import { samples } from './build/samples.js';
-import { Viewer, measureArity } from './render/viewer.js';
+import { Viewer } from './render/viewer.js';
 import { bondedFragment } from './render/display.js';
 import { makeScene, DEFAULT_SCENE } from './render/settings.js';
 import { colorExtrasFrom } from './render/colors.js';
@@ -33,6 +33,7 @@ import { toast, dialog } from './ui/overlays.js';
 import { h } from './ui/dom.js';
 import { makeZip } from './core/zip.js';
 import { HistoryStore, historyBudget, snapStructure, snapPositions, structureFromSnap, applyPositionsSnap, patchPositions, mergePositions, BUDGET_NOTICE, INCONSISTENT, HistoryError } from './core/history.js';
+import { cleanMeasurementList, remapMeasurementList, migrateMeasurementKeys, newMeasurementId, wholeCellShifts } from './core/measure.js';
 
 export const VERSION = '0.3.1';
 const PREF_KEY = 'atomscope.prefs';   // key from the app's former name, kept so saved preferences survive the rename
@@ -98,10 +99,15 @@ function isLightBackground(bg) {
   const ls = [bg.color1, bg.mode === 'solid' ? null : bg.color2].map(luminance).filter((v) => v != null);
   return ls.length > 0 && ls.reduce((a, b) => a + b, 0) / ls.length > 0.5;
 }
-/** Saved measurements that can be shown: a known type with its number of atom keys (others are dropped). */
-const cleanMeasurements = (list) => (Array.isArray(list) ? list : [])
-  .filter((m) => m && Array.isArray(m.keys) && measureArity(m.type) === m.keys.length && m.keys.every((k) => typeof k === 'string'))
-  .map((m) => ({ type: m.type, keys: m.keys.slice() }));
+/**
+ * Saved measurements that can be shown, as {id, type, refs} (core/measure.js): a known type with its number of atoms
+ * (others are dropped). The `keys` of projects saved before references existed are migrated against `structure` and
+ * the display.wrap of `scene`. Ids are kept (undo snapshots) unless `newIds` (an opened project: ids are not saved).
+ */
+const cleanMeasurements = (list, structure = null, scene = null, { newIds = false } = {}) =>
+  cleanMeasurementList(list, structure, { wrap: scene?.display?.wrap !== false, newIds });
+/** A measurement as entries and snapshots keep it: {id, type, refs}. */
+const measurementRecord = (m) => ({ id: m.id, type: m.type, refs: Array.isArray(m.refs) ? m.refs.slice() : m.refs });
 const toStructure = (s) => (s instanceof Structure ? s : Structure.fromJSON(s));
 const pause = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 /** Bump the structure's change counter (Structure.touch() once the data layer provides it). */
@@ -233,7 +239,8 @@ export class App extends Emitter {
       thumbnail: thumb,
       activeStructure: p.activeStructure,
       structures: p.structures.map((s) => {
-        const ms = s === active ? this._viewerMeasurements() : (s.measurements ?? []);
+        // {type, refs}: ids belong to the session and are not saved
+        const ms = (s === active ? this._viewerMeasurements() : (s.measurements ?? [])).filter((m) => Array.isArray(m.refs)).map((m) => ({ type: m.type, refs: m.refs.slice() }));
         return { id: s.id, name: s.name, structure: s.structure.toJSON(), ...(ms.length ? { measurements: ms } : {}) };
       }),
       scene: deepClone(p.scene),
@@ -252,10 +259,16 @@ export class App extends Emitter {
   /** Replace the open project with a document. Throws (leaving the current project open) if it cannot be shown. */
   loadProjectJSON(doc, location = null) {
     if (!doc || !Array.isArray(doc.structures)) throw new Error('This file is not a Crystallume project.');
+    const scene = makeScene(doc.scene);
+    // measurements saved as {type, keys} (before 0.4) become {type, refs} against the structure and the project's wrapping
+    const entryOf = (s) => {
+      const structure = Structure.fromJSON(s.structure);
+      return { id: s.id ?? uid('s'), name: s.name ?? s.structure?.name ?? 'Structure', structure, measurements: cleanMeasurements(s.measurements, structure, scene, { newIds: true }) };
+    };
     const p = {
       id: doc.id ?? uid('p'), name: doc.name ?? 'Untitled project', description: doc.description ?? '', tags: doc.tags ?? [], created: doc.created ?? new Date().toISOString(), updated: doc.updated ?? null,
-      structures: doc.structures.map((s) => ({ id: s.id ?? uid('s'), name: s.name ?? s.structure?.name ?? 'Structure', structure: Structure.fromJSON(s.structure), measurements: cleanMeasurements(s.measurements) })),
-      activeStructure: doc.activeStructure, scene: makeScene(doc.scene), location, thumbnail: doc.thumbnail ?? null,
+      structures: doc.structures.map(entryOf),
+      activeStructure: doc.activeStructure, scene, location, thumbnail: doc.thumbnail ?? null,
     };
     if (doc.importedFrom) p.importedFrom = doc.importedFrom;
     // projects saved before lookBase existed: the look they show, not the default's ('studio')
@@ -652,12 +665,13 @@ export class App extends Emitter {
     const live = new Map(this.project.structures.map((e) => [e.id, e]));
     this.project.structures = snap.order.map((id) => {
       const es = snap.entries[id];
-      if (es?.full) return { id, name: snap.names[id] ?? es.full.name, structure: structureFromSnap(es.full), measurements: cleanMeasurements(es.meas) };
+      // snapshot measurements keep their ids, so a toast's Remove still finds its measurement after undo and redo
+      if (es?.full) { const structure = structureFromSnap(es.full); return { id, name: snap.names[id] ?? es.full.name, structure, measurements: cleanMeasurements(es.meas, structure, this.scene) }; }
       const cur = live.get(id), name = snap.names[id] ?? cur.name;
       if (es?.positions) {
         applyPositionsSnap(cur.structure, es.positions);
         bumpRev(cur.structure);
-        cur.measurements = cleanMeasurements(es.meas);
+        cur.measurements = cleanMeasurements(es.meas, cur.structure, this.scene);
       }
       // renaming is not an undo step, but a step taken before a rename puts the old name back (as it always has)
       if (cur.name !== name) { if (cur.structure.name === cur.name) cur.structure.name = name; cur.name = name; }
@@ -741,7 +755,17 @@ export class App extends Emitter {
     this.emit('selection');
   }
   selectElement(sym, add = false, mode = undefined) { if (!this.structure) return; this.select(this.structure.symbols.map((s, i) => (s === sym ? i : -1)).filter((i) => i >= 0), { add, mode }); }
-  invertSelection() { if (!this.structure) return; const s = this.viewer.selection; this.select(this.structure.symbols.map((_, i) => i).filter((i) => !s.has(i))); }
+  /**
+   * Select the atoms that are not selected. While visibility masks hide atoms (viewer.setVisibility), only the visible
+   * ones are inverted: hidden atoms end up unselected, and a toast says how many are hidden.
+   */
+  invertSelection() {
+    if (!this.structure) return;
+    const v = this.viewer, s = v.selection, hidden = v.hiddenCount ?? 0;
+    const out = this.structure.symbols.map((_, i) => i).filter((i) => !s.has(i) && (!hidden || v.isVisible(i)));
+    this.select(out);
+    if (hidden) toast(`Selected ${plural(out.length, 'visible atom')} (${hidden} hidden).`);
+  }
   clearSelection() { this.viewer.setSelection([]); this.measurePicks = []; this.emit('selection'); }
 
   deleteSelected() {
@@ -849,12 +873,26 @@ export class App extends Emitter {
   }
 
   // ------------------------------------------------------------------ measurements (saved per structure)
-  _viewerMeasurements() { return (this.viewer.measurements ?? []).map((m) => ({ type: m.type, keys: m.keys.slice() })); }
+  /**
+   * The viewer's measurements as the entry keeps them, {id, type, refs} (core/measure.js); an entry a script added with
+   * the old `keys` is migrated against the shown structure.
+   */
+  _viewerMeasurements() {
+    const wrap = this.scene?.display?.wrap !== false;
+    return (this.viewer.measurements ?? []).map((m) => {
+      if (Array.isArray(m.refs) || !Array.isArray(m.keys)) return measurementRecord(m);
+      return { id: m.id, type: m.type, refs: migrateMeasurementKeys(this.structure, m.keys, { wrap }) };
+    }).filter((m) => Array.isArray(m.refs));
+  }
 
+  /** Show an entry's measurements in the viewer, with their ids (stable for the session: undo and redo keep them). */
   _showMeasurements(entry) {
     this._measGuard++;
     try {
-      this.viewer.measurements = (entry?.measurements ?? []).map((m) => ({ id: Math.random().toString(36).slice(2, 8), type: m.type, keys: m.keys.slice() }));
+      this.viewer.measurements = (entry?.measurements ?? []).map((m) => {
+        if (typeof m.id !== 'string' || !m.id) m.id = newMeasurementId();
+        return measurementRecord(m);
+      });
       this.viewer._buildMeasurements?.();
     } finally { this._measGuard--; }
   }
@@ -864,26 +902,32 @@ export class App extends Emitter {
     if (this._measGuard) return;
     const e = this._activeEntry();
     if (!e || this.viewer.structure !== e.structure) return;
+    // the same measurements drawn differently (an atom hidden or shown again): panels that list them redraw
+    const drawn = (this.viewer.measurements ?? []).map((m) => m.drawn ?? '-').join();
+    const redrawn = drawn !== this._measDrawn;
+    this._measDrawn = drawn;
     const cur = this._viewerMeasurements();
-    if (JSON.stringify(cur) === JSON.stringify(e.measurements ?? [])) return;
+    if (JSON.stringify(cur) === JSON.stringify(e.measurements ?? [])) { if (redrawn) this.emit('measure'); return; }
     e.measurements = cur;
     this.markDirty();
   }
 
-  /** Point measurement keys ('src:image') at new atom indices; measurements on removed atoms are dropped. */
-  _remapMeasurements(map) {
-    const out = [];
-    for (const m of this.viewer.measurements ?? []) {
-      const keys = m.keys.map((k) => {
-        const c = k.indexOf(':'), i = Number(k.slice(0, c));
-        const j = Number.isInteger(i) && i >= 0 && i < map.length ? map[i] : -1;
-        return j >= 0 ? `${j}${k.slice(c)}` : null;
-      });
-      if (keys.every((k) => k != null)) out.push({ ...m, keys });
-    }
-    this.viewer.measurements = out;
+  /**
+   * Measurements after an edit (F0-A §3.9.4, core/measure.js remapMeasurementList): atom indices through `map`
+   * (map[old] = new, −1 = removed: a measurement on a removed atom is dropped); `latticeChanged` (a supercell, a
+   * redefined lattice) drops those with a non-zero image; `imageShift(oldIndex) → [ka, kb, kc]` rewrites the images of
+   * atoms whose stored positions the edit moved by whole cells (wrapping into the cell). Without it, while the viewer
+   * still shows the structure from before the edit (a structure swapped in, as Wrap into cell does), whole-cell moves
+   * are read off the two structures (wholeCellShifts). Atoms moved any other way need nothing: references follow the
+   * stored positions. Returns the number of measurements dropped (for the toast: measurementsRemovedNote).
+   */
+  _remapMeasurements(map, { imageShift = null, latticeChanged = false } = {}) {
+    const shift = imageShift ?? (latticeChanged ? null : wholeCellShifts(this.viewer.structure, this.structure, map));
+    const { list, removed } = remapMeasurementList(this.viewer.measurements ?? [], map, { imageShift: shift, latticeChanged });
+    this.viewer.measurements = list;
     const e = this._activeEntry();
-    if (e) e.measurements = out.map((m) => ({ type: m.type, keys: m.keys.slice() }));
+    if (e) e.measurements = list.filter((m) => Array.isArray(m.refs)).map(measurementRecord);
+    return removed;
   }
 
   // ------------------------------------------------------------------ loading

@@ -11,6 +11,8 @@ import { formulaHTML, formulaEl, registerLeftPanel } from '../shell.js';
 import { analyses, runKey, structureKey, defaultParams } from '../../core/analyses.js';
 import { paramForm, renderResult, analysisContext } from '../paramform.js';
 import { renderSections, sectionsSignature } from '../sections.js';
+import { deleteSelection, confirmHiddenSelection } from '../selectioncard.js';
+import { parseRef } from '../../core/measure.js';
 
 /** Analysis results by runKey (structure version, params, scene deps): re-renders never recompute. */
 const results = new Map();
@@ -83,7 +85,7 @@ registerLeftPanel({
     return JSON.stringify([
       p.activeStructure, p.structures.map((e) => `${e.id}:${e.name}:${e.structure.length}:${e.structure.nFrames}`), s ? structureKey(app) : null, s?.name,
       s?.info?.spacegroup, s?.info?.note,
-      app.selection.join(','), ms.map((m) => `${m.id}:${m.valid && Number.isFinite(m.value) ? m.value.toFixed(4) : '-'}`),
+      app.selection.join(','), ms.map((m) => `${m.id}:${m.drawn ?? '-'}:${m.valid && Number.isFinite(m.value) ? m.value.toFixed(4) : '-'}`),
       sc?.style?.colorScheme, sc?.style?.monoColor, sc?.style?.colorOverrides, sc?.display?.bonds, sc?.display?.supercell,
       analyses.list().map((a) => a.id),
       sectionsSignature('structure', app),
@@ -145,10 +147,17 @@ registerLeftPanel({
       const rep = h('input.field', { placeholder: 'e.g. Fe', 'aria-label': 'Replace with element', style: { width: '72px', textAlign: 'center' } });
       selSec.append(
         h('div.row', { style: { flexWrap: 'wrap', gap: '6px' } },
-          btn('Delete', { icon: 'trash', cls: 'small danger', tip: 'Delete selected atoms', kbd: 'Del', on: () => app.deleteSelected() }),
+          btn('Delete', { icon: 'trash', cls: 'small danger', tip: 'Delete selected atoms', kbd: 'Del', on: () => deleteSelection(app) }),
           btn('Invert', { cls: 'small', on: () => app.invertSelection() }),
           btn('Clear', { cls: 'small', kbd: 'Esc', on: () => app.clearSelection() })),
-        h('div.row', h('span.ctl-label', 'Replace with'), rep, btn('Apply', { cls: 'small', on: () => { const sym = normalizeSymbol(rep.value); if (sym === 'X') { toast('Type an element symbol, like Fe or O.', { type: 'error' }); return; } app.replaceSelected(sym); toast(`Replaced ${sel.length} atom${sel.length > 1 ? 's' : ''} with ${sym}`); } })));
+        h('div.row', h('span.ctl-label', 'Replace with'), rep, btn('Apply', { cls: 'small', on: async () => {
+          const sym = normalizeSymbol(rep.value);
+          if (sym === 'X') { toast('Type an element symbol, like Fe or O.', { type: 'error' }); return; }
+          const atoms = await confirmHiddenSelection(app, 'Change', sel);   // hidden atoms change only when the user says so
+          if (!atoms?.length) return;
+          if (atoms.length !== sel.length) app.select(atoms);
+          app.replaceSelected(sym); toast(`Replaced ${atoms.length} atom${atoms.length > 1 ? 's' : ''} with ${sym}`);
+        } })));
     }
     el.append(selSec);
     renderSections('structure', app, el, shell, { slot: 'transform' });
@@ -159,11 +168,15 @@ registerLeftPanel({
     if (!ms.length) mSec.append(h('p.hint', 'Press M or use the ruler in the toolbar, then click 2, 3 or 4 atoms.'), h('div.row', { style: { gap: '6px' } },
       btn('Distance', { cls: 'small', on: () => app.setTool('measure', 'distance') }), btn('Angle', { cls: 'small', on: () => app.setTool('measure', 'angle') }), btn('Dihedral', { cls: 'small', on: () => app.setTool('measure', 'dihedral') })));
     else {
-      const m = app.viewer.model;
       for (const x of ms) {
-        const label = x.valid && Number.isFinite(x.value) ? x.idx.map((i) => `${m.symbols[i]}${m.src[i]}`).join('–') : '(not in view)';
-        mSec.append(h('div.row', { style: { fontSize: '12.5px' } }, h('span', { style: { minWidth: '62px', color: 'var(--muted)' } }, x.type[0].toUpperCase() + x.type.slice(1)), h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' } }, label),
-          h('b.num', { style: { fontWeight: 500 } }, x.valid && Number.isFinite(x.value) ? (x.type === 'distance' ? `${x.value.toFixed(3)} Å` : `${x.value.toFixed(2)}°`) : '—'),
+        // atoms by their structure index (refs); a hidden atom keeps the value but has no line; an atom the structure
+        // does not have (any more) shows no value
+        const ok = x.valid && Number.isFinite(x.value);
+        const atoms = ok ? (x.refs ?? []).map((r) => parseRef(r)?.atom) : [];
+        const names = atoms.map((i) => `${s.symbols[i]}${i}`).join('–');
+        const label = !ok ? '(not in view)' : x.drawn === 'hidden' ? `${names} (hidden)` : names;
+        mSec.append(h('div.row', { style: { fontSize: '12.5px' } }, h('span', { style: { minWidth: '62px', color: 'var(--muted)' } }, x.type[0].toUpperCase() + x.type.slice(1)), h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }, 'data-tip': x.drawn === 'hidden' ? 'An atom of this measurement is hidden, so the view does not draw it' : null }, label),
+          h('b.num', { style: { fontWeight: 500 } }, ok ? (x.type === 'distance' ? `${x.value.toFixed(3)} Å` : `${x.value.toFixed(2)}°`) : '—'),
           btn('', { icon: 'x', cls: 'ghost icon small', tip: 'Remove', on: () => { app.viewer.removeMeasurement(x.id); app.emit('measure'); } })));
       }
     }
