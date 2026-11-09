@@ -1,10 +1,11 @@
 // The input controls of ui/inputs.js and their use in ui/paramform.js (F0-A T8, F0-A §5.6, ledger L-F0-48): numberInput
-// (unit, required boxes that start empty with no placeholder digits, U4), vec3Input (frames, size 2, paste), millerInput
-// (four indices on a hexagonal cell, the readout, paste "1 0 0 0"), imatrixInput (det readout, area, warn, positive:
-// false, presets as a list or a function of ctx, presets with numbers), setInvalid, wheel blocking on a focused box,
-// validity.badInput counted as typing, aria-labels on every box (the e2e locators, lead decision L-06), and paramForm's
-// new types, valid and onValidity. The controls run on the small DOM stand-in below (events with capture and bubble,
-// focus, a selector subset); the real page is checked in the browser.
+// (unit, required boxes that start empty with no placeholder digits, U4), vec3Input (frames, the surface frame from the
+// current structure or a × b, size 2, paste), millerInput (four indices on a hexagonal cell, the readout and the notes
+// of other hexagonal settings, paste "1 0 0 0"), imatrixInput (det readout, area, warn, positive: false, presets as a
+// list or a function of ctx with the app's current structure, presets with numbers), setInvalid, wheel blocking on a
+// focused box, validity.badInput counted as typing, aria-labels on every box (the e2e locators, lead decision L-06),
+// and paramForm's new types, a required element, valid and onValidity. The controls run on the small DOM stand-in
+// below (events with capture and bubble, focus, a selector subset); the real page is checked in the browser.
 // Run: node --test tests/js/inputs.test.mjs (or through pytest: tests/test_js_unit.py).
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -183,6 +184,7 @@ doc.append(doc.body);
 Object.assign(doc, {
   activeElement: doc.body, fullscreenElement: null, documentElement: doc.body, scrollingElement: doc.body,
   createElement: (tag) => new FakeElement(tag), createTextNode: (t) => new FakeText(t),
+  getElementById: (id) => [...doc.descendants()].find((el) => el.id === id) ?? null,
 });
 globalThis.document = doc;
 globalThis.Node = FakeNode;
@@ -197,6 +199,7 @@ const { numberInput, vec3Input, millerInput, imatrixInput, setInvalid } = await 
 const { paramForm } = await import('../../crystallume/web/js/ui/paramform.js');
 const { closeMenu } = await import('../../crystallume/web/js/ui/overlays.js');
 const { cellFromParams } = await import('../../crystallume/web/js/core/util.js');
+const { Structure } = await import('../../crystallume/web/js/core/structure.js');
 
 // ------------------------------------------------------------------------------------------- helpers
 const MINUS = '\u2212';
@@ -383,7 +386,32 @@ describe('vec3Input', () => {
     assert.deepEqual(ctl.inputs.map((b) => b.value), ['0', '0', '1.5']);
     type(ctl.inputs[0], '0.5');
     assert.deepEqual(ctl.value, [1, 0, 1.5]);
-    assert.equal(vec3Input({ label: 'v', frames: ['cartesian', 'surface'], cell }).el.querySelector('[data-frame="surface"]'), null, 'no normal: no surface frame');
+    assert.equal(vec3Input({ label: 'v', frames: ['cartesian', 'surface'] }).el.querySelector('[data-frame="surface"]'), null, 'no cell: no surface frame');
+  });
+  test('the surface frame without `surface`: surfaceNormal of the current structure when `cell` is its cell, else a × b', () => {
+    // vacuum along a: the surface normal is a, u and v run along b and c
+    const slab = new Structure({ symbols: ['Cu', 'Cu', 'Cu'], positions: [[1, 0, 0], [2.5, 1.5, 1.5], [4, 0, 0]], cell: [[20, 0, 0], [0, 3, 0], [0, 0, 3]], pbc: [true, true, true] });
+    const shown = (ctl) => { ctl.el.querySelector('[data-frame="surface"]').click(); return ctl.inputs.map((b) => b.value); };
+    const viaApp = vec3Input({ label: 'Move', value: [2, 0, 1.5], frames: ['cartesian', 'surface'], cell: slab.cell, app: { structure: slab } });
+    assert.deepEqual(shown(viaApp), ['0', '0.5', '2'], 'h along a, the vacuum axis of the app\'s structure');
+    type(viaApp.inputs[2], '1');
+    assert.deepEqual(viaApp.value, [1, 0, 1.5], 'the value stays Cartesian');
+    const copy = slab.cell.map((r) => r.slice());
+    assert.deepEqual(shown(vec3Input({ label: 'Move', value: [2, 0, 1.5], frames: ['cartesian', 'surface'], cell: copy, structure: slab })), ['0', '0.5', '2'],
+      'an equal cell is the structure\'s cell; `structure` overrides the app');
+    const prev = globalThis.crystallume;
+    globalThis.crystallume = { app: { structure: slab } };
+    try {
+      assert.deepEqual(shown(vec3Input({ label: 'Move', value: [2, 0, 1.5], frames: ['cartesian', 'surface'], cell: slab.cell })), ['0', '0.5', '2'], 'the page\'s crystallume.app');
+      const other = [[2, 0, 0], [0, 2, 0], [1, 0, 20]];
+      assert.deepEqual(shown(vec3Input({ label: 'Move', value: [0, 0, 1.5], frames: ['cartesian', 'surface'], cell: other })), ['0', '0', '1.5'],
+        'another cell than the structure\'s: the normal of a × b, h along z');
+    } finally {
+      if (prev === undefined) delete globalThis.crystallume; else globalThis.crystallume = prev;
+    }
+    const flipped = vec3Input({ label: 'Move', value: [0, 0, -2], frames: ['cartesian', 'surface'], cell: [[2, 0, 0], [0, 2, 0], [0, 0, -20]] });
+    assert.deepEqual(shown(flipped), ['0', '0', '2'], 'no structure: a × b turned to the +c side');
+    assert.deepEqual(flipped.inputs.map((b) => b.getAttribute('aria-label')), ['u', 'v', 'h']);
   });
   test('size 2 (labels u v), integer, nonzero, optional', () => {
     const uv = vec3Input({ label: 'Offset', size: 2, value: [0, 0] });
@@ -476,6 +504,21 @@ describe('millerInput', () => {
     type(own.inputs[0], '13');
     assert.equal(errorLine(own), `hkl: use indices from ${MINUS}12 to 12.`);
   });
+  test('the four-index note says what the cell lacks: γ = 120° with c unique, c as the unique axis, or nothing', () => {
+    const notes = (ctl) => ctl.el.querySelectorAll('.readout p').map((x) => x.textContent).filter((t) => t.startsWith('Four-index'));
+    const make = (cell, extra = {}) => millerInput({ label: 'hkl', value: [0, 0, 1], cell, ...extra });
+    assert.deepEqual(notes(make(cellFromParams(3.25, 3.25, 5.2, 90, 90, 60))), ['Four-index (h k i l) notation needs the γ = 120° setting.']);
+    const aUnique = make(cellFromParams(5.2, 3.25, 3.25, 120, 90, 90));   // isHexagonalCell: { axis: 0, gamma: 120 }
+    assert.equal(aUnique.inputs.length, 3);
+    assert.deepEqual(notes(aUnique), ['Four-index (h k i l) notation needs c as the unique axis.'], 'the angle is already 120°');
+    assert.deepEqual(notes(make(cellFromParams(3.25, 5.2, 3.25, 90, 60, 90))), ['Four-index (h k i l) notation needs c as the unique axis and γ = 120°.']);
+    assert.deepEqual(notes(make(hex)), [], 'the c-unique 120° setting shows four boxes, no note');
+    assert.equal(make(hex).el.querySelector('.triple').dataset.n, '4');
+    assert.deepEqual(notes(make(cubic)), []);
+    const forced = make(cellFromParams(3.25, 3.25, 5.2, 90, 90, 60), { hexagonal: true });
+    assert.deepEqual([forced.el.querySelector('.triple').dataset.n, notes(forced)], ['4', []], 'four boxes asked for: no note against them');
+    assert.deepEqual(notes(make(cellFromParams(3.25, 3.25, 5.2, 90, 90, 60), { hexagonal: false })), [], 'three boxes asked for');
+  });
 });
 
 // ------------------------------------------------------------------------------------------- imatrixInput
@@ -564,6 +607,33 @@ describe('imatrixInput', () => {
     assert.deepEqual(onCommit.calls, [[[[1, 1], [-1, 2]]]], 'choosing a preset commits it');
     btn.click();
     assert.deepEqual(calls[1].value, [[1, 1], [-1, 2]], 'ctx.value is the current matrix');
+  });
+  test('presets(ctx) without a structure option get the current structure of the app (`app`, else crystallume.app)', () => {
+    const seen = [];
+    const presets = (ctx) => { seen.push(ctx); return []; };
+    const open = (ctl, label) => { byLabel(ctl.el, `${label} presets`).click(); closeMenu(); return seen.at(-1); };
+    const zno = { cell: hex, name: 'ZnO' };
+    let ctx = open(imatrixInput({ label: 'Surface cell', size: 2, value: [[1, 0], [0, 1]], app: { structure: zno }, presets }), 'Surface cell');
+    assert.deepEqual([ctx.structure, ctx.cell, ctx.value], [zno, hex, [[1, 0], [0, 1]]]);
+    const prev = globalThis.crystallume;
+    const pt = { cell: cubic, name: 'Pt' };
+    globalThis.crystallume = { app: { structure: pt } };
+    try {
+      const ctl = imatrixInput({ label: 'Supercell', presets });
+      ctx = open(ctl, 'Supercell');
+      assert.deepEqual([ctx.structure, ctx.cell], [pt, cubic], 'the page\'s app, as the ledger\'s options have no structure');
+      globalThis.crystallume.app.structure = zno;
+      ctx = open(ctl, 'Supercell');
+      assert.equal(ctx.structure, zno, 'the structure when the menu opens');
+      ctx = open(imatrixInput({ label: 'Own', presets, structure: pt, cell: hex }), 'Own');
+      assert.deepEqual([ctx.structure, ctx.cell], [pt, hex], '`structure` and `cell` override');
+    } finally {
+      if (prev === undefined) delete globalThis.crystallume; else globalThis.crystallume = prev;
+    }
+    ctx = open(imatrixInput({ label: 'Alone', presets }), 'Alone');
+    assert.deepEqual([ctx.structure, ctx.cell], [null, null], 'no app: nothing');
+    ctx = open(imatrixInput({ label: 'Cell only', presets, cell: cubic }), 'Cell only');
+    assert.deepEqual([ctx.structure, ctx.cell], [null, cubic]);
   });
   test('a preset with params asks for its whole numbers, then calls value(params)', () => {
     const got = [];
@@ -671,5 +741,29 @@ describe('paramForm', () => {
     assert.equal(form.values.n, 5, 'values keep the last valid value');
     type(byLabel(form.el, 'Atoms'), '9');
     assert.deepEqual(form.values, { n: 9, spacing: 2.6, cap: null });
+  });
+  test('a required element starts empty and keeps the form invalid until a symbol is entered (U4)', () => {
+    const changes = [];
+    const form = paramForm([{ name: 'el', type: 'element', label: 'Element', required: true }, { name: 'host', type: 'element', label: 'Host' },
+      { name: 'dopant', type: 'element', label: 'Dopant', default: null }], { onChange: (v, name) => changes.push([name, v[name]]) });
+    const el = byLabel(form.el, 'Element');
+    assert.deepEqual([el.value, el.getAttribute('aria-required'), form.values.el], ['', 'true', null], 'no C in the box while the value is null');
+    assert.deepEqual([byLabel(form.el, 'Host').value, byLabel(form.el, 'Dopant').value], ['C', ''], 'optional: the default C, a null default empty');
+    assert.equal(form.valid, false);
+    const seen = [];
+    form.onValidity((v) => seen.push(v));
+    assert.equal(form.validate(), 'Element: enter a value.');
+    assert.equal(el.getAttribute('aria-invalid'), 'true');
+    assert.equal(el.closest('.pf-field').querySelector('p.field-err').textContent, 'Element: enter a value.');
+    el.value = 'cu';
+    el.dispatchEvent(event('change'));
+    assert.deepEqual([el.value, form.values.el, form.valid, seen], ['Cu', 'Cu', true, [true]]);
+    assert.equal(el.getAttribute('aria-invalid'), null, 'the message goes once a symbol is entered');
+    assert.equal(form.validate(), null);
+    el.value = '';
+    el.dispatchEvent(event('change'));
+    assert.deepEqual([form.values.el, form.valid, seen], [null, false, [true, false]], 'emptied again: no value');
+    assert.equal(el.getAttribute('aria-invalid'), 'true');
+    assert.deepEqual(changes, [['el', 'Cu'], ['el', null]]);
   });
 });

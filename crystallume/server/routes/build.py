@@ -137,7 +137,8 @@ def run_custom_builder(
     When the builder declares ``params``, the body is checked against them first (``validate_params``, not strict:
     keys and types it does not declare pass unchanged): a value that does not fit gives 422 with the message (e.g.
     ``hkl: in (h k i l), i must be −(h + k) = -1.``), and the builder gets the normalized values (four Miller indices as
-    three, declared defaults for parameters not given).
+    three, declared defaults for parameters not given).  Declared ``params`` that are themselves invalid (not a list,
+    a vector or imatrix whose size is not 2 or 3) are the plugin's fault: 500 naming the builder's schema.
     """
     from ...core.params import validate_params
 
@@ -146,7 +147,10 @@ def run_custom_builder(
         raise HTTPException(404, f"unknown builder {name!r}; available: {', '.join(plugins.builders) or 'none'}")
     params = dict(params or {})
     if spec.meta.get("params"):
-        params, errors, _ = validate_params(spec.meta["params"], params, strict=False)
+        try:
+            params, errors, _ = validate_params(spec.meta["params"], params, strict=False)
+        except TypeError as exc:
+            raise HTTPException(500, f"builder {name!r} declares invalid params: {exc}") from exc
         if errors:
             raise HTTPException(422, " ".join(errors))
     try:

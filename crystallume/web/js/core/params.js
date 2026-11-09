@@ -70,6 +70,15 @@ const limit = (spec, key, dflt) => (spec[key] === undefined ? dflt : spec[key]);
 /** The numeric bound min/max of an 'int' or 'float' parameter, or null. */
 const bound = (spec, key) => (isNum(spec[key]) ? spec[key] : null);
 const flag = (spec, key, dflt = false) => (spec[key] === undefined ? dflt : !!spec[key]);
+/** A schema entry the functions here read: an object whose name is neither null nor '' (0 is a name), as in Python. */
+const named = (p) => !!p && typeof p === 'object' && !isList(p) && p.name != null && p.name !== '';
+
+/** The entries of `schema`, a list (null or undefined: none); anything else is a TypeError, as in Python. */
+function entries(schema, fn) {
+  if (schema == null) return [];
+  if (!Array.isArray(schema)) throw new TypeError(`${fn}: schema must be a list`);
+  return schema;
+}
 
 /** A deep copy of a JSON-like value (arrays and plain objects; other values as they are). */
 function copy(v) {
@@ -339,10 +348,11 @@ function unknownMessage(title, key, names) {
  * has one (also a null default) and is otherwise left out: nothing is made up for the caller. A missing `required`
  * parameter is an error, `<Label>: enter a value.`. Keys the schema does not have are kept as they are, or with
  * `strict` each is an error, `<title>: unknown parameter “key” (use a, b, c).` (`title` without a trailing ellipsis).
+ * A schema that is not a list (null: no parameters) or values that are not an object throw a TypeError.
  * Python: validate_params (returning the three as a tuple).
  */
 export function validateParams(schema, values, { strict = false, title = null } = {}) {
-  const specs = Array.from(schema ?? []).filter((p) => p && typeof p === 'object' && p.name != null && p.name !== '');
+  const specs = entries(schema, 'validateParams').filter(named);
   const given = values ?? {};
   if (typeof given !== 'object' || isList(given)) throw new TypeError('validateParams: values must be an object');
   const names = specs.map((p) => String(p.name));
@@ -378,14 +388,15 @@ export function validateParams(schema, values, { strict = false, title = null } 
  * The values a form starts with: each parameter's `default` (a copy; a null default stays null), else the default of
  * its type: false for 'bool', the first option for 'select', `min ?? 0` for 'int' and 'float', 'C' for 'element', zeros
  * for 'vector', [1, 1, 1] for 'miller', the unit matrix for 'imatrix', '' otherwise; null (an empty box) for a
- * `required` parameter without a default, except 'bool' and 'select'. `structure` is handed to option functions.
- * Python: default_params(schema).
+ * `required` parameter without a default, except 'bool' and 'select'. `structure` is handed to option functions. The
+ * parameters are those validateParams reads (a name that is neither null nor ''); a schema that is not a list (null:
+ * none) is a TypeError. Python: default_params(schema).
  */
 export function defaultParams(schema = [], structure = null) {
   const out = {};
-  for (const p of schema ?? []) {
-    if (!p?.name) continue;
-    define(out, p.name, p.default !== undefined ? copy(p.default) : typeDefault(p, structure));
+  for (const p of entries(schema, 'defaultParams')) {
+    if (!named(p)) continue;
+    define(out, String(p.name), p.default !== undefined ? copy(p.default) : typeDefault(p, structure));
   }
   return out;
 }

@@ -8,8 +8,7 @@ import { h, select, toggle } from './dom.js';
 import { lineChart } from './chart.js';
 import { normalizeSymbol, ELEMENTS } from '../core/elements.js';
 import { paramOptions } from '../core/analyses.js';
-import { defaultParams } from '../core/params.js';
-import { surfaceNormal } from '../core/lattice.js';
+import { defaultParams, coerceParam } from '../core/params.js';
 import { numberInput, vec3Input, millerInput, imatrixInput, setInvalid } from './inputs.js';
 import { disabledPairsFor } from '../render/display.js';
 
@@ -24,20 +23,15 @@ export function elementInput(value, onChange, label) {
 
 const labelOf = (p) => p.label ?? p.name;
 
-/** The surface normal a vector field's 'surface' frame needs (null without a structure or a usable one). */
-function surfaceOf(p, structure) {
-  if (!structure || !Array.isArray(p.frames) || !p.frames.includes('surface')) return null;
-  try { return surfaceNormal(structure); } catch { return null; }
-}
-
 /**
  * Build a form for `params`. Returns { el, values, validate(), valid, onValidity(cb) }: `values` holds the value of
  * every field and is updated on each valid change (then onChange(values, name) runs); validate() marks the invalid
  * fields and returns the first message, or null; `valid` says whether every field is valid now (a required field
  * left empty is not), and onValidity(cb) calls cb(valid) whenever that changes (it returns a function that stops
  * it), so a panel can keep its main button disabled until the form can run (U4). int and float fields show `unit`
- * after the box and start empty when `required`; vector, miller and imatrix fields use the controls of ui/inputs.js,
- * with the structure's cell for the Å / frac switch and the four-index display.
+ * after the box and start empty when `required`, as does a required element (the box shows the value the form
+ * sends, so it is empty when that is null); vector, miller and imatrix fields use the controls of ui/inputs.js, with
+ * the structure's cell for the Å / frac / u v h switch and the four-index display.
  */
 export function paramForm(params = [], { values = {}, structure = null, onChange = () => {} } = {}) {
   const vals = { ...defaultParams(params, structure), ...values };
@@ -62,7 +56,25 @@ export function paramForm(params = [], { values = {}, structure = null, onChange
     const label = labelOf(p);
     const common = { label, required: !!p.required, optional: p.default === null && !p.required, onChange: (v) => set(p.name, v), onValidity: notify };
     if (p.type === 'bool') return h('div.pf-field.pf-wide', toggle({ label, sub: p.description, checked: !!vals[p.name], onChange: (v) => set(p.name, v) }));
-    if (p.type === 'element') return row(p, elementInput(vals[p.name] ?? 'C', (v) => set(p.name, v), label));
+    if (p.type === 'element') {
+      // the box shows the value the form sends: empty when it is null (a required element starts so, U4)
+      const message = () => {
+        try { coerceParam({ ...p, label }, vals[p.name] ?? null); return null; } catch (err) { return err.message; }
+      };
+      const inp = elementInput(vals[p.name] ?? '', (v) => { set(p.name, v); setInvalid(inp, message()); notify(); }, label);
+      if (p.required) {
+        inp.setAttribute('aria-required', 'true');
+        // elementInput keeps the last symbol when its box is emptied; an empty required box has no value
+        inp.addEventListener('change', () => {
+          if (inp.value !== '' || vals[p.name] == null) return;
+          set(p.name, null);
+          setInvalid(inp, message());
+          notify();
+        });
+      }
+      checked.push({ get valid() { return !message(); }, validate() { const m = message(); setInvalid(inp, m); return m; } });
+      return row(p, inp);
+    }
     if (p.type === 'select') {
       const raw = paramOptions(p, structure);
       const opts = raw.map((o) => ({ value: String(o.value), label: o.label }));
@@ -85,7 +97,7 @@ export function paramForm(params = [], { values = {}, structure = null, onChange
     if (p.type === 'vector') {
       return row(p, control(vec3Input({
         ...common, value: vals[p.name], size: p.size, labels: p.labels, integer: p.integer, nonzero: p.nonzero, frame: p.frame, frames: p.frames,
-        unit: p.unit, cell: structure?.cell ?? null, surface: surfaceOf(p, structure),
+        unit: p.unit, cell: structure?.cell ?? null, structure,
       })), true);
     }
     if (p.type === 'miller') {

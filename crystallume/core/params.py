@@ -532,7 +532,8 @@ def validate_params(schema: Sequence[dict[str, Any]] | None, values: dict[str, A
     ``default`` when the schema has one (also a ``None`` default) and is otherwise left out: nothing is made up for the
     caller.  A missing ``required`` parameter is an error, ``<Label>: enter a value.``.  Keys the schema does not have
     are kept as they are, or with *strict* each is an error, ``<title>: unknown parameter “key” (use a, b, c).``
-    (*title* without a trailing ellipsis).  JS: ``validateParams`` (returning ``{values, errors, warnings}``).
+    (*title* without a trailing ellipsis).  A *schema* that is not a list (``None``: no parameters) or *values* that
+    are not a dict raise :class:`TypeError`.  JS: ``validateParams`` (returning ``{values, errors, warnings}``).
     """
     if schema is not None and not isinstance(schema, (list, tuple)):
         raise TypeError("validate_params: schema must be a list")
@@ -579,8 +580,12 @@ def default_params(schema: Sequence[dict[str, Any]] | None) -> dict[str, Any]:
     default of its type: False for ``bool``, the first option for ``select``, ``min`` (or 0) for ``int`` and ``float``,
     ``"C"`` for ``element``, zeros for ``vector``, ``[1, 1, 1]`` for ``miller``, the unit matrix for ``imatrix``, ``""``
     otherwise; ``None`` (an empty box) for a ``required`` parameter without a default, except ``bool`` and ``select``.
-    JS: ``defaultParams(schema, structure)`` (where options may be a function of the structure).
+    The parameters are those :func:`validate_params` reads (a name that is neither ``None`` nor ``""``); a *schema*
+    that is not a list (``None``: none) raises :class:`TypeError`.  JS: ``defaultParams(schema, structure)`` (where
+    options may be a function of the structure).
     """
+    if schema is not None and not isinstance(schema, (list, tuple)):
+        raise TypeError("default_params: schema must be a list")
     out: dict[str, Any] = {}
     for p in schema or ():
         if not _named(p):

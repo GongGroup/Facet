@@ -5,8 +5,9 @@ The shared cases ``tests/data/surface/coerce.json`` run in both languages (``tes
 ``tests/js/cases.test.mjs``).  The tests here cover the Python API (types, numpy inputs, copies, ``parse_cli_value``),
 the CLI (``--param hkl=1,0,-1,0``, the option named once in messages, required parameters), the REST endpoints
 ``/build/custom/{name}`` and ``/analysis/custom/{name}`` (normalized values, 422 with the message, plugins without a
-schema unchanged) and, through the Node bridge, compare the module with ``web/js/core/params.js`` on generated inputs:
-parsing, coercion, validation and the way numbers are written in messages.
+schema unchanged, 500 naming a plugin whose declared schema is invalid) and, through the Node bridge, compare the
+module with ``web/js/core/params.js`` on generated inputs: parsing, coercion, validation and the way numbers are
+written in messages.
 """
 
 from __future__ import annotations
@@ -188,8 +189,11 @@ def test_validate_and_defaults_copy_their_values():
     assert validate_params(schema, None) == ({"P": [[1, 0], [0, 1]]}, [], [])
     with pytest.raises(TypeError, match="values must be a dict"):
         validate_params(schema, [1])  # type: ignore[arg-type]
-    with pytest.raises(TypeError, match="schema must be a list"):
+    with pytest.raises(TypeError, match="^validate_params: schema must be a list$"):
         validate_params({"name": "x"}, {})  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="^default_params: schema must be a list$"):
+        default_params({"name": "x"})  # type: ignore[arg-type]
+    assert default_params(None) == {} and default_params(()) == {}
 
 
 def test_validate_keeps_unknown_keys_and_types_when_not_strict():
@@ -331,6 +335,49 @@ def test_rest_builder_without_schema_and_analysis(client):
     assert client.post("/api/v1/analysis/custom/missing", json={"structure": s}).status_code == 404
 
 
+BAD_PLUGIN = textwrap.dedent('''
+    """A plugin whose declared params are themselves invalid (tests/test_params.py)."""
+    from crystallume import Structure
+
+    PLUGIN = {"name": "badparams", "version": "0.1"}
+
+    def build(**params):
+        return Structure(["Cu"], [[0.0, 0.0, 0.0]], name="built")
+
+    def probe(structure, **params):
+        return {"received": params}
+
+    def register(ctx):
+        ctx.register_builder("not-a-list", build, {"params": {"n": {"type": "int"}}})
+        ctx.register_builder("size-4", build, {"params": [{"name": "P", "type": "imatrix", "size": 4}]})
+        ctx.register_analysis("not-a-list", probe, {"params": {"n": {"type": "int"}}})
+        ctx.register_analysis("size-1", probe, {"params": [{"name": "v", "type": "vector", "size": 1}]})
+''')
+
+
+def test_rest_plugin_with_invalid_params_names_its_schema(tmp_path):
+    """A schema validate_params cannot read is the plugin's fault: 500 with a message, not an unhandled TypeError."""
+    d = tmp_path / "bad"
+    d.mkdir()
+    (d / "badparams.py").write_text(BAD_PLUGIN, encoding="utf-8")
+    settings = Settings(mode="local", data_dir=tmp_path / "data", plugin_dirs=[d], entry_point_plugins=False,
+                        web_dir=tmp_path / "no-web")
+    cu = {"symbols": ["Cu"], "positions": [[0, 0, 0]]}
+    with TestClient(create_app(settings)) as c:
+        for path, body, detail in [
+            ("/build/custom/not-a-list", {"n": 1},
+             "builder 'not-a-list' declares invalid params: validate_params: schema must be a list"),
+            ("/build/custom/size-4", {"P": [[1, 0], [0, 1]]},
+             "builder 'size-4' declares invalid params: P: size must be 2 or 3 (got 4)"),
+            ("/analysis/custom/not-a-list", {"structure": cu, "params": {}},
+             "analysis 'not-a-list' declares invalid params: validate_params: schema must be a list"),
+            ("/analysis/custom/size-1", {"structure": cu, "params": {"v": [1]}},
+             "analysis 'size-1' declares invalid params: v: size must be 2 or 3 (got 1)"),
+        ]:
+            r = c.post(f"/api/v1{path}", json=body)
+            assert (r.status_code, r.json()["detail"]) == (500, detail), path
+
+
 def test_client_reports_the_422_message(tmp_path, plugin_dir):
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
@@ -441,13 +488,14 @@ def test_coerce_and_validate_match_js_on_random_inputs(js):
         let coerced;
         try { coerced = { value: P.coerceParam(spec, value) }; } catch (e) { coerced = { error: e.message }; }
         const v = P.validateParams([spec], value === null ? {} : { p: value });
-        return { coerced, validated: [v.values, v.errors, v.warnings] };
+        return { coerced, validated: [v.values, v.errors, v.warnings], defaults: P.defaultParams([spec]) };
       });
     """, items)
     for item, out in zip(items, got):
         assert out["coerced"] == _py_outcome(coerce_param, item["spec"], item["value"]), item
         values, errors, warnings = validate_params([item["spec"]], {} if item["value"] is None else {"p": item["value"]})
         assert out["validated"] == [values, errors, warnings], item
+        assert out["defaults"] == default_params([item["spec"]]), item
 
 
 def test_numbers_in_messages_are_written_like_javascript(js):

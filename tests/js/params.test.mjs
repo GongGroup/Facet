@@ -3,7 +3,7 @@
 // particular to the web module: the exports, the 25 boundary inputs of parse2.py, the round trip formatIndices →
 // parseIndices (the bars after each digit of a negative index), the defaults of the new types (and option functions of
 // the structure), strict unknown keys and soft warnings, typed-array inputs, exact determinants, the re-export from
-// core/analyses.js.
+// core/analyses.js, and the rules shared with Python: a schema is a list (else a TypeError) and 0 is a parameter name.
 // Run: node --test tests/js/params.test.mjs (or through pytest: tests/test_js_unit.py).
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -200,6 +200,14 @@ describe('validateParams', () => {
     assert.deepEqual(validateParams(schema, null).errors, ['Vacuum: enter a value.']);
     assert.throws(() => validateParams(schema, [1]), { name: 'TypeError', message: 'validateParams: values must be an object' });
   });
+  test('the schema is a list (or null, no parameters), as in Python', () => {
+    for (const bad of [{ name: 'a', type: 'int' }, 'a', 3, new Set([{ name: 'a' }])]) {
+      assert.throws(() => validateParams(bad, {}), { name: 'TypeError', message: 'validateParams: schema must be a list' }, String(bad));
+    }
+    assert.throws(() => validateParams({ name: 'a' }, [1]), { message: 'validateParams: schema must be a list' }, 'the schema is checked first, as in Python');
+    assert.deepEqual(validateParams(null, { a: 1 }), { values: { a: 1 }, errors: [], warnings: [] });
+    assert.deepEqual(validateParams(undefined, {}), { values: {}, errors: [], warnings: [] });
+  });
   test('defaults are copies', () => {
     const def = [[1, 0], [0, 1]];
     const r = validateParams([{ name: 'P', type: 'imatrix', size: 2, default: def }], {});
@@ -230,5 +238,16 @@ describe('defaultParams', () => {
     const got = defaultParams([{ name: 'v', type: 'vector', default: def }]);
     got.v[2] = 5;
     assert.deepEqual(def, [0, 0, 1]);
+  });
+  test('the same named parameters as validateParams and Python: 0 is a name, "" and null are not; the schema is a list', () => {
+    const schema = [{ name: 0, type: 'int' }, { name: '', type: 'int', default: 3 }, { name: null, type: 'int' }, { type: 'int' }, Object.assign([], { name: 'x' })];
+    assert.deepEqual(defaultParams(schema), { 0: 0 });
+    assert.deepEqual(Object.keys(validateParams(schema, {}).values), [], 'no defaults declared: nothing made up');
+    assert.deepEqual(validateParams([{ name: 0, type: 'int', default: 1 }], {}).values, { 0: 1 });
+    for (const bad of [{ name: 'a', type: 'int' }, 'ab', 3]) {
+      assert.throws(() => defaultParams(bad), { name: 'TypeError', message: 'defaultParams: schema must be a list' }, String(bad));
+    }
+    assert.deepEqual(defaultParams(null), {});
+    assert.deepEqual(defaultParams(), {});
   });
 });

@@ -26,7 +26,10 @@
 import { h } from './dom.js';
 import { showMenu } from './overlays.js';
 import { coerceParam, parseIndices, validateParams } from '../core/params.js';
-import { isHexagonalCell, hklToHkil, centeredCellHint, formatIndices, ariaIndices, inv3 } from '../core/lattice.js';
+import {
+  isHexagonalCell, hklToHkil, centeredCellHint, formatIndices, ariaIndices, inv3, surfaceNormal,
+} from '../core/lattice.js';
+import { cross, dot, norm } from '../core/util.js';
 
 let lastId = 0;
 const nextId = (prefix) => `${prefix}-${++lastId}`;
@@ -270,6 +273,18 @@ class Field {
   }
 }
 
+/**
+ * The app of a control: `opts.app`, else the page's crystallume.app. Its prefs keep the Miller control's hkil / hkl
+ * choice and its structure is the current one (the 'surface' frame of a vector, the presets of a matrix).
+ */
+function appOf(opts) {
+  const app = opts.app ?? globalThis.crystallume?.app ?? null;
+  return app && typeof app === 'object' ? app : null;
+}
+
+/** The current structure of a control: `opts.structure` (an override), else the app's (see appOf), else null. */
+const structureOf = (opts) => opts.structure ?? appOf(opts)?.structure ?? null;
+
 /** The p elements under a control: its error line and its soft-warning line. */
 function messageLines() {
   return [h('p.err-text.field-err', { id: nextId('field-err'), hidden: true }), h('p.hint.field-warn', { id: nextId('field-warn'), hidden: true })];
@@ -339,6 +354,34 @@ const FRAME_TIPS = {
   surface: 'Fractions u, v of the two in-plane cell vectors and the height h (Å) along the surface normal',
 };
 
+/** Cells equal entry by entry within 1e-9 Å. */
+function sameCell(a, b) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  for (let i = 0; i < 3; i++) for (let k = 0; k < 3; k++) if (!(Math.abs(a[i][k] - b[i][k]) <= 1e-9)) return false;
+  return true;
+}
+
+/**
+ * The surface of the 'surface' frame when the caller gave none: surfaceNormal of the current structure when `cell` is
+ * its cell, else the 'ab-plane' rule of surfaceNormal for the bare cell (axis c, the unit normal of a × b on the +c
+ * side); null for a cell whose a and b are parallel.
+ */
+function surfaceOf(cell, opts) {
+  const s = structureOf(opts);
+  if (s && sameCell(s.cell, cell)) {
+    try {
+      const sn = surfaceNormal(s);
+      if (sn?.normal) return sn;
+    } catch { /* the ab-plane rule below */ }
+  }
+  const nv = cross(cell[0], cell[1]);
+  const length = norm(nv);
+  if (!(length > 0)) return null;
+  const sign = dot(nv, cell[2]) < 0 ? -1 : 1;
+  return { normal: nv.map((x) => (sign * x) / length + 0), axis: 2 };
+}
+
 /** Rows of the frame's basis in Cartesian coordinates (null when the frame needs a cell or a surface it does not have). */
 function frameBasis(frame, cell, surface) {
   if (frame === 'cartesian') return [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
@@ -362,18 +405,22 @@ function convert(v, from, to) {
 
 /**
  * Two or three number boxes for a vector: vec3Input({ label, value, size = 3, labels, frame = 'cartesian',
- * frames = [frame], cell, surface, integer, nonzero, unit = 'Å', required, optional, onChange, onCommit, onValidity,
- * key }). The value is always in `frame`; with two or more frames and a cell a small switch (Å / frac / u v h) shows it
- * in another frame (converted with the cell; 'surface' also needs `surface`, the result of surfaceNormal: u, v are
- * fractions of the two in-plane cell vectors and h is in Å along the normal, for displacements). The boxes are
- * labelled x y z (Å), a b c (fractional), u v h (surface) or `labels`; size 2 defaults to u v.
+ * frames = [frame], cell, integer, nonzero, unit = 'Å', required, optional, onChange, onCommit, onValidity, key }).
+ * The value is always in `frame`; with two or more frames and a cell a small switch (Å / frac / u v h) shows it in
+ * another frame, converted with the cell. In the 'surface' frame (for displacements) u, v are fractions of the two
+ * in-plane cell vectors and h is in Å along the surface normal: surfaceNormal of the current structure when `cell` is
+ * its cell (the structure is `structure`, else the app's: `app`, else the page's crystallume.app), else the normal of
+ * a × b; `surface` (a surfaceNormal result) overrides both. The boxes are labelled x y z (Å), a b c (fractional),
+ * u v h (surface) or `labels`; size 2 defaults to u v.
  */
 export function vec3Input(opts = {}) {
   const label = opts.label || 'Vector';
   const n = opts.size === 2 ? 2 : 3;
   const spec = { type: 'vector', label, size: n, integer: !!opts.integer, nonzero: !!opts.nonzero, required: !!opts.required };
   const cell = opts.cell ?? null;
-  const basis = (fr) => frameBasis(fr, cell, opts.surface);
+  const wantsSurface = n === 3 && !!cell && (opts.frame === 'surface' || (opts.frames ?? []).includes('surface'));
+  const surface = wantsSurface ? opts.surface ?? surfaceOf(cell, opts) : null;
+  const basis = (fr) => frameBasis(fr, cell, surface);
   const frame = n === 3 ? opts.frame ?? 'cartesian' : null;
   const available = n === 3 && basis(frame) ? [...new Set([frame, ...(opts.frames ?? [])])].filter((fr) => basis(fr)) : [frame];
   let shown = frame;
@@ -455,12 +502,6 @@ function indices(v) {
   return h('span.idx', h('span', { 'aria-hidden': 'true' }, formatIndices(v)), h('span.sr-only', `(${ariaIndices(v)})`));
 }
 
-/** The app whose prefs keep the hkil / hkl choice: `opts.app`, else the page's crystallume.app. */
-function appOf(opts) {
-  const app = opts.app ?? globalThis.crystallume?.app ?? null;
-  return app && typeof app === 'object' ? app : null;
-}
-
 /**
  * Boxes h k l for Miller indices of the current cell: millerInput({ label, value, cell, hexagonal = 'auto', max = 30,
  * warnAbove = 12, describe, required, optional, app, onChange, onCommit, onValidity, key }). The value is always
@@ -469,7 +510,8 @@ function appOf(opts) {
  * crystallume.app, else for the session); hexagonal true / false forces four / three boxes. Four indices can always be
  * pasted ("1 0 -1 0", "(1 0 1̄ 0)"). Below: "(h k l) of the current cell", the plane it equals when the indices have a
  * common factor, the conventional indices on an fcc or bcc primitive cell (centeredCellHint) and describe(value)
- * (e.g. "d = 2.265 Å").
+ * (e.g. "d = 2.265 Å"); on another hexagonal setting a note says what four indices need (the γ = 120° setting when
+ * γ is 60°, c as the unique axis when another axis is unique).
  */
 export function millerInput(opts = {}) {
   const label = opts.label || 'Miller indices';
@@ -481,6 +523,10 @@ export function millerInput(opts = {}) {
   try { hex = cell ? isHexagonalCell(cell) : null; } catch { hex = null; }
   const hex120 = !!hex && hex.axis === 2 && hex.gamma === 120;
   const canFour = opts.hexagonal === true || (opts.hexagonal !== false && hex120);
+  // a hexagonal cell in another setting: what the four boxes would need (none when the caller chose the boxes)
+  const fourNote = !hex || canFour || opts.hexagonal === false ? null
+    : hex.axis === 2 ? 'Four-index (h k i l) notation needs the γ = 120° setting.'
+      : `Four-index (h k i l) notation needs c as the unique axis${hex.gamma === 120 ? '' : ' and γ = 120°'}.`;
   const app = appOf(opts);
   let four = canFour && (app?.prefs?.millerIndices ?? sessionNotation ?? 'hkil') !== 'hkl';
   let primitive = null;
@@ -521,7 +567,7 @@ export function millerInput(opts = {}) {
       try { extra = opts.describe?.(v) ?? null; } catch { extra = null; }
       if (extra) lines.push(h('p.hint', extra));
     }
-    if (hex && !hex120 && opts.hexagonal !== false) lines.push(h('p.hint', 'Four-index (h k i l) notation needs the γ = 120° setting.'));
+    if (fourNote) lines.push(h('p.hint', fourNote));
     readout.replaceChildren(...lines);
     readout.hidden = !lines.length;
     fillI();
@@ -582,15 +628,16 @@ function detText(m) {
 
 /**
  * A grid of whole-number boxes for a 2×2 or 3×3 matrix: imatrixInput({ label, size = 3, value, presets, positive =
- * true, max = 50, maxDet, warnDet = 400, warn, area, rowLabels, colLabels, structure, cell, required, optional,
- * onChange, onCommit, onValidity, key }). Rows are labelled a′ b′ c′ (2×2: U′ V′), columns a b c (U V); each box is
- * "Row a′, column b" for screen readers; Tab goes along the rows. Below it: "det 3 · 3× the atoms" (2×2: "… the
- * area"), or area(value) when given; warn(value) → text adds a soft warning; with positive: false a negative
- * determinant is not an error (the caller's warn explains the handedness). `presets` is a list or a function
- * ({ structure, cell, value }) → list of { label, value, hint, applicable, why, params } (and { header } or
- * { separator: true } rows): one that is not applicable is greyed with `why` as its tip; one with `params`
- * ([{ name, label, value, min, max }], whole numbers) asks for them below the grid and then calls value(params) (or
- * resolve(params)) for its matrix.
+ * true, max = 50, maxDet, warnDet = 400, warn, area, rowLabels, colLabels, required, optional, onChange, onCommit,
+ * onValidity, key }). Rows are labelled a′ b′ c′ (2×2: U′ V′), columns a b c (U V); each box is "Row a′, column b"
+ * for screen readers; Tab goes along the rows. Below it: "det 3 · 3× the atoms" (2×2: "… the area"), or area(value)
+ * when given; warn(value) → text adds a soft warning; with positive: false a negative determinant is not an error
+ * (the caller's warn explains the handedness). `presets` is a list or a function ({ structure, cell, value }) → list
+ * of { label, value, hint, applicable, why, params } (and { header } or { separator: true } rows), called when the
+ * menu opens: `structure` is the current structure then (`structure` overrides it, else the app's: `app`, else the
+ * page's crystallume.app), `cell` is `cell` or that structure's cell, `value` the matrix in the boxes. A preset that
+ * is not applicable is greyed with `why` as its tip; one with `params` ([{ name, label, value, min, max }], whole
+ * numbers) asks for them below the grid and then calls value(params) (or resolve(params)) for its matrix.
  */
 export function imatrixInput(opts = {}) {
   const label = opts.label || 'Matrix';
@@ -723,7 +770,8 @@ export function imatrixInput(opts = {}) {
     try { apply(typeof p.value === 'function' ? p.value({}) : p.value); } catch (e) { f.fail(e?.message ?? String(e)); }
   };
   presetsBtn?.addEventListener('click', () => {
-    const ctx = { structure: opts.structure ?? null, cell: opts.cell ?? opts.structure?.cell ?? null, value: f.value };
+    const structure = structureOf(opts);
+    const ctx = { structure, cell: opts.cell ?? structure?.cell ?? null, value: f.value };
     let list;
     try { list = typeof opts.presets === 'function' ? opts.presets(ctx) : opts.presets; }
     catch (e) { f.fail(e?.message ?? String(e)); return; }

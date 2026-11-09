@@ -142,7 +142,9 @@ def run_custom_analysis(name: str, body: CustomAnalysisRequest, plugins: PluginM
 
     When the analysis declares ``params``, ``params`` is checked against them first (``validate_params``, not strict:
     keys and types it does not declare pass unchanged): a value that does not fit gives 422 with the message, and the
-    analysis gets the normalized values (declared defaults for parameters not given).
+    analysis gets the normalized values (declared defaults for parameters not given).  Declared ``params`` that are
+    themselves invalid (not a list, a vector or imatrix whose size is not 2 or 3) are the plugin's fault: 500 naming
+    the analysis's schema.
     """
     from ...core.params import validate_params
 
@@ -151,7 +153,10 @@ def run_custom_analysis(name: str, body: CustomAnalysisRequest, plugins: PluginM
         raise HTTPException(404, f"unknown analysis {name!r}; available: {', '.join(plugins.analyses) or 'none'}")
     params = dict(body.params or {})
     if spec.meta.get("params"):
-        params, errors, _ = validate_params(spec.meta["params"], params, strict=False)
+        try:
+            params, errors, _ = validate_params(spec.meta["params"], params, strict=False)
+        except TypeError as exc:
+            raise HTTPException(500, f"analysis {name!r} declares invalid params: {exc}") from exc
         if errors:
             raise HTTPException(422, " ".join(errors))
     s = _structure(body.structure)
