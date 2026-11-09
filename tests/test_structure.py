@@ -9,6 +9,7 @@ it, source maps and tracking sessions, notes, ``mark_edited``, the atom order an
 from __future__ import annotations
 
 import copy
+import inspect
 import json
 import pickle
 
@@ -253,6 +254,8 @@ def test_default_for():
     assert a is not b  # a new list each time
     assert default_for("labels", "Pt", ["x"]) == "Pt" and default_for("atom_names", "O", None) == "O"
     assert default_for("masses", "Pt", None) == pytest.approx(195.084)
+    for other in ("Bq", "Og", "Uue", "X", "pt"):   # not an element symbol as written: no guessed element (Bq is not B)
+        assert default_for("masses", other, None) == 0.0
     assert default_for("poscar_species", "H", ["Ga", "As", "H.75", "H1.25"]) == "H.75"
     assert default_for("poscar_species", "H", ["Ga", "H#2", "H"]) == "H#2"
     assert default_for("poscar_species", "Ti", ["Ga", "H"]) == "Ti"
@@ -277,6 +280,24 @@ def test_append_gives_defaults_not_none():
     s.append("Pt", [1, 1, 1], tags=7, spin="up")
     assert s.props["tags"][-1] == 7 and s.props["spin"] == [None, None, None, "up"]
     assert s.props["poscar_species"][-1] == "Pt"   # the first Pt block
+
+
+def test_new_atoms_read_the_poscar_species_column_once(monkeypatch):
+    """F0-D 7.6: the defaults of m new atoms read a poscar_species column of n labels once, not once per new atom
+    (an O(n·m) scan made extend of 3000 + 3000 atoms take 11 s): one normalize_symbol per distinct label."""
+    calls: list[str] = []
+    real = st._el.normalize_symbol
+    monkeypatch.setattr(st._el, "normalize_symbol", lambda label: calls.append(label) or real(label))
+    n = 200
+    slab = Structure(["Pt"] * n, np.zeros((n, 3)), cell=np.eye(3) * 30,
+                     props={"poscar_species": ["Pt", "Pt#2"] * (n // 2)})
+    slab.extend(Structure(["O"] * n + ["Pt"], np.ones((n + 1, 3))))
+    assert slab.props["poscar_species"][n:] == ["O"] * n + ["Pt"] and len(calls) <= 2
+    calls.clear()
+    doc = {"symbols": ["Pt"] * n + ["O"] * n, "positions": [[0, 0, 0]] * (2 * n),
+           "props": {"poscar_species": ["Pt#2", "Pt"] * (n // 2)}}
+    padded = Structure.from_dict(doc)
+    assert padded.props["poscar_species"][n:] == ["O"] * n and len(calls) <= 2
 
 
 def test_set_prop_copies_normalizes_and_returns_self():
@@ -347,6 +368,10 @@ def test_repeat_counts_names_and_supercell_matrix():
         cu.repeat((2, 2))
     old = Structure(["Cu"], [[0, 0, 0]], cell=np.eye(3) * 3.6, name="Cu fcc 2x2x2", info={"supercell": [2, 2, 2]})
     assert old.repeat(2, 1, 1).name == "Cu fcc 4×2×2"
+    # the counts scale the rows (the new cell vectors): diag(2, 3, 1) @ M, not M @ diag ([[2, 3, 0], [-2, 3, 0], ...])
+    rotated = Structure(["Cu"], [[0, 0, 0]], cell=np.diag([5.1, 5.1, 3.6]),
+                        info={"supercellMatrix": [[1, 1, 0], [-1, 1, 0], [0, 0, 1]]})
+    assert rotated.repeat(2, 3, 1).info["supercellMatrix"] == [[2, 2, 0], [-3, 3, 0], [0, 0, 1]]
 
 
 def test_repeat_tiles_every_frame_and_keeps_the_space_group():
@@ -379,6 +404,11 @@ def test_extend_copies_renumbers_and_converts_flags():
     target.extend(tilted)
     assert target.props["selective_dynamics"][4:] == [[T, T, F], [F, F, F]]
     assert target.info["warnings"] == [st._TIGHTENED.format(n=1)]
+    # from the other's cell to this one, not the other way round: free along the other's a (x) = along this b
+    # (the reverse direction would give F F T)
+    rotated = Structure(["Pt"], [[0, 0, 0]], cell=[[0, 0, 5], [5, 0, 0], [0, 5, 0]])
+    rotated.extend(Structure(["O"], [[1, 1, 1]], cell=np.eye(3) * 5, props={"selective_dynamics": [[T, F, F]]}))
+    assert rotated.props["selective_dynamics"] == [[T, T, T], [F, T, F]] and "warnings" not in rotated.info
     with pytest.raises(TypeError, match="^extend expects a Structure$"):
         target.extend({"symbols": ["H"]})  # type: ignore[arg-type]
 
@@ -413,6 +443,11 @@ def test_concat_structures():
     assert len(slab) == 2 and co.n_frames == 2
     other = concat_structures([slab, co], cell=np.eye(3) * 30, pbc=[T, T, F], defaults={"tags": 5})
     assert np.allclose(other.cell, np.eye(3) * 30) and other.pbc == [T, T, F] and other.props["tags"] == [2, 1, 5, 5]
+    # the flags of parts[0] are carried over to the given cell too (free along x = along the new b)
+    first = Structure(["O"], [[1, 1, 1]], cell=np.eye(3) * 5, props={"selective_dynamics": [[T, F, F]]})
+    turned = concat_structures([first, Structure(["H"], [[2, 2, 2]])], cell=[[0, 0, 5], [5, 0, 0], [0, 5, 0]])
+    assert turned.props["selective_dynamics"] == [[F, T, F], [T, T, T]] and "warnings" not in turned.info
+    assert first.props["selective_dynamics"] == [[T, F, F]]   # the part is unchanged
     with pytest.raises(ValueError, match="^concat_structures needs at least one structure$"):
         concat_structures([])
     with pytest.raises(TypeError, match="^concat_structures expects Structure objects$"):
@@ -478,6 +513,10 @@ def test_remap():
     s.props["tags"].append(4)               # changed by hand: misaligned
     with pytest.raises(ValueError, match=r"^property 'tags' has 4 values but there are 3 atoms$"):
         s._remap([0, 1, 2])
+    # *defaults* are for the new atoms: the old atoms of a key that only added_props brings get default_for (None)
+    spin = _slab(1)._remap([0, -1], new_symbols=["H"], new_positions=[[0, 0, 3]], added_props={"spin": ["u"]},
+                           defaults={"spin": "d"})
+    assert spin.props["spin"] == [None, "u"]
 
 
 def test_remap_frames():
@@ -526,9 +565,14 @@ def test_pbc_values():
     s = _slab(2)
     with pytest.raises(TypeError, match="^pbc must be a boolean or three booleans$"):
         Structure(["H"], [[0, 0, 0]], pbc="TTF")
-    for bad in ("TTF", [T, F], {"a": 1, "b": 2, "c": 3}):
+    for bad in ("TTF", [T, F], {"a": 1, "b": 2, "c": 3}, 0.5, float("nan")):
         with pytest.raises(TypeError, match="^pbc must be a boolean or three booleans$"):
             s.set_pbc(bad)
+    # one whole number counts as a boolean, 1.0 as well (JSON does not tell 1 from 1.0)
+    assert Structure(["H"], [[0, 0, 0]]).set_pbc(1.0).pbc == [T, T, T]
+    assert Structure(["H"], [[0, 0, 0]], cell=np.eye(3)).set_pbc(np.int64(0)).pbc == [F, F, F]
+    with pytest.raises(ValueError, match="^invalid structure: pbc must be a boolean or three booleans$"):
+        Structure.from_dict({"symbols": ["H"], "positions": [[0, 0, 0]], "pbc": 0.5})
     s.info["energy"] = -1.0
     s.set_pbc(np.array([1, 1, 1]))   # no change
     assert s.info["energy"] == -1.0
@@ -755,6 +799,11 @@ def test_center_marks_a_new_cell_only():
     mol.info["energy"] = -14.2
     mol.center(vacuum=5.0)
     assert mol.info["energy"] == -14.2   # boxing a molecule (no cell before, pbc unchanged) keeps it
+    again = _slab(2)
+    again.center(vacuum=10.0, axis=[2])   # a new cell: c = 20 Å
+    again.info.update(spacegroup="P1", energy=-1.0)
+    again.center(vacuum=10.0, axis=[2])   # the same cell again: only a translation, nothing is dropped
+    assert again.info["spacegroup"] == "P1" and again.info["energy"] == -1.0 and np.isclose(again.cell[2, 2], 20.0)
 
 
 # ----------------------------------------------------------------------------------------------- frames
@@ -792,6 +841,11 @@ def test_set_positions_and_write_frame():
     assert np.allclose(s.frames[1]["positions"], [[0, 0, 0.3], [0, 0, 1.0]]) and "energy" not in s.info
     with pytest.raises(ValueError, match=r"^set_positions: expected 2 rows of 3 coordinates, got 1$"):
         s.set_positions([[1, 1, 1]])
+    # the rows are counted whatever their length, as in JS; a flat list is counted in numbers
+    for bad, got in (([[1, 2]], "1"), ([[1, 2, 3], [4, 5]], "2"), ([[1, 2, 3, 4]] * 2, "2"), ([], "0"),
+                     (np.zeros((3, 3)), "3"), ([0, 0, 0, 1, 1, 1], "6 numbers")):
+        with pytest.raises(ValueError, match=rf"^set_positions: expected 2 rows of 3 coordinates, got {got}$"):
+            s.set_positions(bad)
     with pytest.raises(ValueError, match="^positions must be finite numbers$"):
         s.set_positions([[1, 1, np.nan], [0, 0, 0]])
     with pytest.raises(ValueError, match="^mark_edited: unknown kind 'moved'"):
@@ -811,6 +865,16 @@ def test_set_positions_and_write_frame():
         w.write_frame(0, cell=[[np.inf, 0, 0], [0, 1, 0], [0, 0, 1]])
     w.write_frame(0, cell=None)
     assert w.cell is None
+    # ledger L-F0-06: cell=... (the default) keeps the cell, so callers can pass it on
+    assert inspect.signature(Structure.write_frame).parameters["cell"].default is ...
+    keep = _trajectory()
+    assert keep.write_frame(0, positions=[[0, 0, 0.2], [0, 0, 0.9]], cell=...) is keep
+    assert np.allclose(keep.cell, np.eye(3) * 10) and np.allclose(keep.positions[1], [0, 0, 0.9])
+    keep.write_frame(2, cell=...)
+    assert np.allclose(keep.frames[1]["cell"], np.eye(3) * 11)
+    assert np.allclose(keep.frames[1]["positions"][1], [0, 0, 1.0])
+    keep.write_frame(1, positions=[[0, 0, 0.4], [0, 0, 1.4]])
+    assert "cell" not in keep.frames[0] and np.allclose(keep.frames[0]["positions"][1], [0, 0, 1.4])
 
 
 def test_wrap_uses_wrap_fractional_on_every_frame():
@@ -838,6 +902,10 @@ def test_poscar_order_and_canonical_order():
     assert poscar_order([syms[i] for i in order]) == list(range(9))
     with pytest.raises(ValueError, match=r"^blocks must have 2 entries \(got 1\)$"):
         poscar_order(["H", "H"], blocks=["H"])
+    for bad in ([3], ["Ti", None], 5, "TiO", {"Ti": 1}):   # as sort_by_species (and JS) say: not ignored
+        with pytest.raises(TypeError, match=r"^order must be a list of element symbols, e.g. \['Pt', 'C', 'O'\]$"):
+            poscar_order(["O", "Ti"], bad)
+    assert poscar_order(["O", "Ti"], (e for e in ["Ti"])) == [1, 0]   # any iterable of symbols
     with pytest.raises(TypeError, match="layers must be numbers"):
         canonical_order(["H", "H"], [0, None])
 

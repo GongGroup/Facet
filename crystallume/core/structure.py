@@ -61,7 +61,7 @@ import math
 from collections import Counter
 from collections.abc import Mapping
 from types import MappingProxyType
-from typing import Any, Iterable, Iterator, Sequence
+from typing import Any, Callable, Iterable, Iterator, Sequence
 
 import numpy as np
 
@@ -153,7 +153,7 @@ _SAME_CELL = 1e-9
 _CELL_CHANGE = 1e-9
 _TIGHTENED = ("selective dynamics: the partial constraints of {n} atom(s) do not follow the new cell vectors "
               "and were tightened (no atom gains freedom)")
-_UNCHANGED = object()   # write_frame(cell=...) default: keep the cell
+_ORDER_TYPE = "order must be a list of element symbols, e.g. ['Pt', 'C', 'O']"
 _MISSING = object()     # an added_props entry for which the defaults apply
 
 
@@ -230,10 +230,11 @@ def _as_cell(cell: Any) -> np.ndarray | None:
 
 
 def _as_pbc(pbc: Any, has_cell: bool) -> list[bool]:
-    """``pbc`` as three bools: one bool for all axes, three values, or ``None`` (periodic when there is a cell)."""
+    """``pbc`` as three bools: one bool (or whole number, ``1``/``1.0``) for all axes, three values, or ``None``
+    (periodic when there is a cell).  Anything else, ``0.5`` included, raises ``TypeError``."""
     if pbc is None:
         return [has_cell] * 3
-    if isinstance(pbc, (bool, np.bool_, int, np.integer)):
+    if isinstance(pbc, (bool, np.bool_)) or _whole(pbc) is not None:
         return [bool(pbc)] * 3
     if isinstance(pbc, (str, bytes, Mapping)):
         raise TypeError("pbc must be a boolean or three booleans")
@@ -319,18 +320,33 @@ def _as_positions(positions: Any, n: int | None = None) -> np.ndarray:
     return arr.copy()
 
 
-def _coordinates(positions: Any, n: int, who: str) -> np.ndarray:
-    """*n* rows of three finite Cartesian coordinates (a new array) for :meth:`Structure.set_positions` and co."""
+def _rows_given(positions: Any, arr: np.ndarray | None) -> str:
+    """What :func:`_coordinates` got, worded as the JS twin words it: ``, got 35`` (rows, whatever their length),
+    ``, got 7 numbers`` (a flat list), or nothing when *positions* has no length."""
+    if arr is not None and arr.ndim == 1 and arr.size:
+        return f", got {arr.size} numbers"
+    if arr is not None and arr.ndim >= 2:
+        return f", got {arr.shape[0]}"
     try:
-        arr = np.array(positions, dtype=float)
-    except (TypeError, ValueError):
-        raise ValueError(f"{who}: expected {n} rows of 3 coordinates") from None
-    if arr.size == 0 and n == 0:
+        return f", got {len(positions)}"
+    except TypeError:
+        return ""
+
+
+def _coordinates(positions: Any, n: int, who: str) -> np.ndarray:
+    """*n* rows of three finite Cartesian coordinates (a new array) for :meth:`Structure.set_positions` and co.
+
+    Anything else raises ``ValueError`` with the ledger's text, the rows counted whatever their length:
+    ``set_positions: expected 36 rows of 3 coordinates, got 35``.
+    """
+    try:
+        arr: np.ndarray | None = np.array(positions, dtype=float)
+    except (TypeError, ValueError):   # ragged rows, or not numbers
+        arr = None
+    if arr is not None and arr.size == 0 and n == 0:
         return np.zeros((0, 3))
-    if arr.ndim != 2 or arr.shape[1] != 3:
-        raise ValueError(f"{who}: expected {n} rows of 3 coordinates, got an array of shape {arr.shape}")
-    if arr.shape[0] != n:
-        raise ValueError(f"{who}: expected {n} rows of 3 coordinates, got {arr.shape[0]}")
+    if arr is None or arr.ndim != 2 or arr.shape != (n, 3):
+        raise ValueError(f"{who}: expected {n} rows of 3 coordinates{_rows_given(positions, arr)}")
     if not np.all(np.isfinite(arr)):
         raise ValueError("positions must be finite numbers")
     return arr
@@ -430,7 +446,8 @@ def default_for(key: str, symbol: str, column: Sequence[Any] | None) -> Any:
     *column* holds the values the property already has (``None`` when it has none yet).  In order:
 
     1. ``labels``, ``label``, ``atom_names`` (:data:`PROP_SYMBOL_DEFAULT`): *symbol*;
-    2. ``masses``: the standard atomic mass of *symbol* (``crystallume/data/elements.json``);
+    2. ``masses``: the standard atomic mass of the element *symbol* (``crystallume/data/elements.json``), ``0.0``
+       when *symbol* is not an element symbol as written (``X``, ``Bq``, ``pt``);
     3. ``poscar_species``: the first label in *column* that names the same element (``H``, ``H#2`` or a raw POSCAR
        token such as ``H.75``; the element is ``normalize_symbol(label)``), else *symbol*;
     4. :data:`PROP_SHAPED_ZERO` keys: zeros shaped like the first value in *column* (``[0.0, 0.0, 0.0]`` next to
@@ -440,15 +457,24 @@ def default_for(key: str, symbol: str, column: Sequence[Any] | None) -> Any:
 
     Values given by the caller and the per-call ``defaults`` of :meth:`Structure._remap` take precedence over these.
     """
+    return _default_rule(key, column)(symbol)
+
+
+def _default_rule(key: str, column: Sequence[Any] | None) -> Callable[[str], Any]:
+    """``default_for(key, symbol, column)`` as a function of *symbol*, for filling many new atoms of one column.
+
+    The column is read once, here: :meth:`Structure._remap` and :meth:`Structure.from_dict` call the result once per
+    new atom, which would otherwise scan a ``poscar_species`` column (one ``normalize_symbol`` per label) each time.
+    """
     if key in PROP_SYMBOL_DEFAULT:
-        return symbol
+        return _same_symbol
     if key == "masses":
-        return _el.atomic_mass(symbol)
+        return _standard_mass
     if key == "poscar_species":
-        for label in column or ():
-            if isinstance(label, str) and _el.normalize_symbol(label) == symbol:
-                return label
-        return symbol
+        first: dict[str, str] = {}
+        for label in dict.fromkeys(v for v in column or () if isinstance(v, str)):   # each distinct label once
+            first.setdefault(_el.normalize_symbol(label), label)
+        return lambda symbol: first.get(symbol, symbol)
     if key in PROP_SHAPED_ZERO:
         for row in column or ():
             if row is None:
@@ -456,11 +482,26 @@ def default_for(key: str, symbol: str, column: Sequence[Any] | None) -> Any:
             if isinstance(row, np.ndarray):
                 row = row.tolist()
             if isinstance(row, (list, tuple)):
-                return [0.0] * len(row)
-            return 0.0
+                width = len(row)
+                return lambda symbol: [0.0] * width
+            return lambda symbol: 0.0
     if key in PROP_DEFAULTS:
-        return copy_value(PROP_DEFAULTS[key])
-    return None
+        value = PROP_DEFAULTS[key]
+        return lambda symbol: copy_value(value)
+    return lambda symbol: None
+
+
+def _same_symbol(symbol: str) -> str:
+    return symbol
+
+
+def _standard_mass(symbol: str) -> float:
+    """The standard atomic mass of the element *symbol*, written exactly (``Pt``); 0.0 for any other symbol.
+
+    No guessing: :func:`~crystallume.core.elements.atomic_mass` would read ``Bq`` (a ghost atom) as B.
+    """
+    rec = _el.get_element(symbol) if isinstance(symbol, str) and _el.is_element(symbol) else None
+    return float(rec["mass"]) if rec else 0.0
 
 
 def _normalize_ints(values: Sequence[Any]) -> tuple[list[int], int]:
@@ -990,7 +1031,8 @@ class Structure:
             vals = list(val)
             if len(vals) < n:
                 have = vals
-                vals = vals + [default_for(str(key), syms[i], have) for i in range(len(vals), n)]
+                rule = _default_rule(str(key), have)
+                vals = vals + [rule(syms[i]) for i in range(len(vals), n)]
                 add_warning(info, f"property '{key}' had {len(have)} values for {n} atoms and was padded with defaults")
             elif len(vals) > n:
                 add_warning(info, f"property '{key}' had {len(vals)} values for {n} atoms and was truncated")
@@ -1117,32 +1159,33 @@ class Structure:
             mark_edited(self, mark)
         return self
 
-    def write_frame(self, frame: int, *, positions: Any = None, cell: Any = _UNCHANGED) -> "Structure":
+    def write_frame(self, frame: int, *, positions: Any = None, cell: Any = ...) -> "Structure":
         """Write the coordinates and/or the cell of one frame, and nothing else (a low-level primitive).  In place.
 
-        Frame 0 is the structure's own ``positions`` and ``cell``; frame ``i > 0`` is ``frames[i - 1]``.  Leave out
-        *positions* or *cell* to keep them; ``cell=None`` removes the cell (frame 0) or makes frame ``i`` use the
-        structure's cell.  Unlike :meth:`set_positions` this does not call :func:`mark_edited`: the cell tools
-        write with it and then mark the edit themselves.  The JavaScript twin ``writeFrame`` also keeps the web
-        model's frame aliases.  Returns ``self``.
+        Frame 0 is the structure's own ``positions`` and ``cell``; frame ``i > 0`` is ``frames[i - 1]``.  The
+        defaults ``positions=None`` and ``cell=...`` (the Ellipsis) keep the coordinates and the cell, so a caller
+        may pass ``cell=...`` on to say "unchanged"; ``cell=None`` removes the cell (frame 0) or makes frame ``i``
+        use the structure's cell.  Unlike :meth:`set_positions` this does not call :func:`mark_edited`: the cell
+        tools write with it and then mark the edit themselves.  The JavaScript twin ``writeFrame`` (where a left
+        out ``cell`` keeps it) also keeps the web model's frame aliases.  Returns ``self``.
         """
         k = self._frame_index(frame)
         pos = None if positions is None else _coordinates(positions, len(self), "write_frame")
-        new_cell: Any = _UNCHANGED
-        if cell is not _UNCHANGED:
+        new_cell: Any = ...
+        if cell is not ...:
             new_cell = None if cell is None else _as_cell(cell)
             if new_cell is not None and not np.all(np.isfinite(new_cell)):
                 raise ValueError("cell must be finite numbers")
         if k == 0:
             if pos is not None:
                 self.positions = pos
-            if new_cell is not _UNCHANGED:
+            if new_cell is not ...:
                 self.cell = new_cell
         else:
             fr = self.frames[k - 1]
             if pos is not None:
                 fr["positions"] = pos
-            if new_cell is not _UNCHANGED:
+            if new_cell is not ...:
                 if new_cell is None:
                     fr.pop("cell", None)
                 else:
@@ -1548,7 +1591,8 @@ class Structure:
           keep_frame first) when the structure has several frames``).
         * Properties: each key of the structure or of *added_props* (``{key: [one value per new atom]}``) is
           rebuilt; old atoms keep copies of their values, new atoms take the value given in *added_props*, else the
-          one in *defaults* (overrides for this call, e.g. ``{"interface_layer": 2}``), else :func:`default_for`.
+          one in *defaults* (overrides for the new atoms of this call, e.g. ``{"interface_layer": 2}``), else
+          :func:`default_for`.  For a key that only *added_props* brings, the old atoms get :func:`default_for`.
           The known keys are normalized (notes in ``info["warnings"]``).
         * The cell, pbc, info and name are unchanged: callers call :func:`mark_edited` for their kind of edit.
         * :attr:`source_map` and every open tracking session are composed with *src*.
@@ -1631,14 +1675,21 @@ class Structure:
                 old = _column(old)
             add = added.get(key)
             shape = old if old is not None else [v for v in (add or []) if v is not _MISSING]
+            rule = None   # default_for(key, ., shape), built on first use (it reads the column once)
             if old is not None:
                 col = [old[s] if s >= 0 else None for s in S_list]
-            else:
-                col = [None if s < 0 else default_for(key, syms[j], shape) for j, s in enumerate(S_list)]
+            else:   # a key only the new atoms bring: the old atoms get the table's default, not *defaults*
+                rule = _default_rule(key, shape)
+                col = [None if s < 0 else rule(syms[j]) for j, s in enumerate(S_list)]
             for j in new_pos_of:
                 v = _MISSING if add is None else add[new_pos_of[j]]
                 if v is _MISSING:
-                    v = copy_value(overrides[key]) if key in overrides else default_for(key, syms[j], shape)
+                    if key in overrides:
+                        v = copy_value(overrides[key])
+                    else:
+                        if rule is None:
+                            rule = _default_rule(key, shape)
+                        v = rule(syms[j])
                 col[j] = v
             props[key] = _normalized(key, col, info)
         self.symbols = syms
@@ -1692,15 +1743,8 @@ class Structure:
         elements.  A pure reordering: per-atom results move with their atoms and nothing is dropped.  The
         :attr:`source_map` is composed with the sort.
         """
-        if order is not None:
-            if isinstance(order, (str, bytes, Mapping)):
-                raise TypeError("order must be a list of element symbols, e.g. ['Pt', 'C', 'O']")
-            try:
-                items = list(order)
-            except TypeError:
-                raise TypeError("order must be a list of element symbols, e.g. ['Pt', 'C', 'O']") from None
-            if not all(isinstance(e, str) for e in items):
-                raise TypeError("order must be a list of element symbols, e.g. ['Pt', 'C', 'O']")
+        items = _order_arg(order)
+        if items is not None:
             order = [_el.normalize_symbol(e) for e in items]
         blocks = self.props.get("poscar_species")
         idx = poscar_order(self.symbols, order, _column(blocks) if blocks is not None else None)
@@ -1913,20 +1957,36 @@ def _block_keys(symbols: Sequence[str], blocks: Sequence[Any] | None, what: str 
     return keys
 
 
+def _order_arg(order: Any) -> list[str] | None:
+    """*order* as a new list of strings (``None`` stays ``None``); anything else raises the ``TypeError``
+    ``order must be a list of element symbols, e.g. ['Pt', 'C', 'O']`` (a string, a mapping, a non-string entry)."""
+    if order is None:
+        return None
+    if isinstance(order, (str, bytes, Mapping)):
+        raise TypeError(_ORDER_TYPE)
+    try:
+        items = list(order)
+    except TypeError:
+        raise TypeError(_ORDER_TYPE) from None
+    if not all(isinstance(e, str) for e in items):
+        raise TypeError(_ORDER_TYPE)
+    return items
+
+
 def poscar_order(symbols: Sequence[str], order: Sequence[str] | None = None,
                  blocks: Sequence[Any] | None = None) -> list[int]:
     """The atom order of a POSCAR file: new -> old indices (usable as a source map), grouped by species.
 
     The blocks are *blocks* (per-atom block labels, ``props["poscar_species"]``) or the elements, in order of first
-    appearance; with *order* (element symbols) the blocks of those elements come first, in that order (several
+    appearance; with *order* (element symbols, as written; ``TypeError`` ``order must be a list of element symbols,
+    e.g. ['Pt', 'C', 'O']`` for anything else) the blocks of those elements come first, in that order (several
     blocks of one element in order of appearance), then the others.  The order inside a block is kept.
     """
     syms = list(symbols)
     keys = _block_keys(syms, blocks)
     species = list(dict.fromkeys(keys))
+    order = _order_arg(order)
     if order is not None:
-        if isinstance(order, (str, bytes, Mapping)):
-            raise TypeError("order must be a list of element symbols, e.g. ['Pt', 'C', 'O']")
         element_of: dict[Any, str] = {}
         for key, sym in zip(keys, syms):
             element_of.setdefault(key, sym)
