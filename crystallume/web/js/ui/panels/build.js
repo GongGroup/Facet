@@ -1,6 +1,6 @@
 /** Builder panel: crystals from prototypes, nanoclusters, molecules, plugin builders and pasted text. */
 import { h, btn, seg, select, slider, field } from '../dom.js';
-import { prototypes, buildCrystal } from '../../build/crystal.js';
+import { prototypes, buildCrystal, referenceParameters } from '../../build/crystal.js';
 import { clusters, buildCluster, nnDistance } from '../../build/cluster.js';
 import { MOLECULES, buildMolecule } from '../../build/molecules.js';
 import { Structure } from '../../core/structure.js';
@@ -28,7 +28,7 @@ registerLeftPanel({
 
     if (state.tab === 'crystal') {
       const p = prototypes.get(state.proto);
-      const prm = (state.params[p.id] ??= { elements: [...p.defaults.elements], a: p.defaults.a, c: p.defaults.c, u: p.defaults.u, repeat: p.twoD ? [3, 3, 1] : [2, 2, 2] });
+      const prm = (state.params[p.id] ??= { ...p.defaults, elements: [...p.defaults.elements], repeat: p.twoD ? [3, 3, 1] : [2, 2, 2] });
       const protoSel = select({ options: [{ group: 'Cubic', options: prototypes.list().filter((x) => x.lattice === 'cubic').map((x) => ({ value: x.id, label: x.name })) }, { group: 'Hexagonal & tetragonal', options: prototypes.list().filter((x) => x.lattice !== 'cubic' && !x.twoD).map((x) => ({ value: x.id, label: x.name })) }, { group: '2D', options: prototypes.list().filter((x) => x.twoD).map((x) => ({ value: x.id, label: x.name })) }], value: p.id, onChange: (v) => { state.proto = v; rerender(); }, label: 'Prototype' });
       const preview = h('div.callout');
       const update = () => {
@@ -37,17 +37,26 @@ registerLeftPanel({
           preview.replaceChildren(h('div.row', h('b', { style: { fontSize: '15px' } }, formulaEl(s.formula({ reduce: true }))), h('span.muted', { style: { marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: '12px' } }, `${s.length} atoms · ${s.density()?.toFixed(2)} g/cm³`)), h('span.hint', `${p.description} · ${p.spacegroup}`));
         } catch (e) { preview.replaceChildren(h('span.err-text', e.message)); }
       };
-      const roles = h('div.row', { style: { flexWrap: 'wrap' } }, ...p.roles.map((r, i) => h('label.row', { style: { gap: '6px', fontSize: '12.5px', color: 'var(--muted)' } }, r, elementInput(prm.elements[i], (v) => { prm.elements[i] = v; update(); }, `Element ${r}`))));
+      const inputs = {};
+      const shown = (v) => (Number.isFinite(+v) && v !== '' && v != null ? String(+(+v).toFixed(6)) : '');
+      // A new element fills in its reference lattice parameters (tabulated, else estimated), as the Python builder does.
+      const prefill = () => {
+        Object.assign(prm, referenceParameters(p.id, prm.elements));
+        for (const [key, inp] of Object.entries(inputs)) inp.value = shown(prm[key]);
+      };
+      const roles = h('div.row', { style: { flexWrap: 'wrap' } }, ...p.roles.map((r, i) => h('label.row', { style: { gap: '6px', fontSize: '12.5px', color: 'var(--muted)' } }, r, elementInput(prm.elements[i], (v) => { prm.elements[i] = v; prefill(); update(); }, `Element ${r}`))));
       const num = (key, label, step = 0.001, tip) => {
-        const inp = h('input.field.num', { type: 'number', step, value: prm[key], min: 0, 'aria-label': label });
+        const inp = h('input.field.num', { type: 'number', step, value: shown(prm[key]), min: 0, 'aria-label': label });
         inp.addEventListener('input', () => { prm[key] = +inp.value; update(); });
+        inputs[key] = inp;
         return field(label, inp, tip);
       };
       const rep = h('div.triple', ...['a', 'b', 'c'].map((ax, k) => { const i = h('input.field.num', { type: 'number', min: 1, max: 30, value: prm.repeat[k], 'aria-label': `Repeat ${ax}` }); i.addEventListener('input', () => { prm.repeat[k] = Math.max(1, i.value | 0); update(); }); return h('label', `${ax}`, i); }));
       body.append(...[field('Prototype', protoSel), h('div.sub-h', 'Elements'), roles,
-        num('a', 'a (Å)', 0.001, 'Lattice constant'),
-        p.defaults.c != null ? num('c', p.twoD ? 'Vacuum c (Å)' : 'c (Å)', 0.001) : null,
+        num('a', 'a (Å)', 0.001, 'Lattice constant; changing an element fills in its reference value'),
+        p.defaults.c != null ? num('c', p.twoD ? 'Cell height c (Å)' : 'c (Å)', 0.001, p.twoD ? 'Height of the cell: the layer and the vacuum around it' : undefined) : null,
         p.defaults.u != null ? num('u', 'u (internal)', 0.001, 'Internal coordinate of the anion') : null,
+        p.defaults.thickness != null ? num('thickness', 'Thickness (Å)', 0.001, 'Height from the lower to the upper X layer') : null,
         h('div.sub-h', 'Repeat (build a supercell)'), rep, preview,
         h('div.row', btn('Build crystal', { icon: 'build', cls: 'primary', on: () => { try { const s = buildCrystal(p.id, prm); app.addStructure(s, { scene: p.id === 'perovskite' || p.id === 'rutile' ? polyhedraScene() : null }); toast(`Built ${s.name}`); } catch (e) { toast(e.message, { type: 'error' }); } } }),
           h('span.hint', 'Adds to the current project.'))].filter(Boolean));
