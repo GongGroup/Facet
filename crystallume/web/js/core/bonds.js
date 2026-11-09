@@ -6,9 +6,15 @@
  *    coordination analysis, bonded images and complete polyhedra).
  */
 import { element } from './elements.js';
+import { reduceBasis } from './geometry.js';
 import { inv3, cartToFrac, norm, cross } from './util.js';
 
 export const pairKey = (a, b) => (a < b ? `${a}-${b}` : `${b}-${a}`);
+
+/** A search over more periodic images than this (21³, the server's limit) runs on the reduced periodic vectors. */
+const MAX_IMAGES = 9261;
+/** Option of the search on the reduced vectors (not reduced again). */
+const REDUCED = Symbol('reduced');
 
 function radiusTable(symbols) {
   const uniq = [...new Set(symbols)];
@@ -93,7 +99,8 @@ export function findPeriodicNeighbors(pos, symbols, cell, pbc = [true, true, tru
   const vol = Math.abs(cell[0][0] * (cell[1][1] * cell[2][2] - cell[1][2] * cell[2][1]) - cell[0][1] * (cell[1][0] * cell[2][2] - cell[1][2] * cell[2][0]) + cell[0][2] * (cell[1][0] * cell[2][1] - cell[1][1] * cell[2][0]));
   const heights = [vol / norm(cross(cell[1], cell[2])), vol / norm(cross(cell[0], cell[2])), vol / norm(cross(cell[0], cell[1]))];
   const margin = heights.map((h) => cutMax / h);
-  const reach = margin.map((m, k) => (pbc[k] ? Math.min(4, Math.ceil(m)) : 0));
+  const reach = margin.map((m, k) => (pbc[k] ? Math.ceil(m) : 0));
+  if (!opt[REDUCED] && reach.reduce((p, r) => p * (2 * r + 1), 1) > MAX_IMAGES) return reducedNeighbors(pos, symbols, cell, pbc, opt);
   // wrapped fractional coordinates + integer shifts
   const fw = new Float64Array(3 * n), shift = new Int32Array(3 * n);
   const bad = new Uint8Array(n);
@@ -148,6 +155,26 @@ export function findPeriodicNeighbors(pos, symbols, cell, pbc = [true, true, tru
         out.push({ i, j, offset, d });
       }
     }
+  }
+  return out;
+}
+
+/**
+ * findPeriodicNeighbors in a skewed cell: the same search on the reduced periodic vectors (B = U·A, the same lattice,
+ * far fewer images), with each offset taken back to the original cell (offset = offset_B·U). The bonds are those of
+ * the search in the original cell; an atom bonded to its own image keeps the lexicographically positive offset.
+ */
+function reducedNeighbors(pos, symbols, cell, pbc, opt) {
+  const P = [0, 1, 2].filter((k) => pbc[k]);
+  const { B, U } = reduceBasis(P.map((k) => cell[k]));
+  const reduced = cell.map((row) => [row[0], row[1], row[2]]);
+  P.forEach((k, t) => { reduced[k] = B[t]; });
+  const out = findPeriodicNeighbors(pos, symbols, reduced, pbc, { ...opt, [REDUCED]: true });
+  for (const e of out) {
+    const o = [0, 0, 0];
+    P.forEach((k, t) => { let acc = 0; P.forEach((kr, r) => { acc += e.offset[kr] * U[r][t]; }); o[k] = acc; });
+    if (e.i === e.j && (o[0] < 0 || (o[0] === 0 && (o[1] < 0 || (o[1] === 0 && o[2] < 0))))) for (let k = 0; k < 3; k++) o[k] = 0 - o[k];
+    e.offset = o;
   }
   return out;
 }

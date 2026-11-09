@@ -4,6 +4,7 @@
   "mass": "IUPAC 2016 standard atomic weights (via ASE tables)",
   "covalentRadius": "Cordero et al., Dalton Trans. 2008, 2832 (Z<=96); Pyykko & Atsumi 2009 single-bond radii for Bk-Lr",
   "vdwRadius": "Alvarez, Dalton Trans. 2013, 42, 8617; Bondi 1964 where Alvarez is missing; 2.0 A fallback",
+  "bondiRadius": "Bondi, J. Phys. Chem. 1964, 68, 441 (Table I); Mantina et al., J. Phys. Chem. A 2009, 113, 5806 for the main-group elements Bondi lacks (Be, B, Al, Ca, Ge, Rb, Sr, Sb, Cs, Ba, Bi, Po, At, Rn, Fr, Ra); null for the other elements",
   "jmolColor": "Jmol CPK colour table",
   "vestaColor": "VESTA default element colours (fallback: Jmol)",
   "electronegativity": "Pauling scale (null for He, Ne, Ar)"
@@ -16,6 +17,7 @@
    "mass": 1.008,
    "covalentRadius": 0.31,
    "vdwRadius": 1.2,
+   "bondiRadius": 1.2,
    "jmolColor": "#FFFFFF",
    "vestaColor": "#FFCCCC",
    "electronegativity": 2.2
@@ -27,6 +29,7 @@
    "mass": 4.002602,
    "covalentRadius": 0.28,
    "vdwRadius": 1.43,
+   "bondiRadius": 1.4,
    "jmolColor": "#D9FFFF",
    "vestaColor": "#FCE8CE",
    "electronegativity": null
@@ -38,6 +41,7 @@
    "mass": 6.94,
    "covalentRadius": 1.28,
    "vdwRadius": 2.12,
+   "bondiRadius": 1.82,
    "jmolColor": "#CC80FF",
    "vestaColor": "#86DF73",
    "electronegativity": 0.98
@@ -49,6 +53,7 @@
    "mass": 9.012183,
    "covalentRadius": 0.96,
    "vdwRadius": 1.98,
+   "bondiRadius": 1.53,
    "jmolColor": "#C2FF00",
    "vestaColor": "#5ED77B",
    "electronegativity": 1.57
@@ -60,6 +65,7 @@
    "mass": 10.81,
    "covalentRadius": 0.84,
    "vdwRadius": 1.91,
+   "bondiRadius": 1.92,
    "jmolColor": "#FFB5B5",
    "vestaColor": "#1FA20F",
    "electronegativity": 2.04
@@ -71,6 +77,7 @@
    "mass": 12.011,
    "covalentRadius": 0.76,
    "vdwRadius": 1.77,
+   "bondiRadius": 1.7,
    "jmolColor": "#909090",
    "vestaColor": "#4C4C4C",
    "electronegativity": 2.55
@@ -82,6 +89,7 @@
    "mass": 14.007,
    "covalentRadius": 0.71,
    "vdwRadius": 1.66,
+   "bondiRadius": 1.55,
    "jmolColor": "#3050F8",
    "vestaColor": "#B0B9E6",
    "electronegativity": 3.04
@@ -93,6 +101,7 @@
    "mass": 15.999,
    "covalentRadius": 0.66,
    "vdwRadius": 1.5,
+   "bondiRadius": 1.52,
    "jmolColor": "#FF0D0D",
    "vestaColor": "#FE0300",
    "electronegativity": 3.44
@@ -104,6 +113,7 @@
    "mass": 18.998403,
    "covalentRadius": 0.57,
    "vdwRadius": 1.46,
+   "bondiRadius": 1.47,
    "jmolColor": "#90E050",
    "vestaColor": "#B0B9E6",
    "electronegativity": 3.98
@@ -115,6 +125,7 @@
    "mass": 20.1797,
    "covalentRadius": 0.58,
    "vdwRadius": 1.58,
+   "bondiRadius": 1.54,
    "jmolColor": "#B3E3F5",
    "vestaColor": "#FE37B5",
    "electronegativity": null
@@ -126,6 +137,7 @@
    "mass": 22.989769,
    "covalentRadius": 1.66,
    "vdwRadius": 2.5,
+   "bondiRadius": 2.27,
    "jmolColor": "#AB5CF2",
    "vestaColor": "#F9DC3C",
    "electronegativity": 0.93
@@ -137,6 +149,7 @@
    "mass": 24.305,
    "covalentRadius": 1.41,
    "vdwRadius": 2.51,
+   "bondiRadius": 1.73,
    "jmolColor": "#8AFF00",
    "vestaColor": "#FB7B15",
    "electronegativity": 1.31
@@ -148,6 +161,7 @@
    "mass": 26.981538,
    "covalentRadius": 1.21,
    "vdwRadius": 2.25,
+   "bondiRadius": 1.84,
    "jmolColor": "#BFA6A6",
    "vestaColor": "#81B2D6",
    "electronegativity": 1.61
@@ -159,6 +173,7 @@
    "mass": 28.085,
    "covalentRadius": 1.11,
    "vdwRadius": 2.19,
+   "bondiRadius": 2.1,
    "jmolColor": "#F0C8A0",
    "vestaColor": "#1B3BFA",
    "electronegativity": 1.9
@@ -170,6 +185,7 @@
    "mass": 30.973762,
    "covalentRadius": 1.07,
    "vdwRadius": 1.9,
+   "bondiRadius": 1.8,
    "jmolColor": "#FF8000",
    "vestaColor": "#C09CC2",
    "electronegativity": 2.19
@@ -181,6 +197,7 @@
    "mass": 32.06,
    "covalentRadius": 1.05,
    "vdwRadius": 1.89,
+   "bondiRadius": 1.8,
    "jmolColor": "#FFFF30",
    "vestaColor": "#FFFA00",
    "electronegativity": 2.58
@@ -192,6 +209,7 @@
    "mass": 35.45,
    "covalentRadius": 1.02,
    "vdwRadius": 1.82,
+   "bondiRadius": 1.75,
    "jmolColor": "#1FF01F",
    "vestaColor": "#31FC02",
    "electronegativity": 3.16
@@ -203,6 +221,7 @@
    "mass": 39.948,
    "covalentRadius": 1.06,
    "vdwRadius": 1.83,
+   "bondiRadius": 1.88,
    "jmolColor": "#80D1E3",
    "vestaColor": "#CFFEC4",
    "electronegativity": null
@@ -214,6 +233,7 @@
    "mass": 39.0983,
    "covalentRadius": 2.03,
    "vdwRadius": 2.73,
+   "bondiRadius": 2.75,
    "jmolColor": "#8F40D4",
    "vestaColor": "#A121F6",
    "electronegativity": 0.82
@@ -225,6 +245,7 @@
    "mass": 40.078,
    "covalentRadius": 1.76,
    "vdwRadius": 2.62,
+   "bondiRadius": 2.31,
    "jmolColor": "#3DFF00",
    "vestaColor": "#5A96BD",
    "electronegativity": 1.0
@@ -236,6 +257,7 @@
    "mass": 44.955908,
    "covalentRadius": 1.7,
    "vdwRadius": 2.58,
+   "bondiRadius": null,
    "jmolColor": "#E6E6E6",
    "vestaColor": "#B563AB",
    "electronegativity": 1.36
@@ -247,6 +269,7 @@
    "mass": 47.867,
    "covalentRadius": 1.6,
    "vdwRadius": 2.46,
+   "bondiRadius": null,
    "jmolColor": "#BFC2C7",
    "vestaColor": "#78CAFF",
    "electronegativity": 1.54
@@ -258,6 +281,7 @@
    "mass": 50.9415,
    "covalentRadius": 1.53,
    "vdwRadius": 2.42,
+   "bondiRadius": null,
    "jmolColor": "#A6A6AB",
    "vestaColor": "#E51900",
    "electronegativity": 1.63
@@ -269,6 +293,7 @@
    "mass": 51.9961,
    "covalentRadius": 1.39,
    "vdwRadius": 2.45,
+   "bondiRadius": null,
    "jmolColor": "#8A99C7",
    "vestaColor": "#00009E",
    "electronegativity": 1.66
@@ -280,6 +305,7 @@
    "mass": 54.938044,
    "covalentRadius": 1.39,
    "vdwRadius": 2.45,
+   "bondiRadius": null,
    "jmolColor": "#9C7AC7",
    "vestaColor": "#A7089D",
    "electronegativity": 1.55
@@ -291,6 +317,7 @@
    "mass": 55.845,
    "covalentRadius": 1.32,
    "vdwRadius": 2.44,
+   "bondiRadius": null,
    "jmolColor": "#E06633",
    "vestaColor": "#B57100",
    "electronegativity": 1.83
@@ -302,6 +329,7 @@
    "mass": 58.933194,
    "covalentRadius": 1.26,
    "vdwRadius": 2.4,
+   "bondiRadius": null,
    "jmolColor": "#F090A0",
    "vestaColor": "#0000AF",
    "electronegativity": 1.88
@@ -313,6 +341,7 @@
    "mass": 58.6934,
    "covalentRadius": 1.24,
    "vdwRadius": 2.4,
+   "bondiRadius": 1.63,
    "jmolColor": "#50D050",
    "vestaColor": "#B7BBBD",
    "electronegativity": 1.91
@@ -324,6 +353,7 @@
    "mass": 63.546,
    "covalentRadius": 1.32,
    "vdwRadius": 2.38,
+   "bondiRadius": 1.4,
    "jmolColor": "#C88033",
    "vestaColor": "#2247DC",
    "electronegativity": 1.9
@@ -335,6 +365,7 @@
    "mass": 65.38,
    "covalentRadius": 1.22,
    "vdwRadius": 2.39,
+   "bondiRadius": 1.39,
    "jmolColor": "#7D80B0",
    "vestaColor": "#8F8F81",
    "electronegativity": 1.65
@@ -346,6 +377,7 @@
    "mass": 69.723,
    "covalentRadius": 1.22,
    "vdwRadius": 2.32,
+   "bondiRadius": 1.87,
    "jmolColor": "#C28F8F",
    "vestaColor": "#9EE373",
    "electronegativity": 1.81
@@ -357,6 +389,7 @@
    "mass": 72.63,
    "covalentRadius": 1.2,
    "vdwRadius": 2.29,
+   "bondiRadius": 2.11,
    "jmolColor": "#668F8F",
    "vestaColor": "#7E6EA6",
    "electronegativity": 2.01
@@ -368,6 +401,7 @@
    "mass": 74.921595,
    "covalentRadius": 1.19,
    "vdwRadius": 1.88,
+   "bondiRadius": 1.85,
    "jmolColor": "#BD80E3",
    "vestaColor": "#74D057",
    "electronegativity": 2.18
@@ -379,6 +413,7 @@
    "mass": 78.971,
    "covalentRadius": 1.2,
    "vdwRadius": 1.82,
+   "bondiRadius": 1.9,
    "jmolColor": "#FFA100",
    "vestaColor": "#9AEF0F",
    "electronegativity": 2.55
@@ -390,6 +425,7 @@
    "mass": 79.904,
    "covalentRadius": 1.2,
    "vdwRadius": 1.86,
+   "bondiRadius": 1.85,
    "jmolColor": "#A62929",
    "vestaColor": "#7E3102",
    "electronegativity": 2.96
@@ -401,6 +437,7 @@
    "mass": 83.798,
    "covalentRadius": 1.16,
    "vdwRadius": 2.25,
+   "bondiRadius": 2.02,
    "jmolColor": "#5CB8D1",
    "vestaColor": "#FAC1F3",
    "electronegativity": 3.0
@@ -412,6 +449,7 @@
    "mass": 85.4678,
    "covalentRadius": 2.2,
    "vdwRadius": 3.21,
+   "bondiRadius": 3.03,
    "jmolColor": "#702EB0",
    "vestaColor": "#702EB0",
    "electronegativity": 0.82
@@ -423,6 +461,7 @@
    "mass": 87.62,
    "covalentRadius": 1.95,
    "vdwRadius": 2.84,
+   "bondiRadius": 2.49,
    "jmolColor": "#00FF00",
    "vestaColor": "#00FF00",
    "electronegativity": 0.95
@@ -434,6 +473,7 @@
    "mass": 88.90584,
    "covalentRadius": 1.9,
    "vdwRadius": 2.75,
+   "bondiRadius": null,
    "jmolColor": "#94FFFF",
    "vestaColor": "#94FFFF",
    "electronegativity": 1.22
@@ -445,6 +485,7 @@
    "mass": 91.224,
    "covalentRadius": 1.75,
    "vdwRadius": 2.52,
+   "bondiRadius": null,
    "jmolColor": "#94E0E0",
    "vestaColor": "#00FF00",
    "electronegativity": 1.33
@@ -456,6 +497,7 @@
    "mass": 92.90637,
    "covalentRadius": 1.64,
    "vdwRadius": 2.56,
+   "bondiRadius": null,
    "jmolColor": "#73C2C9",
    "vestaColor": "#73C2C9",
    "electronegativity": 1.6
@@ -467,6 +509,7 @@
    "mass": 95.95,
    "covalentRadius": 1.54,
    "vdwRadius": 2.45,
+   "bondiRadius": null,
    "jmolColor": "#54B5B5",
    "vestaColor": "#54B5B5",
    "electronegativity": 2.16
@@ -478,6 +521,7 @@
    "mass": 97.90721,
    "covalentRadius": 1.47,
    "vdwRadius": 2.44,
+   "bondiRadius": null,
    "jmolColor": "#3B9E9E",
    "vestaColor": "#3B9E9E",
    "electronegativity": 1.9
@@ -489,6 +533,7 @@
    "mass": 101.07,
    "covalentRadius": 1.46,
    "vdwRadius": 2.46,
+   "bondiRadius": null,
    "jmolColor": "#248F8F",
    "vestaColor": "#248F8F",
    "electronegativity": 2.2
@@ -500,6 +545,7 @@
    "mass": 102.9055,
    "covalentRadius": 1.42,
    "vdwRadius": 2.44,
+   "bondiRadius": null,
    "jmolColor": "#0A7D8C",
    "vestaColor": "#0A7D8C",
    "electronegativity": 2.28
@@ -511,6 +557,7 @@
    "mass": 106.42,
    "covalentRadius": 1.39,
    "vdwRadius": 2.15,
+   "bondiRadius": 1.63,
    "jmolColor": "#006985",
    "vestaColor": "#006985",
    "electronegativity": 2.2
@@ -522,6 +569,7 @@
    "mass": 107.8682,
    "covalentRadius": 1.45,
    "vdwRadius": 2.53,
+   "bondiRadius": 1.72,
    "jmolColor": "#C0C0C0",
    "vestaColor": "#C0C0C0",
    "electronegativity": 1.93
@@ -533,6 +581,7 @@
    "mass": 112.414,
    "covalentRadius": 1.44,
    "vdwRadius": 2.49,
+   "bondiRadius": 1.58,
    "jmolColor": "#FFD98F",
    "vestaColor": "#FFD98F",
    "electronegativity": 1.69
@@ -544,6 +593,7 @@
    "mass": 114.818,
    "covalentRadius": 1.42,
    "vdwRadius": 2.43,
+   "bondiRadius": 1.93,
    "jmolColor": "#A67573",
    "vestaColor": "#A67573",
    "electronegativity": 1.78
@@ -555,6 +605,7 @@
    "mass": 118.71,
    "covalentRadius": 1.39,
    "vdwRadius": 2.42,
+   "bondiRadius": 2.17,
    "jmolColor": "#668080",
    "vestaColor": "#9A8EB9",
    "electronegativity": 1.96
@@ -566,6 +617,7 @@
    "mass": 121.76,
    "covalentRadius": 1.39,
    "vdwRadius": 2.47,
+   "bondiRadius": 2.06,
    "jmolColor": "#9E63B5",
    "vestaColor": "#9E63B5",
    "electronegativity": 2.05
@@ -577,6 +629,7 @@
    "mass": 127.6,
    "covalentRadius": 1.38,
    "vdwRadius": 1.99,
+   "bondiRadius": 2.06,
    "jmolColor": "#D47A00",
    "vestaColor": "#D47A00",
    "electronegativity": 2.1
@@ -588,6 +641,7 @@
    "mass": 126.90447,
    "covalentRadius": 1.39,
    "vdwRadius": 2.04,
+   "bondiRadius": 1.98,
    "jmolColor": "#940094",
    "vestaColor": "#940094",
    "electronegativity": 2.66
@@ -599,6 +653,7 @@
    "mass": 131.293,
    "covalentRadius": 1.4,
    "vdwRadius": 2.06,
+   "bondiRadius": 2.16,
    "jmolColor": "#429EB0",
    "vestaColor": "#429EB0",
    "electronegativity": 2.6
@@ -610,6 +665,7 @@
    "mass": 132.905452,
    "covalentRadius": 2.44,
    "vdwRadius": 3.48,
+   "bondiRadius": 3.43,
    "jmolColor": "#57178F",
    "vestaColor": "#57178F",
    "electronegativity": 0.79
@@ -621,6 +677,7 @@
    "mass": 137.327,
    "covalentRadius": 2.15,
    "vdwRadius": 3.03,
+   "bondiRadius": 2.68,
    "jmolColor": "#00C900",
    "vestaColor": "#00C900",
    "electronegativity": 0.89
@@ -632,6 +689,7 @@
    "mass": 138.90547,
    "covalentRadius": 2.07,
    "vdwRadius": 2.98,
+   "bondiRadius": null,
    "jmolColor": "#70D4FF",
    "vestaColor": "#5AC449",
    "electronegativity": 1.1
@@ -643,6 +701,7 @@
    "mass": 140.116,
    "covalentRadius": 2.04,
    "vdwRadius": 2.88,
+   "bondiRadius": null,
    "jmolColor": "#FFFFC7",
    "vestaColor": "#FFFFC7",
    "electronegativity": 1.12
@@ -654,6 +713,7 @@
    "mass": 140.90766,
    "covalentRadius": 2.03,
    "vdwRadius": 2.92,
+   "bondiRadius": null,
    "jmolColor": "#D9FFC7",
    "vestaColor": "#D9FFC7",
    "electronegativity": 1.13
@@ -665,6 +725,7 @@
    "mass": 144.242,
    "covalentRadius": 2.01,
    "vdwRadius": 2.95,
+   "bondiRadius": null,
    "jmolColor": "#C7FFC7",
    "vestaColor": "#C7FFC7",
    "electronegativity": 1.14
@@ -676,6 +737,7 @@
    "mass": 144.91276,
    "covalentRadius": 1.99,
    "vdwRadius": 2.0,
+   "bondiRadius": null,
    "jmolColor": "#A3FFC7",
    "vestaColor": "#A3FFC7",
    "electronegativity": 1.13
@@ -687,6 +749,7 @@
    "mass": 150.36,
    "covalentRadius": 1.98,
    "vdwRadius": 2.9,
+   "bondiRadius": null,
    "jmolColor": "#8FFFC7",
    "vestaColor": "#8FFFC7",
    "electronegativity": 1.17
@@ -698,6 +761,7 @@
    "mass": 151.964,
    "covalentRadius": 1.98,
    "vdwRadius": 2.87,
+   "bondiRadius": null,
    "jmolColor": "#61FFC7",
    "vestaColor": "#61FFC7",
    "electronegativity": 1.2
@@ -709,6 +773,7 @@
    "mass": 157.25,
    "covalentRadius": 1.96,
    "vdwRadius": 2.83,
+   "bondiRadius": null,
    "jmolColor": "#45FFC7",
    "vestaColor": "#45FFC7",
    "electronegativity": 1.2
@@ -720,6 +785,7 @@
    "mass": 158.92535,
    "covalentRadius": 1.94,
    "vdwRadius": 2.79,
+   "bondiRadius": null,
    "jmolColor": "#30FFC7",
    "vestaColor": "#30FFC7",
    "electronegativity": 1.1
@@ -731,6 +797,7 @@
    "mass": 162.5,
    "covalentRadius": 1.92,
    "vdwRadius": 2.87,
+   "bondiRadius": null,
    "jmolColor": "#1FFFC7",
    "vestaColor": "#1FFFC7",
    "electronegativity": 1.22
@@ -742,6 +809,7 @@
    "mass": 164.93033,
    "covalentRadius": 1.92,
    "vdwRadius": 2.81,
+   "bondiRadius": null,
    "jmolColor": "#00FF9C",
    "vestaColor": "#00FF9C",
    "electronegativity": 1.23
@@ -753,6 +821,7 @@
    "mass": 167.259,
    "covalentRadius": 1.89,
    "vdwRadius": 2.83,
+   "bondiRadius": null,
    "jmolColor": "#00E675",
    "vestaColor": "#00E675",
    "electronegativity": 1.24
@@ -764,6 +833,7 @@
    "mass": 168.93422,
    "covalentRadius": 1.9,
    "vdwRadius": 2.79,
+   "bondiRadius": null,
    "jmolColor": "#00D452",
    "vestaColor": "#00D452",
    "electronegativity": 1.25
@@ -775,6 +845,7 @@
    "mass": 173.054,
    "covalentRadius": 1.87,
    "vdwRadius": 2.8,
+   "bondiRadius": null,
    "jmolColor": "#00BF38",
    "vestaColor": "#00BF38",
    "electronegativity": 1.1
@@ -786,6 +857,7 @@
    "mass": 174.9668,
    "covalentRadius": 1.87,
    "vdwRadius": 2.74,
+   "bondiRadius": null,
    "jmolColor": "#00AB24",
    "vestaColor": "#00AB24",
    "electronegativity": 1.27
@@ -797,6 +869,7 @@
    "mass": 178.49,
    "covalentRadius": 1.75,
    "vdwRadius": 2.63,
+   "bondiRadius": null,
    "jmolColor": "#4DC2FF",
    "vestaColor": "#4DC2FF",
    "electronegativity": 1.3
@@ -808,6 +881,7 @@
    "mass": 180.94788,
    "covalentRadius": 1.7,
    "vdwRadius": 2.53,
+   "bondiRadius": null,
    "jmolColor": "#4DA6FF",
    "vestaColor": "#4DA6FF",
    "electronegativity": 1.5
@@ -819,6 +893,7 @@
    "mass": 183.84,
    "covalentRadius": 1.62,
    "vdwRadius": 2.57,
+   "bondiRadius": null,
    "jmolColor": "#2194D6",
    "vestaColor": "#2194D6",
    "electronegativity": 2.36
@@ -830,6 +905,7 @@
    "mass": 186.207,
    "covalentRadius": 1.51,
    "vdwRadius": 2.49,
+   "bondiRadius": null,
    "jmolColor": "#267DAB",
    "vestaColor": "#267DAB",
    "electronegativity": 1.9
@@ -841,6 +917,7 @@
    "mass": 190.23,
    "covalentRadius": 1.44,
    "vdwRadius": 2.48,
+   "bondiRadius": null,
    "jmolColor": "#266696",
    "vestaColor": "#266696",
    "electronegativity": 2.2
@@ -852,6 +929,7 @@
    "mass": 192.217,
    "covalentRadius": 1.41,
    "vdwRadius": 2.41,
+   "bondiRadius": null,
    "jmolColor": "#175487",
    "vestaColor": "#175487",
    "electronegativity": 2.2
@@ -863,6 +941,7 @@
    "mass": 195.084,
    "covalentRadius": 1.36,
    "vdwRadius": 2.29,
+   "bondiRadius": 1.72,
    "jmolColor": "#D0D0E0",
    "vestaColor": "#D0D0E0",
    "electronegativity": 2.28
@@ -874,6 +953,7 @@
    "mass": 196.966569,
    "covalentRadius": 1.36,
    "vdwRadius": 2.32,
+   "bondiRadius": 1.66,
    "jmolColor": "#FFD123",
    "vestaColor": "#FFD123",
    "electronegativity": 2.54
@@ -885,6 +965,7 @@
    "mass": 200.592,
    "covalentRadius": 1.32,
    "vdwRadius": 2.45,
+   "bondiRadius": 1.55,
    "jmolColor": "#B8B8D0",
    "vestaColor": "#B8B8D0",
    "electronegativity": 2.0
@@ -896,6 +977,7 @@
    "mass": 204.38,
    "covalentRadius": 1.45,
    "vdwRadius": 2.47,
+   "bondiRadius": 1.96,
    "jmolColor": "#A6544D",
    "vestaColor": "#A6544D",
    "electronegativity": 1.62
@@ -907,6 +989,7 @@
    "mass": 207.2,
    "covalentRadius": 1.46,
    "vdwRadius": 2.6,
+   "bondiRadius": 2.02,
    "jmolColor": "#575961",
    "vestaColor": "#575961",
    "electronegativity": 2.33
@@ -918,6 +1001,7 @@
    "mass": 208.9804,
    "covalentRadius": 1.48,
    "vdwRadius": 2.54,
+   "bondiRadius": 2.07,
    "jmolColor": "#9E4FB5",
    "vestaColor": "#9E4FB5",
    "electronegativity": 2.02
@@ -929,6 +1013,7 @@
    "mass": 208.98243,
    "covalentRadius": 1.4,
    "vdwRadius": 1.97,
+   "bondiRadius": 1.97,
    "jmolColor": "#AB5C00",
    "vestaColor": "#AB5C00",
    "electronegativity": 2.0
@@ -940,6 +1025,7 @@
    "mass": 209.98715,
    "covalentRadius": 1.5,
    "vdwRadius": 2.02,
+   "bondiRadius": 2.02,
    "jmolColor": "#754F45",
    "vestaColor": "#754F45",
    "electronegativity": 2.2
@@ -951,6 +1037,7 @@
    "mass": 222.01758,
    "covalentRadius": 1.5,
    "vdwRadius": 2.2,
+   "bondiRadius": 2.2,
    "jmolColor": "#428296",
    "vestaColor": "#428296",
    "electronegativity": 2.2
@@ -962,6 +1049,7 @@
    "mass": 223.01974,
    "covalentRadius": 2.6,
    "vdwRadius": 3.48,
+   "bondiRadius": 3.48,
    "jmolColor": "#420066",
    "vestaColor": "#420066",
    "electronegativity": 0.7
@@ -973,6 +1061,7 @@
    "mass": 226.02541,
    "covalentRadius": 2.21,
    "vdwRadius": 2.83,
+   "bondiRadius": 2.83,
    "jmolColor": "#007D00",
    "vestaColor": "#007D00",
    "electronegativity": 0.9
@@ -984,6 +1073,7 @@
    "mass": 227.02775,
    "covalentRadius": 2.15,
    "vdwRadius": 2.8,
+   "bondiRadius": null,
    "jmolColor": "#70ABFA",
    "vestaColor": "#70ABFA",
    "electronegativity": 1.1
@@ -995,6 +1085,7 @@
    "mass": 232.0377,
    "covalentRadius": 2.06,
    "vdwRadius": 2.93,
+   "bondiRadius": null,
    "jmolColor": "#00BAFF",
    "vestaColor": "#00BAFF",
    "electronegativity": 1.3
@@ -1006,6 +1097,7 @@
    "mass": 231.03588,
    "covalentRadius": 2.0,
    "vdwRadius": 2.88,
+   "bondiRadius": null,
    "jmolColor": "#00A1FF",
    "vestaColor": "#00A1FF",
    "electronegativity": 1.5
@@ -1017,6 +1109,7 @@
    "mass": 238.02891,
    "covalentRadius": 1.96,
    "vdwRadius": 2.71,
+   "bondiRadius": 1.86,
    "jmolColor": "#008FFF",
    "vestaColor": "#008FFF",
    "electronegativity": 1.38
@@ -1028,6 +1121,7 @@
    "mass": 237.04817,
    "covalentRadius": 1.9,
    "vdwRadius": 2.82,
+   "bondiRadius": null,
    "jmolColor": "#0080FF",
    "vestaColor": "#0080FF",
    "electronegativity": 1.36
@@ -1039,6 +1133,7 @@
    "mass": 244.06421,
    "covalentRadius": 1.87,
    "vdwRadius": 2.81,
+   "bondiRadius": null,
    "jmolColor": "#006BFF",
    "vestaColor": "#006BFF",
    "electronegativity": 1.28
@@ -1050,6 +1145,7 @@
    "mass": 243.06138,
    "covalentRadius": 1.8,
    "vdwRadius": 2.83,
+   "bondiRadius": null,
    "jmolColor": "#545CF2",
    "vestaColor": "#545CF2",
    "electronegativity": 1.13
@@ -1061,6 +1157,7 @@
    "mass": 247.07035,
    "covalentRadius": 1.69,
    "vdwRadius": 3.05,
+   "bondiRadius": null,
    "jmolColor": "#785CE3",
    "vestaColor": "#785CE3",
    "electronegativity": 1.28
@@ -1072,6 +1169,7 @@
    "mass": 247.07031,
    "covalentRadius": 1.68,
    "vdwRadius": 3.4,
+   "bondiRadius": null,
    "jmolColor": "#8A4FE3",
    "vestaColor": "#8A4FE3",
    "electronegativity": 1.3
@@ -1083,6 +1181,7 @@
    "mass": 251.07959,
    "covalentRadius": 1.68,
    "vdwRadius": 3.05,
+   "bondiRadius": null,
    "jmolColor": "#A136D4",
    "vestaColor": "#A136D4",
    "electronegativity": 1.3
@@ -1094,6 +1193,7 @@
    "mass": 252.083,
    "covalentRadius": 1.65,
    "vdwRadius": 2.7,
+   "bondiRadius": null,
    "jmolColor": "#B31FD4",
    "vestaColor": "#B31FD4",
    "electronegativity": 1.3
@@ -1105,6 +1205,7 @@
    "mass": 257.09511,
    "covalentRadius": 1.67,
    "vdwRadius": 2.0,
+   "bondiRadius": null,
    "jmolColor": "#B31FBA",
    "vestaColor": "#B31FBA",
    "electronegativity": 1.3
@@ -1116,6 +1217,7 @@
    "mass": 258.09843,
    "covalentRadius": 1.73,
    "vdwRadius": 2.0,
+   "bondiRadius": null,
    "jmolColor": "#B30DA6",
    "vestaColor": "#B30DA6",
    "electronegativity": 1.3
@@ -1127,6 +1229,7 @@
    "mass": 259.101,
    "covalentRadius": 1.76,
    "vdwRadius": 2.0,
+   "bondiRadius": null,
    "jmolColor": "#BD0D87",
    "vestaColor": "#BD0D87",
    "electronegativity": 1.3
@@ -1138,6 +1241,7 @@
    "mass": 262.11,
    "covalentRadius": 1.61,
    "vdwRadius": 2.0,
+   "bondiRadius": null,
    "jmolColor": "#C70066",
    "vestaColor": "#C70066",
    "electronegativity": 1.3

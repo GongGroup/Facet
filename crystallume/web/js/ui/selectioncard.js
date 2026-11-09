@@ -9,7 +9,8 @@ import { toast, promptDialog, showMenu, dialog } from './overlays.js';
 import { element, normalizeSymbol } from '../core/elements.js';
 import { elementColorHex } from '../render/colors.js';
 import { bondedFragment, storedImage } from '../render/display.js';
-import { inv3, cartToFrac, det3, cross, norm } from '../core/util.js';
+import { inv3, cartToFrac } from '../core/util.js';
+import { micVector, dihedralFromVectors, signedAngle } from '../core/geometry.js';
 import { keyLabel } from './keys.js';
 import { atomInfoRows } from './atominfo.js';
 
@@ -50,19 +51,19 @@ export function chainDisplay(model, srcs) {
 
 const vsub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const vdot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const vcross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const vlen = (a) => Math.hypot(a[0], a[1], a[2]);
 
-/** Distance (Å), angle (°) or dihedral (°) between 2, 3 or 4 points. */
+/**
+ * Distance (Å), angle (°) or dihedral (°) between 2, 3 or 4 points. A dihedral has the IUPAC sign of Python's
+ * get_dihedral, in (−180°, 180°] (core/geometry.js).
+ */
 export function geometryValue(P) {
   if (P.length === 2) return vlen(vsub(P[1], P[0]));
   if (P.length === 3) {
     const u = vsub(P[0], P[1]), v = vsub(P[2], P[1]);
     return (Math.acos(Math.max(-1, Math.min(1, vdot(u, v) / (vlen(u) * vlen(v) || 1)))) * 180) / Math.PI;
   }
-  const b1 = vsub(P[1], P[0]), b2 = vsub(P[2], P[1]), b3 = vsub(P[3], P[2]);
-  const n1 = vcross(b1, b2), n2 = vcross(b2, b3), m1 = vcross(n1, b2.map((x) => x / (vlen(b2) || 1)));
-  return (Math.atan2(vdot(m1, n2), vdot(n1, n2)) * 180) / Math.PI;
+  return signedAngle(dihedralFromVectors(vsub(P[1], P[0]), vsub(P[2], P[1]), vsub(P[3], P[2])));
 }
 
 /** Atom i's stored position (current frame) moved by whole cells I: r_i + I·cell. */
@@ -72,42 +73,9 @@ function storedPoint(s, i, I) {
   return [0, 1, 2].map((k) => p[k] + I[0] * c[0][k] + I[1] * c[1][k] + I[2] * c[2][k]);
 }
 
-/**
- * The shortest periodic image of vector v over the periodic axes of `cell`. Rounding the fractional coordinates gives
- * an image of length R; a shorter one differs from it by a lattice vector t with |t| ≤ 2R, whose coefficient along
- * a_k is at most 2R / h_k (h_k: the distance of a_k from the span of the other periodic vectors), so the search below
- * misses none, whatever the shape of the cell.
- */
-function minimumImage(v, cell, pbc) {
-  const P = [0, 1, 2].filter((k) => pbc?.[k]);
-  if (!cell || !P.length) return v.slice();
-  let inv;
-  try { inv = inv3(cell); } catch { return v.slice(); }
-  const g = cartToFrac(v, inv), v0 = v.slice();
-  for (const k of P) { const n = -Math.floor(g[k] + 0.5); for (let c = 0; c < 3; c++) v0[c] += n * cell[k][c]; }
-  const R = norm(v0);
-  if (!(R > 0)) return v0;
-  const h = P.map((k) => {
-    const o = P.filter((j) => j !== k);
-    if (o.length === 2) return Math.abs(det3(cell)) / norm(cross(cell[o[0]], cell[o[1]]));
-    if (o.length === 1) return norm(cross(cell[k], cell[o[0]])) / norm(cell[o[0]]);
-    return norm(cell[k]);
-  });
-  const K = h.map((x) => Math.floor((2 * R) / x + 1e-9));
-  const sizes = K.map((x) => 2 * x + 1), total = sizes.reduce((a, b) => a * b, 1);
-  if (!Number.isFinite(total) || total > 1e6) return v0;
-  let best = v0, bestL = R * R;
-  for (let t = 0; t < total; t++) {
-    const w = v0.slice();
-    for (let a = 0, r = t; a < P.length; a++) {
-      const n = (r % sizes[a]) - K[a];
-      r = Math.floor(r / sizes[a]);
-      if (n) for (let c = 0; c < 3; c++) w[c] += n * cell[P[a]][c];
-    }
-    const L = w[0] * w[0] + w[1] * w[1] + w[2] * w[2];
-    if (L < bestL - 1e-12) { bestL = L; best = w; }
-  }
-  return best;
+/** The shortest periodic image of vector v in structure s (micVector); v itself when the cell cannot give one. */
+function minimumImage(v, s) {
+  try { return micVector(v, s.cell, s.pbc).vector; } catch { return v; }
 }
 
 /**
@@ -123,7 +91,8 @@ export function selectionPoints(app, sel) {
   sel.forEach((i, k) => {
     if (!k) { P.push(s.pos(i)); return; }
     const a = s.pos(sel[k - 1]), b = s.pos(i), prev = P[k - 1];
-    const d = s.periodic ? minimumImage([b[0] - a[0], b[1] - a[1], b[2] - a[2]], s.cell, s.pbc) : [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const diff = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const d = s.periodic ? minimumImage(diff, s) : diff;
     P.push([prev[0] + d[0], prev[1] + d[1], prev[2] + d[2]]);
   });
   return { ds: null, P };
