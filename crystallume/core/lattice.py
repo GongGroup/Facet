@@ -10,7 +10,7 @@ Conventions
 
 from __future__ import annotations
 
-from typing import Sequence
+from typing import Any, Sequence
 
 import numpy as np
 
@@ -22,6 +22,7 @@ __all__ = [
     "cell_volume",
     "plane_spacings",
     "reciprocal_cell",
+    "wrap_fractional",
 ]
 
 
@@ -99,3 +100,25 @@ def plane_spacings(cell: np.ndarray) -> np.ndarray:
     """Distances between opposite faces of the cell (perpendicular heights)."""
     rec = reciprocal_cell(cell)
     return 1.0 / np.linalg.norm(rec, axis=1)
+
+
+def wrap_fractional(frac: Any, pbc: bool | Sequence[bool] = (True, True, True), eps: float = 1e-12) -> np.ndarray:
+    """Fractional coordinates wrapped into the cell along the periodic axes (a new array, same shape).
+
+    *frac* is one point ``(3,)`` or ``(N, 3)``; *pbc* a bool or three bools.  Along a periodic axis
+    ``w = f - floor(f + eps)``, and ``w >= 1 - eps`` becomes 0: a coordinate within *eps* below a whole number is
+    taken as that number, so an atom at ``f = -1e-17`` or ``0.9999999999999`` stays on the lower face instead of
+    jumping to the upper one (the result can be a hair, at most *eps*, below 0).  Non-periodic axes are copied.
+    This is the rule of :meth:`Structure.wrap`; the vacuum-gap analysis uses its own wrap
+    (``SURFACE_DEFAULTS.gap_wrap_eps``, :mod:`crystallume.analysis.vacuum`).  JS: ``wrapFractional`` in
+    ``web/js/core/lattice.js``.
+    """
+    out = np.array(frac, dtype=float)
+    if out.shape[-1:] != (3,) or out.ndim > 2:
+        raise ValueError(f"frac must be one point (3,) or an N x 3 array (got shape {out.shape})")
+    mask = np.broadcast_to(np.asarray(pbc, dtype=bool), (3,))
+    view = out[None, :] if out.ndim == 1 else out  # a view: writing it writes out
+    sub = view[:, mask]
+    sub = sub - np.floor(sub + eps)
+    view[:, mask] = np.where(sub >= 1.0 - eps, 0.0, sub)
+    return out
