@@ -5,6 +5,7 @@ import './ui/panels/projects.js';
 import './ui/panels/library.js';
 import './ui/panels/build.js';
 import './ui/panels/structure.js';
+import './ui/panels/surface.js';
 import './ui/panels/appearance.js';
 import { commands } from './core/commands.js';
 import { samples } from './build/samples.js';
@@ -14,8 +15,11 @@ import { selectAll, selectNeighbours, selectSameElement, selectFragment } from '
 import { createAPI } from './api/public.js';
 import { installEmbedAPI } from './api/embed.js';
 import { installExtensions, syncRegistryCommands } from './api/extensions.js';
+import { bootTasks, bootFailureMessage } from './core/boot.js';
 
 async function boot() {
+  // start-up data that the imported modules registered (core/boot.js) loads while the app starts
+  const booting = bootTasks();
   const root = document.querySelector('.app');
   let app;
   try { app = new App(root.querySelector('.viewport')); }
@@ -29,6 +33,9 @@ async function boot() {
   await app.init();
   await probeDownloads();
   shell.syncDownloads();
+  // the API, the embed handshake and the first structure wait for that data; a part that fails is reported once
+  const missing = bootFailureMessage(await booting);
+  if (missing) toast(missing, { type: 'error' });
   const api = createAPI(app, shell);
   window.crystallume = api;
   window.atomscope = api;   // the app's former name, for scripts written before the rename
@@ -130,7 +137,7 @@ function registerCommands(app, shell) {
   R({ id: 'ui.tour', title: 'Take the tour', category: 'Help', keywords: 'help guide onboarding', run: () => shell.tour() });
   R({ id: 'ui.theme', title: 'Switch interface theme', category: 'Window', keywords: 'dark light mode', run: () => shell.cycleTheme() });
   R({ id: 'ui.api', title: 'Scripting & API', category: 'Help', run: () => shell.apiDialog() });
-  ['projects', 'library', 'build', 'structure'].forEach((p, i) => R({ id: `panel.${p}`, title: `Show ${p[0].toUpperCase() + p.slice(1)} panel`, category: 'Window', key: `shift+${i + 1}`, shortcutGroup: 'Projects, Library, Build, Structure panel', run: () => shell.openLeft(p) }));
+  ['projects', 'library', 'build', 'structure', 'surface'].forEach((p, i) => R({ id: `panel.${p}`, title: `Show ${p[0].toUpperCase() + p.slice(1)} panel`, category: 'Window', key: `shift+${i + 1}`, shortcutGroup: 'Projects, Library, Build, Structure, Surface panel', run: () => shell.openLeft(p) }));
 
   // representations (keys 1–9), looks, lighting presets, colour schemes, samples and Export <format>:
   // one command per registry entry, kept in step with plugin registrations by extensions.js

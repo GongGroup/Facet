@@ -69,6 +69,14 @@ const P = {
   'zoom-out': '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5M8 11h6"/>',
   neighbors: '<circle cx="12" cy="12" r="2.5"/><circle cx="5" cy="6" r="1.8"/><circle cx="19" cy="6" r="1.8"/><circle cx="12" cy="20.5" r="1.8"/><path d="m10.2 10.3-3.7-3M13.8 10.3l3.7-3M12 14.5v4.2"/>',
   swap: '<path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5"/>',
+  // surface tools
+  surface: '<path d="M2.5 14 8 10h13.5L16 14z"/><path d="M2.5 14v5h13.5l5.5-4v-5M16 14v5"/><circle cx="9" cy="5.5" r="2"/><circle cx="15.5" cy="5.5" r="2"/>',
+  move: '<path d="M12 3v18M3 12h18"/><path d="m9 5.5 3-2.5 3 2.5M9 18.5l3 2.5 3-2.5M5.5 9 3 12l2.5 3M18.5 9l2.5 3-2.5 3"/>',
+  target: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11M12 15v2"/>',
+  unlock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7.5a4 4 0 0 1 7.7-1.5M12 15v2"/>',
+  normal: '<path d="M2.5 19 7 15.5h14.5L17 19z"/><path d="M12 17V4M8.5 7.5 12 4l3.5 3.5"/>',
+  matrix: '<path d="M7 4H4.5v16H7M17 4h2.5v16H17"/><path d="M9 8.5h.01M12 8.5h.01M15 8.5h.01M9 12h.01M12 12h.01M15 12h.01M9 15.5h.01M12 15.5h.01M15 15.5h.01"/>',
 };
 
 export function icon(name, cls = '') {

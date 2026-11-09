@@ -1,14 +1,16 @@
 /**
  * Selection card: what is selected (element, position, coordination; distance, angle or dihedral for
  * 2–4 atoms) with quick actions. Bottom-left of the view on desktop, a slim strip on phones.
- * Also exports the selection helpers used by commands and the atom context menu.
+ * Also exports the selection helpers used by commands and the atom context menu, and the registry of
+ * selection actions (registerSelectionAction) behind the card's buttons and the atom menus.
  */
 import { h, ic, btn } from './dom.js';
-import { toast, promptDialog } from './overlays.js';
+import { toast, promptDialog, showMenu } from './overlays.js';
 import { element, normalizeSymbol } from '../core/elements.js';
 import { elementColorHex } from '../render/colors.js';
 import { bondedFragment } from '../render/display.js';
 import { keyLabel } from './keys.js';
+import { atomInfoRows } from './atominfo.js';
 
 const MEASURE = { 2: 'distance', 3: 'angle', 4: 'dihedral' };
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
@@ -146,7 +148,192 @@ export async function replaceSelection(app) {
   toast(`Changed ${plural(n, 'atom')} to ${sym}`, { action: { label: 'Undo', run: () => app.undo() } });
 }
 
+/** Keep the selected geometry as a measurement (2–4 atoms of `sel`) or start measuring from one atom. */
+export function measureSelection(app, sel = app.selection) {
+  const m = app.viewer.model;
+  if (sel.length === 1) { measureFrom(app, displayIndexOf(m, sel[0])); return; }
+  if (sel.length < 2 || sel.length > 4) return;
+  const ds = chainDisplay(m, sel);
+  if (ds.some((d) => d < 0)) { toast('Show the hidden atoms first to measure them.', { type: 'error' }); return; }
+  app.viewer.addMeasurement(MEASURE[sel.length], ds);
+  const id = app.viewer.measurements.at(-1)?.id;
+  app.emit('measure');
+  toast(`Added a ${MEASURE[sel.length]} measurement`, { action: { label: 'Remove', run: () => { app.viewer.removeMeasurement(id); app.emit('measure'); } } });
+}
+
+// ------------------------------------------------------------------ selection actions (card buttons, atom menus)
+/**
+ * Actions on selected atoms: selection-card buttons and atom context-menu items, which modules add with
+ *   registerSelectionAction({ id, label, short = label, icon, tip, kbd, order = 100, card = true, menu = true,
+ *                             when(app, sel), enabled(app, sel), run(app, sel, ctx), items(app, sel), rows(app, sel), danger })
+ * - label, short (touch screens, narrow windows), icon and tip are strings or functions (app, sel) → string; kbd is a key spec shown as a hint.
+ * - when(app, sel) false: not shown (takes no place); enabled(app, sel) false: shown greyed (buttons do not jump around).
+ * - card: a selection-card button. menu: true = the atom context menu, 'blank' = the menu on empty space, 'both', false.
+ * - run(app, sel, ctx): sel = source indices; ctx = {source: 'card' | 'menu' | 'blank', atom, display} (the right-clicked
+ *   atom and its drawn copy, −1 on the card). In the atom menu sel is the whole selection when the clicked atom is in a
+ *   selection of several, else just that atom (menuTarget); on empty space it is the selection (maybe empty).
+ * - items(app, sel) → [{id, label, kbd, tip, icon, separator, enabled, run}]: a split button (main part runs `run`, ▾ lists
+ *   the items); menus list the items instead of the action. An item without run calls the action's run with ctx.item = id.
+ * - rows(app, sel) → [{label, value}]: lines the card shows while the action is shown.
+ * Order numbers are a contract (F0-A §5.4): Centre 10, Same element 20, Measure 30, Fix ▾ 35, Replace 40, Delete 50,
+ * Move… 60, Rotate… 61, Mark as adsorbate 70. The card shows up to 7 buttons (5 on touch or narrow screens); with more,
+ * the last place is More, a menu of the rest.
+ */
+export const CARD_LIMITS = Object.freeze({ desktop: 7, narrow: 5 });
+const MENU_VALUES = [true, false, 'blank', 'both'];
+const actions = new Map();   // id → [entry, …]; the last entry of a list is the active one
+let actionSeq = 0;
+const cards = new Set();     // live selection cards, redrawn when the actions change
+const reported = new WeakSet();
+
+/** Call fn(app, sel) of an action, or return `fallback` when it throws (reported once per function). */
+function attempt(fn, app, sel, fallback) {
+  try { return fn(app, sel); } catch (e) {
+    if (!reported.has(fn)) { reported.add(fn); console.error('selection action failed', e); }
+    return fallback;
+  }
+}
+const resolve = (v, app, sel, fallback = null) => (typeof v === 'function' ? attempt(v, app, sel, fallback) : v ?? fallback);
+
+/** Add a selection action; returns a function that removes it (bringing back an earlier one with the same id). */
+export function registerSelectionAction(a, { replace = false } = {}) {
+  if (!a || typeof a !== 'object') throw new TypeError('registerSelectionAction: expected an action object');
+  if (typeof a.id !== 'string' || !a.id) throw new TypeError('registerSelectionAction: missing id');
+  if (!(typeof a.label === 'string' && a.label) && typeof a.label !== 'function') throw new TypeError(`registerSelectionAction: “${a.id}” needs a label`);
+  if (typeof a.run !== 'function' && typeof a.items !== 'function') throw new TypeError(`registerSelectionAction: “${a.id}” needs run(app, sel, ctx) or items(app, sel)`);
+  for (const k of ['when', 'enabled', 'items', 'rows']) if (a[k] != null && typeof a[k] !== 'function') throw new TypeError(`registerSelectionAction: “${a.id}”: ${k} must be a function (app, sel)`);
+  const menu = a.menu ?? true;
+  if (!MENU_VALUES.includes(menu)) throw new TypeError(`registerSelectionAction: “${a.id}”: menu must be true, false, 'blank' or 'both'`);
+  if (a.order != null && !Number.isFinite(a.order)) throw new TypeError(`registerSelectionAction: “${a.id}”: order must be a number`);
+  const e = { ...a, order: a.order ?? 100, card: a.card !== false, menu, seq: actionSeq++ };
+  if (!actions.has(a.id)) actions.set(a.id, []);
+  const list = actions.get(a.id);
+  if (list.length && !replace) console.warn(`registerSelectionAction: “${a.id}” already exists and is replaced (pass { replace: true } to do this on purpose)`);
+  list.push(e);
+  redrawCards();
+  let done = false;
+  return () => {
+    if (done) return;
+    done = true;
+    const i = list.indexOf(e);
+    if (i >= 0) list.splice(i, 1);
+    if (!list.length && actions.get(a.id) === list) actions.delete(a.id);
+    redrawCards();
+  };
+}
+let redrawQueued = false;
+function redrawCards() {
+  if (redrawQueued) return;
+  redrawQueued = true;
+  queueMicrotask(() => { redrawQueued = false; for (const c of cards) if (!c.el.hidden) c.update(); });
+}
+
+/** Whether action `a` belongs in `where`: 'card', 'menu' (an atom's context menu) or 'blank' (the menu on empty space). */
+const shownIn = (a, where) => (where === 'card' ? a.card : where === 'blank' ? a.menu === 'blank' || a.menu === 'both' : a.menu === true || a.menu === 'both');
+
+/** The actions shown for `sel` in 'card', 'menu' or 'blank', in order (`when` true; disabled ones included). */
+export function selectionActions(app, sel, where = 'card') {
+  const out = [];
+  for (const list of actions.values()) {
+    const a = list.at(-1);
+    if (!a || !shownIn(a, where)) continue;
+    if (a.when && !attempt(a.when, app, sel, false)) continue;
+    out.push(a);
+  }
+  return out.sort((x, y) => x.order - y.order || x.seq - y.seq);
+}
+
+/** An action's label, short label, icon, tip, key hint, enabled state and items for `sel`. */
+export function actionView(a, app, sel) {
+  const label = String(resolve(a.label, app, sel, a.id) || a.id);
+  const items = a.items ? resolve(a.items, app, sel, null) : null;
+  return {
+    id: a.id, label, short: String(resolve(a.short, app, sel, label) || label),
+    icon: resolve(a.icon, app, sel, null), tip: resolve(a.tip, app, sel, null), kbd: a.kbd ? keyLabel(a.kbd) : null,
+    enabled: a.enabled ? !!attempt(a.enabled, app, sel, false) : true, danger: !!a.danger,
+    items: Array.isArray(items) && items.length ? items : null,
+  };
+}
+
+/** The card lines of the shown actions: [{label, value}] as strings. */
+export function actionRows(list, app, sel) {
+  const out = [];
+  for (const a of list) {
+    if (!a.rows) continue;
+    const rows = attempt(a.rows, app, sel, null);
+    for (const r of Array.isArray(rows) ? rows : []) if (r && r.label != null && r.label !== '') out.push({ label: String(r.label), value: r.value == null ? '' : String(r.value) });
+  }
+  return out;
+}
+
+/** The atoms an atom-menu action works on: the selection when the clicked atom `src` is in a selection of several, else that atom. */
+export function menuTarget(selection, src) {
+  const sel = [...(selection ?? [])];
+  return sel.length > 1 && sel.includes(src) ? sel : [src];
+}
+
+/** Card buttons for the shown actions: all of them up to the limit, else the first limit − 1 and More with the rest. */
+export function splitCardActions(list, { narrow = false } = {}) {
+  const limit = narrow ? CARD_LIMITS.narrow : CARD_LIMITS.desktop;
+  return list.length <= limit ? { shown: list.slice(), more: [] } : { shown: list.slice(0, limit - 1), more: list.slice(limit - 1) };
+}
+
+/** Run an action or item; errors (thrown or rejected) become a toast. */
+function runAction(fn, app, sel, ctx) {
+  try { const r = fn?.(app, sel, ctx); r?.catch?.((e) => toast(e?.message ?? String(e), { type: 'error' })); }
+  catch (e) { console.error(e); toast(e?.message ?? String(e), { type: 'error' }); }
+}
+
+/**
+ * Menu items (for showMenu) of an action: its items when it has any, else one item. `locked` greys them all
+ * (a drag preview is open).
+ */
+export function actionMenuItems(a, app, sel, ctx, { locked = false } = {}) {
+  const v = actionView(a, app, sel);
+  const off = locked || !v.enabled;
+  if (!v.items) return [{ label: v.label, icon: v.icon, kbd: v.kbd, tip: v.tip, disabled: off, run: () => runAction(a.run, app, sel, ctx) }];
+  return v.items.filter(Boolean).map((it) => (it.separator ? { separator: true } : {
+    label: String(it.label ?? it.id ?? ''), icon: it.icon ?? null, kbd: it.kbd ? keyLabel(it.kbd) : null, tip: it.tip ?? null,
+    disabled: off || (typeof it.enabled === 'function' ? !attempt(it.enabled, app, sel, false) : it.enabled === false),
+    run: () => runAction(typeof it.run === 'function' ? it.run : (aa, ss, cc) => a.run?.(aa, ss, { ...cc, item: it.id }), app, sel, ctx),
+  }));
+}
+
+// the five built-in actions (the atom menu has its own Centre here, Measure from here and Delete items)
+const one = (app, sel) => { const s = app.structure; const syms = new Set(sel.map((i) => s?.symbols[i])); return syms.size === 1 ? [...syms][0] : null; };
+registerSelectionAction({
+  id: 'sel.centre', label: 'Centre', icon: 'crosshair', order: 10, menu: false,
+  tip: (app, sel) => (sel.length === 1 ? 'Centre the view on this atom' : 'Centre the view on the selection'),
+  run: (app, sel) => centreSelection(app, sel.length === 1 ? displayIndexOf(app.viewer.model, sel[0]) : null),
+});
+registerSelectionAction({
+  id: 'sel.sameElement', label: 'Same element', icon: 'atom', order: 20, menu: false,
+  short: (app, sel) => { const x = one(app, sel); return x ? `All ${x}` : 'Same element'; },
+  tip: (app, sel) => (sel.length === 1 ? `Select every ${app.structure.symbols[sel[0]]} atom` : 'Select every atom of these elements'),
+  run: (app) => selectSameElement(app),
+});
+registerSelectionAction({
+  id: 'sel.measure', label: 'Measure', icon: 'ruler', order: 30, menu: false,
+  when: (app, sel) => sel.length >= 1 && sel.length <= 4,
+  tip: (app, sel) => (sel.length === 1 ? 'Measure from this atom: click 1 more atom' : `Keep this ${MEASURE[sel.length]} as a measurement in the view`),
+  run: (app, sel) => measureSelection(app, sel),
+});
+registerSelectionAction({
+  id: 'sel.replace', label: 'Replace…', short: 'Replace', icon: 'swap', order: 40, menu: false,
+  tip: 'Change the element of the selected atoms',
+  run: (app) => replaceSelection(app),
+});
+registerSelectionAction({
+  id: 'sel.delete', label: 'Delete', icon: 'trash', order: 50, menu: false, danger: true, kbd: 'Delete',
+  tip: (app, sel) => (sel.length === 1 ? 'Delete this atom' : `Delete ${sel.length} atoms`),
+  run: (app) => app.deleteSelected(),
+});
+
 // ------------------------------------------------------------------ card
+const isTouch = () => matchMedia('(pointer: coarse)').matches;
+/** Touch screens and narrow windows get fewer card buttons (CARD_LIMITS.narrow). */
+const isNarrow = () => isTouch() || matchMedia('(max-width: 920px)').matches;
+
 export class SelectionCard {
   constructor(shell) {
     this.shell = shell;
@@ -155,10 +342,12 @@ export class SelectionCard {
     this.multi = false;
     this.el = h('section.float.selcard', { hidden: true, 'aria-label': 'Selected atoms' });
     shell.stage.append(this.el);
+    cards.add(this);
     const app = this.app;
     const upd = () => this.update();
     app.on('selection', upd);
     app.on('structure', upd);
+    app.on('preview', upd);
     app.on('scene', () => { if (!this.el.hidden) upd(); });
     app.viewer.on('model', () => { if (!this.el.hidden) upd(); });
   }
@@ -166,12 +355,17 @@ export class SelectionCard {
   update() {
     const app = this.app, s = app.structure, sel = s ? app.selection.filter((i) => i < s.length) : [];
     if (!sel.length) this.multi = false;   // multi-select ends with the selection (its chip is not on screen)
-    this.el.hidden = !sel.length || app.tool === 'measure';
+    // hidden under a tool that does not select atoms and while another structure is previewed; a drag preview keeps
+    // the card with its actions greyed (F0-A §3.6.3)
+    const session = app.session && app.session.active !== false ? app.session : null;
+    this.el.hidden = !sel.length || app.tool === 'measure' || app.toolDef?.selects === false || session?.kind === 'structure';
     if (this.el.hidden) return;
     const n = sel.length, m = app.viewer.model;
-    const touch = matchMedia('(pointer: coarse)').matches;
+    // phones, tablets and narrow windows: fewer buttons, each an icon over a short label (touch gets no tooltips)
+    const touch = isTouch(), compact = isNarrow();
     const dot = (sym) => h('span.dot', { style: { background: elementColorHex(sym, app.scene.style) } });
     const tag = (i) => h('span.atom', dot(s.symbols[i]), h('b', s.symbols[i]), h('span.idx', `#${i}`));
+    const line = (r) => h('div.r', h('span.k', r.label), h('span.v', r.value));
     const rows = [];
     let title;
     if (n === 1) {
@@ -182,6 +376,7 @@ export class SelectionCard {
       rows.push(h('div.r', h('span.k', 'xyz'), h('span.v', `${f(info?.position ?? s.pos(i))} Å`)));
       if (info?.frac) rows.push(h('div.r', h('span.k', 'frac'), h('span.v', f(info.frac))));
       if (info) rows.push(h('div.r', h('span.k', 'CN'), h('span.v', { 'data-tip': 'Coordination number: bonds drawn to this atom' }, String(info.cn))));
+      rows.push(...atomInfoRows(app, i, 'card').map(line));
     } else if (n <= 4) {
       title = h('div.t', ...sel.flatMap((i, k) => (k ? [h('span.dash', '–'), tag(i)] : [tag(i)])));
       const { P } = selectionPoints(app, sel);
@@ -195,32 +390,42 @@ export class SelectionCard {
       title = h('div.t', h('b', plural(n, 'atom')), h('span.nm', `of ${s.length}`));
       rows.push(h('div.r.comp', ...Object.entries(comp).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([sym, c]) => h('span.atom', dot(sym), h('b', sym), h('span.idx', `×${c}`)))));
     }
-    const first = n === 1 ? displayIndexOf(m, sel[0]) : -1;
-    // phones and tablets get no tooltips, so each action keeps a short label under its icon
-    const act = (label, short, o) => btn(touch ? short ?? label : label, { ...o, cls: `${o.cls}${touch ? ' stack' : ''}` });
-    const one = new Set(sel.map((i) => s.symbols[i])).size === 1 ? s.symbols[sel[0]] : null;
-    const acts = h('div.acts',
-      act('Centre', null, { icon: 'crosshair', cls: 'ghost small', tip: n === 1 ? 'Centre the view on this atom' : 'Centre the view on the selection', on: () => centreSelection(app, n === 1 ? first : null) }),
-      act('Same element', one ? `All ${one}` : 'Same element', { icon: 'atom', cls: 'ghost small', tip: n === 1 ? `Select every ${s.symbols[sel[0]]} atom` : 'Select every atom of these elements', on: () => selectSameElement(app) }),
-      n <= 4 ? act('Measure', null, { icon: 'ruler', cls: 'ghost small', tip: n === 1 ? 'Measure from this atom: click 1 more atom' : `Keep this ${MEASURE[n]} as a measurement in the view`, on: () => this.measure() }) : null,
-      act('Replace…', 'Replace', { icon: 'swap', cls: 'ghost small', tip: 'Change the element of the selected atoms', on: () => replaceSelection(app) }),
-      act('Delete', null, { icon: 'trash', cls: 'ghost small danger', tip: n === 1 ? 'Delete this atom' : `Delete ${n} atoms`, kbd: keyLabel('Delete'), on: () => app.deleteSelected() }),
-    );
+    const list = selectionActions(app, sel, 'card');
+    rows.push(...actionRows(list, app, sel).map(line));
+    const { shown, more } = splitCardActions(list, { narrow: compact });
+    const locked = session?.kind === 'positions';
+    const ctx = { source: 'card', atom: -1, display: -1 };
+    const buttons = shown.map((a) => this.button(a, sel, ctx, { compact, locked }));
+    if (more.length) {
+      const b = btn('More', { icon: 'more', cls: `ghost small${compact ? ' stack' : ''}`, tip: 'More actions', on: (ev) => showMenu(ev.currentTarget, more.flatMap((a) => actionMenuItems(a, app, sel, ctx, { locked })), { label: 'More actions' }) });
+      b.setAttribute('aria-haspopup', 'menu');
+      buttons.push(b);
+    }
+    const acts = h('div.acts', { role: 'group', 'aria-label': 'Actions on the selection' }, buttons);
     const close = btn('', { icon: 'x', cls: 'ghost icon small close', tip: 'Clear selection', kbd: keyLabel('Escape'), on: () => app.clearSelection() });
     const multi = touch ? h('button.chip.multi', { type: 'button', 'aria-pressed': String(this.multi), 'data-tip': 'When on, each tap adds or removes an atom', on: { click: () => { this.multi = !this.multi; this.update(); this.shell.updateHint?.(); toast(this.multi ? 'Multi-select on: tap atoms to add or remove them' : 'Multi-select off'); } } }, ic('hand', 'sm'), 'Multi-select') : null;
     this.el.replaceChildren(...[h('div.head', title, multi, close), rows.length ? h('div.rows', rows) : null, acts].filter(Boolean));
     document.documentElement.style.setProperty('--selcard-h', `${this.el.offsetHeight}px`);
   }
 
-  /** Keep the selected geometry as a measurement (2–4 atoms) or start measuring from one atom. */
-  measure() {
-    const app = this.app, sel = app.selection, m = app.viewer.model;
-    if (sel.length === 1) { measureFrom(app, displayIndexOf(m, sel[0])); return; }
-    const ds = chainDisplay(m, sel);
-    if (ds.some((d) => d < 0)) { toast('Show the hidden atoms first to measure them.', { type: 'error' }); return; }
-    app.viewer.addMeasurement(MEASURE[sel.length], ds);
-    const id = app.viewer.measurements.at(-1)?.id;
-    app.emit('measure');
-    toast(`Added a ${MEASURE[sel.length]} measurement`, { action: { label: 'Remove', run: () => { app.viewer.removeMeasurement(id); app.emit('measure'); } } });
+  /** A card button for action `a` (a split button with a ▾ menu when it has items); `compact`: icon over the short label. */
+  button(a, sel, ctx, { compact, locked }) {
+    const app = this.app, v = actionView(a, app, sel);
+    const off = locked || !v.enabled;
+    const menu = (anchor) => showMenu(anchor, actionMenuItems(a, app, sel, ctx, { locked }), { label: v.label });
+    const main = btn(compact ? v.short : v.label, {
+      icon: v.icon, cls: `ghost small${v.danger ? ' danger' : ''}${compact ? ' stack' : ''}`, tip: v.tip, kbd: v.kbd,
+      on: (ev) => { if (off) return; if (typeof a.run === 'function') runAction(a.run, app, sel, ctx); else menu(ev.currentTarget); },
+    });
+    main.dataset.action = a.id;
+    if (off) main.setAttribute('aria-disabled', 'true');
+    if (!v.items || typeof a.run !== 'function') return main;
+    const name = v.label.replace(/…$/, '');
+    const caret = btn('', { icon: 'chevronDown', cls: 'ghost small icon caret', tip: `${name} options`, on: (ev) => menu(ev.currentTarget) });
+    caret.setAttribute('aria-haspopup', 'menu');
+    return h('span.split', { role: 'group', 'aria-label': name, dataset: { action: a.id } }, main, caret);
   }
+
+  /** Keep the selected geometry as a measurement (2–4 atoms) or start measuring from one atom. */
+  measure() { measureSelection(this.app, this.app.selection); }
 }
