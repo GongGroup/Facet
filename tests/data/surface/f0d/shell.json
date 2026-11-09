@@ -117,9 +117,6 @@
             ]
           }
         }
-      },
-      "xfail": {
-        "js": "the web POSCAR reader drops Selective dynamics flags (fixed by F0-D T4)"
       }
     },
     {
