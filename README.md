@@ -8,13 +8,13 @@ Run it on your own computer, or as a server for your group.
 With Docker, for yourself (no login, reachable from this computer only):
 
 ```bash
-docker run -d --name facet -p 127.0.0.1:8765:8765 -v facet-data:/data -e FACET_MODE=local ghcr.io/mastreina/facet
+docker run -d --name facet -p 127.0.0.1:8765:8765 -v facet-data:/data -e FACET_MODE=local ghcr.io/gonggroup/facet
 ```
 
 Then open <http://127.0.0.1:8765>. For a group, with accounts:
 
 ```bash
-docker run -d --name facet -p 8765:8765 -v facet-data:/data ghcr.io/mastreina/facet
+docker run -d --name facet -p 8765:8765 -v facet-data:/data ghcr.io/gonggroup/facet
 docker exec facet facet user create alice
 ```
 

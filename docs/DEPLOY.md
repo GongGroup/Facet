@@ -82,17 +82,17 @@ facet user create alice --data /srv/facet     # asks for a password
 
 ## Docker
 
-The image is published at `ghcr.io/mastreina/facet` for amd64 and arm64 computers. `latest` follows the main
+The image is published at `ghcr.io/gonggroup/facet` for amd64 and arm64 computers. `latest` follows the main
 branch; version tags such as `0.3.2` stay fixed.
 
 ```bash
-docker run -d -p 8765:8765 -v facet-data:/data --name facet ghcr.io/mastreina/facet     # cloud mode
+docker run -d -p 8765:8765 -v facet-data:/data --name facet ghcr.io/gonggroup/facet     # cloud mode
 docker exec facet facet user create alice
 
 # local mode: projects as folders in ./facet-data/projects/, reachable from this computer only
 mkdir -p facet-data
 docker run -p 127.0.0.1:8765:8765 --user "$(id -u):$(id -g)" -v "$PWD/facet-data:/data" \
-  -e FACET_MODE=local -e FACET_TOKEN=<long random string> ghcr.io/mastreina/facet
+  -e FACET_MODE=local -e FACET_TOKEN=<long random string> ghcr.io/gonggroup/facet
 ```
 
 Or with Docker Compose, from a checkout:
@@ -107,7 +107,7 @@ Compose pulls the published image, and builds it from the checkout when it canno
 
 - While the image is private, sign in first: `docker login ghcr.io` with a GitHub user name and a token that
   may read packages.
-- To update, pull the image again (`docker pull ghcr.io/mastreina/facet`, or `docker compose pull`) and start
+- To update, pull the image again (`docker pull ghcr.io/gonggroup/facet`, or `docker compose pull`) and start
   a new container on the same volume.
 
 - The image runs as user id 1000. Create a mounted folder before you start, and pass

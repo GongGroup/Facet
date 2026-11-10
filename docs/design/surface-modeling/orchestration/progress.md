@@ -92,3 +92,6 @@
   Crystallume and AtomScope names keep working (tests/test_former_names.py). The nine interrupted worktrees predate the rename:
   to carry one over, run orchestration/rename_to_facet.py in it, `git mv crystallume facet`, commit, then rebase onto the main branch;
   the six with uncommitted partial edits are cheaper to redo. Development chains are still paused at the user's request.
+- 2026-11-10 11:00 PR #9 was squash-merged into main (648132a). GitHub Actions is disabled for the Mastreina account, so the user
+  transferred the repository to GongGroup/Facet; the image is now ghcr.io/gonggroup/facet (the workflow takes the owner from the
+  repository, the docs and the compose file were updated by hand). The development branch was restarted from main.

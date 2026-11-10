@@ -1,9 +1,9 @@
 # Facet server image (cloud mode by default).
-#   docker run -p 8765:8765 -v facet-data:/data ghcr.io/mastreina/facet
+#   docker run -p 8765:8765 -v facet-data:/data ghcr.io/gonggroup/facet
 # Local mode with a folder of this machine (runs as you, published on this machine only):
 #   mkdir -p facet-data
 #   docker run -p 127.0.0.1:8765:8765 --user "$(id -u):$(id -g)" -v "$PWD/facet-data:/data" \
-#     -e FACET_MODE=local -e FACET_TOKEN=<long random string> ghcr.io/mastreina/facet
+#     -e FACET_MODE=local -e FACET_TOKEN=<long random string> ghcr.io/gonggroup/facet
 # Build it yourself:
 #   docker build -t facet .
 FROM python:3.13-slim

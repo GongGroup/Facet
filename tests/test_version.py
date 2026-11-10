@@ -17,4 +17,4 @@ def test_web_app_version_matches():
 
 def test_compose_image_tag_matches():
     compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
-    assert re.findall(r"^\s*image: ghcr\.io/mastreina/facet:(\S+)", compose, re.M) == [__version__]
+    assert re.findall(r"^\s*image: ghcr\.io/gonggroup/facet:(\S+)", compose, re.M) == [__version__]

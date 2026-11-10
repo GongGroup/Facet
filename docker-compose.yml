@@ -10,7 +10,7 @@
 name: atomscope
 services:
   facet:
-    image: ghcr.io/mastreina/facet:0.3.2
+    image: ghcr.io/gonggroup/facet:0.3.2
     build: .
     restart: unless-stopped
     ports:
