@@ -57,6 +57,10 @@ import './ui/panels/appearance.js';
 // --- end M6-interface ---
 
 import { commands } from './core/commands.js';
+import { sectionFallbacks, CANCEL_PREVIEW } from './core/commands.js';
+import { openSection, requireCell, requireVacuumGap } from './ui/sections.js';
+import { confirmDialog } from './ui/overlays.js';
+import * as vacuumGaps from './core/vacuum.js';
 import { samples } from './build/samples.js';
 import { pickFiles, probeDownloads, canDownload, NO_DOWNLOADS, isArtifact } from './storage/files.js';
 import { toast } from './ui/overlays.js';
@@ -205,6 +209,18 @@ function registerCommands(app, shell) {
   for (const [path, title] of [['post.ao.enabled', 'ambient occlusion'], ['post.outline.enabled', 'ink outlines'], ['post.bloom.enabled', 'bloom'], ['post.dof.enabled', 'depth of field'], ['post.fog.enabled', 'depth cueing'], ['post.dropShadow.enabled', 'drop shadows'], ['post.paper.enabled', 'paper texture'], ['lighting.shadows.enabled', 'shadows']]) {
     R({ id: `toggle.${path}`, title: `Toggle ${title}`, category: 'Effects', run: () => { app.set(path, !app.get(path)); toast(`${title[0].toUpperCase() + title.slice(1)} ${app.get(path) ? 'on' : 'off'}`); } });
   }
+
+  // F0-A's commands of the surface tools (F0-A §5.8). A command run from a panel with {interactive: true} asks
+  // before it makes more than LIMITS.confirmAtoms atoms; scripts and embedding pages are not asked.
+  commands.setConfirm((o) => confirmDialog(o));
+  commands.registerFallback(CANCEL_PREVIEW);
+  // the M1–M6 commands open their panel section until the module registers its own command under the same id
+  // (registerFallback leaves an id that is already registered alone, so module code imported earlier wins too)
+  for (const c of sectionFallbacks({
+    open: (panel, section) => (section ? openSection(panel, section) : (shell.openLeft(panel), false)),
+    notify: (m) => toast(m),
+    guards: { cell: requireCell, gap: (a) => requireVacuumGap(a, vacuumGaps) },
+  })) commands.registerFallback(c);
 }
 
 boot().catch((e) => { console.error(e); toast(`Crystallume failed to start: ${e.message}`, { type: 'error' }); });

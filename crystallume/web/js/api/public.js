@@ -440,6 +440,14 @@ export function createAPI(app, shell) {
     reference() {
       const ids = (reg, f = () => true) => reg.list().filter(f).map((x) => x.id);
       const R = (name, label, list, example) => ({ name, label, count: list.length, ids: list, example });
+      // a command's parameter schema as data: functions (option lists, presets of the structure) are left out
+      const data = (v, depth = 0) => (typeof v === 'function' || depth > 8 ? undefined
+        : Array.isArray(v) ? v.map((x) => data(x, depth + 1)).filter((x) => x !== undefined)
+          : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, data(x, depth + 1)]).filter(([, x]) => x !== undefined)) : v);
+      const command = (c) => ({
+        id: c.id, title: c.title, category: c.category, key: c.key == null ? '' : [].concat(c.key).join(' / '),
+        aliases: c.aliases == null ? [] : [].concat(c.aliases), ms: c.ms ?? null, params: Array.isArray(c.params) ? data(c.params) : null,
+      });
       return {
         registries: [
           R('looks', 'Looks', ids(looks, (l) => !l.hidden), "crystallume.applyLook('{id}')"),
@@ -457,7 +465,8 @@ export function createAPI(app, shell) {
           R('storage', 'Project storage', app.storage.list().map((p) => p.id), "await crystallume.projects.list('{id}')"),
           R('panels', 'Side panels', [...leftPanels.keys()], "crystallume.shell.openLeft('{id}')"),
         ],
-        commands: commands.list().filter((c) => !c.hidden).map((c) => ({ id: c.id, title: c.title, category: c.category, key: c.key == null ? '' : [].concat(c.key).join(' / ') })),
+        // with the Materials Studio names (aliases), the MS menu path (ms) and the parameter schema (null: none)
+        commands: commands.list().filter((c) => !c.hidden).map(command),
         scene: scenePaths().map(([path, def]) => ({ path, type: typeOf(def), default: def, current: app.get(path) })),
         events: EVENTS,
         // namespace members: the app's crystallume.edit, then what modules added with defineApi ({path, owner, sig, call})

@@ -72,40 +72,11 @@ function luminance(hex) {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-/** Palette ranking: title prefix/substring, then all words as word prefixes; subsequence only as a last resort. */
-export function rankCommands(list, query) {
-  const q = String(query ?? '').toLowerCase().trim();
-  if (!q) return list.slice();
-  const words = q.split(/\s+/);
-  const split = (s) => String(s ?? '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
-  const prefixes = (ws, pool) => ws.every((w) => pool.some((t) => t.startsWith(w)));
-  const scored = [];
-  list.forEach((c, order) => {
-    const title = c.title.toLowerCase(), tw = split(c.title), cw = split(c.category), kw = split(c.keywords);
-    let s = 0;
-    if (title.startsWith(q)) s = 1000;
-    else if (tw.some((_, i) => tw.slice(i).join(' ').startsWith(q))) s = 900;
-    else if (title.includes(q)) s = 800;
-    else if (prefixes(words, tw)) s = 700;
-    else if (prefixes(words, [...tw, ...cw])) s = 600;
-    else if (words.every((w) => w.length >= 3) && prefixes(words, [...tw, ...cw, ...kw])) s = 400;
-    if (s) scored.push([s, c.title.length, order, c]);
-  });
-  if (!scored.length) {
-    // nothing matched as words: fall back to letters in order within the category and title (never keywords)
-    list.forEach((c, order) => {
-      const t = `${c.category ?? ''} ${c.title}`.toLowerCase();
-      let i = 0, gaps = 0;
-      for (const ch of q.replace(/\s+/g, '')) { const j = t.indexOf(ch, i); if (j < 0) { i = -1; break; } gaps += j - i; i = j + 1; }
-      if (i >= 0) scored.push([100 - Math.min(99, gaps), c.title.length, order, c]);
-    });
-  }
-  return scored.sort((a, b) => b[0] - a[0] || a[1] - b[1] || a[2] - b[2]).map((x) => x[3]);
-}
-
-const CATEGORY_ORDER = ['File', 'Edit', 'View', 'Tools', 'Window', 'Export', 'Look', 'Representation', 'Lighting', 'Colours', 'Effects', 'Sample', 'Trajectory', 'Help'];
-const catRank = (c) => { const i = CATEGORY_ORDER.indexOf(c); return i < 0 ? 100 : i; };
-const byCategory = (a, b) => catRank(a) - catRank(b) || String(a).localeCompare(String(b));
+// palette ranking (titles and the Materials Studio aliases) and the category order: ui/rank.js, re-exported here
+import { rankCommands, byCategory } from './rank.js';
+export { rankCommands, CATEGORY_ORDER } from './rank.js';
+/** The grey alias after a palette result's title, when the query matched that alias rather than the title. */
+const ALIAS_STYLE = { color: 'var(--muted)', fontSize: '12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: '0' };
 
 /** Label for several shortcuts shown as one row: 'A B C', '1 – 7' or 'Shift 1 – 4'. */
 function groupLabel(specs) {
@@ -1268,9 +1239,12 @@ export class Shell {
     this._palette = modal;
     let sel = 0, opts = [];
     const available = () => commands.list().filter((c) => { if (c.hidden || c.palette === false) return false; try { return !c.when || c.when(app); } catch { return false; } });
-    const row = (c, cat = true) => {
+    // a result found by one of its Materials Studio names shows that name in grey; the MS menu path (`ms`) is its tooltip
+    const row = (c, cat = true, alias = null) => {
       const k = c.kbd ?? c.key;
-      const r = h('div.res', { role: 'option', id: `pal-opt-${opts.length}`, 'aria-selected': 'false', dataset: { i: opts.length } }, cat ? h('span.cat', c.category ?? '') : null, h('span.tt', c.title), k ? h('span.kbd.k', keyLabel(Array.isArray(k) ? k[0] : k)) : null);
+      const r = h('div.res', { role: 'option', id: `pal-opt-${opts.length}`, 'aria-selected': 'false', title: c.ms || null, dataset: { i: opts.length } },
+        cat ? h('span.cat', c.category ?? '') : null, h('span.tt', c.title), alias ? h('span.alias', { style: ALIAS_STYLE }, alias) : null,
+        k ? h('span.kbd.k', keyLabel(Array.isArray(k) ? k[0] : k)) : null);
       opts.push(c);
       return r;
     };
@@ -1290,7 +1264,7 @@ export class Shell {
         const groups = new Map();
         for (const c of list) { const g = c.category ?? 'Other'; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(c); }
         for (const g of [...groups.keys()].sort(byCategory)) { nodes.push(h('div.grp', { role: 'presentation' }, g)); groups.get(g).forEach((c) => nodes.push(row(c, false))); }
-      } else rankCommands(list, q).slice(0, 50).forEach((c) => nodes.push(row(c)));
+      } else rankCommands(list, q).slice(0, 50).forEach(({ cmd, alias }) => nodes.push(row(cmd, true, alias)));
       results.replaceChildren(...nodes);
       if (!opts.length) results.append(h('p.hint.pal-empty', `No command matches “${q}”.`));
       sel = Math.min(sel, Math.max(0, opts.length - 1));
