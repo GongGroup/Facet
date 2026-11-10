@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 
 from crystallume import __version__, build
+from crystallume.io.capabilities import WRITER_CAPABILITIES
+from crystallume.server.models import ExportResponse
 
 POSCAR_TEXT = """Si8 diamond
 5.431
@@ -195,6 +197,128 @@ def test_io_export_and_convert(local_client, data_dir):
         r = local_client.post("/api/v1/io/convert", files={"file": ("NaCl.cif", fh)}, data={"to": "extxyz"})
     assert r.status_code == 200 and r.text.startswith("8\nLattice=")
     assert "attachment" in r.headers["content-disposition"]
+
+
+CONSTRAINTS_LOST = ("18 atom(s) are fixed or partly fixed (selective dynamics), but CIF cannot store constraints; "
+                    "use POSCAR, Extended XYZ or Crystallume JSON to keep them")
+ORDER_NOTE = ("POSCAR groups atoms by element, so the atom order in the file differs from the order in the structure; "
+              "sort the atoms by species to make them match")
+
+
+def test_io_export_warnings_and_notes(local_client, data_dir):
+    """F0-D §7.4: the export check in the /io/export response (CIF loses the constraints; POSCAR keeps them)."""
+    contcar = (data_dir / "surface" / "contcar_pt111.vasp").read_text()
+    slab = local_client.post("/api/v1/io/parse", json={"text": contcar, "filename": "CONTCAR"}).json()["structure"]
+    assert slab["pbc"] == [True, True, True]  # reading changes no pbc (design decision U1)
+    cif = local_client.post("/api/v1/io/export", json={"structure": slab, "format": "cif"}).json()
+    assert cif["warnings"] == [CONSTRAINTS_LOST] and cif["notes"] == [] and cif["text"].startswith("# Generated")
+    poscar = local_client.post("/api/v1/io/export", json={"structure": slab, "format": "poscar"}).json()
+    assert poscar["warnings"] == [] and poscar["notes"] == [] and "Selective dynamics" in poscar["text"]
+    mixed = {"symbols": ["O", "Ti", "O", "Ti"], "positions": [[0, 0, 0], [1, 1, 1], [2, 2, 2], [3, 3, 3]],
+             "cell": [[4, 0, 0], [0, 4, 0], [0, 0, 4]], "pbc": [True, True, True]}
+    r = local_client.post("/api/v1/io/export", json={"structure": mixed, "format": "poscar"}).json()
+    assert r["warnings"] == [] and r["notes"] == [ORDER_NOTE]
+    assert set(ExportResponse.model_fields) >= {"warnings", "notes"}
+
+
+def test_formats_list_writer_capabilities(local_client, plugin_client):
+    writers = {w["name"]: w for w in local_client.get("/api/v1/formats").json()["writers"]}
+    table = {k: dict(v) for k, v in WRITER_CAPABILITIES.items()}
+    assert {k: writers[k]["capabilities"] for k in WRITER_CAPABILITIES} == table
+    info = local_client.get("/api/v1/info").json()["formats"]["writers"]
+    assert all("capabilities" in w for w in info)
+    hello = {w["name"]: w for w in plugin_client.get("/api/v1/formats").json()["writers"]}["hello"]
+    assert hello["capabilities"] is None and hello["source"] == "hello"  # a plugin that declares nothing
+
+
+PLUGIN_CAPS = {"label": "Caps format", "frames": "one", "cell": True, "constraints": "none", "occupancy": False,
+               "order": "keep", "pbc": "stored", "overlap": True, "handedness": True}
+
+
+def test_plugin_writers_declare_capabilities(tmp_path):
+    """F0-D §3.12.1: a Python plugin declares what its writer stores with ``ctx.register_writer(...,
+    capabilities=...)``; GET /formats (and /info, which the web app copies them from) lists them and they drive the
+    warnings of POST /io/export.  The nine capabilities of ledger L-F0-25 are enough (``velocities`` is optional);
+    invalid ones fail the plugin, whose writers are then rolled back."""
+    import textwrap
+
+    from fastapi.testclient import TestClient
+
+    from crystallume import io as cl_io
+    from crystallume.config import Settings
+    from crystallume.server import create_app
+
+    d = tmp_path / "plugins"
+    d.mkdir()
+    (d / "capsplug.py").write_text(textwrap.dedent(f"""
+        CAPS = {PLUGIN_CAPS!r}
+        def register(ctx):
+            ctx.register_writer("capsfmt", lambda s: "CAPS\\n", extensions=[".caps"], capabilities=CAPS)
+            ctx.register_writer("capsvel", lambda s: "CAPS\\n", capabilities={{**CAPS, "velocities": False}})
+    """))
+    (d / "badcaps.py").write_text(textwrap.dedent(f"""
+        CAPS = {PLUGIN_CAPS!r}
+        def register(ctx):
+            ctx.register_writer("badfirst", lambda s: "BAD\\n")
+            ctx.register_writer("badcaps", lambda s: "BAD\\n", capabilities={{**CAPS, "frames": 2}})
+    """))
+    settings = Settings(mode="local", data_dir=tmp_path / "data", plugin_dirs=[d], entry_point_plugins=False,
+                        web_dir=tmp_path / "no-web")
+    traj = {"symbols": ["Pt", "O"], "positions": [[0, 0, 1], [1.5, 1.5, 3]], "cell": [[3, 0, 0], [0, 3, 0], [0, 0, 20]],
+            "pbc": [True, True, True], "props": {"velocities": [[0, 0, 0.01], [0, 0, 0]]},
+            "frames": [{"positions": [[0, 0, 1], [0, 0, 1.2]], "cell": [[0, 3, 0], [3, 0, 0], [0, 0, 20]]}]}
+    try:
+        with TestClient(create_app(settings)) as c:
+            info = c.get("/api/v1/info").json()
+            plugins = {p["name"]: p for p in info["plugins"]}
+            assert {k: p["status"] for k, p in plugins.items()} == {"badcaps": "error", "capsplug": "loaded"}
+            assert plugins["badcaps"]["error"] == ("ValueError: writer 'badcaps': capabilities.frames must be one of "
+                                                   "all, one")
+            writers = {w["name"]: w for w in c.get("/api/v1/formats").json()["writers"]}
+            assert writers["capsfmt"]["capabilities"] == PLUGIN_CAPS and writers["capsfmt"]["source"] == "capsplug"
+            assert {w["name"]: w for w in info["formats"]["writers"]}["capsfmt"]["capabilities"] == PLUGIN_CAPS
+            assert writers["capsvel"]["capabilities"] == {**PLUGIN_CAPS, "velocities": False}
+            assert "badfirst" not in writers and "badcaps" not in writers  # rolled back
+            r = c.post("/api/v1/io/export", json={"structure": traj, "format": "capsfmt"}).json()
+            assert r["text"] == "CAPS\n"
+            assert r["warnings"] == ["Caps format holds one frame: wrote frame 1 of 2"] and r["notes"] == []
+            r = c.post("/api/v1/io/export", json={"structure": traj, "format": "capsvel"}).json()
+            assert r["notes"] == ["the atoms have velocities, but Caps format cannot store them; use POSCAR, "
+                                  "Extended XYZ or Crystallume JSON to keep them"]
+    finally:
+        for name in ("capsfmt", "capsvel", "badfirst", "badcaps"):
+            cl_io.unregister_writer(name)
+
+
+def test_supercell_estimate_counts_every_frame(tmp_path):
+    """Defect E-63: repeat() tiles every frame, so the atom estimate counts them all."""
+    from fastapi.testclient import TestClient
+
+    from crystallume.config import Settings
+    from crystallume.server import create_app
+
+    si = build.crystal("diamond", "Si")
+    traj = si.to_dict()
+    traj["frames"] = [{"positions": (si.positions + 0.01 * k).tolist()} for k in (1, 2)]   # 8 atoms, 3 frames
+    settings = Settings(data_dir=tmp_path / "d", entry_point_plugins=False, web_dir=tmp_path / "w", max_atoms=100)
+    with TestClient(create_app(settings)) as c:
+        one = c.post("/api/v1/build/supercell", json={"structure": si.to_dict(), "repeat": [2, 2, 2]})
+        assert one.status_code == 200 and len(one.json()["structure"]["symbols"]) == 64
+        r = c.post("/api/v1/build/supercell", json={"structure": traj, "repeat": [2, 2, 2]})
+        assert r.status_code == 400 and r.json()["detail"] == "This would create about 192 atoms (limit 100)."
+        r = c.post("/api/v1/build/supercell", json={"structure": traj, "repeat": [2, 2, 1]})   # 32 x 3 = 96
+        assert r.status_code == 200 and len(r.json()["structure"]["frames"]) == 2
+
+
+def test_pair_limit_is_a_fixed_constant():
+    """Defect E-64: no setting overrides MAX_PAIRS (the comment that said so is gone)."""
+    from types import SimpleNamespace
+
+    from crystallume.config import Settings
+    from crystallume.server.routes import analysis
+
+    assert analysis.MAX_PAIRS == 50_000_000 and not hasattr(Settings(), "max_pairs")
+    analysis._guard_work(build.crystal("fcc", "Cu"), 5.0, SimpleNamespace(max_pairs=1, max_atoms=None))
 
 
 def test_build_endpoints(local_client):

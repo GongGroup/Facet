@@ -307,7 +307,7 @@ function fixed(v, d) {
 }
 
 /** The velocities the writer writes: one row of three finite numbers per atom, not all zero; else null. */
-function velocityRows(s) {
+export function velocityRows(s) {
   const col = has(s.props, 'velocities') ? s.props.velocities : null;
   if (!Array.isArray(col) || col.length !== s.length) return null;
   const rows = [];
@@ -323,7 +323,7 @@ function velocityRows(s) {
  * The block label of every atom: its poscar_species label when that names the atom's element (a label left
  * behind by changing an atom's element is ignored), else the element symbol.
  */
-function speciesBlocks(s) {
+export function speciesBlocks(s) {
   const col = has(s.props, 'poscar_species') && Array.isArray(s.props.poscar_species) && s.props.poscar_species.length === s.length
     ? s.props.poscar_species : null;
   return s.symbols.map((sym, i) => {

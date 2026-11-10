@@ -21,6 +21,9 @@ Commands::
 else ``CRYSTALLUME_PLUGIN_DIRS``, plus installed entry-point plugins), so plugin file formats,
 builders and analyses work on the command line too. Their ``--plugins`` takes one directory per flag
 (repeat it, or join directories with ``os.pathsep``) and may come anywhere on the line.
+
+``convert`` and ``build`` check what the written file loses (``crystallume.io.export_report``) and print
+``crystallume: warning: ...`` and ``crystallume: note: ...`` lines on stderr; the exit code stays 0.
 """
 
 from __future__ import annotations
@@ -140,25 +143,55 @@ def cmd_serve(args: argparse.Namespace) -> int:
     return 0
 
 
+def _print_export_report(structure, fmt: str) -> None:
+    """The export check of *fmt* on stderr: ``crystallume: warning: ...`` and ``crystallume: note: ...`` lines."""
+    from .io import export_report
+
+    report = export_report(structure, fmt)
+    for msg in report["warnings"]:
+        print(f"crystallume: warning: {msg}", file=sys.stderr)
+    for msg in report["notes"]:
+        print(f"crystallume: note: {msg}", file=sys.stderr)
+
+
+def _export(structure, output: str, fmt: str | None) -> str:
+    """Write *structure* to the file *output* (format: *fmt*, else from the name) and return the format written.
+
+    ``write()``'s :class:`~crystallume.io.ExportWarning` are silenced: the caller prints the export check itself.
+    """
+    import warnings
+
+    from .io import ExportWarning, _writer_for_name, write
+
+    fmt = fmt or _writer_for_name(output)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ExportWarning)
+        write(output, structure, format=fmt)  # no format: write() explains that it cannot infer one
+    return fmt or ""
+
+
 def _write_or_print(structure, output: str | None, fmt: str | None) -> None:
-    from .io import to_text, write
+    from .io import to_text
 
     if output:
-        write(output, structure, format=fmt)
+        fmt = _export(structure, output, fmt)
         print(f"wrote {len(structure)} atoms ({structure.formula}) to {output}", file=sys.stderr)
     else:
-        sys.stdout.write(to_text(structure, fmt or "extxyz"))
+        fmt = fmt or "extxyz"
+        sys.stdout.write(to_text(structure, fmt))
+    _print_export_report(structure, fmt)
 
 
 def cmd_convert(args: argparse.Namespace) -> int:
-    from .io import read, write
+    from .io import read
 
     index = args.index
     if index is not None and ":" not in index:
         index = int(index)
     s = read(args.input, format=args.from_, index=index)
-    write(args.output, s, format=args.to)
+    fmt = _export(s, args.output, args.to)
     print(f"converted {args.input} -> {args.output} ({len(s)} atoms, {s.n_frames} frame(s))", file=sys.stderr)
+    _print_export_report(s, fmt)
     return 0
 
 
@@ -256,11 +289,13 @@ def _fmt_num(v: float | None, unit: str = "", digits: int = 4) -> str:
 
 
 def cmd_info(args: argparse.Namespace) -> int:
-    from .analysis import coordination_numbers, summary
+    from .analysis import coordination_numbers, find_vacuum_gap, summary
     from .io import read
 
     s = read(args.file, format=args.format)
     info = summary(s)
+    gap = find_vacuum_gap(s)  # any structure alike (design decision U1): a report, nothing changes
+    info["vacuumGap"] = gap
     if args.bonds:
         cn = coordination_numbers(s)
         info["bonds"] = int(cn.sum() // 2)
@@ -281,6 +316,8 @@ def cmd_info(args: argparse.Namespace) -> int:
     else:
         print("Cell        : none (molecule / cluster)")
     print("PBC         : " + " ".join("T" if p else "F" for p in info["pbc"]))
+    if gap is not None:
+        print(f"Vacuum gap  : {gap['width']:.2f} Å along {'abc'[gap['axis']]}")
     if info.get("spacegroup"):
         print(f"Space group : {info['spacegroup']}")
     size = info["boundingBox"]["size"]

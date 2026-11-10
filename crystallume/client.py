@@ -11,6 +11,7 @@
     for summary in c.projects():
         print(summary["id"], summary["name"])
     c.convert("in.cif", "poscar", "out.vasp")        # server-side conversion (plugin formats too)
+    r = c.export_structure_with_warnings(s, "cif")   # r.text, r.warnings ("... cannot store constraints ...")
     c.analysis("hello-com", s)                       # a plugin analysis → its JSON result
 
 Every REST endpoint except authentication internals has a method here (the test suite checks
@@ -29,12 +30,13 @@ import secrets
 import urllib.error
 import urllib.parse
 import urllib.request
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
 
 from .core.structure import Structure
 
-__all__ = ["Client", "ClientError"]
+__all__ = ["Client", "ClientError", "ExportResult"]
 
 
 class ClientError(RuntimeError):
@@ -45,6 +47,21 @@ class ClientError(RuntimeError):
         self.status = status
         self.detail = detail
         self.url = url
+
+
+@dataclass
+class ExportResult:
+    """A structure written by the server (:meth:`Client.export_structure_with_warnings`).
+
+    ``warnings`` lists what the file loses (constraints, frames, the cell, ...) and ``notes`` what changes without
+    affecting a calculation: the export check of :func:`crystallume.io.export_report`.
+    """
+
+    text: str
+    filename: str
+    mimetype: str
+    warnings: list[str] = field(default_factory=list)
+    notes: list[str] = field(default_factory=list)
 
 
 def _struct_dict(s: Structure | dict[str, Any]) -> dict[str, Any]:
@@ -236,8 +253,15 @@ class Client:
         return Structure.from_dict(res["structure"])
 
     def export_structure(self, structure: Structure | dict[str, Any], format: str) -> str:
-        """Server-side export; returns the file text."""
+        """Server-side export; returns the file text (:meth:`export_structure_with_warnings` adds the export check)."""
         return self.request("POST", "/io/export", {"structure": _struct_dict(structure), "format": format})["text"]
+
+    def export_structure_with_warnings(self, structure: Structure | dict[str, Any], format: str) -> ExportResult:
+        """Server-side export with the export check: an :class:`ExportResult` (``text``, ``filename``,
+        ``mimetype``, ``warnings``, ``notes``)."""
+        res = self.request("POST", "/io/export", {"structure": _struct_dict(structure), "format": format})
+        return ExportResult(res["text"], res["filename"], res["mimetype"], list(res.get("warnings") or []),
+                            list(res.get("notes") or []))
 
     def convert(self, path: str | os.PathLike, to: str, output: str | os.PathLike | None = None,
                 from_format: str | None = None, index: int | str | None = None) -> str:

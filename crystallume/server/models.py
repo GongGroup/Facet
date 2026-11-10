@@ -136,6 +136,10 @@ class ExportResponse(BaseModel):
     text: str
     filename: str
     mimetype: str
+    warnings: list[str] = Field([], description="What the file loses (constraints, frames, the cell, ...): the "
+                                                "export check of crystallume.io.export_report.")
+    notes: list[str] = Field([], description="What changes without affecting a calculation (POSCAR atom order, "
+                                             "periodicity, velocities).")
 
 
 class CrystalRequest(BaseModel):

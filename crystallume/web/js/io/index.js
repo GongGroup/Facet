@@ -1,14 +1,25 @@
 /**
  * Format registry. Readers/writers can be added at runtime by plugins:
- *   formats.register({ id, name, extensions, read(text, filename) => Structure, write(structure) => string })
+ *   formats.register({ id, name, extensions, read(text, filename) => Structure, write(structure) => string,
+ *                      capabilities })
  * Formats without a JS reader can be delegated to the Python server (see storage/server.js).
+ *
+ * Export check: `capabilities` (io/capabilities.js) says what a writer can store; exportReport compares it with
+ * the structure (warnings: what the file loses; notes: what changes without affecting a calculation), with the
+ * same rules and words as Python's crystallume.io.export_report. A format without capabilities gets no report.
  */
-import { readXYZ, writeXYZ } from './xyz.js';
-import { slug } from '../core/util.js';
-import { readPOSCAR, writePOSCAR } from './poscar.js';
+import { readXYZ, writeXYZ, extxyzColumns, formatInfoValue } from './xyz.js';
+import { det3, slug } from '../core/util.js';
+import { readPOSCAR, writePOSCAR, speciesBlocks, velocityRows } from './poscar.js';
 import { readCIF, writeCIF } from './cif.js';
 import { readPDB, writePDB } from './pdb.js';
 import { readJSON, writeJSON } from './jsonfmt.js';
+import { OCCUPANCY_TOLERANCE, OVERLAP_CHECK_MAX_ATOMS, WRITER_CAPABILITIES, validateCapabilities } from './capabilities.js';
+import { RESULT_INFO, RESULT_PROPS, poscarOrder } from '../core/structure.js';
+import { constraintSummary, latticeToCartesianMask, moveFlags } from '../core/constraints.js';
+import { closeContacts } from '../core/contacts.js';
+import { findVacuumGap } from '../core/vacuum.js';
+import { SURFACE_DEFAULTS } from '../core/defaults.js';
 
 const registry = new Map();
 
@@ -28,9 +39,18 @@ export function num(tok, fmt = 'File', line = null) {
 }
 
 export const formats = {
+  /**
+   * Add (or replace) a format. `capabilities` (validated, see io/capabilities.js) turns on the export check of its
+   * writer; invalid capabilities are reported with console.warn and dropped (the format still works, unchecked).
+   */
   register(fmt) {
     if (!fmt?.id) throw new Error('format needs an id');
-    registry.set(fmt.id, { extensions: [], filenames: [], mime: 'text/plain', ...fmt });
+    let capabilities = null;
+    if (fmt.capabilities != null) {
+      try { capabilities = validateCapabilities(fmt.id, fmt.capabilities); }
+      catch (e) { console.warn(`Crystallume: ${e.message}; the export check of this format is off`); }
+    }
+    registry.set(fmt.id, { extensions: [], filenames: [], mime: 'text/plain', ...fmt, capabilities });
     return () => registry.delete(fmt.id);
   },
   get: (id) => registry.get(id),
@@ -39,12 +59,13 @@ export const formats = {
   writers: () => [...registry.values()].filter((f) => f.write),
 };
 
-formats.register({ id: 'xyz', name: 'XYZ', extensions: ['xyz'], read: readXYZ, write: (s) => writeXYZ(s, { extended: false }), description: 'Plain XYZ (multi-frame)' });
-formats.register({ id: 'extxyz', name: 'Extended XYZ', extensions: ['extxyz'], read: readXYZ, write: (s) => writeXYZ(s, { extended: true }), description: 'XYZ with Lattice/Properties header' });
-formats.register({ id: 'poscar', name: 'VASP POSCAR', extensions: ['vasp', 'poscar'], filenames: ['POSCAR', 'CONTCAR', 'XDATCAR'], read: readPOSCAR, write: writePOSCAR, description: 'VASP 4/5 POSCAR, CONTCAR, XDATCAR' });
-formats.register({ id: 'cif', name: 'CIF', extensions: ['cif', 'mcif'], read: readCIF, write: writeCIF, description: 'Crystallographic Information File (symmetry expanded)' });
-formats.register({ id: 'pdb', name: 'PDB', extensions: ['pdb', 'ent'], read: readPDB, write: writePDB, description: 'Protein Data Bank (ATOM/HETATM, CRYST1, MODEL)' });
-formats.register({ id: 'json', name: 'Crystallume JSON', extensions: ['json'], read: readJSON, write: writeJSON, mime: 'application/json', description: 'Native structure JSON' });
+const CAPS = WRITER_CAPABILITIES;
+formats.register({ id: 'xyz', name: 'XYZ', extensions: ['xyz'], read: readXYZ, write: (s) => writeXYZ(s, { extended: false }), description: 'Plain XYZ (multi-frame)', capabilities: CAPS.xyz });
+formats.register({ id: 'extxyz', name: 'Extended XYZ', extensions: ['extxyz'], read: readXYZ, write: (s) => writeXYZ(s, { extended: true }), description: 'XYZ with Lattice/Properties header', capabilities: CAPS.extxyz });
+formats.register({ id: 'poscar', name: 'VASP POSCAR', extensions: ['vasp', 'poscar'], filenames: ['POSCAR', 'CONTCAR', 'XDATCAR'], read: readPOSCAR, write: writePOSCAR, description: 'VASP 4/5 POSCAR, CONTCAR, XDATCAR', capabilities: CAPS.poscar });
+formats.register({ id: 'cif', name: 'CIF', extensions: ['cif', 'mcif'], read: readCIF, write: writeCIF, description: 'Crystallographic Information File (symmetry expanded)', capabilities: CAPS.cif });
+formats.register({ id: 'pdb', name: 'PDB', extensions: ['pdb', 'ent'], read: readPDB, write: writePDB, description: 'Protein Data Bank (ATOM/HETATM, CRYST1, MODEL)', capabilities: CAPS.pdb });
+formats.register({ id: 'json', name: 'Crystallume JSON', extensions: ['json'], read: readJSON, write: writeJSON, mime: 'application/json', description: 'Native structure JSON', capabilities: CAPS.json });
 
 export function detectFormat(filename = '', text = '') {
   const base = filename.split(/[\\/]/).pop() ?? '';
@@ -93,11 +114,161 @@ function checkFinite(s, name) {
   if (s.cell && !s.cell.every((r) => r.every(Number.isFinite))) throw new Error(`${name}: the unit cell contains invalid numbers.`);
 }
 
+/**
+ * Write `structure` (its current frame for the single-frame formats) with the `formatId` writer. Synchronous:
+ * `text` is a string, or a Promise for formats written by the server; `warnings` and `notes` are always arrays,
+ * computed here by exportReport (for server formats too, from the capabilities GET /formats gave them; the server
+ * gets the whole structure and, like every Python writer, writes frame 0, so that is the frame they describe).
+ * @returns {{text: string | Promise<string>, filename: string, mime: string, warnings: string[], notes: string[]}}
+ */
 export function exportStructure(structure, formatId) {
   const fmt = registry.get(formatId);
   if (!fmt?.write) throw new Error(`No writer for format "${formatId}".`);
   const ext = fmt.extensions[0] ?? formatId;
   const base = slug(structure.name);   // the same name (and 'untitled' fallback) as the PNG / GLB exports of this structure
   const filename = formatId === 'poscar' ? `${base}.vasp` : `${base}.${ext}`;
-  return { text: fmt.write(structure), filename, mime: fmt.mime };
+  const text = fmt.write(structure);
+  const { warnings, notes } = exportReport(structure, formatId);
+  return { text, filename, mime: fmt.mime, warnings, notes };
+}
+
+// ------------------------------------------------------------------------------------------------- export check
+/** The words for "the other formats" in the advice of the warnings and notes. */
+const KEEPERS = 'use POSCAR, Extended XYZ or Crystallume JSON to keep them';
+const AXES = 'abc';
+
+/** `x` (>= 0) with `d` decimals, rounding halves up (the same digits as the Python twin). */
+function fixed(x, d) {
+  const scale = 10 ** d;
+  const q = Math.floor(x * scale + 0.5);
+  return d ? `${Math.floor(q / scale)}.${String(q % scale).padStart(d, '0')}` : String(q);
+}
+
+const isNumber = (x) => typeof x === 'number' && Number.isFinite(x);
+const isList = (v) => Array.isArray(v) || (ArrayBuffer.isView(v) && !(v instanceof DataView));
+
+/** The sites whose occupancy is a number further than OCCUPANCY_TOLERANCE from 1. */
+function partlyOccupied(s) {
+  const col = s.props?.occupancy;
+  if (!isList(col)) return 0;
+  let q = 0;
+  for (const v of col) if (isNumber(v) && Math.abs(v - 1) > OCCUPANCY_TOLERANCE) q++;
+  return q;
+}
+
+/** Whether props.velocities holds a finite number other than zero. */
+function hasVelocities(s) {
+  const col = s.props?.velocities;
+  if (!isList(col)) return false;
+  for (const row of col) for (const x of isList(row) ? row : [row]) if (isNumber(x) && x !== 0) return true;
+  return false;
+}
+
+/** The calculated results the extended XYZ writer writes for the first frame only: columns, then info keys. */
+function resultNames(s, columns) {
+  const names = columns.filter((c) => RESULT_PROPS.includes(c.name)).map((c) => c.name);
+  for (const [k, v] of Object.entries(s.info ?? {})) if (RESULT_INFO.includes(k) && formatInfoValue(k, v) !== null) names.push(k);
+  return names;
+}
+
+/** The export check of writer `id` with capabilities `caps` (F0-D §3.12.2; the Python twin is `_report`). */
+function report(s, id, caps, frame) {
+  const n = s.nFrames;
+  const k = s._frameIndex(frame ?? 'current');
+  const F = caps.label;
+  const cell = s._frameCell(k);
+  const warnings = [], notes = [];
+  // W1, W2 (W3, a cell-less structure boxed by the writer, is Python only: the web POSCAR and CIF writers need a cell)
+  if (caps.frames === 'one' && n > 1) warnings.push(`${F} holds one frame: wrote frame ${k + 1} of ${n}`);
+  if (caps.cell === false && cell) warnings.push(`${F} does not store the unit cell; use Extended XYZ to keep it`);
+  // W4-W6: constraints
+  const c = constraintSummary(s);
+  const m = c.fixed + c.partial;
+  if (m && caps.constraints === 'none') {
+    warnings.push(`${m} atom(s) are fixed or partly fixed (selective dynamics), but ${F} cannot store constraints; ${KEEPERS}`);
+  }
+  if (m && caps.constraints === 'cartesian') {
+    let mask = [], tightened = 0;
+    try { ({ mask, tightened } = latticeToCartesianMask(moveFlags(s), s._frameCell(0))); } catch { /* a cell that cannot be inverted: the writer fails as well */ }
+    if (tightened) {
+      warnings.push(`${F} stores constraints along x, y and z (ASE move_mask): the partial constraints of ${tightened} atom(s) are along cell vectors that are not x, y or z and were tightened; POSCAR keeps them exactly`);
+    }
+    const partial = mask.filter((r) => r.some(Boolean) && !r.every(Boolean)).length;
+    if (partial) {
+      warnings.push(`${F} stores these constraints as ASE FixCartesian masks because ${partial} atom(s) are only partly fixed; ASE's VASP writer ignores FixCartesian and would write every atom as free, so export POSCAR from Crystallume for VASP`);
+    }
+  }
+  // W7: occupancies
+  const q = partlyOccupied(s);
+  if (q && caps.occupancy === false) warnings.push(`${q} site(s) are partially occupied, but ${F} cannot store occupancy; they are written as full atoms`);
+  // W8, W9: the columns and frames of the extended XYZ writer
+  if (id === 'extxyz') {
+    const { columns, skipped } = extxyzColumns(s);
+    for (const [key, reason] of skipped) warnings.push(`property '${key}' was not written: ${reason}`);
+    if (n > 1) {
+      const names = resultNames(s, columns);
+      if (names.length) {
+        const one = names.length === 1;
+        warnings.push(`${names.join(', ')} ${one ? 'is' : 'are'} known only for frame 1 and ${one ? 'was' : 'were'} written for that frame only`);
+      }
+    }
+  }
+  // W10: a left-handed cell
+  if (caps.handedness && cell && det3(cell) < 0) {
+    warnings.push('the cell is left-handed (negative volume); VASP stops on such cells, so swap two cell vectors first');
+  }
+  // W11: overlapping atoms, with the periodicity the written file has (positions that are not finite: no check)
+  const finite = Array.prototype.every.call(s._framePositions(k), Number.isFinite);
+  let skippedCheck = false;
+  if (caps.overlap && finite) {
+    if (s.length > OVERLAP_CHECK_MAX_ATOMS) skippedCheck = true;
+    else {
+      const pbc = { periodic: [true, true, true], stored: [0, 1, 2].map((a) => !!s.pbc?.[a]), none: [false, false, false] }[caps.pbc];
+      const pairs = closeContacts(k === s.frame ? s : s.getFrame(k), { pbc });
+      if (pairs.length) {
+        const [i, j, d] = pairs[0];
+        warnings.push(`${pairs.length} pair(s) of atoms are closer than ${SURFACE_DEFAULTS.overlapDistance} Å (e.g. atoms ${i + 1} and ${j + 1}, ${fixed(d, 2)} Å apart)`);
+      }
+    }
+  }
+  // N1-N3
+  if (caps.order === 'species' && s.length) {
+    const idx = poscarOrder(s.symbols, null, speciesBlocks(s));
+    if (idx.some((v, t) => v !== t)) notes.push(`${F} groups atoms by element, so the atom order in the file differs from the order in the structure; sort the atoms by species to make them match`);
+  }
+  if (id === 'poscar' && cell && finite) {
+    for (let axis = 0; axis < 3; axis++) {
+      if (s.pbc?.[axis]) continue;
+      const gap = findVacuumGap(s, axis, { minWidth: 0, frame: k, periodicOnly: false });
+      if (gap) notes.push(`${F} is always periodic: ${AXES[axis]} was not periodic and is written as a cell vector with a ${fixed(gap.width, 1)} Å gap between periodic images`);
+    }
+  }
+  // lead decision L-01: a note when the file drops the velocities; a format that does not declare the optional
+  // capability gets none (nothing is guessed)
+  if (caps.velocities != null && hasVelocities(s)) {
+    if (caps.velocities === false) notes.push(`the atoms have velocities, but ${F} cannot store them; ${KEEPERS}`);
+    // the writer's own rule: three finite numbers for every atom, or none
+    else if (id === 'poscar' && !velocityRows(s)) notes.push(`the velocities were not written: ${F} needs three finite numbers for every atom`);
+  }
+  if (skippedCheck) notes.push(`the overlap check was skipped for more than ${String(OVERLAP_CHECK_MAX_ATOMS).replace(/\B(?=(\d{3})+$)/g, ' ')} atoms`);
+  return { warnings, notes };
+}
+
+/**
+ * What writing `s` as `formatId` loses or changes: `{warnings, notes}` (word for word Python's
+ * crystallume.io.export_report). Warnings change a calculation or lose data: a single-frame format, the unit cell,
+ * constraints, partial occupancies, props Extended XYZ cannot write, results known only for the first frame, a
+ * left-handed cell, atoms closer than 0.5 Å. Notes do not: the POSCAR atom order, a non-periodic axis written as a
+ * POSCAR cell vector, velocities a format cannot store (or POSCAR velocities that are not three finite numbers for
+ * every atom), a skipped overlap check (more than 200 000 atoms). `frame` is the frame the file holds (default: the
+ * current frame, which the web writers write; frame 0 for a format the server writes, as the Python writers and
+ * the server's own report do). Synchronous for every format (server formats use the capabilities copied from
+ * GET /formats); a format without capabilities gives empty lists, an unknown one throws.
+ * @returns {{warnings: string[], notes: string[]}}
+ */
+export function exportReport(s, formatId, { frame } = {}) {
+  const fmt = registry.get(formatId);
+  if (!fmt?.write) throw new Error(`No writer for format "${formatId}".`);
+  if (!fmt.capabilities) return { warnings: [], notes: [] };
+  return report(s, formatId, fmt.capabilities, frame ?? (fmt.server ? 0 : null));
 }
