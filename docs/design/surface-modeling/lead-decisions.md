@@ -27,4 +27,6 @@
 | L-22 | 计划 P-12 / L-11：体相名统一 | 统一为 Python 现有写法（如 `Pt fcc`），收尾阶段（W5）落实 | M7 |
 | L-23 | 快捷键 Shift+A、Shift+S | 按 M5 与 M7 §5.2 的登记注册；W5 复核冲突 | M5、M7 |
 | L-24 | 账本 L-F0-25 的写出器能力表（F0-D T6 实现时提出） | 增补一列**可选**能力 `velocities`（排在 `handedness` 之后）：内置值 json true、extxyz true、xyz false、poscar true、cif false、pdb false；写出器不声明这一列时不给速度相关的说明。九个原有能力仍是必填集合 | F0-D（已实现），w0-docs 写进 SCHEMA.md |
+| L-25 | M2 §3.9.1 没写阳离子进入"第一个电中性组合"搜索的顺序（M2-T2 审查提出） | 按化学式顺序（电负性从小到大），即 M2-T2 的实现；金标生成器 `make_cleave_cases.py` 的 `formal_charges_of` 改用同一顺序 | M2 |
+| L-26 | M7 §6.1 把 `load_oxidation_states`/`estimate_oxidation_states` 列在 `core/webdata` 下，而 M2 §6 与实现放在 `build/surface` | 以 M2 §6 与实现为准（`build/surface.py`/`.js`）；M7-T1 生成名字清单时按此，并更正 M7 §6.1 | M7 |
 | L-19 | G-39 c(2×2) 等预设产生的结构名 | 自动名一律用由 `info.supercellMatrix` 计算的 Wood 标签（如 `(√2×√2)R45°`）；预设标签只出现在读数与 toast 里（`Made a c(2×2) = (√2×√2)R45° supercell: 8 atoms`）。两条路径（Slab 分区与 Cell 分区）的名字由同一个测试核对 | M1、M2 |
