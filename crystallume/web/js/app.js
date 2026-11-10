@@ -1973,6 +1973,15 @@ export class App extends Emitter {
 
   // ------------------------------------------------------------------ prefs
   setPref(k, v) { this.prefs[k] = v; savePrefs(this.prefs); this.emit('prefs'); }
+
+  // --- surface-modeling M2 ---
+  // --- end M2 ---
+
+  // --- surface-modeling M3 ---
+  // --- end M3 ---
+
+  // --- surface-modeling M4 ---
+  // --- end M4 ---
 }
 
 export { formats, samples };

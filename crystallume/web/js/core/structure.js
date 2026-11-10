@@ -1471,6 +1471,27 @@ export class Structure {
       periodic: this.periodic, cell: cp, volume: this.volume(), density: this.density(), composition: this.composition(),
     };
   }
+
+  // --- surface-modeling M1-T3a ---
+  // --- end M1-T3a ---
+
+  // --- surface-modeling M1-T3b ---
+  // --- end M1-T3b ---
+
+  // --- surface-modeling M1-T4 ---
+  // --- end M1-T4 ---
+
+  // --- surface-modeling M2 ---
+  // --- end M2 ---
+
+  // --- surface-modeling M3 ---
+  // --- end M3 ---
+
+  // --- surface-modeling M4-geometry ---
+  // --- end M4-geometry ---
+
+  // --- surface-modeling M4-placement ---
+  // --- end M4-placement ---
 }
 
 // --------------------------------------------------------------------------------------------- combining

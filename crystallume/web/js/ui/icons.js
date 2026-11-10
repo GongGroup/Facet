@@ -77,6 +77,14 @@ const P = {
   unlock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7.5a4 4 0 0 1 7.7-1.5M12 15v2"/>',
   normal: '<path d="M2.5 19 7 15.5h14.5L17 19z"/><path d="M12 17V4M8.5 7.5 12 4l3.5 3.5"/>',
   matrix: '<path d="M7 4H4.5v16H7M17 4h2.5v16H17"/><path d="M9 8.5h.01M12 8.5h.01M15 8.5h.01M9 12h.01M12 12h.01M15 12h.01M9 15.5h.01M12 15.5h.01M15 15.5h.01"/>',
+  // --- surface-modeling M3 ---
+  // --- end M3 ---
+
+  // --- surface-modeling M4 ---
+  // --- end M4 ---
+
+  // --- surface-modeling M5 ---
+  // --- end M5 ---
 };
 
 export function icon(name, cls = '') {

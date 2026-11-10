@@ -437,3 +437,10 @@ def centered_cell_hint(cell: np.ndarray | Sequence[Sequence[float]] | None) -> d
         if all(abs(x - target) <= _ANGLE_TOL for x in angles):
             return {"kind": kind, "to_conventional": [list(r) for r in _TO_CONVENTIONAL[kind]]}
     return None
+
+
+# --- surface-modeling M1 ---
+# --- end M1 ---
+
+# --- surface-modeling M2 ---
+# --- end M2 ---

@@ -76,3 +76,13 @@ def add_repeat_suffix(name: str, reps: Sequence[int]) -> str:
         old = (int(m.group(3)), int(m.group(4)), int(m.group(5)))
         return f"{m.group(1)} {format_repeat([a * b for a, b in zip(old, counts)])}"
     return f"{name} {format_repeat(counts)}"
+
+
+# --- surface-modeling M1 ---
+# --- end M1 ---
+
+# --- surface-modeling M2 ---
+# --- end M2 ---
+
+# --- surface-modeling M6 ---
+# --- end M6 ---

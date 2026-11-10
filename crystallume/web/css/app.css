@@ -891,3 +891,45 @@ input.field[aria-invalid="true"], select.field[aria-invalid="true"] { border-col
   .app:has(> .inspector[data-collapsed="false"]) > .stage { margin-right: min(360px, 50vw); }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* --- surface-modeling M1 --- */
+/* --- end M1 --- */
+
+/* --- surface-modeling M2-cleave --- */
+/* --- end M2-cleave --- */
+
+/* --- surface-modeling M2-slab --- */
+/* --- end M2-slab --- */
+
+/* --- surface-modeling M3-markers --- */
+/* --- end M3-markers --- */
+
+/* --- surface-modeling M3-layers --- */
+/* --- end M3-layers --- */
+
+/* --- surface-modeling M3-constraints --- */
+/* --- end M3-constraints --- */
+
+/* --- surface-modeling M3-atomselection --- */
+/* --- end M3-atomselection --- */
+
+/* --- surface-modeling M4-move --- */
+/* --- end M4-move --- */
+
+/* --- surface-modeling M4-transform --- */
+/* --- end M4-transform --- */
+
+/* --- surface-modeling M4-place --- */
+/* --- end M4-place --- */
+
+/* --- surface-modeling M4-card --- */
+/* --- end M4-card --- */
+
+/* --- surface-modeling M5-markers --- */
+/* --- end M5-markers --- */
+
+/* --- surface-modeling M5-panel --- */
+/* --- end M5-panel --- */
+
+/* --- surface-modeling M6 --- */
+/* --- end M6 --- */

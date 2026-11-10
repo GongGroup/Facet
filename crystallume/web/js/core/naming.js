@@ -51,3 +51,12 @@ export function addRepeatSuffix(name, reps) {
   }
   return `${text} ${formatRepeat(counts)}`;
 }
+
+// --- surface-modeling M1 ---
+// --- end M1 ---
+
+// --- surface-modeling M2 ---
+// --- end M2 ---
+
+// --- surface-modeling M6 ---
+// --- end M6 ---
