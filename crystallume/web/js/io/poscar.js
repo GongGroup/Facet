@@ -307,7 +307,7 @@ function fixed(v, d) {
 }
 
 /** The velocities the writer writes: one row of three finite numbers per atom, not all zero; else null. */
-function velocityRows(s) {
+export function velocityRows(s) {
   const col = has(s.props, 'velocities') ? s.props.velocities : null;
   if (!Array.isArray(col) || col.length !== s.length) return null;
   const rows = [];

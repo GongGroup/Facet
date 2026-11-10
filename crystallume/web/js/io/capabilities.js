@@ -3,7 +3,8 @@
  * (io/index.js) compares a writer's capabilities with the structure to tell what the file loses (warnings) and what
  * changes without affecting a calculation (notes). The built-in formats carry the rows of WRITER_CAPABILITIES; a
  * plugin format declares its own `capabilities` (formats.register validates them), the server-only formats copy
- * theirs from GET /formats, and a format without capabilities gets no report at all (nothing is guessed).
+ * theirs from GET /formats (a Python plugin declares them with ctx.register_writer), and a format without
+ * capabilities gets no report at all (nothing is guessed).
  *
  * | id | label | frames | cell | constraints | occupancy | order | pbc | overlap | handedness | velocities |
  * |---|---|---|---|---|---|---|---|---|---|---|
@@ -18,7 +19,9 @@
  * `constraints`: selective dynamics along the cell vectors (lattice), along x, y, z (cartesian: ASE's move_mask) or
  * not at all; `order`: kept, or grouped by species (POSCAR); `pbc`: stored in the file, T T T whenever there is a
  * cell (periodic), or no cell (none); `overlap`, `handedness`: look for atoms closer than 0.5 Å and for a
- * left-handed cell; `velocities`: props.velocities is written (lead decision L-01: a note when they are dropped).
+ * left-handed cell; `velocities` (optional, OPTIONAL_CAPABILITIES): props.velocities is written. Lead decision L-01
+ * asks for a note when velocities are dropped; the column is an addition to the nine of F0-D §3.12.1 (ledger
+ * L-F0-25), so a format may leave it out, and then the export check says nothing about velocities.
  *
  * The Python twin is crystallume/io/capabilities.py: the same table, the same validation and, word for word, the
  * same messages (a test compares the two tables).
@@ -37,8 +40,14 @@ export const CAPABILITY_VALUES = Object.freeze({
   handedness: Object.freeze([true, false]),
   velocities: Object.freeze([true, false]),
 });
+/**
+ * The capabilities a format may leave out (null or undefined count as left out): velocities, which lead decision
+ * L-01 added to the table of F0-D §3.12.1. Every other key of CAPABILITY_VALUES is required.
+ */
+export const OPTIONAL_CAPABILITIES = Object.freeze(['velocities']);
 
 const KEYS = Object.keys(CAPABILITY_VALUES);
+const REQUIRED = KEYS.filter((k) => !OPTIONAL_CAPABILITIES.includes(k));
 const row = (label, frames, cell, constraints, occupancy, order, pbc, overlap, handedness, velocities) =>
   Object.freeze({ label, frames, cell, constraints, occupancy, order, pbc, overlap, handedness, velocities });
 
@@ -62,18 +71,22 @@ const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArr
 
 /**
  * Check the capabilities `caps` of writer `name` and return them as a new frozen object in table order. Every key
- * of CAPABILITY_VALUES is required and no other key is allowed; booleans must be true or false. Throws an Error
- * naming the writer and the key, e.g. `writer 'myfmt': capabilities.constraints must be one of lattice, cartesian, none`.
+ * of CAPABILITY_VALUES is required except those of OPTIONAL_CAPABILITIES, which may be left out, null or undefined
+ * (and are then left out of the result), and no other key is allowed; booleans must be true or false. Throws an
+ * Error naming the writer and the key, e.g. `writer 'myfmt': capabilities.constraints must be one of lattice, cartesian, none`.
  */
 export function validateCapabilities(name, caps) {
   const where = `writer '${name}'`;
-  if (!isPlainObject(caps)) throw new Error(`${where}: capabilities must be an object with the keys ${KEYS.join(', ')}`);
+  if (!isPlainObject(caps)) {
+    throw new Error(`${where}: capabilities must be an object with the keys ${REQUIRED.join(', ')} (optional: ${OPTIONAL_CAPABILITIES.join(', ')})`);
+  }
   const unknown = Object.keys(caps).filter((k) => !KEYS.includes(k));
   if (unknown.length) throw new Error(`${where}: unknown capability '${unknown[0]}' (known: ${KEYS.join(', ')})`);
   const out = {};
   for (const key of KEYS) {
     const values = CAPABILITY_VALUES[key];
     const value = caps[key];
+    if (value == null && OPTIONAL_CAPABILITIES.includes(key)) continue;
     if (values === null) {
       if (typeof value !== 'string' || !value.trim()) throw new Error(`${where}: capabilities.${key} must be a non-empty string`);
     } else if (!values.includes(value)) {

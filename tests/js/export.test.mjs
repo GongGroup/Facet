@@ -9,7 +9,8 @@ import { readFileSync } from 'node:fs';
 import { Structure } from '../../crystallume/web/js/core/structure.js';
 import { closeContacts } from '../../crystallume/web/js/core/contacts.js';
 import { exportReport, exportStructure, formats, parseStructure } from '../../crystallume/web/js/io/index.js';
-import { CAPABILITY_VALUES, WRITER_CAPABILITIES, validateCapabilities } from '../../crystallume/web/js/io/capabilities.js';
+import { CAPABILITY_VALUES, OPTIONAL_CAPABILITIES, WRITER_CAPABILITIES, validateCapabilities } from '../../crystallume/web/js/io/capabilities.js';
+import { writePOSCAR } from '../../crystallume/web/js/io/poscar.js';
 import { installExtensions } from '../../crystallume/web/js/api/extensions.js';
 import { repoPath } from './helpers.mjs';
 
@@ -27,6 +28,8 @@ const trajectory = (n = 3) => new Structure({
 const fixed = (flags) => new Structure({ symbols: flags.map(() => 'Pt'), positions: flags.map((_, i) => [0, 0, 1 + 2.3 * i]), cell: HEX, props: { selective_dynamics: flags } });
 const has = (list, fragment) => list.some((m) => m.includes(fragment));
 const MYFMT = { label: 'My format', frames: 'one', cell: true, constraints: 'none', occupancy: false, order: 'keep', pbc: 'stored', overlap: false, handedness: false, velocities: false };
+/** The nine capabilities of ledger L-F0-25 (F0-D §3.12.1), without the optional velocities of lead decision L-01. */
+const LEDGER = Object.fromEntries(Object.entries(MYFMT).filter(([k]) => k !== 'velocities'));
 
 /** Collect console.warn calls while fn runs. */
 function warnsDuring(fn) {
@@ -71,10 +74,36 @@ describe('capabilities', () => {
       [{ ...MYFMT, cell: null }, "writer 'myfmt': capabilities.cell must be one of true, false, required"],
       [{ ...MYFMT, label: '' }, "writer 'myfmt': capabilities.label must be a non-empty string"],
       [{ ...MYFMT, extra: true }, "writer 'myfmt': unknown capability 'extra'"],
+      [{ ...MYFMT, velocities: 'yes' }, "writer 'myfmt': capabilities.velocities must be true or false"],
       [{ label: 'x' }, "writer 'myfmt': capabilities.frames must be one of all, one"],
-      [null, "writer 'myfmt': capabilities must be an object with the keys label, frames"],
+      [null, "writer 'myfmt': capabilities must be an object with the keys label, frames, cell, constraints, occupancy, order, pbc, overlap, handedness (optional: velocities)"],
     ];
     for (const [caps, message] of bad) assert.throws(() => validateCapabilities('myfmt', caps), (e) => e.message.startsWith(message), message);
+  });
+
+  test('the nine capabilities of the ledger are enough: velocities is optional and nothing is guessed', () => {
+    // velocities (lead decision L-01) may be left out, null or undefined
+    const ledger = LEDGER;
+    assert.deepEqual(Object.keys(ledger), ['label', 'frames', 'cell', 'constraints', 'occupancy', 'order', 'pbc', 'overlap', 'handedness']);
+    assert.deepEqual(OPTIONAL_CAPABILITIES, ['velocities']);
+    for (const caps of [ledger, { ...ledger, velocities: null }, { ...ledger, velocities: undefined }]) {
+      const out = validateCapabilities('myfmt', caps);
+      assert.deepEqual(out, ledger);
+      assert.deepEqual(Object.keys(out), Object.keys(ledger));
+    }
+    const s = trajectory(2);
+    s.setProp('velocities', [[0, 0, 0.01], [0, 0, 0]]);
+    const offs = [];
+    try {
+      const warned = warnsDuring(() => offs.push(formats.register({ id: 'jsledger', write: () => 'x\n', capabilities: { ...ledger } })));
+      assert.deepEqual(warned, []);
+      assert.deepEqual(formats.get('jsledger').capabilities, ledger);
+      assert.deepEqual(exportReport(s, 'jsledger'), { warnings: ['My format holds one frame: wrote frame 1 of 2'], notes: [] });
+      offs.push(formats.register({ id: 'jsnovel', write: () => 'x\n', capabilities: { ...ledger, velocities: false } }));
+      assert.deepEqual(exportReport(s, 'jsnovel').notes, ['the atoms have velocities, but My format cannot store them; use POSCAR, Extended XYZ or Crystallume JSON to keep them']);
+      offs.push(formats.register({ id: 'jsvel', write: () => 'x\n', capabilities: { ...ledger, velocities: true } }));
+      assert.deepEqual(exportReport(s, 'jsvel').notes, []);
+    } finally { offs.forEach((off) => off()); }
   });
 });
 
@@ -117,6 +146,29 @@ describe('exportReport rules', () => {
       assert.equal(has([...rep.warnings, ...rep.notes], fragment), applies, JSON.stringify(rep));
       if (applies) assert.ok(has(rule.startsWith('N') || rule === 'velocities' ? rep.notes : rep.warnings, fragment), JSON.stringify(rep));
     });
+  });
+
+  test('the POSCAR velocity note follows the writer: a note exactly when writePOSCAR drops the velocities', () => {
+    // lead decision L-01; the writer drops the whole block when a row is not three finite numbers (velocityRows)
+    const NOT_WRITTEN = 'the velocities were not written: POSCAR needs three finite numbers for every atom';
+    const cases = [
+      [[[0, 0, 0.1], [0, 0.2, 0.1]], true],
+      [[Float64Array.of(0, 0, 0.1), Float64Array.of(0, 0.2, 0.1)], true],
+      [[[0, 0, 0.1], [0, NaN, 0.1]], false],
+      [[[0, 0, 0.1], [0, Infinity, 0.1]], false],
+      [[[0, 0, 0.1], [0, 0.2]], false],
+      [[[0, 0, 0.1], null], false],
+      [[[0, 0, 0.1], [0, true, 0.1]], false],
+      [[[0, 0, 0.1], [0, '0.2', 0.1]], false],
+      [[[0, 0, 0], [0, NaN, 0]], null],   // nothing but zeros: no velocity is lost
+      [[[0, 0, 0], [0, 0, 0]], null],
+    ];
+    for (const [velocities, written] of cases) {
+      const s = two({ props: { velocities } });
+      const label = JSON.stringify(velocities);
+      assert.equal(writePOSCAR(s).includes('\n\n'), written === true, label);   // the block follows a blank line
+      assert.deepEqual(exportReport(s, 'poscar'), { warnings: [], notes: written === false ? [NOT_WRITTEN] : [] }, label);
+    }
   });
 
   test('W9: results of the first frame', () => {
@@ -173,6 +225,7 @@ describe('exportStructure', () => {
   test('server formats (fake store): capabilities from GET /formats, warnings synchronous, text a Promise', async () => {
     const calls = [];
     const caps = { ...MYFMT, label: 'Server format' };
+    const frameCaps = { ...LEDGER, label: 'Server frame', overlap: true, handedness: true };
     const app = {
       busy: false, structure: null, emit() {},
       serverStore: {
@@ -184,6 +237,7 @@ describe('exportStructure', () => {
               { name: 'srvfmt', extensions: ['.srv'], description: 'only the server writes it', mimetype: 'text/plain', source: 'plug', capabilities: caps },
               { name: 'srvbad', extensions: ['.bad'], description: 'invalid capabilities', mimetype: 'text/plain', source: 'plug', capabilities: { ...caps, frames: 2 } },
               { name: 'srvnone', extensions: ['.none'], description: 'no capabilities', mimetype: 'text/plain', source: 'plug', capabilities: null },
+              { name: 'srvframe', extensions: ['.frm'], description: 'one frame, checked', mimetype: 'text/plain', source: 'plug', capabilities: frameCaps },
             ],
           },
         },
@@ -218,6 +272,23 @@ describe('exportStructure', () => {
         assert.equal(await o.text, `TEXT ${id}`);
       }
       assert.deepEqual(exportReport(s, 'srvfmt'), { warnings: out.warnings, notes: [] });
+
+      // The server gets the whole structure and, like every Python writer, writes frame 0 (F0-D §3.12.5: the local
+      // warnings are the server's): on screen is frame 2, with a left-handed cell and two atoms 0.2 Å apart.
+      assert.deepEqual(formats.get('srvframe').capabilities, frameCaps);
+      const t = new Structure({ symbols: ['Pt', 'O'], positions: [[0, 0, 1], [1.5, 1.5, 3]], cell: ORTHO, frames: [{ positions: [[0, 0, 1], [0, 0, 1.2]], cell: LEFT }] });
+      t.setFrame(1);
+      const W10 = 'the cell is left-handed (negative volume); VASP stops on such cells, so swap two cell vectors first';
+      const W11 = '1 pair(s) of atoms are closer than 0.5 Å (e.g. atoms 1 and 2, 0.20 Å apart)';
+      const srv = exportStructure(t, 'srvframe');
+      assert.deepEqual([srv.warnings, srv.notes], [['Server frame holds one frame: wrote frame 1 of 2'], []]);
+      assert.equal(await srv.text, 'TEXT srvframe');
+      const body = calls.at(-1)[1].body;
+      assert.deepEqual([body.format, body.structure.positions, body.structure.cell], ['srvframe', [[0, 0, 1], [1.5, 1.5, 3]], ORTHO]);
+      assert.deepEqual(exportReport(t, 'srvframe'), { warnings: srv.warnings, notes: [] });
+      assert.deepEqual(exportReport(t, 'srvframe', { frame: 1 }).warnings, ['Server frame holds one frame: wrote frame 2 of 2', W10, W11]);
+      assert.deepEqual(exportReport(t, 'poscar').warnings, ['POSCAR holds one frame: wrote frame 2 of 2', W10, W11]);   // a web writer: the frame on screen
+      assert.equal(t.frame, 1);
     } finally { offs.forEach((off) => off()); }
   });
 });

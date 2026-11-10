@@ -194,10 +194,10 @@ def register_writer(
     """Register (or replace) a writer for format *name*.
 
     The first extension is used when suggesting download file names.  *capabilities* declares what the format can
-    store, for the export check (:func:`export_report`; all keys of
-    :data:`~crystallume.io.capabilities.CAPABILITY_VALUES`, checked by
+    store, for the export check (:func:`export_report`; the keys of
+    :data:`~crystallume.io.capabilities.CAPABILITY_VALUES`, ``velocities`` optional, checked by
     :func:`~crystallume.io.capabilities.validate_capabilities`, ``ValueError`` when invalid).  Without them the
-    export check reports nothing for this writer.
+    export check reports nothing for this writer.  A plugin passes them to ``ctx.register_writer``.
     """
     key = name.strip().lower()
     if not re.fullmatch(r"[a-z0-9][a-z0-9_\-+.]*", key):
@@ -634,8 +634,17 @@ def _report(structure: Structure, fmt: str, caps: dict[str, Any], frame: int | N
             if gap is not None:
                 notes.append(f"{F} is always periodic: {_AXES[axis]} was not periodic and is written as a cell "
                              f"vector with a {_fixed(gap['width'], 1)} Å gap between periodic images")
-    if caps["velocities"] is False and _has_velocities(s):
-        notes.append(f"the atoms have velocities, but {F} cannot store them; {_KEEPERS}")
+    # lead decision L-01: a note when the file drops the velocities; a writer that does not declare the optional
+    # capability gets none (nothing is guessed)
+    keeps_velocities = caps.get("velocities")
+    if keeps_velocities is not None and _has_velocities(s):
+        if keeps_velocities is False:
+            notes.append(f"the atoms have velocities, but {F} cannot store them; {_KEEPERS}")
+        elif fmt == "poscar":
+            from .poscar import _velocity_rows
+
+            if _velocity_rows(s) is None:   # the writer's own rule: three finite numbers for every atom, or none
+                notes.append(f"the velocities were not written: {F} needs three finite numbers for every atom")
     if skipped:
         notes.append(f"the overlap check was skipped for more than {OVERLAP_CHECK_MAX_ATOMS:,} atoms".replace(",", " "))
     return {"warnings": warnings, "notes": notes}
@@ -647,7 +656,8 @@ def export_report(structure: Structure, format: str, *, frame: int | None = None
     Warnings change a calculation or lose data: a single-frame format, the unit cell, constraints (selective
     dynamics), partial occupancies, properties Extended XYZ cannot write, results known only for the first frame,
     a left-handed cell, atoms closer than 0.5 Å.  Notes do not: the POSCAR atom order, a non-periodic axis written
-    as a POSCAR cell vector, velocities a format cannot store, a skipped overlap check (more than 200 000 atoms).
+    as a POSCAR cell vector, velocities a format cannot store (or POSCAR velocities that are not three finite
+    numbers for every atom), a skipped overlap check (more than 200 000 atoms).
     The messages are word for word those of the web app (``exportReport`` in ``web/js/io/index.js``).
 
     *frame* is the frame the file holds (default 0: the Python writers write frame 0 of a trajectory; negative

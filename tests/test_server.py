@@ -231,6 +231,65 @@ def test_formats_list_writer_capabilities(local_client, plugin_client):
     assert hello["capabilities"] is None and hello["source"] == "hello"  # a plugin that declares nothing
 
 
+PLUGIN_CAPS = {"label": "Caps format", "frames": "one", "cell": True, "constraints": "none", "occupancy": False,
+               "order": "keep", "pbc": "stored", "overlap": True, "handedness": True}
+
+
+def test_plugin_writers_declare_capabilities(tmp_path):
+    """F0-D §3.12.1: a Python plugin declares what its writer stores with ``ctx.register_writer(...,
+    capabilities=...)``; GET /formats (and /info, which the web app copies them from) lists them and they drive the
+    warnings of POST /io/export.  The nine capabilities of ledger L-F0-25 are enough (``velocities`` is optional);
+    invalid ones fail the plugin, whose writers are then rolled back."""
+    import textwrap
+
+    from fastapi.testclient import TestClient
+
+    from crystallume import io as cl_io
+    from crystallume.config import Settings
+    from crystallume.server import create_app
+
+    d = tmp_path / "plugins"
+    d.mkdir()
+    (d / "capsplug.py").write_text(textwrap.dedent(f"""
+        CAPS = {PLUGIN_CAPS!r}
+        def register(ctx):
+            ctx.register_writer("capsfmt", lambda s: "CAPS\\n", extensions=[".caps"], capabilities=CAPS)
+            ctx.register_writer("capsvel", lambda s: "CAPS\\n", capabilities={{**CAPS, "velocities": False}})
+    """))
+    (d / "badcaps.py").write_text(textwrap.dedent(f"""
+        CAPS = {PLUGIN_CAPS!r}
+        def register(ctx):
+            ctx.register_writer("badfirst", lambda s: "BAD\\n")
+            ctx.register_writer("badcaps", lambda s: "BAD\\n", capabilities={{**CAPS, "frames": 2}})
+    """))
+    settings = Settings(mode="local", data_dir=tmp_path / "data", plugin_dirs=[d], entry_point_plugins=False,
+                        web_dir=tmp_path / "no-web")
+    traj = {"symbols": ["Pt", "O"], "positions": [[0, 0, 1], [1.5, 1.5, 3]], "cell": [[3, 0, 0], [0, 3, 0], [0, 0, 20]],
+            "pbc": [True, True, True], "props": {"velocities": [[0, 0, 0.01], [0, 0, 0]]},
+            "frames": [{"positions": [[0, 0, 1], [0, 0, 1.2]], "cell": [[0, 3, 0], [3, 0, 0], [0, 0, 20]]}]}
+    try:
+        with TestClient(create_app(settings)) as c:
+            info = c.get("/api/v1/info").json()
+            plugins = {p["name"]: p for p in info["plugins"]}
+            assert {k: p["status"] for k, p in plugins.items()} == {"badcaps": "error", "capsplug": "loaded"}
+            assert plugins["badcaps"]["error"] == ("ValueError: writer 'badcaps': capabilities.frames must be one of "
+                                                   "all, one")
+            writers = {w["name"]: w for w in c.get("/api/v1/formats").json()["writers"]}
+            assert writers["capsfmt"]["capabilities"] == PLUGIN_CAPS and writers["capsfmt"]["source"] == "capsplug"
+            assert {w["name"]: w for w in info["formats"]["writers"]}["capsfmt"]["capabilities"] == PLUGIN_CAPS
+            assert writers["capsvel"]["capabilities"] == {**PLUGIN_CAPS, "velocities": False}
+            assert "badfirst" not in writers and "badcaps" not in writers  # rolled back
+            r = c.post("/api/v1/io/export", json={"structure": traj, "format": "capsfmt"}).json()
+            assert r["text"] == "CAPS\n"
+            assert r["warnings"] == ["Caps format holds one frame: wrote frame 1 of 2"] and r["notes"] == []
+            r = c.post("/api/v1/io/export", json={"structure": traj, "format": "capsvel"}).json()
+            assert r["notes"] == ["the atoms have velocities, but Caps format cannot store them; use POSCAR, "
+                                  "Extended XYZ or Crystallume JSON to keep them"]
+    finally:
+        for name in ("capsfmt", "capsvel", "badfirst", "badcaps"):
+            cl_io.unregister_writer(name)
+
+
 def test_supercell_estimate_counts_every_frame(tmp_path):
     """Defect E-63: repeat() tiles every frame, so the atom estimate counts them all."""
     from fastapi.testclient import TestClient

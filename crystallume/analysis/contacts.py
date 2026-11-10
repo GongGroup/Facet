@@ -46,30 +46,91 @@ _SINGULAR = 1e-12
 _OFFSETS = list(itertools.product((-1, 0, 1), repeat=3))
 
 
-def _show(value: Any) -> str:
-    """*value* in an error message, written like the JS twin does (numbers plainly, other values as JSON)."""
-    if isinstance(value, Real) and not isinstance(value, bool):
-        v = float(value)
-        if math.isnan(v):
-            return "NaN"
-        if math.isinf(v):
-            return "Infinity" if v > 0 else "-Infinity"
-        return str(int(v)) if v.is_integer() and abs(v) < 2**53 else repr(v)
+def _as_float(value: Real) -> float:
+    """*value* as the double JavaScript would hold: an int beyond the floats becomes an infinity."""
     try:
+        return float(value)
+    except OverflowError:
+        return math.inf if value > 0 else -math.inf
+
+
+def _js_number(value: Real) -> str:
+    """*value* as JavaScript's ``String(value)`` writes it: the shortest digits that read back as the double (the
+    digits of ``repr``), in exponent form from 1e21 up and below 1e-6, without a leading zero in the exponent
+    (``1e-7``, ``0.000001``, ``100000000000000000000``, ``1e+21``; ``-0`` as ``0``)."""
+    v = _as_float(value)
+    if math.isnan(v):
+        return "NaN"
+    if math.isinf(v):
+        return "Infinity" if v > 0 else "-Infinity"
+    if v == 0:
+        return "0"
+    if v < 0:
+        return "-" + _js_number(-v)
+    mantissa, _, exponent = repr(v).partition("e")
+    whole, _, fraction = mantissa.partition(".")
+    digits = whole + fraction
+    n = len(whole) + int(exponent or 0)          # v = 0.<digits> * 10**n
+    stripped = digits.lstrip("0")
+    n -= len(digits) - len(stripped)
+    digits = stripped.rstrip("0")
+    k = len(digits)
+    if k <= n <= 21:
+        return digits + "0" * (n - k)
+    if 0 < n <= 21:
+        return digits[:n] + "." + digits[n:]
+    if -6 < n <= 0:
+        return "0." + "0" * -n + digits
+    e = n - 1
+    return (digits if k == 1 else digits[0] + "." + digits[1:]) + "e" + ("+" if e >= 0 else "-") + str(abs(e))
+
+
+def _js_json(value: Any) -> str:
+    """*value* as JavaScript's ``JSON.stringify`` writes it (no spaces, other alphabets kept, numbers as
+    :func:`_js_number`, ``null`` for numbers that are not finite, keys in their order); ``TypeError`` for what JSON
+    cannot hold."""
+    if isinstance(value, np.generic):
+        value = value.item()
+    if value is None or isinstance(value, bool):
         return json.dumps(value)
+    if isinstance(value, Real):
+        return _js_number(value) if math.isfinite(_as_float(value)) else "null"
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=False)
+    if isinstance(value, np.ndarray):
+        value = value.tolist()
+    if isinstance(value, (list, tuple)):
+        return "[" + ",".join(_js_json(v) for v in value) + "]"
+    if isinstance(value, dict):
+        items = (json.dumps(str(k), ensure_ascii=False) + ":" + _js_json(v) for k, v in value.items())
+        return "{" + ",".join(items) + "}"
+    raise TypeError(f"{type(value).__name__} is not JSON")
+
+
+def _show(value: Any) -> str:
+    """*value* in an error message, written like the JS twin does (numbers with ``String``, other values with
+    ``JSON.stringify``), so the two languages give the same message (``1e-7``, not Python's ``1e-07``)."""
+    if isinstance(value, Real) and not isinstance(value, bool):
+        return _js_number(value)
+    try:
+        return _js_json(value)
     except (TypeError, ValueError):
         return repr(value)
 
 
+def _number(value: Any) -> bool:
+    """Whether *value* is a finite number (not a bool; an int beyond the floats is not finite, as in JavaScript)."""
+    return isinstance(value, Real) and not isinstance(value, bool) and math.isfinite(_as_float(value))
+
+
 def _cutoff(value: Any) -> float:
-    if isinstance(value, bool) or not isinstance(value, Real) or not math.isfinite(value) or value <= 0:
+    if not _number(value) or value <= 0:
         raise ValueError(f"cutoff must be a positive number (got {_show(value)})")
     return float(value)
 
 
 def _limit(value: Any) -> int:
-    if isinstance(value, bool) or not isinstance(value, Real) or not math.isfinite(value) \
-            or not float(value).is_integer() or value < 0:
+    if not _number(value) or not float(value).is_integer() or value < 0:
         raise ValueError(f"limit must be a non-negative integer (got {_show(value)})")
     return int(value)
 

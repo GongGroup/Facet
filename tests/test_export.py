@@ -12,6 +12,7 @@ from __future__ import annotations
 import io
 import itertools
 import json
+import math
 import warnings
 from pathlib import Path
 
@@ -34,7 +35,12 @@ from crystallume.io import (
     unregister_writer,
     write,
 )
-from crystallume.io.capabilities import CAPABILITY_VALUES, WRITER_CAPABILITIES, validate_capabilities
+from crystallume.io.capabilities import (
+    CAPABILITY_VALUES,
+    OPTIONAL_CAPABILITIES,
+    WRITER_CAPABILITIES,
+    validate_capabilities,
+)
 
 DATA = Path(__file__).resolve().parent / "data"
 CONTCAR = DATA / "surface" / "contcar_pt111.vasp"
@@ -78,15 +84,21 @@ def test_the_table_is_read_only():
 
 def test_both_languages_have_the_same_table(js):
     table = js("const m = await web('io/capabilities.js'); return {table: m.WRITER_CAPABILITIES, "
-               "keys: Object.keys(m.CAPABILITY_VALUES), max: m.OVERLAP_CHECK_MAX_ATOMS, tol: m.OCCUPANCY_TOLERANCE};")
+               "keys: Object.keys(m.CAPABILITY_VALUES), optional: m.OPTIONAL_CAPABILITIES, "
+               "max: m.OVERLAP_CHECK_MAX_ATOMS, tol: m.OCCUPANCY_TOLERANCE};")
     assert table["table"] == {k: dict(v) for k, v in WRITER_CAPABILITIES.items()}
     assert table["keys"] == list(CAPABILITY_VALUES)
+    assert table["optional"] == list(OPTIONAL_CAPABILITIES) == ["velocities"]
     from crystallume.io.capabilities import OCCUPANCY_TOLERANCE, OVERLAP_CHECK_MAX_ATOMS
     assert (table["max"], table["tol"]) == (OVERLAP_CHECK_MAX_ATOMS, OCCUPANCY_TOLERANCE)
 
 
 MYFMT = {"label": "My format", "frames": "one", "cell": True, "constraints": "none", "occupancy": False,
          "order": "keep", "pbc": "stored", "overlap": False, "handedness": False, "velocities": False}
+#: The nine capabilities of ledger L-F0-25 (F0-D §3.12.1), without the optional ``velocities`` of lead decision L-01.
+LEDGER_ROW = {k: v for k, v in MYFMT.items() if k != "velocities"}
+VELOCITIES_LOST = ("the atoms have velocities, but My format cannot store them; use POSCAR, Extended XYZ or "
+                   "Crystallume JSON to keep them")
 
 
 @pytest.fixture
@@ -126,13 +138,34 @@ def test_register_writer_refuses_invalid_capabilities(myfmt, change, message):
         get_writer(myfmt)  # nothing was registered
 
 
-def test_validate_capabilities_needs_every_key_and_an_object():
-    missing = {k: v for k, v in MYFMT.items() if k != "velocities"}
-    with pytest.raises(ValueError, match="capabilities.velocities must be true or false"):
+def test_validate_capabilities_needs_the_ledger_keys_and_an_object():
+    missing = {k: v for k, v in MYFMT.items() if k != "frames"}
+    with pytest.raises(ValueError, match="capabilities.frames must be one of all, one"):
         validate_capabilities("myfmt", missing)
-    with pytest.raises(ValueError, match="capabilities must be an object with the keys label, frames"):
+    with pytest.raises(ValueError, match=r"capabilities must be an object with the keys label, frames, cell, "
+                                         r"constraints, occupancy, order, pbc, overlap, handedness "
+                                         r"\(optional: velocities\)$"):
         validate_capabilities("myfmt", ["frames", "one"])
+    with pytest.raises(ValueError, match="capabilities.velocities must be true or false"):
+        validate_capabilities("myfmt", {**LEDGER_ROW, "velocities": 0})
     assert validate_capabilities("x", WRITER_CAPABILITIES["cif"]) == dict(WRITER_CAPABILITIES["cif"])
+    assert OPTIONAL_CAPABILITIES == ("velocities",)
+
+
+def test_the_ledger_row_is_enough_and_no_velocity_note_is_guessed(myfmt):
+    """Ledger L-F0-25 lists nine capabilities; ``velocities`` (lead decision L-01) is optional: a writer that leaves it
+    out (or gives ``None``) is registered and checked, gets no velocity note, and lists only what it declared."""
+    s = trajectory(2)
+    s.set_prop("velocities", [[0.0, 0.0, 0.01], [0.0, 0.0, 0.0]])
+    for caps in (LEDGER_ROW, {**LEDGER_ROW, "velocities": None}):
+        spec = register_writer(myfmt, lambda s: "x\n", capabilities=caps)
+        assert spec.capabilities == LEDGER_ROW and list(spec.capabilities) == list(LEDGER_ROW)
+        assert {w["name"]: w for w in formats()["writers"]}[myfmt]["capabilities"] == LEDGER_ROW
+        assert export_report(s, myfmt) == {"warnings": ["My format holds one frame: wrote frame 1 of 2"], "notes": []}
+    register_writer(myfmt, lambda s: "x\n", capabilities={**LEDGER_ROW, "velocities": False})
+    assert export_notes(s, myfmt) == [VELOCITIES_LOST]
+    register_writer(myfmt, lambda s: "x\n", capabilities={**LEDGER_ROW, "velocities": True})
+    assert export_notes(s, myfmt) == []
 
 
 # ------------------------------------------------------------------------------------------------ the rules
@@ -186,6 +219,10 @@ RULES = [
     ("velocities", lambda: two(props={"velocities": np.array([[0.0, 0.0, 0.0], [0.0, 0.02, 0.0]])}), "cif", {},
      "the atoms have velocities, but CIF cannot store them", True),
     ("velocities", lambda: two(props={"velocities": [[0.0, 0.0, 0.0]] * 2}), "cif", {}, "velocities", False),
+    ("velocities", lambda: two(props={"velocities": [[0.0, 0.0, 0.1], [0.0, math.nan, 0.1]]}), "poscar", {},
+     "the velocities were not written: POSCAR needs three finite numbers for every atom", True),
+    ("velocities", lambda: two(props={"velocities": [[0.0, 0.0, 0.1], [0.0, 0.2, 0.1]]}), "poscar", {},
+     "velocities", False),
 ]
 
 
@@ -198,6 +235,30 @@ def test_rule(rule, make, fmt, kwargs, fragment, applies):
     if applies:  # warnings and notes in their own lists
         is_note = rule.startswith("N") or rule == "velocities"
         assert has(rep["notes" if is_note else "warnings"], fragment), (rule, rep)
+
+
+NOT_WRITTEN = "the velocities were not written: POSCAR needs three finite numbers for every atom"
+
+
+@pytest.mark.parametrize("velocities, written", [
+    ([[0.0, 0.0, 0.1], [0.0, 0.2, 0.1]], True),
+    (np.array([[0.0, 0.0, 0.1], [0.0, 0.2, 0.1]]), True),
+    ([[0.0, 0.0, 0.1], [0.0, math.nan, 0.1]], False),
+    ([[0.0, 0.0, 0.1], [0.0, math.inf, 0.1]], False),
+    ([[0.0, 0.0, 0.1], [0.0, 0.2]], False),
+    ([[0.0, 0.0, 0.1], None], False),
+    ([[0.0, 0.0, 0.1], [0.0, True, 0.1]], False),
+    ([[0.0, 0.0, 0.0], [0.0, math.nan, 0.0]], None),     # nothing but zeros: no velocity is lost
+    ([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], None),
+])
+def test_the_poscar_velocity_note_follows_the_writer(velocities, written):
+    """Lead decision L-01: a note exactly when the structure has velocities and the POSCAR writer drops its velocity
+    block (it does when any row is not three finite numbers), decided by the writer's own row function."""
+    s = two(props={"velocities": velocities})
+    block = "\n\n" in to_text(s, "poscar")          # the velocities follow the coordinates after a blank line
+    assert block is (written is True)
+    assert export_notes(s, "poscar") == ([NOT_WRITTEN] if written is False else [])
+    assert export_warnings(s, "poscar") == []
 
 
 def test_w9_results_of_the_first_frame():
@@ -217,6 +278,35 @@ def test_the_checks_look_at_the_frame_written():
     assert has(export_warnings(s, "poscar", frame=1), "left-handed")
     with pytest.raises(IndexError, match="frame 2 out of range"):
         export_report(s, "poscar", frame=2)
+
+
+def test_server_formats_are_checked_at_the_frame_the_server_writes(js, myfmt):
+    """F0-D §3.12.5: the web app's warnings for a format the server writes are those of the server's /io/export,
+    which gets the whole structure and, like every Python writer, writes frame 0, whatever frame is on screen."""
+    caps = {**MYFMT, "label": "Srv", "overlap": True, "handedness": True}
+    traj = {"symbols": ["Pt", "O"], "positions": [[0.0, 0.0, 1.0], [1.5, 1.5, 3.0]], "cell": ORTHO.tolist(),
+            "pbc": [T, T, T], "frames": [{"positions": [[0.0, 0.0, 1.0], [0.0, 0.0, 1.2]],
+                                          "cell": ORTHO[[1, 0, 2]].tolist()}]}
+    web = js("""
+      const { Structure } = await web('core/structure.js');
+      const { formats, exportStructure, exportReport } = await web('io/index.js');
+      const s = Structure.fromJSON(input.traj);
+      s.setFrame(1);   // on screen: frame 2, a left-handed cell and two atoms 0.2 Å apart
+      let body = null;   // what installServerFormats posts to /io/export
+      const off = formats.register({ id: 'srvframe', server: true, capabilities: input.caps,
+                                     write: async (st) => { body = st.toJSON(); return ''; } });
+      try {
+        const out = exportStructure(s, 'srvframe');
+        await out.text;
+        return { warnings: out.warnings, notes: out.notes, body, frame2: exportReport(s, 'srvframe', { frame: 1 }) };
+      } finally { off(); }
+    """, {"traj": traj, "caps": caps})
+    register_writer(myfmt, lambda s: "", capabilities=caps)
+    server = export_report(Structure.from_dict(web["body"]), myfmt)   # the report of /io/export for that body
+    assert web["warnings"] == server["warnings"] == ["Srv holds one frame: wrote frame 1 of 2"]
+    assert web["notes"] == server["notes"] == []
+    assert web["frame2"] == export_report(Structure.from_dict(web["body"]), myfmt, frame=1)
+    assert len(web["frame2"]["warnings"]) == 3   # W1 (frame 2 of 2), W10, W11
 
 
 def test_overlap_check_is_skipped_for_huge_structures():
@@ -355,6 +445,9 @@ def test_close_contacts_options_and_errors():
     for kwargs, message in [({"cutoff": 0}, "cutoff must be a positive number \\(got 0\\)"),
                             ({"cutoff": True}, "cutoff must be a positive number \\(got true\\)"),
                             ({"limit": -1}, "limit must be a non-negative integer \\(got -1\\)"),
+                            ({"limit": 1e-7}, "limit must be a non-negative integer \\(got 1e-7\\)"),
+                            ({"cutoff": -1e-7}, "cutoff must be a positive number \\(got -1e-7\\)"),
+                            ({"cutoff": [0.5, -1e-5]}, "cutoff must be a positive number \\(got \\[0.5,-0.00001\\]\\)"),
                             ({"pbc": "yes"}, "pbc must be a bool or a list of three bools")]:
         with pytest.raises(ValueError, match=message):
             close_contacts(s, **kwargs)
@@ -371,6 +464,35 @@ def test_close_contacts_is_read_only_and_uses_frame_0():
     assert [(i, j) for i, j, _ in close_contacts(s)] == [(0, 1)]
     assert close_contacts(s.get_frame(1)) == []
     assert s.to_dict(decimals=17) == before
+
+
+def test_close_contacts_errors_read_the_same_in_both_languages(js):
+    """Ledger §0.3: the messages are word for word the JS ones; numbers are written as JavaScript writes them
+    (``1e-7``, ``0.00001``, ``100000000000000000000``, ``1e+21``; an int beyond the floats is ``Infinity``, as JSON
+    gives it to JavaScript), other values as ``JSON.stringify`` does."""
+    s = Structure(["H", "H"], [[0, 0, 0], [0, 0, 1.0]], cell=ORTHO)
+    numbers = [-1e-7, -1.5e-7, -1e-6, -1.25e-6, -1e-5, 0, -0.0, -123.456, -0.1, -2.0**53, -(2.0**53 + 2), -1e15,
+               -1e16, -1e20, -1e21, -1.5e21, -5e-324, -2.2250738585072014e-308, -1.7976931348623157e308, -1 / 3,
+               -(2**60), -(10**400), 10**400]
+    others = ["0.5", "Å", "a\nb", [0.5, 1e-7, -(10**400)], [], {"a": [1.0, None, "b"]}, True, False]
+    bad = [{"cutoff": v} for v in numbers + others]
+    bad += [{"limit": v} for v in (1e-7, 0.5, 2.5e-300, -2.0, -1e21, -(2**60), 10**400, "3", [1], True)]
+    want = []
+    for kw in bad:
+        with pytest.raises(ValueError) as err:
+            close_contacts(s, **kw)
+        want.append(str(err.value))
+    got = js("""
+      const { Structure } = await web('core/structure.js');
+      const { closeContacts } = await web('core/contacts.js');
+      const s = Structure.fromJSON(input.s);
+      return input.bad.map((o) => { try { closeContacts(s, o); return null; } catch (e) { return e.message; } });
+    """, {"s": s.to_dict(), "bad": bad})
+    assert got == want
+    assert want[0] == "cutoff must be a positive number (got -1e-7)"
+    assert want[numbers.index(-1e20)] == "cutoff must be a positive number (got -100000000000000000000)"
+    assert want[numbers.index(10**400)] == "cutoff must be a positive number (got Infinity)"
+    assert want[-4] == "limit must be a non-negative integer (got Infinity)"
 
 
 def test_close_contacts_is_the_same_in_both_languages(js):

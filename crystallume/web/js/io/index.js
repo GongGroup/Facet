@@ -10,7 +10,7 @@
  */
 import { readXYZ, writeXYZ, extxyzColumns, formatInfoValue } from './xyz.js';
 import { det3, slug } from '../core/util.js';
-import { readPOSCAR, writePOSCAR, speciesBlocks } from './poscar.js';
+import { readPOSCAR, writePOSCAR, speciesBlocks, velocityRows } from './poscar.js';
 import { readCIF, writeCIF } from './cif.js';
 import { readPDB, writePDB } from './pdb.js';
 import { readJSON, writeJSON } from './jsonfmt.js';
@@ -117,7 +117,8 @@ function checkFinite(s, name) {
 /**
  * Write `structure` (its current frame for the single-frame formats) with the `formatId` writer. Synchronous:
  * `text` is a string, or a Promise for formats written by the server; `warnings` and `notes` are always arrays,
- * computed here by exportReport (for server formats too, from the capabilities GET /formats gave them).
+ * computed here by exportReport (for server formats too, from the capabilities GET /formats gave them; the server
+ * gets the whole structure and, like every Python writer, writes frame 0, so that is the frame they describe).
  * @returns {{text: string | Promise<string>, filename: string, mime: string, warnings: string[], notes: string[]}}
  */
 export function exportStructure(structure, formatId) {
@@ -242,7 +243,13 @@ function report(s, id, caps, frame) {
       if (gap) notes.push(`${F} is always periodic: ${AXES[axis]} was not periodic and is written as a cell vector with a ${fixed(gap.width, 1)} Å gap between periodic images`);
     }
   }
-  if (caps.velocities === false && hasVelocities(s)) notes.push(`the atoms have velocities, but ${F} cannot store them; ${KEEPERS}`);
+  // lead decision L-01: a note when the file drops the velocities; a format that does not declare the optional
+  // capability gets none (nothing is guessed)
+  if (caps.velocities != null && hasVelocities(s)) {
+    if (caps.velocities === false) notes.push(`the atoms have velocities, but ${F} cannot store them; ${KEEPERS}`);
+    // the writer's own rule: three finite numbers for every atom, or none
+    else if (id === 'poscar' && !velocityRows(s)) notes.push(`the velocities were not written: ${F} needs three finite numbers for every atom`);
+  }
   if (skippedCheck) notes.push(`the overlap check was skipped for more than ${String(OVERLAP_CHECK_MAX_ATOMS).replace(/\B(?=(\d{3})+$)/g, ' ')} atoms`);
   return { warnings, notes };
 }
@@ -252,15 +259,16 @@ function report(s, id, caps, frame) {
  * crystallume.io.export_report). Warnings change a calculation or lose data: a single-frame format, the unit cell,
  * constraints, partial occupancies, props Extended XYZ cannot write, results known only for the first frame, a
  * left-handed cell, atoms closer than 0.5 Å. Notes do not: the POSCAR atom order, a non-periodic axis written as a
- * POSCAR cell vector, velocities a format cannot store, a skipped overlap check (more than 200 000 atoms). `frame`
- * is the frame the file holds (default: the current frame, which the web writers write). Synchronous for every
- * format (server formats use the capabilities copied from GET /formats); a format without capabilities gives
- * empty lists, an unknown one throws.
+ * POSCAR cell vector, velocities a format cannot store (or POSCAR velocities that are not three finite numbers for
+ * every atom), a skipped overlap check (more than 200 000 atoms). `frame` is the frame the file holds (default: the
+ * current frame, which the web writers write; frame 0 for a format the server writes, as the Python writers and
+ * the server's own report do). Synchronous for every format (server formats use the capabilities copied from
+ * GET /formats); a format without capabilities gives empty lists, an unknown one throws.
  * @returns {{warnings: string[], notes: string[]}}
  */
 export function exportReport(s, formatId, { frame } = {}) {
   const fmt = registry.get(formatId);
   if (!fmt?.write) throw new Error(`No writer for format "${formatId}".`);
   if (!fmt.capabilities) return { warnings: [], notes: [] };
-  return report(s, formatId, fmt.capabilities, frame);
+  return report(s, formatId, fmt.capabilities, frame ?? (fmt.server ? 0 : null));
 }

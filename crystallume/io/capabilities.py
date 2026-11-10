@@ -2,10 +2,10 @@
 
 :func:`crystallume.io.export_report` reads a writer's capabilities to tell, before or after a file is written, what
 the file loses (warnings) and what changes without affecting a calculation (notes).  The built-in writers carry the
-rows of :data:`WRITER_CAPABILITIES`; a plugin declares its own with ``register_writer(..., capabilities={...})``
-(validated by :func:`validate_capabilities`), and a writer without capabilities gets no report at all (nothing is
-guessed).  ``GET /api/v1/formats`` lists the capabilities of every writer, and the web app copies them for the
-server-only formats, so both languages decide from the same table.
+rows of :data:`WRITER_CAPABILITIES`; a plugin declares its own with ``ctx.register_writer(..., capabilities={...})``
+(or :func:`crystallume.io.register_writer`; validated by :func:`validate_capabilities`), and a writer without
+capabilities gets no report at all (nothing is guessed).  ``GET /api/v1/formats`` lists the capabilities of every
+writer, and the web app copies them for the server-only formats, so both languages decide from the same table.
 
 ======  ================  ======  ========  ===========  =========  =======  ========  =======  ==========  ==========
 id      label             frames  cell      constraints  occupancy  order    pbc       overlap  handedness  velocities
@@ -30,7 +30,9 @@ pdb     PDB               all     true      none         false      keep     per
   (``periodic``: a 2D structure with ``pbc = T T F`` comes back as T T T); no cell at all (``none``).
 - ``overlap``, ``handedness``: the export check looks for atoms closer than 0.5 Å and for a left-handed cell (VASP
   stops on one).
-- ``velocities``: ``props["velocities"]`` is written (lead decision L-01: a note when they are dropped).
+- ``velocities`` (optional, see :data:`OPTIONAL_CAPABILITIES`): ``props["velocities"]`` is written.  Lead decision
+  L-01 asks for a note when velocities are dropped; the column is an addition to the nine of F0-D §3.12.1 (ledger
+  L-F0-25), so a writer may leave it out, and then the export check says nothing about velocities.
 
 The JavaScript twin is ``crystallume/web/js/io/capabilities.js``: the same table, the same validation and, word for
 word, the same messages (a test compares the two tables).
@@ -44,6 +46,7 @@ from typing import Any
 
 __all__ = [
     "CAPABILITY_VALUES",
+    "OPTIONAL_CAPABILITIES",
     "WRITER_CAPABILITIES",
     "OVERLAP_CHECK_MAX_ATOMS",
     "OCCUPANCY_TOLERANCE",
@@ -63,6 +66,10 @@ CAPABILITY_VALUES: Mapping[str, tuple[Any, ...] | None] = MappingProxyType({
     "handedness": (True, False),
     "velocities": (True, False),
 })
+#: The capabilities a writer may leave out (``None`` counts as left out): ``velocities``, which lead decision L-01
+#: added to the table of F0-D §3.12.1.  Every other key of :data:`CAPABILITY_VALUES` is required.
+OPTIONAL_CAPABILITIES: tuple[str, ...] = ("velocities",)
+_REQUIRED = [k for k in CAPABILITY_VALUES if k not in OPTIONAL_CAPABILITIES]
 
 
 def _row(label: str, frames: str, cell: bool | str, constraints: str, occupancy: bool, order: str, pbc: str,
@@ -104,19 +111,23 @@ def _allowed(value: Any, values: tuple[Any, ...]) -> bool:
 def validate_capabilities(name: str, caps: Any) -> dict[str, Any]:
     """Check the capabilities *caps* of writer *name* and return them as a new dict in table order.
 
-    Every key of :data:`CAPABILITY_VALUES` is required and no other key is allowed; booleans must be ``True`` or
-    ``False`` (not 1 or 0).  Raises ``ValueError`` naming the writer and the key, for example
+    Every key of :data:`CAPABILITY_VALUES` is required except those of :data:`OPTIONAL_CAPABILITIES`, which may be
+    left out or ``None`` (and are then left out of the result), and no other key is allowed; booleans must be
+    ``True`` or ``False`` (not 1 or 0).  Raises ``ValueError`` naming the writer and the key, for example
     ``writer 'myfmt': capabilities.constraints must be one of lattice, cartesian, none``.
     """
     where = f"writer '{name}'"
     if not isinstance(caps, Mapping):
-        raise ValueError(f"{where}: capabilities must be an object with the keys {', '.join(CAPABILITY_VALUES)}")
+        raise ValueError(f"{where}: capabilities must be an object with the keys {', '.join(_REQUIRED)} "
+                         f"(optional: {', '.join(OPTIONAL_CAPABILITIES)})")
     unknown = [str(k) for k in caps if k not in CAPABILITY_VALUES]
     if unknown:
         raise ValueError(f"{where}: unknown capability '{unknown[0]}' (known: {', '.join(CAPABILITY_VALUES)})")
     out: dict[str, Any] = {}
     for key, values in CAPABILITY_VALUES.items():
         value = caps.get(key)
+        if value is None and key in OPTIONAL_CAPABILITIES:
+            continue
         if values is None:
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"{where}: capabilities.{key} must be a non-empty string")

@@ -211,11 +211,17 @@ class PluginContext:
         self._record.readers.append(name.lower())
 
     def register_writer(self, name: str, func: Callable[[Any], str], extensions: Iterable[str] = (),
-                        description: str = "", mimetype: str = "text/plain") -> None:
-        """Register a file writer ``func(structure) -> str``."""
+                        description: str = "", mimetype: str = "text/plain", *,
+                        capabilities: dict[str, Any] | None = None) -> None:
+        """Register a file writer ``func(structure) -> str``.
+
+        *capabilities* says what the format can store, for the export check (``crystallume.io.export_report``;
+        keys and values in :mod:`crystallume.io.capabilities`, ``ValueError`` when invalid); without them the
+        exports of this format are not checked.
+        """
         prev = _io._WRITERS.get(name.lower())
         _io.register_writer(name, func, list(extensions), description or f"{name} (plugin {self.name})",
-                            mimetype=mimetype, source=self.name)
+                            mimetype=mimetype, source=self.name, capabilities=capabilities)
         self._io_undo.append(("writer", name.lower(), prev))
         self._record.writers.append(name.lower())
 
