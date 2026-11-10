@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="latin1"?>
+<!DOCTYPE XSD []>
+<XSD Version="6.0" WrittenBy="Crystallume">
+	<AtomisticTreeRoot ID="1" NumProperties="40" NumChildren="1">
+		<Property DefinedOn="ClassicalEnergyHolder" Name="AngleEnergy" Type="Double"/>
+		<Property DefinedOn="ClassicalEnergyHolder" Name="BendBendEnergy" Type="Double"/>
+		<Property DefinedOn="ClassicalEnergyHolder" Name="BendTorsionBendEnergy" Type="Double"/>
+		<Property DefinedOn="ClassicalEnergyHolder" Name="BondEnergy" Type="Double"/>
+		<Property DefinedOn="Atom" Name="EFGAsymmetry" Type="Double"/>
+		<Property DefinedOn="Atom" Name="EFGQuadrupolarCoupling" Type="Double"/>
+		<Property DefinedOn="ClassicalEnergyHolder" Name="ElectrostaticEnergy" Type="Double"/>
+		<Property DefinedOn="GrowthFace" Name="FaceMillerIndex" Type="MillerIndex"/>
+		<Property DefinedOn="GrowthFace" Name="FacetTransparency" Type="Float"/>
+		<Property DefinedOn="Bondable" Name="Force" Type="CoDirection"/>
+		<Property DefinedOn="ClassicalEnergyHolder" Name="HydrogenBondEnergy" Type="Double"/>
+		<Property DefinedOn="Bondable" Name="ImportOrder" Type="UnsignedInteger"/>
+		<Property DefinedOn="ClassicalEnergyHolder" Name="InversionEnergy" Type="Double"/>
+		<Property DefinedOn="Atom" Name="IsBackboneAtom" Type="Boolean"/>
+		<Property DefinedOn="Atom" Name="IsChiralCenter" Type="Boolean"/>
+		<Property DefinedOn="Atom" Name="IsOutOfPlane" Type="Boolean"/>
+		<Property DefinedOn="BestFitLineMonitor" Name="LineExtentPadding" Type="Double"/>
+		<Property DefinedOn="Linkage" Name="LinkageGroupName" Type="String"/>
+		<Property DefinedOn="PropertyList" Name="ListIdentifier" Type="String"/>
+		<Property DefinedOn="Atom" Name="NMRShielding" Type="Double"/>
+		<Property DefinedOn="ClassicalEnergyHolder" Name="NonBondEnergy" Type="Double"/>
+		<Property DefinedOn="Bondable" Name="NormalMode" Type="Direction"/>
+		<Property DefinedOn="Bondable" Name="NormalModeFrequency" Type="Double"/>
+		<Property DefinedOn="Bondable" Name="OrbitalCutoffRadius" Type="Double"/>
+		<Property DefinedOn="BestFitPlaneMonitor" Name="PlaneExtentPadding" Type="Double"/>
+		<Property DefinedOn="ClassicalEnergyHolder" Name="PotentialEnergy" Type="Double"/>
+		<Property DefinedOn="ScalarFieldBase" Name="QuantizationValue" Type="Double"/>
+		<Property DefinedOn="ClassicalEnergyHolder" Name="RestraintEnergy" Type="Double"/>
+		<Property DefinedOn="ClassicalEnergyHolder" Name="SeparatedStretchStretchEnergy" Type="Double"/>
+		<Property DefinedOn="Trajectory" Name="SimulationStep" Type="Integer"/>
+		<Property DefinedOn="ClassicalEnergyHolder" Name="StretchBendStretchEnergy" Type="Double"/>
+		<Property DefinedOn="ClassicalEnergyHolder" Name="StretchStretchEnergy" Type="Double"/>
+		<Property DefinedOn="ClassicalEnergyHolder" Name="StretchTorsionStretchEnergy" Type="Double"/>
+		<Property DefinedOn="ClassicalEnergyHolder" Name="TorsionBendBendEnergy" Type="Double"/>
+		<Property DefinedOn="ClassicalEnergyHolder" Name="TorsionEnergy" Type="Double"/>
+		<Property DefinedOn="ClassicalEnergyHolder" Name="TorsionStretchEnergy" Type="Double"/>
+		<Property DefinedOn="ClassicalEnergyHolder" Name="ValenceCrossTermEnergy" Type="Double"/>
+		<Property DefinedOn="ClassicalEnergyHolder" Name="ValenceDiagonalEnergy" Type="Double"/>
+		<Property DefinedOn="ClassicalEnergyHolder" Name="VanDerWaalsEnergy" Type="Double"/>
+		<Property DefinedOn="SymmetrySystem" Name="_Stress" Type="Matrix"/>
+		<Molecule ID="2" NumChildren="3" Name="H2O">
+			<Atom3d ID="3" Name="O1" UserID="1" DisplayStyle="Ball and Stick" XYZ="-0.2947333333,-0.2182000000,0.1541666667" Components="O"/>
+			<Atom3d ID="4" Name="H1" UserID="2" DisplayStyle="Ball and Stick" XYZ="-0.0173333333,0.6747000000,0.4085666667" Components="H"/>
+			<Atom3d ID="5" Name="H2" UserID="3" DisplayStyle="Ball and Stick" XYZ="0.3120666667,-0.4565000000,-0.5627333333" Components="H"/>
+		</Molecule>
+	</AtomisticTreeRoot>
+</XSD>
