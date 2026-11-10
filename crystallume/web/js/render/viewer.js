@@ -43,6 +43,7 @@ import { tools } from './tools/index.js';
 import { parseRef, normalizeRefs, measurementPoints, migrateMeasurementKeys, newMeasurementId } from '../core/measure.js';
 import { dihedralFromVectors, signedAngle } from '../core/geometry.js';
 import { inv3, cartToFrac } from '../core/util.js';
+import { millerNormal, latticeDirection, hkilToHkl, uvtwToUvw, uvwToUvtw, formatIndices, ariaIndices, surfaceNormal } from '../core/lattice.js';
 import { styles, atomRadius, segmentsFor, autoPolyhedraCenters, buildAtoms, buildBonds, buildLines, buildPolyhedra, writeAtomMatrices, writeBondMatrices } from './styles.js';
 import { computeColors, colorSchemes } from './colors.js';
 import { createMaterial, updateMaterial, isSeeThrough, materials } from './materials.js';
@@ -84,6 +85,18 @@ function inPolygon(pts, x, y) {
 }
 /** Above this many drawn atoms the cell letters clear the atoms' bounding box instead of each atom. */
 const LETTER_DISC_LIMIT = 20000;
+/** viewAlong (F0-A §3.14.1): the axis names it hands to setView, its messages and the layer of the direction label. */
+const AXIS_VIEWS = new Set(['a', 'b', 'c', 'x', 'y', 'z', '-a', '-b', '-c', '-x', '-y', '-z']);
+const VIEW_BAD_TARGET = 'viewAlong: use a direction like [1, 1, 0], {uvw: [1, 1, 0]}, {hkl: [1, 1, 1]} or "normal".';
+const VIEW_ZERO = 'That direction has zero length.';
+const VIEW_NEEDS_CELL = 'Looking along a lattice direction needs a unit cell.';
+const VIEW_NEEDS_STRUCTURE = 'Load a structure first.';
+const VIEW_LABEL_LAYER = 'view-direction';
+/** The direction label stays while the view is within 0.5° of the one it describes. */
+const SAME_VIEW = Math.cos(0.5 * DEG);
+const MINUS = '\u2212';
+const isList = (v) => Array.isArray(v) || (ArrayBuffer.isView(v) && !(v instanceof DataView));
+const finiteVec3 = (v) => isList(v) && v.length === 3 && Array.from(v).every((x) => typeof x === 'number' && Number.isFinite(x));
 
 /**
  * Selection / hover halo: a Fresnel rim on the back faces of a slightly larger sphere, so the atom
@@ -1864,28 +1877,239 @@ export class Viewer extends Emitter {
   /**
    * Look along a cell axis (a/b/c) or a Cartesian axis (x/y/z), optionally negated ('-a').
    * With display.orthoAxisViews the view uses an orthographic camera (atom columns line up) until the
-   * next free rotation.
+   * next free rotation. Options as viewAlong's (animate: unless the user prefers reduced motion); the
+   * direction label above the axis gizmo says "along a". Returns {dir, up, label, note}.
    */
-  setView(axis) {
+  setView(axis, { animate = !this.reducedMotion(), refit = true, up: upGiven = null, ortho = 'auto' } = {}) {
     const cell = this._cell();
     const cart = { x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] };
-    let dir, up;
+    let dir, up, name;
     const neg = String(axis).startsWith('-');
     const ax = String(axis).replace('-', '');
     if ('abc'.includes(ax) && ax.length === 1 && cell) {
       dir = cell['abc'.indexOf(ax)];
       up = ax === 'c' ? cell[1] : cell[2];
+      name = ax;
     } else {
       dir = cart[ax] ?? [0, 0, 1];
       up = ax === 'z' ? [0, 1, 0] : [0, 0, 1];
+      name = cart[ax] ? ax : 'z';
     }
     if (neg) dir = dir.map((v) => -v);
+    return this._lookAlong(dir, upGiven ?? up, {
+      ortho, animate, refit, label: `along ${neg ? MINUS : ''}${name}`, spoken: `along ${neg ? 'minus ' : ''}${name}`,
+    });
+  }
+
+  /**
+   * Look along a direction (F0-A §3.14.1): target is an axis name ('a' 'b' 'c' 'x' 'y' 'z', or '-a' …, as setView),
+   * 'normal' or '-normal' (surfaceNormal of the structure: from above its top surface or below its bottom one; without
+   * a vacuum gap c*, normal to a and b, with a note saying so), a Cartesian vector [x, y, z], a lattice direction
+   * {uvw: [u, v, w]} or {uvtw: [U, V, T, W]}, or the normal of a plane {hkl: [h, k, l]} or {hkil: [h, k, i, l]} of the
+   * current cell. The camera goes to the +dir side and looks back along −dir, as setView's does. up: 'auto' (the rules
+   * of _autoUp: a surface seen from the side has its top surface up, seen along its normal its first in-plane cell
+   * vector runs from left to right) or a vector; ortho: 'auto' (setView's temporary orthographic camera with
+   * display.orthoAxisViews), true or false. The direction label above the axis gizmo (and, for screen readers, a
+   * status line) says what the view looks along until the camera turns.
+   * Returns {dir, up, label, note}: unit vectors, the label text and a note to show the user (or null).
+   */
+  viewAlong(target, { up = 'auto', ortho = 'auto', animate = !this.reducedMotion(), refit = true } = {}) {
+    const auto = up === 'auto' || up == null;
+    if (!auto && !finiteVec3(up)) throw new TypeError("viewAlong: up must be 'auto' or a vector [x, y, z].");
+    if (ortho !== 'auto' && ortho !== true && ortho !== false) throw new TypeError("viewAlong: ortho must be 'auto', true or false.");
+    const opts = { ortho, animate: !!animate, refit: refit !== false };
+    if (typeof target === 'string' && AXIS_VIEWS.has(target)) {
+      if ('abc'.includes(target.at(-1)) && !this._cell()) throw new Error(this.structure ? VIEW_NEEDS_CELL : VIEW_NEEDS_STRUCTURE);
+      return this.setView(target, { ...opts, up: auto ? null : Array.from(up) });
+    }
+    const t = this._viewTarget(target);
+    const u = auto ? this._autoUp(t.dir, t.surface) : new THREE.Vector3(up[0], up[1], up[2]);
+    return this._lookAlong(t.dir.toArray(), u.toArray(), { ...opts, label: t.label, spoken: t.spoken, note: t.note });
+  }
+
+  /** Whether the user prefers reduced motion (the system setting): view changes then jump instead of turning. */
+  reducedMotion() {
+    try { return !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches; } catch { return false; }
+  }
+
+  /**
+   * The direction, label and surfaceNormal result of a viewAlong target other than an axis name: {dir (unit Vector3),
+   * label, spoken (the label for screen readers), note, surface}. Throws the messages of F0-A §3.14.1.
+   */
+  _viewTarget(target) {
+    const s = this.structure;
+    if (target === 'normal' || target === '-normal') {
+      if (!s) throw new Error(VIEW_NEEDS_STRUCTURE);
+      const sn = surfaceNormal(s);
+      if (!sn) throw new Error('Looking along the surface normal needs a unit cell.');
+      const below = target === '-normal';
+      const dir = new THREE.Vector3(...sn.normal).multiplyScalar(below ? -1 : 1);
+      let label, spoken = null, note = null;
+      if (sn.surface) label = below ? 'from below the surface' : 'along the surface normal';
+      else if (sn.source === 'ab-plane') {
+        // no vacuum gap (U1): c*, said as such, never as "not a slab"
+        label = `along ${below ? MINUS : ''}c* (normal to a and b)`;
+        spoken = `along ${below ? 'minus ' : ''}c star, normal to a and b`;
+        note = `No vacuum gap found: looking ${label}.`;
+      } else label = `along the widest vacuum (${'abc'[sn.axis]})${below ? ', from the other side' : ''}`;
+      return { dir, label, spoken: spoken ?? label, note, surface: sn };
+    }
+    if (isList(target)) {
+      if (!finiteVec3(target)) throw new Error(VIEW_BAD_TARGET);
+      const v = new THREE.Vector3(target[0], target[1], target[2]);
+      if (!(v.lengthSq() > 0)) throw new Error(VIEW_ZERO);
+      const xs = [v.x, v.y, v.z].map((x) => { const t = x.toFixed(2); return t === '-0.00' ? '0.00' : t; });
+      return { dir: v.normalize(), label: `along [${xs.join(', ')}]`, spoken: `along the vector ${xs.join(', ')}`, note: null };
+    }
+    const keys = target && typeof target === 'object' ? Object.keys(target) : [];
+    const kind = keys.length === 1 && ['uvw', 'uvtw', 'hkl', 'hkil'].includes(keys[0]) ? keys[0] : null;
+    const raw = kind ? target[kind] : null;
+    if (!kind || !isList(raw) || raw.length !== kind.length || !Array.from(raw).every((x) => typeof x === 'number' && Number.isFinite(x))) {
+      throw new Error(VIEW_BAD_TARGET);
+    }
+    const ix = Array.from(raw, (x) => x + 0);
+    if (!ix.every(Number.isSafeInteger)) throw new Error('Lattice directions and Miller indices must be whole numbers.');
+    if (kind === 'hkil' && ix[0] + ix[1] + ix[2] !== 0) throw new Error(`In (h k i l), i must be ${MINUS}(h + k) = ${0 - (ix[0] + ix[1])}.`);
+    const three = kind === 'uvtw' ? uvtwToUvw(ix) : kind === 'hkil' ? hkilToHkl(ix) : ix;
+    if (three.every((x) => x === 0)) throw new Error(VIEW_ZERO);
+    if (!s) throw new Error(VIEW_NEEDS_STRUCTURE);
+    const cell = this._latticeCell();
+    if (!cell) throw new Error(VIEW_NEEDS_CELL);
+    const plane = kind[0] === 'h';
+    const dir = new THREE.Vector3(...(plane ? millerNormal(cell, three) : latticeDirection(cell, three)));
+    // four-index directions in their smallest whole numbers ([4 2̅ 2̅ 0] is [2 1̅ 1̅ 0]); the rest as given
+    const shown = kind === 'uvtw' ? uvwToUvtw(three, { integer: true }) : ix;
+    const label = plane ? `along the normal of ${formatIndices(shown, '(')} of the current cell` : `along ${formatIndices(shown, '[')} of the current cell`;
+    const spoken = plane ? `along the normal of the plane ${ariaIndices(shown)} of the current cell` : `along the direction ${ariaIndices(shown)} of the current cell`;
+    return { dir, label, spoken, note: null };
+  }
+
+  /** The current cell of the structure when it has three independent vectors (lattice directions need it), else null. */
+  _latticeCell() {
+    const cell = this.structure?.cell;
+    if (!cell || cell.length !== 3 || !cell.every((r) => finiteVec3(r))) return null;
+    const [a, b, c] = cell.map((r) => new THREE.Vector3(r[0], r[1], r[2]));
+    const det = a.dot(new THREE.Vector3().crossVectors(b, c));
+    return Math.abs(det) > 1e-9 * a.length() * b.length() * c.length() ? cell.map((r) => [r[0], r[1], r[2]]) : null;
+  }
+
+  /**
+   * The screen "up" of a view along `d` (unit, towards the camera) for the current structure, F0-A §3.14.1;
+   * `sn` = surfaceNormal(structure) when the caller has it:
+   * 1. a structure with a surface seen from the side (|d · n| < 0.99): the part of its normal n across d, so the top
+   *    surface is up;
+   * 2. seen along the normal (|d · n| ≥ 0.99, with a vacuum gap or not: U1 makes no difference): up = d × r, r the part
+   *    across d of the first in-plane cell vector a_(k+1) (a for a standard slab), which then runs from left to right;
+   * 3. other views of a structure without a surface: r = the shortest lattice vector u a + v b + w c (|u|, |v|, |w| ≤ 3)
+   *    perpendicular to d (|t̂ · d| < 1e-6), of equal ones the largest (u, v, w);
+   * 4. none: setView's rule, the part of c across d (b when c is along d), and without a cell z (y along z).
+   */
+  _autoUp(d, sn) {
+    const cell = this._latticeCell();
+    if (sn === undefined) { try { sn = cell ? surfaceNormal(this.structure) : null; } catch { sn = null; } }
+    const across = (v) => { const p = v.clone().addScaledVector(d, -v.dot(d)); return p.lengthSq() > 1e-20 ? p.normalize() : null; };
+    const upOf = (r) => (r ? new THREE.Vector3().crossVectors(d, r).normalize() : null);
+    const vec = (r) => new THREE.Vector3(r[0], r[1], r[2]);
+    if (cell && sn) {
+      const n = vec(sn.normal);
+      const along = Math.abs(d.dot(n));
+      const up = sn.surface && along < 0.99 ? across(n) : along >= 0.99 ? upOf(across(vec(cell[(sn.axis + 1) % 3]))) : null;
+      if (up) return up;
+    }
+    if (cell) {
+      const [A, B, C] = cell.map(vec);
+      let best = null, bestLength = Infinity;
+      // from (3, 3, 3) down, so that of equal lengths the first found, the largest (u, v, w), stays
+      for (let u = 3; u >= -3; u--) for (let v = 3; v >= -3; v--) for (let w = 3; w >= -3; w--) {
+        if (!u && !v && !w) continue;
+        const t = new THREE.Vector3().addScaledVector(A, u).addScaledVector(B, v).addScaledVector(C, w);
+        const length = t.length();
+        if (!(length > 0) || Math.abs(t.dot(d)) >= 1e-6 * length) continue;
+        if (length < bestLength * (1 - 1e-9)) { bestLength = length; best = t; }
+      }
+      const up = upOf(best && across(best)) ?? across(Math.abs(C.clone().normalize().dot(d)) > 0.98 ? B : C);
+      if (up) return up;
+    }
+    return across(new THREE.Vector3(0, Math.abs(d.z) > 0.98 ? 1 : 0, Math.abs(d.z) > 0.98 ? 0 : 1)) ?? new THREE.Vector3(0, 1, 0);
+  }
+
+  /**
+   * Turn the view to look along dir (towards the camera) with `up` on screen, through setViewDirection, and show
+   * `label` above the axis gizmo. ortho 'auto' takes setView's temporary orthographic camera with
+   * display.orthoAxisViews (not in turntable mode or an orthographic scene), true takes it, false leaves it.
+   */
+  _lookAlong(dir, up, { ortho = 'auto', animate = true, refit = true, label = null, spoken = label, note = null } = {}) {
     const d = this.settings.display;
-    if (d.orthoAxisViews !== false && !d.turntable && d.projection !== 'orthographic') {
+    const temp = ortho === 'auto' ? d.orthoAxisViews !== false && !d.turntable && d.projection !== 'orthographic' : ortho && !this.camera.isOrthographicCamera;
+    if (temp) {
       this._tempOrtho = true;
       this._useCamera(true);
+    } else if (ortho === false) this._leaveTempOrtho();
+    this.setViewDirection(dir, up, animate, refit);
+    const D = new THREE.Vector3(...dir).normalize();
+    const U = (this._camAnim ? this._camAnim.u1 : this.camera.up).clone().normalize();
+    this._setViewLabel(label, spoken, D, U);
+    const out = (v) => v.toArray().map((x) => x + 0);
+    return { dir: out(D), up: out(U), label, note };
+  }
+
+  /** The direction label shown now (null once the camera turned away from the view it describes). */
+  get viewLabel() { return this._viewLabelNow()?.text ?? null; }
+
+  _setViewLabel(text, spoken, dir, up) {
+    this._viewLabel = text ? { text, dir: dir.clone(), up: up.clone() } : null;
+    // a canvas layer (tier C) draws it: drawOverlay is not changed, exports never show it
+    if (text && !this.overlays.get(VIEW_LABEL_LAYER)) {
+      this.overlays.add({
+        id: VIEW_LABEL_LAYER, owner: 'viewer', tier: 'canvas', export: 'never',
+        draw: (g, ctx) => this._drawViewLabel(g, ctx),
+        // another structure entry is shown (Overlays.switched): the label goes with the layer
+        dispose: () => { this._viewLabel = null; this._announceView(''); },
+      });
     }
-    this.setViewDirection(dir, up, true, true);
+    this._announceView(text ? `Looking ${spoken ?? text}` : '');
+    this._dirty = true;
+  }
+
+  /**
+   * The label while the camera (or the end of its animation) still looks the way the label says, within 0.5°: an
+   * orbit, a turn about a screen axis, a drag or a gizmo click ends it; zooming, panning and fitting keep it.
+   */
+  _viewLabelNow() {
+    const L = this._viewLabel;
+    if (!L) return null;
+    const a = this._camAnim;
+    const back = (a ? a.p1 : this.camera.position).clone().sub(a ? a.c1 : this.controls.target);
+    const up = (a ? a.u1 : this.camera.up).clone();
+    if (back.lengthSq() > 0 && up.lengthSq() > 0 && back.normalize().dot(L.dir) >= SAME_VIEW && up.normalize().dot(L.up) >= SAME_VIEW) return L;
+    this._viewLabel = null;
+    this._announceView('');
+    return null;
+  }
+
+  /** The direction label, just above the axis gizmo in the bottom-left corner (in that corner when the gizmo is off). */
+  _drawViewLabel(g, ctx) {
+    const L = this._viewLabelNow();
+    if (!L) return;
+    const s = ctx.scale;
+    const bottom = ctx.h - (8 + (this.settings.display.axes ? (this.gizmo?.size ?? 104) : 0)) * s;
+    g.textAlign = 'left'; g.textBaseline = 'bottom';
+    ctx.text(L.text, 12 * s, bottom - 2 * s, 12, undefined, 600);
+  }
+
+  /** Say the view direction to screen readers (a visually hidden role=status line in the viewer). */
+  _announceView(text) {
+    let el = this._viewStatus;
+    if (!el) {
+      if (!text || typeof document === 'undefined' || typeof this.container?.appendChild !== 'function') return;
+      el = this._viewStatus = document.createElement('div');
+      el.className = 'sr-only';
+      el.setAttribute('role', 'status');
+      el.setAttribute('aria-live', 'polite');
+      this.container.appendChild(el);
+    }
+    // the same words again (N pressed twice) differ by a trailing no-break space, so they are announced again
+    el.textContent = text && el.textContent === text ? `${text}\u00a0` : text;
   }
 
   focusAtom(i) {
