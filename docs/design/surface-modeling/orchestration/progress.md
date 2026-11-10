@@ -77,3 +77,12 @@
 - 03:35 Merged w0-a-t7b (view along; N key verified in Chromium on main) + w1-m2-data: ac4bf11, pushed (node 2488 tests, 0 fail). L-25, L-26 recorded; w0-leftovers.md started for the wave-0 end fix chain.
 - 03:45 Pushed a3286fb (L-25, L-26). B13 launched from a3286fb: wf_12a387be-d52 (w1-m3-layers [L, critical: M3-T1 + M3-T3a], w3-m5-library),
   wf_a152d65e-fa6 (w4-m6-data). Running: w0-a-t3a, w1-m1-contracts, w1-m1-lattice, w1-m2-miller, w2-m4-geometry, w2-m4-fixtures, w1-m3-layers, w3-m5-library, w4-m6-data.
+- 02:02 Synced orchestration state to GitHub at the user's request: docs/design/surface-modeling/orchestration/ (RESUME.md). Re-sync after each batch of merges.
+- 05:50 All nine running chains were cut off by the 5-hour usage limit (reset 05:20 UTC). State of the worktrees (local only):
+  w0-a-t3a dev committed 810de45 (verify not run); w1-m1-contracts dev committed a5754a7 (verify not run; its finding is ruled as L-27,
+  note added for w1-m1-supercell); uncommitted partial edits in w1-m1-lattice (5 files), w1-m2-miller (9), w1-m3-layers (1),
+  w2-m4-geometry (8), w2-m4-fixtures (2), w4-m6-data (11); w3-m5-library untouched. chain-notes.json tells a restarted agent to
+  review the partial edits. running.txt still lists the nine chains (interrupted, not running).
+  The user asked NOT to resume the chains and NOT to start the agent team for now: wait for their go-ahead.
+  Progress page for the user: https://claude.ai/artifact/AVYSpBsdV7vPeLWZn1gx2d (29 of 141 tasks merged). Main: pytest 3788 passed,
+  node 2139 passed, 0 failed.

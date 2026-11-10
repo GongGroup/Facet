@@ -30,3 +30,4 @@
 | L-25 | M2 §3.9.1 没写阳离子进入"第一个电中性组合"搜索的顺序（M2-T2 审查提出） | 按化学式顺序（电负性从小到大），即 M2-T2 的实现；金标生成器 `make_cleave_cases.py` 的 `formal_charges_of` 改用同一顺序 | M2 |
 | L-26 | M7 §6.1 把 `load_oxidation_states`/`estimate_oxidation_states` 列在 `core/webdata` 下，而 M2 §6 与实现放在 `build/surface` | 以 M2 §6 与实现为准（`build/surface.py`/`.js`）；M7-T1 生成名字清单时按此，并更正 M7 §6.1 | M7 |
 | L-19 | G-39 c(2×2) 等预设产生的结构名 | 自动名一律用由 `info.supercellMatrix` 计算的 Wood 标签（如 `(√2×√2)R45°`）；预设标签只出现在读数与 toast 里（`Made a c(2×2) = (√2×√2)R45° supercell: 8 atoms`）。两条路径（Slab 分区与 Cell 分区）的名字由同一个测试核对 | M1、M2 |
+| L-27 | L-F0-07 与 L-X-02 对 `repeat` 如何维护 `info.supercell` / `info.supercellMatrix` 写法不同（M1-T12 契约测试提出，4 处差异） | 以 L-X-02 与 M1 §3.5.5 为准：`repeat` 与 `update_supercell_matrix` 用同一套记账（连续重复累乘；已有非对角矩阵时删旧键；只有旧键时从 diag(旧键) 接着算；(1,1,1) 两个键都不写）。由 M1-T3a（w1-m1-supercell）修 `repeat` 并把契约测试里的 4 个 strict xfail/todo 改成普通断言 | M1（T3a） |
