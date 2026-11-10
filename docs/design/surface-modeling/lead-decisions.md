@@ -26,4 +26,5 @@
 | L-21 | 计划 P-04：预览条与 mod+Enter，P-swap 会话无参 `commit()` 可能替换体相 | M2-T9 先核对；确有问题才给会话加 `commitArgs` 选项 | M2、F0-A |
 | L-22 | 计划 P-12 / L-11：体相名统一 | 统一为 Python 现有写法（如 `Pt fcc`），收尾阶段（W5）落实 | M7 |
 | L-23 | 快捷键 Shift+A、Shift+S | 按 M5 与 M7 §5.2 的登记注册；W5 复核冲突 | M5、M7 |
+| L-24 | 账本 L-F0-25 的写出器能力表（F0-D T6 实现时提出） | 增补一列**可选**能力 `velocities`（排在 `handedness` 之后）：内置值 json true、extxyz true、xyz false、poscar true、cif false、pdb false；写出器不声明这一列时不给速度相关的说明。九个原有能力仍是必填集合 | F0-D（已实现），w0-docs 写进 SCHEMA.md |
 | L-19 | G-39 c(2×2) 等预设产生的结构名 | 自动名一律用由 `info.supercellMatrix` 计算的 Wood 标签（如 `(√2×√2)R45°`）；预设标签只出现在读数与 toast 里（`Made a c(2×2) = (√2×√2)R45° supercell: 8 atoms`）。两条路径（Slab 分区与 Cell 分区）的名字由同一个测试核对 | M1、M2 |
