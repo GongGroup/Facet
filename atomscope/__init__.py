@@ -1,9 +1,9 @@
-"""Former name of :mod:`crystallume`, kept so code written for AtomScope keeps working.
+"""Former name of :mod:`facet`, kept so code written for AtomScope keeps working.
 
-``import atomscope`` gives the :mod:`crystallume` package itself, and ``atomscope.<sub>`` (``atomscope.io``,
-``atomscope.plugins``, ``atomscope.core.structure`` ...) the matching ``crystallume.<sub>`` module, so old plugins
+``import atomscope`` gives the :mod:`facet` package itself, and ``atomscope.<sub>`` (``atomscope.io``,
+``atomscope.plugins``, ``atomscope.core.structure`` ...) the matching ``facet.<sub>`` module, so old plugins
 (``from atomscope import PluginContext, Structure``) and scripts (``import atomscope as ats``) run unchanged.
-New code should import ``crystallume``.
+New code should import ``facet``.
 """
 
 from __future__ import annotations
@@ -14,13 +14,13 @@ import importlib.util
 import sys
 import warnings
 
-import crystallume
+import facet
 
-_OLD, _NEW = "atomscope", "crystallume"
+_OLD, _NEW = "atomscope", "facet"
 
 
 class _AliasFinder(importlib.abc.MetaPathFinder, importlib.abc.Loader):
-    """Import ``atomscope.<x>`` as the same module object as ``crystallume.<x>`` (no second copy)."""
+    """Import ``atomscope.<x>`` as the same module object as ``facet.<x>`` (no second copy)."""
 
     @staticmethod
     def _target(fullname):
@@ -53,7 +53,7 @@ class _AliasFinder(importlib.abc.MetaPathFinder, importlib.abc.Loader):
         return module
 
     def exec_module(self, module):
-        # importlib set __spec__ to the alias spec; give the crystallume module its own back
+        # importlib set __spec__ to the alias spec; give the facet module its own back
         alias = module.__spec__
         if alias is not None and alias.loader is self:
             module.__spec__ = alias.loader_state
@@ -62,7 +62,7 @@ class _AliasFinder(importlib.abc.MetaPathFinder, importlib.abc.Loader):
 if not any(isinstance(f, _AliasFinder) for f in sys.meta_path):
     sys.meta_path.insert(0, _AliasFinder())
 
-warnings.warn("the 'atomscope' package is now called 'crystallume'; import crystallume instead",
+warnings.warn("the 'atomscope' package is now called 'facet'; import facet instead",
               DeprecationWarning, stacklevel=2)
 
-sys.modules[__name__] = crystallume
+sys.modules[__name__] = facet

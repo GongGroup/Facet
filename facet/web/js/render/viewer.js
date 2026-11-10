@@ -1,0 +1,3062 @@
+/**
+ * Viewer — owns the WebGL renderer, cameras, controls, light rig, post-processing and the drawn
+ * representation of one Structure. Driven entirely by a `scene` settings object (see settings.js).
+ *
+ * Events:
+ *   'hover'       {index, x, y}                       pointer over a displayed atom (index −1: none)
+ *   'atomclick'   {index, mode, shiftKey, x, y}       click without drag (index −1: empty space); mode is
+ *                                                     'replace', 'add' (Shift) or 'toggle' (Ctrl/⌘), and
+ *                                                     shiftKey is true for the last two
+ *   'atomdblclick' {index, mode, altKey, x, y}        double-click on a displayed atom (Alt: the element)
+ *   'atomcontext' {index, x, y, clientX, clientY}     right-click without drag (index −1: empty space);
+ *                                                     x/y are relative to the viewport element
+ *   'boxselect'   {indices, mode, add, shape}         a rectangle (drag) or lasso (Q+drag) finished with a tool
+ *                                                     that selects; indices are unique source (structure) indices,
+ *                                                     add = mode is not 'replace', shape 'rect' | 'lasso'
+ *   'frame' i | 'play' bool | 'selection' srcIndices | 'render' | 'measure' list | 'camera' | 'model' model | 'error' err
+ *
+ * Mouse, as in Materials Studio: left button selects (see _setupPointer), right-drag rotates, middle-drag
+ * pans, the wheel or both buttons together zoom. Without a middle button (trackpads, a Magic Mouse) Alt/⌥+drag
+ * pans, and on a Mac Control+drag rotates as a right-drag does. Touch, and a pen tip without modifiers: one
+ * finger rotates, two pan and pinch, a tap selects.
+ * Keyboard, while the canvas has focus: arrows turn the model 45° about the screen axes, Shift/Alt+arrows
+ * pan, +/− zoom; those keys do not reach the global shortcuts. `holdKeys` (X, Y, Z, R, Q, E) change
+ * what a drag does while held; `heldKeyUsed(k)` tells the shortcut router that a drag used one, so that
+ * releasing it does not also run the key's own shortcut.
+ * `tool` is the app's active tool ('select' | 'measure' | …); box and lasso selection run only with a tool that
+ * selects atoms (toolSelects, render/tools/index.js), and `toolHandler` gets the left button (see _setupPointer).
+ * The app keeps it current by setting `toolProvider = () => app.tool` (or by assigning `tool`).
+ * `helpers` = the building blocks styles receive as ctx.helpers (buildAtoms, buildBonds, …).
+ */
+import * as THREE from '../../vendor/three/three.module.js';
+import { OrbitControls } from '../../vendor/three/addons/controls/OrbitControls.js';
+import { TrackballControls } from '../../vendor/three/addons/controls/TrackballControls.js';
+import { LineSegments2 } from '../../vendor/three/addons/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from '../../vendor/three/addons/lines/LineSegmentsGeometry.js';
+import { LineMaterial } from '../../vendor/three/addons/lines/LineMaterial.js';
+import { GLTFExporter } from '../../vendor/three/addons/exporters/GLTFExporter.js';
+import { mergeGeometries } from '../../vendor/three/addons/utils/BufferGeometryUtils.js';
+import { Emitter } from '../core/events.js';
+import { element } from '../core/elements.js';
+import { buildDisplayModel, modelBounds, refOf, storedImage } from './display.js';
+import { tools } from './tools/index.js';
+import { parseRef, normalizeRefs, measurementPoints, migrateMeasurementKeys, newMeasurementId } from '../core/measure.js';
+import { dihedralFromVectors, signedAngle } from '../core/geometry.js';
+import { inv3, cartToFrac } from '../core/util.js';
+import { millerNormal, latticeDirection, hkilToHkl, uvtwToUvw, uvwToUvtw, formatIndices, ariaIndices, surfaceNormal } from '../core/lattice.js';
+import { styles, atomRadius, segmentsFor, autoPolyhedraCenters, buildAtoms, buildBonds, buildLines, buildPolyhedra, writeAtomMatrices, writeBondMatrices } from './styles.js';
+import { computeColors, colorSchemes } from './colors.js';
+import { createMaterial, updateMaterial, isSeeThrough, materials } from './materials.js';
+import { LightRig } from './lighting.js';
+import { PostPipeline, skipInAuxPass } from './post.js';
+import { makeBackground } from './background.js';
+import { AxisGizmo, axisColors } from './gizmo.js';
+import { makeScene, scenePathValues } from './settings.js';
+import { drawLegends } from './legend.js';
+import {
+  Overlays, haloMaterial, normalizeHighlight, checkHighlightName, highlightIndexSet, haloOrder, remapIndices, resolveColor,
+  DEFAULT_HIGHLIGHT_COLOR, HALO_EDGE, HALO_ORDER_BASE,
+} from './overlays.js';
+
+const sig = (o) => JSON.stringify(o ?? null);
+const DEG = Math.PI / 180;
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const cssVar = (name, fallback) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+const KEY_TURN = 45, KEY_PAN = 40, KEY_ZOOM = 1.2;
+/** A press that moves less than this (CSS px) is a click; two clicks this close in time and place are a double-click. */
+const CLICK_PX = 5, DOUBLE_MS = 450, DOUBLE_PX = 6;
+/** What _toolCall gives when a tool's handler method throws. */
+const TOOL_FAILED = Symbol('tool failed');
+/** Keys held down to change what a drag does: X/Y/Z + right-drag, R (zoom box), Q (lasso), E (rectangle) + left-drag. */
+const HOLD_KEYS = new Set(['x', 'y', 'z', 'r', 'q', 'e']);
+const SVG_NS = 'http://www.w3.org/2000/svg';
+/** A Mac, where Control-click is the right (secondary) click; the same test as ui/keys.js. */
+const IS_MAC = /mac|iphone|ipad/i.test(globalThis.navigator?.platform ?? globalThis.navigator?.userAgent ?? '');
+/** Selection mode of a click or drag from its modifier keys: Ctrl/⌘ toggles, Shift adds. */
+const selectMode = (e) => (e.ctrlKey || e.metaKey ? 'toggle' : e.shiftKey ? 'add' : 'replace');
+/** Even-odd test of a point against a polygon [[x, y], …]. */
+function inPolygon(pts, x, y) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i], [xj, yj] = pts[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+/** Above this many drawn atoms the cell letters clear the atoms' bounding box instead of each atom. */
+const LETTER_DISC_LIMIT = 20000;
+/** viewAlong (F0-A §3.14.1): the axis names it hands to setView, its messages and the layer of the direction label. */
+const AXIS_VIEWS = new Set(['a', 'b', 'c', 'x', 'y', 'z', '-a', '-b', '-c', '-x', '-y', '-z']);
+const VIEW_BAD_TARGET = 'viewAlong: use a direction like [1, 1, 0], {uvw: [1, 1, 0]}, {hkl: [1, 1, 1]} or "normal".';
+const VIEW_ZERO = 'That direction has zero length.';
+const VIEW_NEEDS_CELL = 'Looking along a lattice direction needs a unit cell.';
+const VIEW_NEEDS_STRUCTURE = 'Load a structure first.';
+const VIEW_LABEL_LAYER = 'view-direction';
+/** The direction label stays while the view is within 0.5° of the one it describes. */
+const SAME_VIEW = Math.cos(0.5 * DEG);
+const MINUS = '\u2212';
+const isList = (v) => Array.isArray(v) || (ArrayBuffer.isView(v) && !(v instanceof DataView));
+const finiteVec3 = (v) => isList(v) && v.length === 3 && Array.from(v).every((x) => typeof x === 'number' && Number.isFinite(x));
+
+/**
+ * Selection / hover halo: a Fresnel rim on the back faces of a slightly larger sphere, so the atom
+ * keeps its own colour and only its outline lights up in the accent colour.
+ */
+function rimMaterial(strength) {
+  return new THREE.ShaderMaterial({
+    uniforms: { color: { value: new THREE.Color('#e8a33d') }, strength: { value: strength } },
+    vertexShader: `
+      varying vec3 vN; varying vec3 vV;
+      void main() {
+        vec4 mv = vec4(position, 1.0);
+        vec3 n = normal;
+        #ifdef USE_INSTANCING
+          mv = instanceMatrix * mv;
+          n = mat3(instanceMatrix) * n;
+        #endif
+        mv = modelViewMatrix * mv;
+        vN = normalize(normalMatrix * n);
+        vV = isOrthographic ? vec3(0.0, 0.0, 1.0) : normalize(-mv.xyz);
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      uniform vec3 color; uniform float strength;
+      varying vec3 vN; varying vec3 vV;
+      void main() {
+        float d = abs(dot(normalize(vN), normalize(vV)));
+        float a = pow(1.0 - d, 2.0) * smoothstep(0.0, 0.18, d) * strength;
+        gl_FragColor = vec4(color, clamp(a, 0.0, 1.0));
+        #include <colorspace_fragment>
+      }`,
+    transparent: true, depthWrite: false, side: THREE.BackSide, toneMapped: false,
+  });
+}
+
+export class Viewer extends Emitter {
+  constructor(container) {
+    super();
+    this.container = container;
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    const el = this.renderer.domElement;
+    el.className = 'viewer-canvas';
+    el.tabIndex = 0;
+    el.setAttribute('role', 'application');
+    el.setAttribute('aria-label', '3D structure view. Arrow keys rotate by 45 degrees, Shift or Alt+arrows pan, +/- zoom');
+    container.appendChild(el);
+    this.overlay = document.createElement('canvas');
+    this.overlay.className = 'viewer-overlay';
+    container.appendChild(this.overlay);
+
+    this.scene3 = new THREE.Scene();
+    this.root = new THREE.Group();
+    this.scene3.add(this.root);
+    this.persp = new THREE.PerspectiveCamera(30, 1, 0.05, 2000);
+    this.ortho = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.05, 2000);
+    this.camera = this.persp;
+    this.camera.position.set(0, 0, 30);
+    this.lights = new LightRig(this.renderer, this.scene3);
+    this.post = new PostPipeline(this.renderer, this.scene3, this.camera);
+    this.gizmo = new AxisGizmo();
+    // contact-shadow floor; oriented to the view "up" in _updateFloor
+    this.floor = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShadowMaterial({ opacity: 0.22, side: THREE.DoubleSide }));
+    this.floor.receiveShadow = true;
+    this.floor.visible = false;
+    this.floor.userData.noInk = true;
+    this.scene3.add(this.floor);
+
+    this.structure = null;
+    this.settings = makeScene();
+    this.model = null;
+    this.rep = null;
+    this.cellObj = null;
+    this.measureObj = null;
+    this.atomMaterial = null;
+    this.bondMaterial = null;
+    this.selection = new Set();
+    this.hoverIndex = -1;
+    this.measurements = [];
+    this.bounds = { center: new THREE.Vector3(), radius: 5 };
+    this.playing = false;
+    this.fps = 12;
+    this._sigs = {};
+    this._dirty = true;
+    this._camAnim = null;
+    this._trash = [];
+    this._tempOrtho = false;
+    this._viewUp = null;
+    this.width = 1; this.height = 1;
+    /** Space (CSS px) that fitting keeps clear on each side, e.g. for floating toolbars: {x, y}. */
+    this.fitMargins = { x: 0, y: 0 };
+    this.resolution = new THREE.Vector2(1, 1);
+    this._tool = 'select';
+    this.toolProvider = null;
+    this.holdKeys = HOLD_KEYS;
+    this._held = new Set();       // hold keys down now
+    this._heldUsed = new Set();   // hold keys that took part in a press since they went down
+    this._ptrs = new Map();       // pointerId → press being tracked (see _ptrDown)
+    this._lastTap = null;
+    this.helpers = { buildAtoms, buildBonds, buildLines, buildPolyhedra, atomRadius, segmentsFor };
+
+    this._setupHalos();
+    // overlay layers (render/overlays.js): tier A under the root next to the halos, tier B in a scene of its own
+    this.overlays = new Overlays(this);
+    this.overlayGroup = this.overlays.sceneGroup;
+    this.root.add(this.overlayGroup);
+    this.topScene = this.overlays.topScene;
+
+    this._setupControls('orbit');
+    this._setupPointer();
+    this._setupKeys();
+    this._ro = new ResizeObserver(() => this.resize());
+    this._ro.observe(container);
+    this.resize();
+    this._last = performance.now();
+    this._frameAcc = 0;
+    this._loop = this._loop.bind(this);
+    requestAnimationFrame(this._loop);
+    el.addEventListener('webglcontextlost', (e) => { e.preventDefault(); this.emit('error', new Error('The graphics context was lost. Reload the page to continue.')); });
+  }
+
+  /** The active tool: from `toolProvider()` when the app set one, otherwise the value last assigned. */
+  get tool() {
+    const t = typeof this.toolProvider === 'function' ? this.toolProvider() : null;
+    return t || this._tool;
+  }
+  set tool(t) { this._tool = t || 'select'; }
+
+  // ------------------------------------------------------------------ setup
+  _setupControls(kind) {
+    const old = this.controls;
+    const target = old ? old.target.clone() : new THREE.Vector3();
+    old?.dispose();
+    if (kind === 'trackball') {
+      const c = new TrackballControls(this.camera, this.renderer.domElement);
+      c.rotateSpeed = 3; c.zoomSpeed = 1.4; c.dynamicDampingFactor = 0.15;
+      c.keys = [];   // its A/S/D hold keys would change what a drag does
+      // its pan ran several times too far (its damping repeats the whole offset each frame) and crawled in an
+      // orthographic view: the viewer pans instead, for the mouse and for two fingers (_ptrMove)
+      c.noPan = true;
+      this.controls = c;
+    } else {
+      const c = new OrbitControls(this.camera, this.renderer.domElement);
+      c.enableDamping = true; c.dampingFactor = 0.12; c.rotateSpeed = 0.9; c.zoomSpeed = 1.1; c.screenSpacePanning = true;
+      this.controls = c;
+    }
+    // right-drag rotates, as in Materials Studio; the middle button and Alt never reach the controls and the
+    // left button only for a pen tip or a Mac's Control-drag (_ptrDown); _rotateWith adjusts this per press
+    this.controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
+    this.controls.target.copy(target);
+    this.controlsKind = kind;
+    this._syncControlsUp();
+    this.controls.addEventListener('change', () => { this._dirty = true; this.emit('camera'); });
+    this.controls.addEventListener('start', () => {
+      this._camAnim = null;
+      // an axis view's temporary orthographic camera lasts until the next free rotation
+      const st = this.controls.state;
+      if (this._tempOrtho && (st === 0 || st === 3)) this._leaveTempOrtho();
+    });
+  }
+
+  /** OrbitControls orbits around the "up" it saw when created; keep it in step with camera.up. */
+  _syncControlsUp() {
+    const c = this.controls;
+    if (!c?._quat || !c._quatInverse) return;
+    const up = this.camera.up.clone();
+    if (up.lengthSq() < 1e-10) return;
+    c._quat.setFromUnitVectors(up.normalize(), new THREE.Vector3(0, 1, 0));
+    c._quatInverse.copy(c._quat).invert();
+  }
+
+  /**
+   * Mouse buttons as in Materials Studio. Left: click selects (Shift adds, Ctrl/⌘ toggles, empty space
+   * clears), drag draws a selection rectangle (Q held: a lasso; R held: a box to zoom into), double-click
+   * selects the bonded fragment (Alt: every atom of the element). Right: drag rotates (Alt: pans; X/Y/Z
+   * held: turns about that screen axis), click opens the atom menu. Middle-drag pans; the wheel, or the
+   * left and right buttons dragged together, zoom. For trackpads and mice without a middle button, Alt/⌥
+   * + left-drag pans too, and on a Mac Control works as the right button (Control+drag rotates,
+   * Control-click opens the menu), as Control-click does everywhere on a Mac. Touch and a pen tip without
+   * modifiers keep the camera controls' gestures, and a tap selects.
+   * What is under the pointer comes from one merged pick (pick()): when an item of a pickable overlay layer wins
+   * over the atoms, the view sends 'overlayhover' {layer, index, item, x, y} (index −1 once the pointer leaves the
+   * layer), 'overlayclick' and 'overlaydblclick' {layer, index, item, x, y, mode} and 'overlaycontext' {…, clientX,
+   * clientY} instead of 'hover' on an atom, 'atomclick', 'atomdblclick' and 'atomcontext' (F0-A §3.11.5).
+   * Tools (render/tools/index.js, F0-A §3.13.3): the app sets `toolHandler` to the active tool's ToolHandler. A left
+   * press it claims with down() — or, with ToolDef.touch 'claim', a one-finger or pen-tip press it claims() and
+   * down()s — waits: once the pointer moves CLICK_PX it becomes the tool's drag (begin, move…, up), and without moving
+   * it is an ordinary click (selection, double-click, multi-select; handler.click first). Esc, losing the press, the
+   * browser cancelling it, a second finger or cancelToolPress() end it with handler.cancel(press, reason). The right
+   * and middle buttons, Alt, the wheel, both buttons together and R + drag never reach the tool. Whether clicks and
+   * drags on empty space select atoms follows the tool (toolSelects). While a preview locks the input (inputLocked),
+   * the tool gets no presses, clicks or hovers and clicks send no events.
+   */
+  _setupPointer() {
+    const el = this.renderer.domElement;
+    let raf = 0, lastMove = null;
+    // a pick still waiting for its frame would hover again after the pointer left or a button went down
+    const dropPending = () => { if (raf) { cancelAnimationFrame(raf); raf = 0; } };
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
+    el.addEventListener('mousedown', (e) => { if (e.button === 1) e.preventDefault(); });   // no autoscroll when the middle button pans
+    // the controls are off during a press (a pan with the wheel button held, a box…), so they leave the wheel alone:
+    // a nudge of the wheel must not scroll the page around the view instead
+    el.addEventListener('wheel', (e) => { if (this._ptrs.size) e.preventDefault(); }, { passive: false });
+    el.addEventListener('pointermove', (e) => {
+      lastMove = e;
+      if (e.buttons) { dropPending(); this._clearHover(e); return; }
+      if (!raf) raf = requestAnimationFrame(() => { raf = 0; this._hoverAt(lastMove); });
+    });
+    el.addEventListener('pointerleave', (e) => { dropPending(); this._clearHover(e); this._toolLeave(e); });
+    // a capture listener on the container runs before the camera controls (on the canvas) see a press;
+    // moves and releases are followed on the window, in its capture phase, ahead of the controls too
+    this.container.addEventListener('pointerdown', (e) => this._ptrDown(e), true);
+    this._ptrMove = this._ptrMove.bind(this);
+    this._ptrUp = this._ptrUp.bind(this);
+    this._ptrCancel = (e) => this._ptrUp(e, true);
+  }
+
+  _setupKeys() {
+    // hold keys are followed on the window, wherever the focus is: a drag in the view reads them
+    const hold = (e, down) => {
+      const k = e.key?.toLowerCase();
+      if (!HOLD_KEYS.has(k)) return;
+      if (!down) this._held.delete(k);
+      else if (!e.repeat) { this._held.add(k); this._heldUsed.delete(k); }
+    };
+    addEventListener('keydown', (e) => {
+      hold(e, true);
+      // Esc during a drag ends the drag, a tool's included (cancel('esc')), and does nothing else (M7 KC-05 ①)
+      if (e.key === 'Escape' && this._cancelShapes()) { e.preventDefault(); e.stopPropagation(); }   // (not also clearing the selection)
+    }, true);
+    addEventListener('keyup', (e) => hold(e, false), true);
+    // losing the window ends every press (a tool's: cancel('lost'))
+    addEventListener('blur', () => { this._held.clear(); for (const id of [...this._ptrs.keys()]) this._endPress(id); });
+    this.renderer.domElement.addEventListener('keydown', (e) => {
+      // the active tool sees the view's keys first
+      const h = this.toolHandler;
+      if (typeof h?.keydown === 'function' && this._toolCall(h, 'keydown', e) === true) { e.preventDefault(); e.stopPropagation(); return; }
+      if (e.ctrlKey || e.metaKey || !this.structure) return;
+      const k = e.key;
+      const arrow = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[k];
+      let done = true;
+      if (arrow) {
+        const [sx, sy] = arrow;
+        if (e.shiftKey || e.altKey) this.panBy(sx * KEY_PAN, sy * KEY_PAN);
+        // ←/→ turn about the screen's vertical axis, ↑/↓ about its horizontal one; a held arrow turns step by step
+        else if (!(e.repeat && this._camAnim)) this.rotateScreen(sx ? 'y' : 'x', (sx || sy) * KEY_TURN);
+      } else if (e.altKey) done = false;
+      else if (k === '+' || k === '=') this.zoomBy(KEY_ZOOM);
+      else if (k === '-' || k === '_') this.zoomBy(1 / KEY_ZOOM);
+      else done = false;
+      if (done) { e.preventDefault(); e.stopPropagation(); }
+    });
+  }
+
+  /** True when hold key `k` took part in a press (a drag or click in the view) since it went down. */
+  heldKeyUsed(k) { return this._heldUsed.has(String(k).toLowerCase()); }
+
+  _setHover(i, e) {
+    if (i === this.hoverIndex && i === -1) return;
+    const changed = i !== this.hoverIndex;
+    this.hoverIndex = i;
+    if (changed) { this._writeHalos(['hover']); this._dirty = true; }
+    const r = this.container.getBoundingClientRect();
+    this.emit('hover', { index: i, x: e.clientX - r.left, y: e.clientY - r.top });
+  }
+
+  /**
+   * A pointer move without buttons (once a frame): one pick gives the hovered overlay item, the hovered atom and the
+   * active tool's hover(hit, e) — last, so that a cursor the tool sets wins over the one the hover card sets.
+   */
+  _hoverAt(e) {
+    const hit = this.pick(e.clientX, e.clientY);
+    this._setOverlayHover(hit.kind === 'overlay' ? hit.overlay : null, e);
+    this._setHover(hit.kind === 'atom' ? hit.atom.index : -1, e);
+    const h = this.toolHandler;
+    if (typeof h?.hover === 'function' && !this.inputLocked) this._toolCall(h, 'hover', hit, e);
+  }
+
+  /** The pointer left the view with no button down: the tool hovers nothing (a 'none' hit). */
+  _toolLeave(e) {
+    const h = this.toolHandler;
+    if (typeof h?.hover !== 'function' || this._ptrs.size || this.inputLocked) return;
+    this._toolCall(h, 'hover', { kind: 'none', t: Infinity, point: null, ray: this.ray(e.clientX, e.clientY), atom: null, overlay: null }, e);
+  }
+
+  /** The pointer left the view, or a button went down: no overlay item and no atom is hovered any more. */
+  _clearHover(e) {
+    this._setOverlayHover(null, e);
+    this._setHover(-1, e);
+  }
+
+  /**
+   * 'overlayhover' {layer, index, item, x, y} while the pointer is over an item of a pickable overlay layer (`ov`, the
+   * pick's overlay hit; sent on every move, as 'hover' is), and {layer, index: −1, item: null, x, y} once for the
+   * layer the pointer was over when it leaves it (`ov` null or on another layer). The layers hear of each change
+   * (overlays.hover: a marker layer enlarges the marker under the pointer).
+   */
+  _setOverlayHover(ov, e) {
+    const prev = this._overlayHover ?? null;
+    if (!ov && !prev) return;
+    const r = this.container.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    this._overlayHover = ov ? { layer: ov.layer, index: ov.index } : null;
+    if (prev && prev.layer !== ov?.layer) {
+      this.overlays?.hover(prev.layer, -1);
+      this.emit('overlayhover', { layer: prev.layer, index: -1, item: null, x, y });
+    }
+    if (ov) {
+      if (prev?.layer !== ov.layer || prev.index !== ov.index) this.overlays?.hover(ov.layer, ov.index);
+      this.emit('overlayhover', { layer: ov.layer, index: ov.index, item: ov.item, x, y });
+    }
+  }
+
+  /**
+   * A left press released without dragging, or a tap: the axis gizmo; else the active tool's click(e, hit) — true
+   * means it handled the click, and no event follows; else 'overlayclick' when an item of a pickable overlay layer is
+   * under the pointer (instead of 'atomclick', A-D8), or 'atomclick'. Returns the pick (null: the gizmo took the click,
+   * or a preview locks the input: then no event at all, so the selection is not cleared either).
+   */
+  _click(e, mode = selectMode(e)) {
+    const r = this.renderer.domElement.getBoundingClientRect();
+    const gx = e.clientX - r.left, gy = r.bottom - e.clientY;
+    if (this.settings.display.axes && gx < this.gizmo.size + 8 && gy < this.gizmo.size + 8 && gx > 8 && gy > 8) {
+      const nx = ((gx - 8) / this.gizmo.size) * 2 - 1, ny = ((gy - 8) / this.gizmo.size) * 2 - 1;
+      const hit = this.gizmo.pick(nx, ny);
+      if (hit) { this.setViewDirection(hit.dir.toArray(), null, true); return null; }
+    }
+    if (this.inputLocked) return null;
+    const hit = this.pick(e.clientX, e.clientY);
+    const h = this.toolHandler;
+    // the pick is still returned: two handled clicks in a row make a double-click (Pick site: double-click places)
+    if (typeof h?.click === 'function' && this._toolCall(h, 'click', e, hit) === true) return hit;
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    if (hit.kind === 'overlay') {
+      const { layer, index, item } = hit.overlay;
+      this.emit('overlayclick', { layer, index, item, x, y, mode });
+    } else {
+      this.emit('atomclick', { index: hit.kind === 'atom' ? hit.atom.index : -1, mode, shiftKey: mode !== 'replace', x, y });
+    }
+    return hit;
+  }
+
+  /**
+   * A click, and also a double-click when it closely follows the previous click: 'overlaydblclick' on an item of a
+   * pickable overlay layer (instead of 'atomdblclick'), 'atomdblclick' on an atom.
+   */
+  _tap(e) {
+    const now = performance.now(), last = this._lastTap;
+    const double = !!last && now - last.t < DOUBLE_MS && Math.hypot(e.clientX - last.x, e.clientY - last.y) < DOUBLE_PX;
+    this._lastTap = double ? null : { t: now, x: e.clientX, y: e.clientY };
+    const mode = selectMode(e);
+    const hit = this._click(e, mode);
+    if (!double || !hit || hit.kind === 'none') return;
+    const r = this.renderer.domElement.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    if (hit.kind === 'overlay') {
+      const { layer, index, item } = hit.overlay;
+      this.emit('overlaydblclick', { layer, index, item, x, y, mode });
+    } else this.emit('atomdblclick', { index: hit.atom.index, mode, altKey: e.altKey, x, y });
+  }
+
+  /**
+   * A right click without dragging: 'overlaycontext' on an item of a pickable overlay layer (instead of 'atomcontext'),
+   * else 'atomcontext'; nothing while a preview locks the input.
+   */
+  _context(e) {
+    if (this.inputLocked) return;
+    const r = this.container.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    const hit = this.pick(e.clientX, e.clientY);
+    if (hit.kind === 'overlay') {
+      const { layer, index, item } = hit.overlay;
+      this.emit('overlaycontext', { layer, index, item, x, y, mode: selectMode(e), clientX: e.clientX, clientY: e.clientY });
+      return;
+    }
+    this.emit('atomcontext', { index: hit.kind === 'atom' ? hit.atom.index : -1, x, y, clientX: e.clientX, clientY: e.clientY });
+  }
+
+  /**
+   * Start following a press on the canvas. Its `kind`: 'left' (selection, see _leftPress), 'tool' (claimed by the
+   * active tool: see _toolPress), 'axis' (X/Y/Z + right-drag), 'pan' (middle, or Alt with the left or right button),
+   * 'chord' (left and right together: zoom) or 'controls' (the camera controls drag; a release without moving is a
+   * tap, or the atom menu for the right button). `button` is the press's button, with a Mac's Control+left counted as
+   * the right one.
+   */
+  _ptrDown(e) {
+    if (e.target !== this.renderer.domElement) return;
+    const touch = e.pointerType === 'touch';
+    // a mouse or pen goes down only with no button held: a press still followed lost its release
+    for (const [id, q] of this._ptrs) if (!touch && q.type === e.pointerType) this._endPress(id);
+    if (!touch && [...this._ptrs.values()].some((q) => q.type !== 'touch')) return;
+    if (!touch && e.button !== 0 && e.button !== 1 && e.button !== 2) return;   // back / forward buttons
+    for (const k of this._held) this._heldUsed.add(k);   // a hold key used here does not run its own shortcut
+    const button = IS_MAC && !touch && e.button === 0 && e.ctrlKey && !e.metaKey ? 2 : e.button;
+    const p = { id: e.pointerId, type: e.pointerType, button, x0: e.clientX, y0: e.clientY, lx: e.clientX, ly: e.clientY, t0: performance.now(), far: false, kind: 'controls' };
+    const held = (k) => this._held.has(k);
+    if (touch) {
+      // a second finger makes both presses a pan or pinch, not taps; it cancels a tool's drag, and the camera takes
+      // the rest of that gesture as a one-finger rotation (F0-A §3.13.4)
+      for (const q of this._ptrs.values()) {
+        if (q.type !== 'touch') continue;
+        q.far = true; p.far = true;
+        if (q.kind === 'tool') this._cancelTool(q, 'second-finger');
+      }
+      this._claimPress(e, p);
+    } else if (button === 0 && e.altKey && !['r', 'q', 'e'].some(held)) {
+      this._panPress(e, p);   // Alt/⌥+drag: a pan without a middle button (a click stays a click)
+    } else if (button === 0 && (e.pointerType === 'mouse' || e.shiftKey || e.ctrlKey || e.metaKey || ['r', 'q', 'e'].some(held))) {
+      this._leftPress(e, p);
+    } else if (button === 2 && ['x', 'y', 'z'].some(held)) {
+      e.preventDefault();
+      p.kind = 'axis'; p.axis = ['x', 'y', 'z'].find(held);
+      this._holdControls(p);
+      this._capture(p);
+    } else if (button === 1 || (button === 2 && e.altKey)) {
+      this._panPress(e, p);
+    } else if (!(e.pointerType === 'pen' && button === 0 && this._claimPress(e, p))) this._rotateWith(e);   // a pen tip without modifiers
+    this._ptrs.set(e.pointerId, p);
+    if (this._ptrs.size === 1) {
+      addEventListener('pointermove', this._ptrMove, true);
+      addEventListener('pointerup', this._ptrUp, true);
+      addEventListener('pointercancel', this._ptrCancel, true);
+    }
+  }
+
+  /**
+   * Left press: a zoom box with R held; else a press the active tool claims (handler.down → true: _toolPress); else a
+   * click, and a selection rectangle (a lasso with Q held) with a tool that selects atoms (toolSelects).
+   */
+  _leftPress(e, p) {
+    e.preventDefault();   // no text selection while dragging; the canvas still takes the focus for its keys
+    this.renderer.domElement.focus?.({ preventScroll: true });
+    p.kind = 'left';
+    this._holdControls(p);
+    this._capture(p);
+    const h = this.toolHandler;
+    if (typeof h?.down === 'function' && !this._held.has('r') && this.model?.n && !this.inputLocked) {
+      const hit = this.pick(e.clientX, e.clientY);
+      if (this._toolCall(h, 'down', e, hit, p) === true) { this._toolPress(p, h); return; }
+    }
+    const select = this.toolSelects && !!this.model?.n && !this.inputLocked;
+    p.shape = this._held.has('r') ? 'zoom' : !select ? null : this._held.has('q') ? 'lasso' : 'rect';
+    p.pts = [[e.clientX, e.clientY]];
+  }
+
+  /**
+   * Whether clicks and drags on empty space select atoms under the active tool: its ToolDef.selects (from
+   * `toolDefProvider()` when set, else the registered tool of this.tool); true for Select without a registry entry.
+   */
+  get toolSelects() {
+    const d = this._activeToolDef();
+    return d ? !!d.selects : this.tool === 'select';
+  }
+
+  /** The active tool's ToolDef.touch: 'claim' (one-finger and pen-tip presses may belong to the tool) or 'none'. */
+  get toolTouch() { return this._activeToolDef()?.touch ?? 'none'; }
+
+  _activeToolDef() {
+    const d = typeof this.toolDefProvider === 'function' ? this.toolDefProvider() : null;
+    return d ?? tools.get(this.tool);
+  }
+
+  /**
+   * Make press p the tool's (handler h): it waits until the pointer moves CLICK_PX (then begin, move…, up) and
+   * without moving is an ordinary click (_ptrUp → _tap). The camera controls stay out of it, as for every left press.
+   */
+  _toolPress(p, h) {
+    p.kind = 'tool'; p.handler = h; p.started = false;
+    p.cancelled = false; p.done = false; p.cancelNotified = false;
+    p.shape = null;
+  }
+
+  /**
+   * Touch or a pen tip (no modifiers): a press the active tool claims — ToolDef.touch 'claim', handler.claims(hit, e)
+   * and handler.down(e, hit, p) === true — becomes a tool press; true when it did. Not for a second finger, a model
+   * without atoms or a locked input.
+   */
+  _claimPress(e, p) {
+    const h = this.toolHandler;
+    if (p.far || this.toolTouch !== 'claim' || typeof h?.claims !== 'function' || !this.model?.n || this.inputLocked) return false;
+    const hit = this.pick(e.clientX, e.clientY);
+    const claimed = this._toolCall(h, 'claims', hit, e);
+    if (!claimed || claimed === TOOL_FAILED || this._toolCall(h, 'down', e, hit, p) !== true) return false;
+    e.preventDefault();
+    this._toolPress(p, h);
+    this._holdControls(p);
+    this._capture(p);
+    return true;
+  }
+
+  /**
+   * Call method `name` of tool handler h with `args`. An error in it is logged (once per handler and method: hover and
+   * move run every frame) and gives TOOL_FAILED, so a broken tool cannot break the view's own handling.
+   */
+  _toolCall(h, name, ...args) {
+    try { return h[name](...args); } catch (err) {
+      const seen = (this._toolErrors ??= new WeakMap());
+      const names = seen.get(h) ?? new Set();
+      if (!names.has(name)) { names.add(name); seen.set(h, names); console.error(`A tool's ${name}() failed`, err); }
+      return TOOL_FAILED;
+    }
+  }
+
+  /**
+   * A claimed press ends without its drag finishing: handler.cancel(p, reason) once (CANCEL_REASONS in
+   * render/tools/index.js); the press stays followed until its release, and its later moves are ignored. A second
+   * finger also gives the camera controls back, so that they take the rest of the gesture.
+   */
+  _cancelTool(p, reason) {
+    if (p.done || p.cancelled) return;
+    p.cancelled = true;
+    if (reason === 'second-finger') { p.restore?.(); p.restore = null; }
+    this._notifyCancel(p, reason);
+  }
+
+  _notifyCancel(p, reason) {
+    if (p.cancelNotified) return;
+    p.cancelNotified = true;
+    if (typeof p.handler?.cancel === 'function') this._toolCall(p.handler, 'cancel', p, reason);
+  }
+
+  /**
+   * Cancel every press the tool claimed, with `reason` (app.setTool: 'switch'; a preview that ends: 'session'; the
+   * Esc command: 'esc'). True when there was one.
+   */
+  cancelToolPress(reason = 'switch') {
+    let any = false;
+    for (const p of this._ptrs.values()) if (p.kind === 'tool' && !p.done && !p.cancelled) { this._cancelTool(p, reason); any = true; }
+    return any;
+  }
+
+  /**
+   * Pan press (middle button, or Alt with the left or right one). The viewer pans rather than the camera
+   * controls: the model stays under the pointer and stops with it (the controls' damping made it trail and
+   * glide on), whatever the controls and projection.
+   */
+  _panPress(e, p) {
+    e.preventDefault();
+    this.renderer.domElement.focus?.({ preventScroll: true });
+    p.kind = 'pan';
+    this._holdControls(p);
+    this._capture(p);
+  }
+
+  /**
+   * A press the camera controls drag (the right button, a Mac's Control+left, a pen tip): make it rotate.
+   * OrbitControls pans instead while Ctrl, ⌘ or Shift is held; the viewer has its own pans, so map the button to
+   * a pan that those keys turn back into the rotation.
+   */
+  _rotateWith(e) {
+    const c = this.controls, key = e.button === 0 ? 'LEFT' : e.button === 2 ? 'RIGHT' : null;
+    if (!c.mouseButtons || !key) return;
+    const swapped = this.controlsKind !== 'trackball' && (e.ctrlKey || e.metaKey || e.shiftKey);
+    c.mouseButtons[key] = swapped ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE;
+  }
+
+  /** Keep the camera controls out of press p until it ends. */
+  _holdControls(p) {
+    if (p.restore) return;
+    const c = this.controls, was = c.enabled;
+    c.enabled = false;
+    p.restore = () => { c.enabled = was; };
+  }
+
+  /** Send press p's events to the container while it lasts, even when the pointer leaves the view. */
+  _capture(p) {
+    try { this.container.setPointerCapture?.(p.id); p.captured = true; } catch { /* not capturable */ }
+  }
+
+  _ptrMove(e) {
+    const p = this._ptrs.get(e.pointerId);
+    if (!p) return;
+    if (!p.far && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) >= CLICK_PX) p.far = true;
+    const dx = e.clientX - p.lx, dy = e.clientY - p.ly;
+    p.lx = e.clientX; p.ly = e.clientY;
+    if (p.kind === 'tool') {
+      // a claimed press becomes the tool's drag once it has moved CLICK_PX; it never zooms with both buttons
+      if (p.cancelled || p.done) return;
+      if (!p.started) {
+        if (!p.far) return;
+        p.started = true;
+        if (typeof p.handler.begin === 'function' && this._toolCall(p.handler, 'begin', e, p) === TOOL_FAILED) { this._cancelTool(p, 'lost'); return; }
+      }
+      if (typeof p.handler.move === 'function' && this._toolCall(p.handler, 'move', e, p) === TOOL_FAILED) this._cancelTool(p, 'lost');
+      return;
+    }
+    if (p.type === 'touch') {
+      // the camera controls handle touch, except the trackball's two-finger pan: the model follows the fingers' midpoint
+      if (this.controlsKind === 'trackball' && (dx || dy) && [...this._ptrs.values()].filter((q) => q.type === 'touch').length === 2) this.panBy(dx / 2, dy / 2);
+      return;
+    }
+    // the left and right buttons pressed together zoom, whichever went down first (the second button
+    // of a mouse arrives as a move, not as a press)
+    if (p.type === 'mouse' && (e.buttons & 3) === 3 && (p.kind === 'left' || (p.button === 2 && (p.kind === 'controls' || p.kind === 'pan')))) {
+      p.kind = 'chord'; p.far = true;
+      this._holdControls(p);
+      this._removeShape(p);
+    }
+    if (p.cancelled) return;
+    if (p.kind === 'pan') { if (dx || dy) this.panBy(dx, dy); return; }
+    if (p.kind === 'chord') { if (dy) this.zoomBy(Math.exp(-dy * 0.01)); return; }
+    if (p.kind === 'axis') {
+      // the same speed as a free rotation: dragging across the view's height turns about 320°
+      const deg = ((p.axis === 'x' ? dy : p.axis === 'y' ? dx : -dx) * 0.9 * 360) / Math.max(1, this.height);
+      if (deg) this.rotateScreen(p.axis, deg, { animate: false });
+      return;
+    }
+    if (p.kind === 'left' && p.far && p.shape) this._drawShape(p, e);
+  }
+
+  /** The last button of a press was released (cancelled: the browser took the pointer, or Esc). */
+  _ptrUp(e, cancelled = false) {
+    const p = this._ptrs.get(e.pointerId);
+    if (!p) return;
+    if (p.kind === 'tool') {
+      p.done = true;
+      this._endPress(e.pointerId);
+      if (cancelled || p.cancelled) { this._notifyCancel(p, cancelled ? 'pointercancel' : 'esc'); return; }
+      if (!p.started) {
+        // no drag: an ordinary click (selection, double-click, multi-select; handler.click first)
+        if (Math.hypot(e.clientX - p.x0, e.clientY - p.y0) < CLICK_PX) { this._tap(e); return; }
+        // released far away without a move in between: the drag happened at once
+        p.started = true;
+        if (typeof p.handler.begin === 'function' && this._toolCall(p.handler, 'begin', e, p) === TOOL_FAILED) { this._notifyCancel(p, 'lost'); return; }
+        if (typeof p.handler.move === 'function' && this._toolCall(p.handler, 'move', e, p) === TOOL_FAILED) { this._notifyCancel(p, 'lost'); return; }
+      }
+      if (typeof p.handler.up === 'function') this._toolCall(p.handler, 'up', e, p);
+      return;
+    }
+    this._endPress(e.pointerId);
+    if (cancelled || p.cancelled || p.kind === 'chord' || (p.kind === 'pan' && p.button === 1)) return;   // (Alt+right-click: the menu)
+    if (!p.far && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) < CLICK_PX) {
+      if (p.button === 2) this._context(e);
+      else if (p.button === 0 && (p.kind !== 'controls' || performance.now() - p.t0 < 500)) this._tap(e);
+      return;
+    }
+    if (p.kind !== 'left' || !p.shape) return;
+    if (p.shape === 'zoom') { this.zoomToRect(p.x0, p.y0, e.clientX, e.clientY); return; }
+    const indices = p.shape === 'lasso' ? this.atomsInPolygon([...p.pts, [e.clientX, e.clientY]]) : this.atomsInRect(p.x0, p.y0, e.clientX, e.clientY);
+    const mode = selectMode(e);
+    this.emit('boxselect', { indices, mode, add: mode !== 'replace', shape: p.shape });
+  }
+
+  /**
+   * Stop following press `id`: give the controls back (before their own release handler runs) and remove its shape.
+   * A tool press that ends here without its release (the window lost the focus, a release went missing) is cancelled
+   * with 'lost'.
+   */
+  _endPress(id) {
+    const p = this._ptrs.get(id);
+    if (!p) return;
+    this._ptrs.delete(id);
+    if (!this._ptrs.size) {
+      removeEventListener('pointermove', this._ptrMove, true);
+      removeEventListener('pointerup', this._ptrUp, true);
+      removeEventListener('pointercancel', this._ptrCancel, true);
+    }
+    if (p.kind === 'tool' && !p.done) { p.done = true; this._notifyCancel(p, 'lost'); }
+    p.restore?.();
+    this._removeShape(p);
+    if (p.captured) { try { this.container.releasePointerCapture?.(id); } catch { /* already released */ } }
+  }
+
+  /** Esc during a drag drops its rectangle, lasso or zoom box and cancels a tool's press (cancel('esc')); true when there was one. */
+  _cancelShapes() {
+    let any = this.cancelToolPress('esc');
+    for (const p of this._ptrs.values()) if (p.kind === 'left' && !p.cancelled && p.far && p.shape) { p.cancelled = true; this._removeShape(p); any = true; }
+    return any;
+  }
+
+  /** Draw press p's rectangle, zoom box or lasso up to pointer event e (their looks come from app.css). */
+  _drawShape(p, e) {
+    const host = this.container.getBoundingClientRect();
+    if (p.shape === 'lasso') {
+      const last = p.pts[p.pts.length - 1];
+      if (Math.hypot(e.clientX - last[0], e.clientY - last[1]) >= 3) p.pts.push([e.clientX, e.clientY]);
+      if (!p.el) {
+        p.el = document.createElementNS(SVG_NS, 'svg');
+        p.el.setAttribute('class', 'viewer-lasso');
+        p.el.setAttribute('aria-hidden', 'true');
+        Object.assign(p.el.style, { position: 'absolute', left: '0', top: '0', width: '100%', height: '100%', zIndex: 6, pointerEvents: 'none', overflow: 'visible' });
+        p.el.appendChild(document.createElementNS(SVG_NS, 'polygon'));
+        this.container.appendChild(p.el);
+      }
+      p.el.firstChild.setAttribute('points', p.pts.map(([x, y]) => `${(x - host.left).toFixed(1)},${(y - host.top).toFixed(1)}`).join(' '));
+      return;
+    }
+    if (!p.el) {
+      p.el = document.createElement('div');
+      p.el.className = p.shape === 'zoom' ? 'viewer-boxselect zoom' : 'viewer-boxselect';
+      p.el.setAttribute('aria-hidden', 'true');
+      Object.assign(p.el.style, { position: 'absolute', zIndex: 6, pointerEvents: 'none' });
+      this.container.appendChild(p.el);
+    }
+    Object.assign(p.el.style, {
+      left: `${Math.min(p.x0, e.clientX) - host.left}px`, top: `${Math.min(p.y0, e.clientY) - host.top}px`,
+      width: `${Math.abs(e.clientX - p.x0)}px`, height: `${Math.abs(e.clientY - p.y0)}px`,
+    });
+  }
+
+  _removeShape(p) { p.el?.remove(); p.el = null; }
+
+  /** Unique source indices of the displayed atoms whose centres project inside a client-space rectangle. */
+  atomsInRect(x0, y0, x1, y1) {
+    const xa = Math.min(x0, x1), xb = Math.max(x0, x1), ya = Math.min(y0, y1), yb = Math.max(y0, y1);
+    return this._atomsWhere((x, y) => x >= xa && x <= xb && y >= ya && y <= yb);
+  }
+
+  /** Unique source indices of the displayed atoms whose centres project inside a client-space polygon [[x, y], …], as a lasso draws it. */
+  atomsInPolygon(points) {
+    const pts = (Array.isArray(points) ? points : []).filter((q) => Number.isFinite(q?.[0]) && Number.isFinite(q?.[1]));
+    if (pts.length < 3) return [];
+    let xa = Infinity, xb = -Infinity, ya = Infinity, yb = -Infinity;
+    for (const [x, y] of pts) { xa = Math.min(xa, x); xb = Math.max(xb, x); ya = Math.min(ya, y); yb = Math.max(yb, y); }
+    return this._atomsWhere((x, y) => x >= xa && x <= xb && y >= ya && y <= yb && inPolygon(pts, x, y));
+  }
+
+  /** Sorted unique source indices of the displayed atoms in front of the camera whose centres project to client (x, y) with test(x, y). */
+  _atomsWhere(test) {
+    const m = this.model;
+    if (!m?.n) return [];
+    const r = this.renderer.domElement.getBoundingClientRect();
+    this.camera.updateMatrixWorld();
+    const e = new THREE.Matrix4().multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse).elements;
+    const p = m.positions, out = new Set();
+    for (let i = 0; i < m.n; i++) {
+      const x = p[3 * i], y = p[3 * i + 1], z = p[3 * i + 2];
+      const w = e[3] * x + e[7] * y + e[11] * z + e[15];
+      if (w <= 0) continue;
+      const cz = (e[2] * x + e[6] * y + e[10] * z + e[14]) / w;
+      if (cz < -1 || cz > 1) continue;
+      const cx = (e[0] * x + e[4] * y + e[8] * z + e[12]) / w, cy = (e[1] * x + e[5] * y + e[9] * z + e[13]) / w;
+      if (test(r.left + ((cx + 1) / 2) * r.width, r.top + ((1 - cy) / 2) * r.height)) out.add(m.src[i]);
+    }
+    return [...out].sort((a, b) => a - b);
+  }
+
+  // ------------------------------------------------------------------ public API
+  setStructure(structure, { resetCamera = true } = {}) {
+    this.structure = structure;
+    this._sigs = {};
+    if (resetCamera) { this.measurements = []; this.selection.clear(); }
+    // visibility masks of another atom count (an undone deletion, a structure swapped without remapIndexed) go
+    const dropped = this._fitVisibility();
+    this._noRefit = resetCamera;
+    try { this.applySettings(this.settings, { force: true }); } finally { this._noRefit = false; }
+    if (resetCamera) this.resetView(false);
+    this.emit('model', this.model);
+    if (dropped) this.emit('visibility', { hidden: this.hiddenCount, names: this.visibilityNames() });
+  }
+
+  /** Apply a full scene-settings object; rebuilds only what changed. */
+  applySettings(settings, { force = false } = {}) {
+    this.settings = settings;
+    const st = settings.style, d = settings.display;
+    const S = {
+      camera: sig([d.projection, d.fov, d.controls]),
+      model: sig([d.supercell, d.wrap, d.boundaryAtoms, d.completeBonds, d.bonds, d.hiddenElements, styles.get(st.rep)?.wantsImages ? st.polyhedra?.centers : null, this._visRev ?? 0, this.gapCut]),
+      frame: sig(this.structure?.frame),
+      colors: sig([st.colorScheme, st.monoColor, st.colorOverrides, st.property, this._colorDeps(settings)]),
+      geom: sig([st.rep, st.radiusSource, st.bondRadius, st.bondColor, st.bondUniformColor, st.lineWidth, st.quality, st.polyhedra, d.bonds?.show]),
+      radii: sig([st.atomScale, st.radiusOverrides]),
+      material: sig([st.material, st.bondMaterial]),
+      matParams: sig([st.roughness, st.metalness, st.opacity]),
+      lights: sig(settings.lighting),
+      post: sig(settings.post),
+      bg: sig([d.background, settings.post?.fog]),
+      cell: sig(d.cell),
+    };
+    const ch = (k) => force || S[k] !== this._sigs[k];
+    if (ch('camera')) this._applyCamera(d);
+    if (this.structure) {
+      const prev = this.model ? { model: this.model, radii: this.radii } : null;
+      const modelChanged = ch('model') || ch('frame');
+      const rebuild = modelChanged || ch('colors') || ch('geom') || ch('material');
+      if (modelChanged) this._buildModel();
+      if (modelChanged || ch('colors')) this._computeColors();
+      if (rebuild) this._buildRep();
+      else {
+        if (ch('radii') && !this._updateRadii()) this._buildRep();
+        if (ch('matParams')) this._updateMaterialParams();
+      }
+      if (modelChanged || ch('cell')) this._buildCell();
+      if (modelChanged) this._buildMeasurements();
+      // grow the view when the drawing no longer fits (not for plain trajectory frames or new structures)
+      const frameOnly = !force && ch('frame') && !ch('model') && !ch('geom') && !ch('radii');
+      if (!this._noRefit && !frameOnly && (modelChanged || ch('geom') || ch('radii'))) this._maybeRefit(prev);
+    }
+    if (ch('lights')) { this.lights.apply(settings.lighting); this._applyShadows(); this._updateFloor(); }
+    if (ch('post') || ch('camera')) this.post.configure(settings.post, false);
+    if (ch('bg')) this._applyBackground();
+    this._sigs = S;
+    this._dirty = true;
+  }
+
+  requestRender() { this._dirty = true; }
+
+  setFrame(i) {
+    if (!this.structure) return;
+    this.structure.setFrame(i);
+    this.applySettings(this.settings);
+    this.emit('frame', this.structure.frame);
+  }
+
+  play(on = !this.playing) { this.playing = on && (this.structure?.nFrames ?? 1) > 1; this.emit('play', this.playing); }
+
+  setSelection(srcIndices) { this.selection = new Set(srcIndices); this._writeHalos(); this._dirty = true; this.emit('selection', [...this.selection]); }
+
+  // ------------------------------------------------------------------ per-atom visibility
+  /**
+   * Hide atoms under a name (masks of several names combine: an atom is drawn when none hides it). spec: null
+   * (remove that mask), {hide: indices}, {show: indices} (every other atom hidden) or a Uint8Array with one entry per
+   * atom (1 = drawn). Hidden atoms are not drawn, so they cannot be clicked, hovered or box-selected; selecting by
+   * index still reaches them. Masks are view state, never saved: remapIndexed carries them through edits, another
+   * structure entry drops them. A mask that hides nothing is removed; one of another length than the structure is
+   * ignored with a console warning. Emits 'visibility' {hidden, names}; returns the number of atoms hidden.
+   */
+  setVisibility(name, spec) {
+    if (typeof name !== 'string' || !name) throw new TypeError('setVisibility: the name must be a non-empty string.');
+    const vis = (this._vis ??= new Map());
+    if (spec == null) {
+      if (!vis.delete(name)) return this.hiddenCount;
+    } else {
+      const mask = this._maskFrom(name, spec, this.structure?.length ?? 0);
+      if (!mask) return this.hiddenCount;
+      if (mask.includes(0)) vis.set(name, mask);
+      else if (!vis.delete(name)) return this.hiddenCount;
+    }
+    this._visibilityChanged();
+    return this.hiddenCount;
+  }
+
+  /** A mask (Uint8Array, 1 = drawn) from a setVisibility spec; null (with a warning) for a mask of the wrong length. */
+  _maskFrom(name, spec, n) {
+    if (ArrayBuffer.isView(spec)) {
+      if (spec.length !== n) { console.warn(`setVisibility “${name}”: the mask has ${spec.length} entries for ${n} atoms, so it is ignored.`); return null; }
+      return Uint8Array.from(spec, (v) => (v ? 1 : 0));
+    }
+    const show = spec && typeof spec === 'object' && 'show' in spec;
+    const list = show ? spec.show : spec?.hide;
+    if (!spec || typeof spec !== 'object' || (!show && !('hide' in spec)) || list == null || typeof list === 'string' || typeof list[Symbol.iterator] !== 'function') {
+      throw new TypeError(`setVisibility “${name}”: pass null, {hide: indices}, {show: indices} or a Uint8Array with one entry per atom.`);
+    }
+    const mask = new Uint8Array(n).fill(show ? 0 : 1);
+    for (const i of list) {
+      if (!Number.isInteger(i) || i < 0) throw new TypeError(`setVisibility “${name}”: atom indices must be whole numbers ≥ 0 (got ${typeof i === 'number' ? i : typeof i}).`);
+      if (i < n) mask[i] = show ? 1 : 0;
+    }
+    return mask;
+  }
+
+  /** The combined visibility mask of the shown structure (Uint8Array, 1 = drawn), or null when no mask hides an atom. */
+  visibleMask() {
+    const n = this.structure?.length ?? 0;
+    if (!this._vis?.size) return null;
+    const key = `${this._visRev ?? 0}:${n}`;
+    if (this._visMask !== undefined && this._visMaskKey === key) return this._visMask;
+    const { mask, hidden } = this._combinedMask(n, { warn: true });
+    this._visMask = mask; this._visMaskKey = key; this._visHidden = hidden;
+    return mask;
+  }
+
+  /** The AND of the masks of n entries (others skipped, with a warning when `warn`): {mask | null, hidden}. */
+  _combinedMask(n, { warn = false } = {}) {
+    let out = null;
+    for (const [name, mask] of this._vis ?? []) {
+      if (mask.length !== n) {
+        if (warn) console.warn(`setVisibility “${name}”: the mask has ${mask.length} entries for ${n} atoms, so it is ignored.`);
+        continue;
+      }
+      if (!out) out = mask.slice(); else for (let i = 0; i < n; i++) out[i] &= mask[i];
+    }
+    let hidden = 0;
+    if (out) for (let i = 0; i < n; i++) if (!out[i]) hidden++;
+    return hidden ? { mask: out, hidden } : { mask: null, hidden: 0 };
+  }
+
+  /** Atoms hidden by visibility masks (atoms of hidden elements not counted). */
+  get hiddenCount() { return this.visibleMask() ? this._visHidden : 0; }
+  /** Names of the visibility masks. */
+  visibilityNames() { return [...(this._vis?.keys() ?? [])]; }
+  /** False for a structure atom that a visibility mask hides (hidden elements do not count) or that does not exist. */
+  isVisible(i) {
+    const n = this.structure?.length ?? 0;
+    if (!Number.isInteger(i) || i < 0 || i >= n) return false;
+    const mask = this.visibleMask();
+    return !mask || mask[i] === 1;
+  }
+
+  /** Remove every visibility mask (the view.showAll command). Returns how many atoms were hidden. */
+  showAll() {
+    if (!this._vis?.size) return 0;
+    const hidden = this.hiddenCount;
+    this._vis.clear();
+    this._visibilityChanged();
+    return hidden;
+  }
+
+  /**
+   * After an edit that renumbered atoms (map[old] = new index, −1 or null: removed; n1 = the new number of atoms):
+   * visibility masks follow their atoms (new atoms are visible; a mask that hides nothing any more is dropped), and so
+   * do the named highlights. The edit's rebuild (setStructure) draws the result.
+   */
+  remapIndexed(map, n1) {
+    const n = Math.max(0, Math.floor(Number(n1)) || 0);
+    const vis = this._vis;
+    if (vis?.size) {
+      for (const [name, mask] of [...vis]) {
+        const next = new Uint8Array(n).fill(1);
+        for (let i = 0; i < mask.length; i++) {
+          const j = map?.[i];
+          if (!mask[i] && Number.isInteger(j) && j >= 0 && j < n) next[j] = 0;
+        }
+        if (next.includes(0)) vis.set(name, next); else vis.delete(name);
+      }
+      // the viewer may still hold the structure from before the edit: count against the new number of atoms
+      this._visRev = (this._visRev ?? 0) + 1;
+      this._visMask = undefined;
+      this.emit('visibility', { hidden: this._combinedMask(n).hidden, names: this.visibilityNames() });
+    }
+    this._remapHighlights?.(map);
+  }
+
+  /** A copy of what remapIndexed changes (the visibility masks, the atoms of the named highlights), for restoreIndexedState. */
+  indexedState() {
+    return {
+      vis: [...(this._vis ?? [])].map(([name, mask]) => [name, mask.slice()]),
+      highlights: [...(this._highlights ?? [])].map(([name, h]) => [name, new Set(h.set)]),
+    };
+  }
+
+  /**
+   * Put back the masks (all of them) and the atoms of the named highlights (those still shown) that indexedState()
+   * copied: an edit that failed after remapIndexed is undone. The redraw of the restored structure draws them.
+   */
+  restoreIndexedState(state) {
+    if (!state) return;
+    this._vis = new Map(state.vis.map(([name, mask]) => [name, mask.slice()]));
+    this._visRev = (this._visRev ?? 0) + 1;
+    this._visMask = undefined;
+    for (const [name, set] of state.highlights) { const h = this._highlights?.get(name); if (h) h.set = new Set(set); }
+    this.emit('visibility', { hidden: this._combinedMask(state.vis[0]?.[1].length ?? 0).hidden, names: this.visibilityNames() });
+  }
+
+  /** Drop masks whose length is not the shown structure's (setStructure). True when one was dropped. */
+  _fitVisibility() {
+    const vis = this._vis, n = this.structure?.length ?? 0;
+    if (!vis?.size) return false;
+    let dropped = false;
+    for (const [name, mask] of [...vis]) if (mask.length !== n) { vis.delete(name); dropped = true; }
+    if (dropped) { this._visRev = (this._visRev ?? 0) + 1; this._visMask = undefined; }
+    return dropped;
+  }
+
+  /** Another structure entry is shown: its atoms start visible. */
+  _clearVisibility() {
+    if (!this._vis?.size) return;
+    this._vis.clear();
+    this._visibilityChanged({ rebuild: false });
+  }
+
+  _visibilityChanged({ rebuild = true } = {}) {
+    this._visRev = (this._visRev ?? 0) + 1;
+    this._visMask = undefined;
+    if (rebuild && this.structure) this.applySettings(this.settings);
+    this.emit('visibility', { hidden: this.hiddenCount, names: this.visibilityNames() });
+  }
+
+  /** The whole cells by which the drawing moves each atom to its home copy (model.home; Int32Array(3n)), or null. */
+  homeOffsets() { return this.model?.home ?? null; }
+
+  /**
+   * Debug switch (not saved): false draws with the [0, 1) wrapping on every axis instead of the vacuum-gap cuts of
+   * U1, for comparing with the old rule.
+   */
+  get gapCut() { return this._gapCut !== false; }
+  set gapCut(on) {
+    const v = on !== false;
+    if (v === this.gapCut) return;
+    this._gapCut = v;
+    if (this.structure) this.applySettings(this.settings);
+  }
+
+  // ------------------------------------------------------------------ building
+  _buildModel() {
+    const s = this.structure, st = this.settings.style, d = this.settings.display;
+    const style = styles.get(st.rep) ?? styles.get('ballstick');
+    const opt = { visible: this.visibleMask(), cuts: this.gapCut ? undefined : false };
+    let model = buildDisplayModel(s, d, opt);
+    if (style.wantsImages && model.periodic && !d.completeBonds) {
+      const centers = st.polyhedra?.centers === 'auto' || !st.polyhedra?.centers ? autoPolyhedraCenters(model) : st.polyhedra.centers;
+      if (centers.length) model = buildDisplayModel(s, d, { ...opt, cuts: model.cuts, imageCenters: new Set(centers) });
+    }
+    this.model = model;
+    const cn = new Int32Array(model.n);
+    for (let b = 0; b < model.bonds.count; b++) { cn[model.bonds.pairs[2 * b]]++; cn[model.bonds.pairs[2 * b + 1]]++; }
+    this.cn = cn;
+    const b = modelBounds(model);
+    this.bounds = { center: new THREE.Vector3(...b.center), radius: b.radius, min: b.min, max: b.max };
+    this.lights.setBounds(this.bounds.center, this.bounds.radius);
+    this._updateFloor();
+    const cut = model.truncated ? sig([model.requestedSupercell, model.supercell, s.length]) : null;
+    if (cut && cut !== this._cutWarned) this.emit('error', new Error(`Showing a ${model.supercell.join('×')} supercell instead of ${model.requestedSupercell.join('×')} to stay under 2 million drawn atoms.`));
+    this._cutWarned = cut;
+    this.emit('model', model);
+  }
+
+  _computeColors() { this.colors = computeColors(this.model, this.structure, this.settings.style, this.cn, { scene: this.settings, extras: this._colorExtras }); }
+
+  _disposeObject(obj) {
+    obj?.traverse?.((o) => {
+      o.geometry?.dispose?.();
+      if (o.material && !o.userData.sharedMaterial) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose?.());
+    });
+    obj?.parent?.remove(obj);
+  }
+
+  /** Dispose replaced objects / materials after the next frame, so shader programs they share with their replacements stay compiled. */
+  _flushTrash() {
+    const t = this._trash;
+    if (!t.length) return;
+    this._trash = [];
+    for (const x of t) {
+      if (x.isMaterial) { if (x !== this.atomMaterial && x !== this.bondMaterial) x.dispose(); }
+      else this._disposeObject(x);
+    }
+  }
+
+  _computeRadii() {
+    const st = this.settings.style, m = this.model;
+    const radii = new Float32Array(m.n);
+    const rcache = new Map();
+    for (let i = 0; i < m.n; i++) {
+      const s = m.symbols[i];
+      if (!rcache.has(s)) rcache.set(s, atomRadius(s, st));
+      radii[i] = rcache.get(s);
+    }
+    let rmax = 0;
+    for (const r of rcache.values()) rmax = Math.max(rmax, r);
+    this.radii = radii;
+    this.maxRadius = rmax;
+  }
+
+  _matParams() {
+    const st = this.settings.style;
+    return { roughness: st.roughness ?? undefined, metalness: st.metalness ?? undefined, opacity: st.opacity };
+  }
+
+  /** Bonds under see-through atoms (glass, x-ray) get their own opaque material unless style.bondMaterial says otherwise. */
+  _makeBondMaterial(atomMat, params) {
+    const pref = this.settings.style.bondMaterial ?? 'auto';
+    this._bondAuto = false;
+    if (pref === 'same') return atomMat;
+    if (pref !== 'auto' && materials.get(pref)) return pref === atomMat.userData.preset ? atomMat : createMaterial(pref, params);
+    if (!isSeeThrough(atomMat)) return atomMat;
+    this._bondAuto = true;
+    return createMaterial('standard', { roughness: params.roughness, metalness: params.metalness, opacity: 1 });
+  }
+
+  _buildRep() {
+    const st = this.settings.style, d = this.settings.display;
+    const style = styles.get(st.rep) ?? styles.get('ballstick');
+    const m = this.model;
+    this._computeRadii();
+    const oldRep = this.rep, oldAtom = this.atomMaterial, oldBond = this.bondMaterial;
+    const params = this._matParams();
+    // new materials first; the old ones are disposed after the next frame (keeps shader programs alive)
+    const atomMaterial = createMaterial(st.material, params);
+    const bondMaterial = this._makeBondMaterial(atomMaterial, params);
+    const ctx = {
+      model: m, colors: this.colors, radii: this.radii, settings: st, atomMaterial, bondMaterial,
+      segments: segmentsFor(m.n, st.quality), showBonds: d.bonds?.show !== false && style.bonds, resolution: this.resolution, THREE,
+      helpers: this.helpers,
+    };
+    let rep;
+    try {
+      rep = style.build(ctx);
+      if (!rep?.isObject3D) throw new Error('build() did not return a THREE.Object3D');
+    } catch (err) {
+      console.error(err);
+      this.emit('error', new Error(`The "${style.name}" style failed to draw: ${err.message}`));
+      rep = new THREE.Group();
+    }
+    const noShadow = !!materials.get(st.material)?.transparent;
+    rep.traverse((o) => {
+      if (o.material === atomMaterial || o.material === bondMaterial) o.userData.sharedMaterial = true;
+      if (noShadow && o.material === atomMaterial) o.castShadow = false;
+    });
+    this.atomMaterial = atomMaterial;
+    this.bondMaterial = bondMaterial;
+    this.rep = rep;
+    this.root.add(rep);
+    if (oldRep) { oldRep.parent?.remove(oldRep); this._trash.push(oldRep); }
+    if (oldAtom) this._trash.push(oldAtom);
+    if (oldBond && oldBond !== oldAtom) this._trash.push(oldBond);
+    this._writeHalos();
+    this._updateFloor();
+    this._dirty = true;
+  }
+
+  /** atomScale / radiusOverrides changed: rewrite instance matrices in place when the style allows it. */
+  _updateRadii() {
+    const st = this.settings.style, m = this.model;
+    const style = styles.get(st.rep);
+    if (!style?.inPlaceRadii || !this.rep || !m) return false;
+    const meshes = [];
+    this.rep.traverse((o) => { if (o.isInstancedMesh && (o.userData.role === 'atoms' || o.userData.role === 'bonds')) meshes.push(o); });
+    if (meshes.some((o) => o.userData.role === 'atoms' && o.count !== m.n)) return false;
+    if (meshes.some((o) => o.userData.role === 'bonds' && o.userData.bondRadius === undefined)) return false;
+    this._computeRadii();
+    const ctx = { model: m, colors: null, radii: this.radii, settings: st };
+    for (const o of meshes) {
+      if (o.userData.role === 'atoms') writeAtomMatrices(o, m, this.radii);
+      else if (st.bondColor !== 'uniform') writeBondMatrices(o, ctx, o.userData.bondRadius);
+    }
+    this._writeHalos();
+    this._updateFloor();
+    this._dirty = true;
+    return true;
+  }
+
+  /** roughness / metalness / opacity changed: update the materials in place (no shader rebuild). */
+  _updateMaterialParams() {
+    if (!this.atomMaterial || !this.rep) return;
+    const params = this._matParams();
+    let ok = updateMaterial(this.atomMaterial, params);
+    if (ok && this.bondMaterial && this.bondMaterial !== this.atomMaterial) {
+      ok = updateMaterial(this.bondMaterial, this._bondAuto ? { roughness: params.roughness, metalness: params.metalness, opacity: 1 } : params);
+    }
+    if (!ok) { this._buildRep(); return; }
+    this._dirty = true;
+  }
+
+  /** Refit (animated) when the drawing used to fit the view and no longer does, e.g. ball & stick → space-filling. */
+  _maybeRefit(prev) {
+    if (!prev?.model || !this.model || this._camAnim || !this._hasView) return;
+    if (prev.model === this.model && prev.radii === this.radii) return;
+    const before = this._ndcExtent(prev.model, prev.radii), after = this._ndcExtent(this.model, this.radii);
+    if (before <= 1 && after > 1 && after > before + 1e-3) this.fitView(true);
+  }
+
+  /** Largest |NDC| reached by the model's atoms (sphere radii included); > 1 means something is cut off. */
+  _ndcExtent(model, radii) {
+    if (!model?.n || model.n > 200000) return 0;
+    const cam = this.camera;
+    cam.updateMatrixWorld();
+    const e = cam.matrixWorldInverse.elements, p = model.positions;
+    const persp = cam.isPerspectiveCamera;
+    const tanH = Math.tan(((cam.fov ?? 30) * DEG) / 2), aspect = this.width / this.height;
+    const halfH = persp ? 0 : (cam.top - cam.bottom) / 2 / (cam.zoom || 1), halfW = persp ? 0 : (cam.right - cam.left) / 2 / (cam.zoom || 1);
+    let ext = 0;
+    for (let i = 0; i < model.n; i++) {
+      const x = p[3 * i], y = p[3 * i + 1], z = p[3 * i + 2];
+      const vx = e[0] * x + e[4] * y + e[8] * z + e[12], vy = e[1] * x + e[5] * y + e[9] * z + e[13], vz = e[2] * x + e[6] * y + e[10] * z + e[14];
+      const r = radii?.[i] ?? 0;
+      if (persp) {
+        const depth = -vz;
+        if (depth <= r) return Infinity;
+        const hy = depth * tanH, hx = hy * aspect;
+        ext = Math.max(ext, (Math.abs(vx) + r) / hx, (Math.abs(vy) + r) / hy);
+      } else ext = Math.max(ext, (Math.abs(vx) + r) / halfW, (Math.abs(vy) + r) / halfH);
+    }
+    return ext;
+  }
+
+  /**
+   * Shared halo resources: one geometry, and one material and growable instanced mesh per kind. The selection and
+   * hover halos take the theme's accent colour; named highlights (setHighlight) keep their own and are made when
+   * first used. `_halo` has no prototype, so a highlight may have any name ('constructor', '__proto__'…).
+   */
+  _setupHalos() {
+    this._haloGeo = new THREE.SphereGeometry(1, 32, 20);
+    this._halo = Object.assign(Object.create(null), {
+      select: this._makeHalo(rimMaterial(2.0), { name: 'select', themed: true, grow: 1.25 }),
+      hover: this._makeHalo(rimMaterial(0.9), { name: 'hover', themed: true, grow: 1.32 }),
+    });
+    this._haloHidden = new Set();   // halo kinds an export leaves out (overlays.exportScope)
+    this._highlights = new Map();   // name → { set (source indices), color, grow, opacity, strength, contrast, export }
+    this._orderHalos();
+  }
+
+  /**
+   * A halo kind: one growable instanced mesh with its own material. opts: name, themed (takes the theme's accent:
+   * the selection and hover halos), grow (halo radius ÷ atom radius, about), export (policy, named highlights).
+   */
+  _makeHalo(material, { name = 'halo', themed = false, grow = 1.25, export: exp = 'never' } = {}) {
+    const mesh = new THREE.InstancedMesh(this._haloGeo, material, 16);
+    mesh.count = 1;
+    mesh.setMatrixAt(0, new THREE.Matrix4().makeScale(0, 0, 0));   // keeps the program compiled while idle
+    mesh.setColorAt(0, new THREE.Color(0.8, 0, 0));                 // instanceColor.r: the atom's share of the halo radius
+    mesh.frustumCulled = false;
+    Object.assign(mesh.userData, { noInk: true, sharedMaterial: true, highlight: name, themed, grow, export: exp });
+    mesh.renderOrder = HALO_ORDER_BASE;
+    mesh.name = 'halo';
+    this.root.add(mesh);
+    return mesh;
+  }
+
+  _writeHalo(kind, indices) {
+    let mesh = this._halo[kind];
+    if (!mesh) return;
+    if (indices.length > mesh.instanceMatrix.count) {
+      const next = new THREE.InstancedMesh(this._haloGeo, mesh.material, Math.max(indices.length, mesh.instanceMatrix.count * 2));
+      Object.assign(next, { frustumCulled: false, renderOrder: mesh.renderOrder, name: mesh.name, visible: mesh.visible });
+      Object.assign(next.userData, mesh.userData);
+      this.root.remove(mesh);
+      mesh.dispose();
+      this.root.add(next);
+      this._halo[kind] = mesh = next;
+    }
+    const grow = mesh.userData.grow ?? 1.25;
+    const mtx = new THREE.Matrix4(), share = new THREE.Color(), p = this.model?.positions;
+    if (!indices.length || !p) { mesh.count = 1; mesh.setMatrixAt(0, mtx.makeScale(0, 0, 0)); }
+    else {
+      mesh.count = indices.length;
+      indices.forEach((i, k) => {
+        const ra = this.radii?.[i] ?? 0.3;
+        const r = Math.max(ra, 0.18) * grow + 0.05;
+        mtx.makeScale(r, r, r).setPosition(p[3 * i], p[3 * i + 1], p[3 * i + 2]);
+        mesh.setMatrixAt(k, mtx);
+        mesh.setColorAt(k, share.setRGB(Math.min(0.98, ra / r), 0, 0));
+      });
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }
+
+  /**
+   * Rewrite halos — every kind, or only `kinds` — from the selection, the hovered atom and the named highlights
+   * (no new materials or geometry); each drawn image of an atom gets one. One pass over the drawn atoms.
+   */
+  _writeHalos(kinds = null) {
+    if (!this._halo) return;
+    const m = this.model;
+    const want = (kinds ?? Object.keys(this._halo)).filter((k) => this._halo[k]);
+    // a preview of other atoms (previewStructure without sameAtoms) shows neither the selection nor named highlights
+    const other = this._preview?.kind === 'structure' && !this._preview.sameAtoms;
+    const lists = new Map();
+    if (m && !other) {
+      const sets = [];
+      for (const k of want) {
+        const set = k === 'select' ? this.selection : k === 'hover' ? null : this._highlights.get(k)?.set;
+        if (set?.size) { const list = []; lists.set(k, list); sets.push([set, list]); }
+      }
+      if (sets.length) {
+        const src = m.src;
+        for (let d = 0; d < m.n; d++) { const s = src[d]; for (const [set, list] of sets) if (set.has(s)) list.push(d); }
+      }
+    }
+    for (const k of want) {
+      if (k === 'hover') { const h = this.hoverIndex; this._writeHalo('hover', m && h >= 0 && h < m.n ? [h] : []); }
+      else this._writeHalo(k, lists.get(k) ?? []);
+    }
+    this._dirty = true;
+  }
+
+  /**
+   * A named halo around atoms (source indices; every drawn image gets one), e.g. fixed atoms. opts: color
+   * ('#c93636', {light, dark} chosen by the background, or 'var(--token)' read from the page's CSS again on every
+   * theme change; never the theme's accent), grow (radius factor, 1.15), opacity (1), strength (1.4), contrast
+   * (true: a dark inner line, then the colour), export ('never' | 'marker' (default: PNG exports with "Include
+   * markers") | 'always'). Highlights are drawn in grow order, the smallest first. indices null clears it.
+   * Kept through edits by remapIndexed, dropped when another structure is shown; never saved.
+   */
+  setHighlight(name, srcIndices, opts = {}) {
+    checkHighlightName(name);
+    if (srcIndices == null) { this.clearHighlight(name); return; }
+    const o = normalizeHighlight(name, opts ?? {});
+    const set = highlightIndexSet(name, srcIndices);
+    const mesh = this._halo[name] ?? (this._halo[name] = this._makeHalo(haloMaterial(o), { name }));
+    const u = mesh.material.uniforms;
+    u.strength.value = o.strength; u.opacity.value = o.opacity; u.contrast.value = o.contrast ? 1 : 0;
+    Object.assign(mesh.userData, { grow: o.grow, export: o.export });
+    this._highlights.set(name, { ...o, set });
+    this._colorHighlight(name);
+    this._orderHalos();
+    this._writeHalos([name]);
+  }
+
+  /** Remove a named highlight (its halo kind stays, empty, for the next setHighlight of that name). */
+  clearHighlight(name) {
+    if (!this._highlights.delete(name)) return;
+    this._writeHalos([name]);
+    this._orderHalos();
+  }
+
+  /** Names of the named highlights shown now. */
+  highlightNames() { return [...this._highlights.keys()]; }
+
+  /** After an edit that renumbered atoms: map[old] = new index (−1 or null: removed). remapIndexed calls this. */
+  _remapHighlights(map) {
+    for (const h of this._highlights.values()) h.set = remapIndices(h.set, map);
+    this._writeHalos();
+  }
+
+  /** Halo draw order: by grow, the smallest first, the selection (1.25) and hover (1.32) halos included. */
+  _orderHalos() {
+    const entries = [...Object.entries(this._halo)].filter(([k, mesh]) => mesh.userData.themed || this._highlights.has(k)).map(([name, mesh]) => ({ name, grow: mesh.userData.grow }));
+    const order = haloOrder(entries);
+    for (const [k, mesh] of Object.entries(this._halo)) mesh.renderOrder = order.get(k) ?? HALO_ORDER_BASE;
+    this._dirty = true;
+  }
+
+  /** Set a named highlight's colour (its {light, dark} by the background, 'var(--token)' from the page) and inner line. */
+  _colorHighlight(name) {
+    const h = this._highlights.get(name), mesh = this._halo[name];
+    if (!h || !mesh) return;
+    const dark = !!this.overlayDark;
+    const fallback = dark ? DEFAULT_HIGHLIGHT_COLOR.dark : DEFAULT_HIGHLIGHT_COLOR.light;
+    mesh.material.uniforms.color.value.set(resolveColor(h.color, { dark, css: (token) => this._cssToken(token), fallback }));
+    mesh.material.uniforms.edge.value.set(dark ? HALO_EDGE.dark : HALO_EDGE.light);
+  }
+
+  /**
+   * The page's value of CSS custom property `name` ('' when it has none), read once per theme: _updateHalos forgets
+   * the values, so named highlights and overlay legend swatches given 'var(--token)' change together.
+   */
+  _cssToken(name) {
+    const seen = (this._cssTokens ??= new Map());
+    if (!seen.has(name)) {
+      let v = '';
+      try { v = cssVar(name, ''); } catch { v = ''; }   // no page (node tests, workers)
+      seen.set(name, v);
+    }
+    return seen.get(name);
+  }
+
+  /** The background turned dark or light, or the theme changed: named highlights and overlay building blocks follow. */
+  _themeOverlays() {
+    this._themeDark = !!this.overlayDark;
+    for (const name of this._highlights.keys()) this._colorHighlight(name);
+    this.overlays.theme(this._themeDark);
+    this._dirty = true;
+  }
+
+  /** Re-read theme colours (accent, fonts, CSS tokens) and refresh the halos; the shell calls this on theme changes. */
+  _updateHalos() {
+    this._css = null;
+    this._cssTokens = null;
+    this._cssTheme();        // the accent of the selection and hover halos
+    this._themeOverlays();   // 'var(--token)' colours of named highlights
+    this._writeHalos();
+  }
+
+  _cssTheme() {
+    if (!this._css) {
+      this._css = {
+        accent: cssVar('--accent', '#e8a33d'), accentStrong: cssVar('--accent-strong', '#c27c12'),
+        font: cssVar('--font-ui', 'system-ui, sans-serif'),
+      };
+      // only the themed kinds take the accent: named highlights keep the colour they were given
+      for (const mesh of Object.values(this._halo ?? {})) if (mesh.userData.themed) mesh.material.uniforms.color.value.set(this._css.accent);
+    }
+    return this._css;
+  }
+
+  /** The app showed another structure entry: overlay layers marked clearOnSwitch, visibility masks and the named highlights go. */
+  structureSwitched() {
+    this._clearVisibility();
+    this.overlays.switched();
+    if (!this._highlights.size) return;
+    this._highlights.clear();
+    this._writeHalos();
+    this._orderHalos();
+  }
+
+  /**
+   * What a colour scheme reads besides the style settings, for the 'colors' signature: the values at its dependsOn
+   * scene paths and the app's extras (app.registerColorExtra, fetched through extrasProvider before every settings pass).
+   */
+  _colorDeps(settings) {
+    let extras = {};
+    try { extras = this.extrasProvider?.() ?? {}; } catch (e) { console.error('[facet] colour extras failed', e); }
+    const scheme = colorSchemes.get(settings.style?.colorScheme);
+    let key;
+    try { key = JSON.stringify([scenePathValues(settings, scheme?.dependsOn), extras]); } catch { extras = {}; key = '[]'; }
+    this._colorExtras = extras;
+    return key;
+  }
+
+  /** Overlay pixels per Å at the depth of `point` ([x, y, z] or a Vector3; default: the target), for a canvas `h` pixels high. */
+  _pxPerAAt(point = null, h = this.height) {
+    const cam = this.camera;
+    if (cam.isOrthographicCamera || !point) return this.pixelsPerAngstrom(h);
+    const p = Array.isArray(point) || ArrayBuffer.isView(point) ? new THREE.Vector3(point[0], point[1], point[2]) : new THREE.Vector3(point.x, point.y, point.z);
+    cam.updateMatrixWorld();
+    const depth = -p.applyMatrix4(cam.matrixWorldInverse).z;
+    return h / (2 * Math.max(1e-6, depth) * Math.tan(((cam.fov ?? 30) * DEG) / 2));
+  }
+
+  /**
+   * A see-through drawing of `structure` in the current representation, wrapped with the drawn model's cuts and
+   * without boundary copies (ghostLayer, P-ghost previews). Returns a THREE.Object3D or null (no atoms).
+   */
+  buildGhost(structure, { opacity = 0.45 } = {}) {
+    if (!structure?.length) return null;
+    const st = this.settings.style, d = this.settings.display;
+    const style = styles.get(st.rep) ?? styles.get('ballstick');
+    const model = buildDisplayModel(structure, { ...d, boundaryAtoms: false, completeBonds: false }, { cuts: this.model?.cuts });
+    if (!model.n) return null;
+    const cn = new Int32Array(model.n);
+    for (let b = 0; b < model.bonds.count; b++) { cn[model.bonds.pairs[2 * b]]++; cn[model.bonds.pairs[2 * b + 1]]++; }
+    const colors = computeColors(model, structure, st, cn, { scene: this.settings, extras: this._colorExtras });
+    const radii = new Float32Array(model.n);
+    for (let i = 0; i < model.n; i++) radii[i] = atomRadius(model.symbols[i], st);
+    // depthWrite keeps the instanced spheres from showing through each other (no per-instance sorting)
+    const see = (mat, op) => { mat.transparent = true; mat.opacity = op; mat.depthWrite = true; mat.needsUpdate = true; return mat; };
+    const atomMaterial = see(createMaterial(st.material, this._matParams()), opacity);
+    const ctx = {
+      model, colors, radii, settings: st, atomMaterial, bondMaterial: atomMaterial, segments: segmentsFor(model.n, st.quality),
+      showBonds: d.bonds?.show !== false && style.bonds, resolution: this.resolution, THREE, helpers: this.helpers,
+    };
+    const rep = style.build(ctx);
+    if (!rep?.isObject3D) { atomMaterial.dispose(); return null; }
+    rep.traverse((o) => {
+      for (const mat of o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []) if (mat !== atomMaterial) see(mat, Math.min(mat.opacity ?? 1, opacity));
+    });
+    rep.name = 'ghost';
+    return rep;
+  }
+
+  _buildCell() {
+    this._disposeObject(this.cellObj); this.cellObj = null;
+    const c = this.settings.display.cell, m = this.model;
+    if (!c?.show || !m?.cell) return;
+    const [A, B, C] = m.cell, N = m.supercell;
+    const corner = (a, b, cc) => [a * A[0] + b * B[0] + cc * C[0], a * A[1] + b * B[1] + cc * C[1], a * A[2] + b * B[2] + cc * C[2]];
+    const seg = [];
+    const box = (o, s) => {
+      const P = (a, b, cc) => corner(o[0] + a * s[0], o[1] + b * s[1], o[2] + cc * s[2]);
+      const E = [[[0, 0, 0], [1, 0, 0]], [[0, 0, 0], [0, 1, 0]], [[0, 0, 0], [0, 0, 1]], [[1, 0, 0], [1, 1, 0]], [[1, 0, 0], [1, 0, 1]], [[0, 1, 0], [1, 1, 0]],
+        [[0, 1, 0], [0, 1, 1]], [[0, 0, 1], [1, 0, 1]], [[0, 0, 1], [0, 1, 1]], [[1, 1, 0], [1, 1, 1]], [[1, 0, 1], [1, 1, 1]], [[0, 1, 1], [1, 1, 1]]];
+      for (const [u, v] of E) seg.push(...P(...u), ...P(...v));
+    };
+    // a cell grid of more than a few thousand boxes is unreadable (and slow): draw the outline instead
+    const which = c.which === 'grid' && N[0] * N[1] * N[2] > 4096 ? 'supercell' : c.which;
+    if (which === 'grid') { for (let a = 0; a < N[0]; a++) for (let b = 0; b < N[1]; b++) for (let cc = 0; cc < N[2]; cc++) box([a, b, cc], [1, 1, 1]); }
+    else if (which === 'supercell') box([0, 0, 0], N);
+    else box([0, 0, 0], [1, 1, 1]);
+    const g = new LineSegmentsGeometry();
+    g.setPositions(new Float32Array(seg));
+    const mat = new LineMaterial({ color: new THREE.Color(c.color ?? '#3b4048'), linewidth: c.width ?? 1.6, worldUnits: false, transparent: true, opacity: 0.9 });
+    mat.resolution.copy(this.resolution);
+    this.cellObj = new LineSegments2(g, mat);
+    this.cellObj.name = 'cell';
+    this.root.add(this.cellObj);
+  }
+
+  _applyBackground() {
+    const bgs = this.settings.display.background;
+    const bg = makeBackground(bgs);
+    this.scene3.background = bg.background;
+    this.renderer.setClearColor(bg.fogColor, bg.alpha);
+    this._fogColor = bg.fogColor;
+    const fog = this.settings.post?.fog;
+    this.scene3.fog = fog?.enabled ? new THREE.Fog(bg.fogColor, 1, 100) : null;
+    this.overlayDark = luminance(bg.fogColor) < 0.4;
+    this.post.setTransparent(bg.alpha < 1);
+  }
+
+  /** The floor's "up": the c axis of periodic structures, otherwise the up of the last reset view (+Y by default). */
+  _floorUp() {
+    const cell = this.model?.periodic ? this.model.cell : null;
+    if (cell) {
+      const c = new THREE.Vector3(...cell[2]);
+      if (c.lengthSq() > 1e-8) return c.normalize();
+    }
+    return (this._viewUp?.lengthSq() > 1e-8 ? this._viewUp.clone() : new THREE.Vector3(0, 1, 0)).normalize();
+  }
+
+  _updateFloor() {
+    this._fitShadowCamera();
+    const sh = this.settings.lighting?.shadows;
+    this.floor.visible = !!(sh?.enabled && sh?.floor && this.model?.n);
+    if (!this.model?.n) return;
+    const up = this._floorUp();
+    const p = this.model.positions, radii = this.radii?.length === this.model.n ? this.radii : null;
+    let lo = Infinity, loCentre = Infinity;
+    for (let i = 0; i < this.model.n; i++) {
+      const h = p[3 * i] * up.x + p[3 * i + 1] * up.y + p[3 * i + 2] * up.z;
+      loCentre = Math.min(loCentre, h);
+      lo = Math.min(lo, h - (radii ? radii[i] : 0));
+    }
+    // just under the lowest atom surface (and never closer than 0.8 Å below the lowest centre)
+    const level = Math.min(loCentre - 0.8, lo - 0.3);
+    const c = this.bounds.center;
+    const r = this.bounds.radius;
+    this.floor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), up);
+    this.floor.position.copy(c).addScaledVector(up, level - c.dot(up));
+    this.floor.scale.set(r * 12, r * 12, 1);
+    this.floor.updateMatrixWorld();
+    this._dirty = true;
+  }
+
+  /** Shadow camera tight around the model (sharper shadow map); depth range long enough to reach the floor. */
+  _fitShadowCamera() {
+    const cam = this.lights.key?.shadow?.camera;
+    if (!cam) return;
+    const r = this.bounds.radius, R = r + (this.maxRadius ?? 1) + 1;
+    const D = (this.lights.radius ?? r) * 4;   // LightRig keeps its lights 4 radii from the centre
+    Object.assign(cam, { left: -R, right: R, top: R, bottom: -R, near: Math.max(0.05, D - R - 1), far: D + R * 4 + 2 });
+    cam.updateProjectionMatrix();
+    this._applyShadows();
+  }
+
+  /** Soft shadows (softness > 1.5) use variance shadow maps blurred over a world-space width; PCF otherwise. */
+  _applyShadows() {
+    const sh = this.settings.lighting?.shadows ?? {};
+    const softness = sh.softness ?? 3;
+    const type = softness > 1.5 ? THREE.VSMShadowMap : THREE.PCFShadowMap;
+    const sm = this.renderer.shadowMap;
+    if (sm.type !== type) {
+      sm.type = type;
+      // the shadow-map type is part of every lit shader; three does not notice the change on its own
+      if (sh.enabled) this.scene3.traverse((o) => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { m.needsUpdate = true; }); });
+    }
+    const shadow = this.lights.key?.shadow;
+    if (!shadow) return;
+    if (type === THREE.VSMShadowMap) {
+      const cam = shadow.camera;
+      const texel = (cam.right - cam.left) / (shadow.mapSize.x || 2048);
+      shadow.radius = clamp((softness * 0.05) / Math.max(texel, 1e-4), 1, 24);
+      shadow.blurSamples = 16;
+    } else shadow.radius = softness;
+  }
+
+  /**
+   * Values and lines of the measurements: {id, type, refs} (core/measure.js; an entry with the old `keys` is migrated)
+   * gets value (Å or °, from the Float64 stored coordinates of the referenced atoms and images), valid (false for an
+   * unknown type, the wrong number of atoms or an atom the structure does not have: kept, never drawn), drawn
+   * ('exact': on drawn copies whose stored images match; 'floating': no such set of copies is drawn, so the line starts
+   * at the first atom's home copy and an end may have no atom drawn at it; 'hidden': an atom is hidden, no line; null
+   * when not valid), idx (the drawn index of each atom, −1 where none) and points (the line's drawn coordinates).
+   */
+  _buildMeasurements() {
+    this._disposeObject(this.measureObj); this.measureObj = null;
+    if (!this.model) return;
+    const m = this.model, s = this.structure;
+    const wrap = this.settings?.display?.wrap !== false;
+    let copies = null;
+    /** The drawn copies of atom i, its home copy first. */
+    const copiesOf = (i) => {
+      if (!copies) {
+        copies = new Map();
+        for (let d = 0; d < m.n; d++) { const a = m.src[d]; let l = copies.get(a); if (!l) copies.set(a, (l = [])); l.push(d); }
+      }
+      const l = copies.get(i) ?? [], h = m.homeIndex?.[i] ?? -1;
+      return h >= 0 && l[0] !== h ? [h, ...l.filter((d) => d !== h)] : l;
+    };
+    const homeOf = (i) => (m.homeIndex ? m.homeIndex[i] ?? -1 : copiesOf(i)[0] ?? -1);
+    const pts = [];
+    for (const ms of this.measurements) {
+      if (!Array.isArray(ms.refs) && Array.isArray(ms.keys) && s) {
+        const refs = migrateMeasurementKeys(s, ms.keys, { wrap });
+        if (refs) { ms.refs = refs; delete ms.keys; }
+      }
+      const refs = Array.isArray(ms.refs) ? ms.refs : [];
+      const parsed = refs.map(parseRef);
+      ms.idx = refs.map(() => -1); ms.points = null; ms.drawn = null;
+      const P = s && measureArity(ms.type) === refs.length && parsed.every(Boolean) ? measurementPoints(s, refs) : null;
+      let value = NaN;
+      if (P) {
+        const V = parsed.map((_, k) => new THREE.Vector3(P[3 * k], P[3 * k + 1], P[3 * k + 2]));
+        try { value = measureValue(ms.type, V); } catch { value = NaN; }
+      }
+      ms.valid = Number.isFinite(value);
+      ms.value = ms.valid ? value : undefined;
+      if (!ms.valid) continue;
+      if (parsed.some(({ atom }) => homeOf(atom) < 0)) { ms.drawn = 'hidden'; continue; }
+      Object.assign(ms, this._measureLine(m, parsed, P, copiesOf, homeOf));
+      const Q = ms.points;
+      for (let k = 0; k + 1 < parsed.length; k++) {
+        pts.push(new THREE.Vector3(Q[3 * k], Q[3 * k + 1], Q[3 * k + 2]), new THREE.Vector3(Q[3 * k + 3], Q[3 * k + 4], Q[3 * k + 5]));
+      }
+    }
+    if (pts.length) {
+      const g = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineDashedMaterial({ color: this._cssTheme().accent, dashSize: 0.18, gapSize: 0.12, depthTest: false, transparent: true, toneMapped: false });
+      this.measureObj = new THREE.LineSegments(g, mat);
+      this.measureObj.computeLineDistances();
+      this.measureObj.renderOrder = 20;
+      this.root.add(this.measureObj);
+    }
+    this.emit('measure', this.measurements);
+    this._dirty = true;
+  }
+
+  /**
+   * Where a measurement's line goes: on the first set of drawn copies whose stored images match the references
+   * (anchored on each drawn copy of the first atom, its home copy first), else 'floating' from the first atom's home
+   * copy by the stored offsets P_k − P_0.
+   */
+  _measureLine(m, parsed, P, copiesOf, homeOf) {
+    const refs = m.refs, I0 = parsed[0].image;
+    const lookup = (T) => parsed.map(({ atom, image }) => refs.get(`${atom}:${image[0] + T[0]},${image[1] + T[1]},${image[2] + T[2]}`) ?? -1);
+    const shift = (d) => { const S = storedImage(m, d); return [S[0] - I0[0], S[1] - I0[1], S[2] - I0[2]]; };
+    for (const d of copiesOf(parsed[0].atom)) {
+      const idx = lookup(shift(d));
+      if (idx.every((x) => x >= 0)) {
+        const points = new Float64Array(3 * idx.length);
+        idx.forEach((x, k) => { points[3 * k] = m.positions[3 * x]; points[3 * k + 1] = m.positions[3 * x + 1]; points[3 * k + 2] = m.positions[3 * x + 2]; });
+        return { drawn: 'exact', idx, points };
+      }
+    }
+    const h = homeOf(parsed[0].atom);
+    const idx = lookup(shift(h));
+    idx[0] = h;
+    const points = new Float64Array(3 * parsed.length);
+    for (let k = 0; k < parsed.length; k++) for (let c = 0; c < 3; c++) points[3 * k + c] = m.positions[3 * h + c] + (P[3 * k + c] - P[c]);
+    return { drawn: 'floating', idx, points };
+  }
+
+  /**
+   * Measure between drawn atoms: type 'distance' | 'angle' | 'dihedral' with 2 | 3 | 4 display indices. Returns the
+   * entry {id, type, refs, …}: the atoms and their stored images (core/measure.js), so later edits and other wrapping
+   * rules keep it on the same atoms; the id stays for the session.
+   */
+  addMeasurement(type, displayIndices) {
+    const n = measureArity(type);
+    if (!n) throw new Error(`Unknown measurement “${typeof type === 'string' ? type : typeof type}”: use distance, angle or dihedral.`);
+    if (!this.model) throw new Error('Load a structure first.');
+    const idx = Array.isArray(displayIndices) ? displayIndices : [];
+    if (idx.length !== n) throw new Error(`${type === 'angle' ? 'An' : 'A'} ${type} needs ${n} atoms (got ${idx.length}).`);
+    const bad = idx.find((i) => !Number.isInteger(i) || i < 0 || i >= this.model.n);
+    if (bad !== undefined) throw new Error(`No drawn atom with index ${bad} (0–${this.model.n - 1}).`);
+    const ms = { id: newMeasurementId(), type, refs: normalizeRefs(idx.map((d) => refOf(this.model, d))) };
+    this.measurements.push(ms);
+    this._buildMeasurements();
+    return ms;
+  }
+
+  removeMeasurement(id) { this.measurements = this.measurements.filter((m) => m.id !== id); this._buildMeasurements(); }
+  clearMeasurements() { this.measurements = []; this._buildMeasurements(); }
+
+  // ------------------------------------------------------------------ camera
+  _applyCamera(d) {
+    this.persp.fov = d.fov ?? 30;
+    if (d.projection === 'orthographic') this._tempOrtho = false;
+    const kind = d.controls ?? 'orbit';
+    if (kind !== this.controlsKind) this._setupControls(kind);
+    this._useCamera(d.projection === 'orthographic' || this._tempOrtho);
+    this.resize();
+  }
+
+  /** Switch between the perspective and orthographic camera, keeping position, target and framing. */
+  _useCamera(ortho) {
+    const want = ortho ? this.ortho : this.persp;
+    if (want === this.camera) return false;
+    const fovH = Math.tan((this.persp.fov * DEG) / 2);
+    want.position.copy(this.camera.position);
+    want.quaternion.copy(this.camera.quaternion);
+    want.up.copy(this.camera.up);
+    if (want.isOrthographicCamera) {
+      this._orthoHalf = this.camera.position.distanceTo(this.controls.target) * fovH;
+      want.zoom = 1;
+    } else {
+      const h = (this._orthoHalf ?? 10) / (this.camera.zoom || 1);
+      const dir = new THREE.Vector3().subVectors(this.camera.position, this.controls.target).normalize();
+      want.position.copy(this.controls.target).addScaledVector(dir, h / fovH);
+    }
+    this.camera = want;
+    this.controls.object = want;
+    this._syncControlsUp();
+    this._updateOrtho();
+    this.post.setCamera(want);
+    this.controls.update?.();
+    this._dirty = true;
+    return true;
+  }
+
+  /** Back from an axis view's temporary orthographic camera to the scene's projection. */
+  _leaveTempOrtho() {
+    if (!this._tempOrtho) return;
+    this._tempOrtho = false;
+    this._useCamera(this.settings.display.projection === 'orthographic');
+  }
+
+  _cell() {
+    if (this.model) return this.model.cell ?? null;
+    const s = this.structure;
+    return s?.cell && s.cell.every((v) => Math.hypot(...v) > 1e-6) ? s.cell : null;
+  }
+
+  defaultView() {
+    const s = this.structure, cell = this._cell();
+    if (s?.periodic && cell && (this.model?.periodic ?? true)) {
+      const [A, , C] = cell.map((v) => new THREE.Vector3(...v).normalize());
+      const twoD = s.pbc[2] === false;
+      const up = C.clone();
+      const w0 = A.clone().addScaledVector(up, -A.dot(up)).normalize();
+      const v = new THREE.Vector3().crossVectors(up, w0);
+      if (twoD) return { dir: up.clone().multiplyScalar(1).addScaledVector(v, -0.75).addScaledVector(w0, 0.25).normalize(), up: v.clone() };
+      return { dir: w0.clone().multiplyScalar(0.42).addScaledVector(v, -1).addScaledVector(up, 0.38).normalize(), up };
+    }
+    return { dir: new THREE.Vector3(0.45, 0.38, 1).normalize(), up: new THREE.Vector3(0, 1, 0) };
+  }
+
+  /** View size left for the model once the fit margins are taken off (never under half the view). */
+  _fitArea(w = this.width, h = this.height) {
+    const { x = 0, y = 0 } = this.fitMargins ?? {};
+    return [Math.max(w * 0.5, w - 2 * x), Math.max(h * 0.5, h - 2 * y)];
+  }
+  /** Perspective camera distance per unit of radius that fits a sphere into a w × h view. */
+  _fitFactor(w = this.width, h = this.height) {
+    const [ew, eh] = this._fitArea(w, h);
+    const t = Math.tan((this.persp.fov * DEG) / 2);
+    return Math.max(1 / Math.sin(Math.atan((t * eh) / h)), 1 / Math.sin(Math.atan((t * ew) / h)));
+  }
+  /** Orthographic half-height per unit of radius that fits a sphere into a w × h view. */
+  _orthoFactor(w = this.width, h = this.height) {
+    const [ew, eh] = this._fitArea(w, h);
+    return Math.max(h / eh, h / ew);
+  }
+
+  _fitDistance(radius) {
+    radius += this.maxRadius ?? 0;
+    return radius * this._fitFactor() * 1.02;
+  }
+
+  /**
+   * After the view changed size, zoom so it shows what it showed before: a view that gets narrower
+   * (a panel opened, the window shrank) zooms out instead of cutting the model off at the sides.
+   */
+  _keepFraming(w0, h0) {
+    if (!this._hasView) return;
+    if (this.camera.isOrthographicCamera) {
+      const k = this._orthoFactor() / this._orthoFactor(w0, h0);
+      if (Number.isFinite(k) && Math.abs(k - 1) > 1e-6) this._orthoHalf = (this._orthoHalf ?? 10) * k;
+      return;
+    }
+    const k = this._fitFactor() / this._fitFactor(w0, h0);
+    if (!Number.isFinite(k) || Math.abs(k - 1) < 1e-6) return;
+    const t = this.controls.target;
+    this.camera.position.sub(t).multiplyScalar(k).add(t);
+    const a = this._camAnim;
+    if (a) { a.p0.sub(a.c0).multiplyScalar(k).add(a.c0); a.p1.sub(a.c1).multiplyScalar(k).add(a.c1); }
+    this.controls.update?.();
+  }
+
+  resetView(animate = true) {
+    this._leaveTempOrtho();
+    const v = this.defaultView();
+    this._viewUp = v.up.clone();
+    this.setViewDirection(v.dir.toArray(), v.up.toArray(), animate, true);
+    this._updateFloor();
+  }
+
+  fitView(animate = true) {
+    const dir = new THREE.Vector3().subVectors(this.camera.position, this.controls.target).normalize();
+    this.setViewDirection(dir.toArray(), this.camera.up.toArray(), animate, true);
+  }
+
+  /** dir: vector from target to camera. */
+  setViewDirection(dir, up = null, animate = true, refit = false) {
+    const target = refit ? this.bounds.center.clone() : this.controls.target.clone();
+    const d = new THREE.Vector3(...dir).normalize();
+    if (d.lengthSq() < 0.5) return;
+    let u = up ? new THREE.Vector3(...up).normalize() : this.camera.up.clone();
+    if (u.lengthSq() < 0.5 || Math.abs(u.dot(d)) > 0.98) u = Math.abs(d.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
+    u.addScaledVector(d, -u.dot(d)).normalize();
+    const dist = refit || !this._hasView ? this._fitDistance(this.bounds.radius) : this.camera.position.distanceTo(this.controls.target);
+    const pos = target.clone().addScaledVector(d, dist);
+    if (this.camera.isOrthographicCamera && refit) { this._orthoHalf = (this.bounds.radius + (this.maxRadius ?? 0)) * 1.05 * this._orthoFactor(); this.camera.zoom = 1; this._updateOrtho(); }
+    this._hasView = true;
+    if (!animate) {
+      this._camAnim = null;
+      this.camera.position.copy(pos); this.camera.up.copy(u); this.controls.target.copy(target);
+      this.camera.lookAt(target); this._syncControlsUp(); this.controls.update(); this._dirty = true; this.emit('camera'); return;
+    }
+    this._camAnim = {
+      t0: performance.now(), dur: 420,
+      p0: this.camera.position.clone(), p1: pos, u0: this.camera.up.clone(), u1: u, c0: this.controls.target.clone(), c1: target,
+    };
+  }
+
+  /**
+   * Look along a cell axis (a/b/c) or a Cartesian axis (x/y/z), optionally negated ('-a').
+   * With display.orthoAxisViews the view uses an orthographic camera (atom columns line up) until the
+   * next free rotation. Options as viewAlong's (animate: unless the user prefers reduced motion); the
+   * direction label above the axis gizmo says "along a". Returns {dir, up, label, note}.
+   */
+  setView(axis, { animate = !this.reducedMotion(), refit = true, up: upGiven = null, ortho = 'auto' } = {}) {
+    const cell = this._cell();
+    const cart = { x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] };
+    let dir, up, name;
+    const neg = String(axis).startsWith('-');
+    const ax = String(axis).replace('-', '');
+    if ('abc'.includes(ax) && ax.length === 1 && cell) {
+      dir = cell['abc'.indexOf(ax)];
+      up = ax === 'c' ? cell[1] : cell[2];
+      name = ax;
+    } else {
+      dir = cart[ax] ?? [0, 0, 1];
+      up = ax === 'z' ? [0, 1, 0] : [0, 0, 1];
+      name = cart[ax] ? ax : 'z';
+    }
+    if (neg) dir = dir.map((v) => -v);
+    return this._lookAlong(dir, upGiven ?? up, {
+      ortho, animate, refit, label: `along ${neg ? MINUS : ''}${name}`, spoken: `along ${neg ? 'minus ' : ''}${name}`,
+    });
+  }
+
+  /**
+   * Look along a direction (F0-A §3.14.1): target is an axis name ('a' 'b' 'c' 'x' 'y' 'z', or '-a' …, as setView),
+   * 'normal' or '-normal' (surfaceNormal of the structure: from above its top surface or below its bottom one; without
+   * a vacuum gap c*, normal to a and b, with a note saying so), a Cartesian vector [x, y, z], a lattice direction
+   * {uvw: [u, v, w]} or {uvtw: [U, V, T, W]}, or the normal of a plane {hkl: [h, k, l]} or {hkil: [h, k, i, l]} of the
+   * current cell. The camera goes to the +dir side and looks back along −dir, as setView's does. up: 'auto' (the rules
+   * of _autoUp: a surface seen from the side has its top surface up, seen along its normal its first in-plane cell
+   * vector runs from left to right) or a vector; ortho: 'auto' (setView's temporary orthographic camera with
+   * display.orthoAxisViews), true or false. The direction label above the axis gizmo (and, for screen readers, a
+   * status line) says what the view looks along until the camera turns.
+   * Returns {dir, up, label, note}: unit vectors, the label text and a note to show the user (or null).
+   */
+  viewAlong(target, { up = 'auto', ortho = 'auto', animate = !this.reducedMotion(), refit = true } = {}) {
+    const auto = up === 'auto' || up == null;
+    if (!auto && !finiteVec3(up)) throw new TypeError("viewAlong: up must be 'auto' or a vector [x, y, z].");
+    if (ortho !== 'auto' && ortho !== true && ortho !== false) throw new TypeError("viewAlong: ortho must be 'auto', true or false.");
+    const opts = { ortho, animate: !!animate, refit: refit !== false };
+    if (typeof target === 'string' && AXIS_VIEWS.has(target)) {
+      if ('abc'.includes(target.at(-1)) && !this._cell()) throw new Error(this.structure ? VIEW_NEEDS_CELL : VIEW_NEEDS_STRUCTURE);
+      return this.setView(target, { ...opts, up: auto ? null : Array.from(up) });
+    }
+    const t = this._viewTarget(target);
+    const u = auto ? this._autoUp(t.dir, t.surface) : new THREE.Vector3(up[0], up[1], up[2]);
+    return this._lookAlong(t.dir.toArray(), u.toArray(), { ...opts, label: t.label, spoken: t.spoken, note: t.note });
+  }
+
+  /** Whether the user prefers reduced motion (the system setting): view changes then jump instead of turning. */
+  reducedMotion() {
+    try { return !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches; } catch { return false; }
+  }
+
+  /**
+   * The direction, label and surfaceNormal result of a viewAlong target other than an axis name: {dir (unit Vector3),
+   * label, spoken (the label for screen readers), note, surface}. Throws the messages of F0-A §3.14.1.
+   */
+  _viewTarget(target) {
+    const s = this.structure;
+    if (target === 'normal' || target === '-normal') {
+      if (!s) throw new Error(VIEW_NEEDS_STRUCTURE);
+      const sn = surfaceNormal(s);
+      if (!sn) throw new Error('Looking along the surface normal needs a unit cell.');
+      const below = target === '-normal';
+      const dir = new THREE.Vector3(...sn.normal).multiplyScalar(below ? -1 : 1);
+      let label, spoken = null, note = null;
+      if (sn.surface) label = below ? 'from below the surface' : 'along the surface normal';
+      else if (sn.source === 'ab-plane') {
+        // no vacuum gap (U1): c*, said as such, never as "not a slab"
+        label = `along ${below ? MINUS : ''}c* (normal to a and b)`;
+        spoken = `along ${below ? 'minus ' : ''}c star, normal to a and b`;
+        note = `No vacuum gap found: looking ${label}.`;
+      } else label = `along the widest vacuum (${'abc'[sn.axis]})${below ? ', from the other side' : ''}`;
+      return { dir, label, spoken: spoken ?? label, note, surface: sn };
+    }
+    if (isList(target)) {
+      if (!finiteVec3(target)) throw new Error(VIEW_BAD_TARGET);
+      const v = new THREE.Vector3(target[0], target[1], target[2]);
+      if (!(v.lengthSq() > 0)) throw new Error(VIEW_ZERO);
+      const xs = [v.x, v.y, v.z].map((x) => { const t = x.toFixed(2); return t === '-0.00' ? '0.00' : t; });
+      return { dir: v.normalize(), label: `along [${xs.join(', ')}]`, spoken: `along the vector ${xs.join(', ')}`, note: null };
+    }
+    const keys = target && typeof target === 'object' ? Object.keys(target) : [];
+    const kind = keys.length === 1 && ['uvw', 'uvtw', 'hkl', 'hkil'].includes(keys[0]) ? keys[0] : null;
+    const raw = kind ? target[kind] : null;
+    if (!kind || !isList(raw) || raw.length !== kind.length || !Array.from(raw).every((x) => typeof x === 'number' && Number.isFinite(x))) {
+      throw new Error(VIEW_BAD_TARGET);
+    }
+    const ix = Array.from(raw, (x) => x + 0);
+    if (!ix.every(Number.isSafeInteger)) throw new Error('Lattice directions and Miller indices must be whole numbers.');
+    if (kind === 'hkil' && ix[0] + ix[1] + ix[2] !== 0) throw new Error(`In (h k i l), i must be ${MINUS}(h + k) = ${0 - (ix[0] + ix[1])}.`);
+    const three = kind === 'uvtw' ? uvtwToUvw(ix) : kind === 'hkil' ? hkilToHkl(ix) : ix;
+    if (three.every((x) => x === 0)) throw new Error(VIEW_ZERO);
+    if (!s) throw new Error(VIEW_NEEDS_STRUCTURE);
+    const cell = this._latticeCell();
+    if (!cell) throw new Error(VIEW_NEEDS_CELL);
+    const plane = kind[0] === 'h';
+    const dir = new THREE.Vector3(...(plane ? millerNormal(cell, three) : latticeDirection(cell, three)));
+    // four-index directions in their smallest whole numbers ([4 2̅ 2̅ 0] is [2 1̅ 1̅ 0]); the rest as given
+    const shown = kind === 'uvtw' ? uvwToUvtw(three, { integer: true }) : ix;
+    const label = plane ? `along the normal of ${formatIndices(shown, '(')} of the current cell` : `along ${formatIndices(shown, '[')} of the current cell`;
+    const spoken = plane ? `along the normal of the plane ${ariaIndices(shown)} of the current cell` : `along the direction ${ariaIndices(shown)} of the current cell`;
+    return { dir, label, spoken, note: null };
+  }
+
+  /** The current cell of the structure when it has three independent vectors (lattice directions need it), else null. */
+  _latticeCell() {
+    const cell = this.structure?.cell;
+    if (!cell || cell.length !== 3 || !cell.every((r) => finiteVec3(r))) return null;
+    const [a, b, c] = cell.map((r) => new THREE.Vector3(r[0], r[1], r[2]));
+    const det = a.dot(new THREE.Vector3().crossVectors(b, c));
+    return Math.abs(det) > 1e-9 * a.length() * b.length() * c.length() ? cell.map((r) => [r[0], r[1], r[2]]) : null;
+  }
+
+  /**
+   * The screen "up" of a view along `d` (unit, towards the camera) for the current structure, F0-A §3.14.1;
+   * `sn` = surfaceNormal(structure) when the caller has it:
+   * 1. a structure with a surface seen from the side (|d · n| < 0.99): the part of its normal n across d, so the top
+   *    surface is up;
+   * 2. seen along the normal (|d · n| ≥ 0.99, with a vacuum gap or not: U1 makes no difference): up = d × r, r the part
+   *    across d of the first in-plane cell vector a_(k+1) (a for a standard slab), which then runs from left to right;
+   * 3. other views of a structure without a surface: r = the shortest lattice vector u a + v b + w c (|u|, |v|, |w| ≤ 3)
+   *    perpendicular to d (|t̂ · d| < 1e-6), of equal ones the largest (u, v, w);
+   * 4. none: setView's rule, the part of c across d (b when c is along d), and without a cell z (y along z).
+   */
+  _autoUp(d, sn) {
+    const cell = this._latticeCell();
+    if (sn === undefined) { try { sn = cell ? surfaceNormal(this.structure) : null; } catch { sn = null; } }
+    const across = (v) => { const p = v.clone().addScaledVector(d, -v.dot(d)); return p.lengthSq() > 1e-20 ? p.normalize() : null; };
+    const upOf = (r) => (r ? new THREE.Vector3().crossVectors(d, r).normalize() : null);
+    const vec = (r) => new THREE.Vector3(r[0], r[1], r[2]);
+    if (cell && sn) {
+      const n = vec(sn.normal);
+      const along = Math.abs(d.dot(n));
+      const up = sn.surface && along < 0.99 ? across(n) : along >= 0.99 ? upOf(across(vec(cell[(sn.axis + 1) % 3]))) : null;
+      if (up) return up;
+    }
+    if (cell) {
+      const [A, B, C] = cell.map(vec);
+      let best = null, bestLength = Infinity;
+      // from (3, 3, 3) down, so that of equal lengths the first found, the largest (u, v, w), stays
+      for (let u = 3; u >= -3; u--) for (let v = 3; v >= -3; v--) for (let w = 3; w >= -3; w--) {
+        if (!u && !v && !w) continue;
+        const t = new THREE.Vector3().addScaledVector(A, u).addScaledVector(B, v).addScaledVector(C, w);
+        const length = t.length();
+        if (!(length > 0) || Math.abs(t.dot(d)) >= 1e-6 * length) continue;
+        if (length < bestLength * (1 - 1e-9)) { bestLength = length; best = t; }
+      }
+      const up = upOf(best && across(best)) ?? across(Math.abs(C.clone().normalize().dot(d)) > 0.98 ? B : C);
+      if (up) return up;
+    }
+    return across(new THREE.Vector3(0, Math.abs(d.z) > 0.98 ? 1 : 0, Math.abs(d.z) > 0.98 ? 0 : 1)) ?? new THREE.Vector3(0, 1, 0);
+  }
+
+  /**
+   * Turn the view to look along dir (towards the camera) with `up` on screen, through setViewDirection, and show
+   * `label` above the axis gizmo. ortho 'auto' takes setView's temporary orthographic camera with
+   * display.orthoAxisViews (not in turntable mode or an orthographic scene), true takes it, false leaves it.
+   */
+  _lookAlong(dir, up, { ortho = 'auto', animate = true, refit = true, label = null, spoken = label, note = null } = {}) {
+    const d = this.settings.display;
+    const temp = ortho === 'auto' ? d.orthoAxisViews !== false && !d.turntable && d.projection !== 'orthographic' : ortho && !this.camera.isOrthographicCamera;
+    if (temp) {
+      this._tempOrtho = true;
+      this._useCamera(true);
+    } else if (ortho === false) this._leaveTempOrtho();
+    this.setViewDirection(dir, up, animate, refit);
+    const D = new THREE.Vector3(...dir).normalize();
+    const U = (this._camAnim ? this._camAnim.u1 : this.camera.up).clone().normalize();
+    this._setViewLabel(label, spoken, D, U);
+    const out = (v) => v.toArray().map((x) => x + 0);
+    return { dir: out(D), up: out(U), label, note };
+  }
+
+  /** The direction label shown now (null once the camera turned away from the view it describes). */
+  get viewLabel() { return this._viewLabelNow()?.text ?? null; }
+
+  _setViewLabel(text, spoken, dir, up) {
+    this._viewLabel = text ? { text, dir: dir.clone(), up: up.clone() } : null;
+    // a canvas layer (tier C) draws it: drawOverlay is not changed, exports never show it
+    if (text && !this.overlays.get(VIEW_LABEL_LAYER)) {
+      this.overlays.add({
+        id: VIEW_LABEL_LAYER, owner: 'viewer', tier: 'canvas', export: 'never',
+        draw: (g, ctx) => this._drawViewLabel(g, ctx),
+        // another structure entry is shown (Overlays.switched): the label goes with the layer
+        dispose: () => { this._viewLabel = null; this._announceView(''); },
+      });
+    }
+    this._announceView(text ? `Looking ${spoken ?? text}` : '');
+    this._dirty = true;
+  }
+
+  /**
+   * The label while the camera (or the end of its animation) still looks the way the label says, within 0.5°: an
+   * orbit, a turn about a screen axis, a drag or a gizmo click ends it; zooming, panning and fitting keep it.
+   */
+  _viewLabelNow() {
+    const L = this._viewLabel;
+    if (!L) return null;
+    const a = this._camAnim;
+    const back = (a ? a.p1 : this.camera.position).clone().sub(a ? a.c1 : this.controls.target);
+    const up = (a ? a.u1 : this.camera.up).clone();
+    if (back.lengthSq() > 0 && up.lengthSq() > 0 && back.normalize().dot(L.dir) >= SAME_VIEW && up.normalize().dot(L.up) >= SAME_VIEW) return L;
+    this._viewLabel = null;
+    this._announceView('');
+    return null;
+  }
+
+  /** The direction label, just above the axis gizmo in the bottom-left corner (in that corner when the gizmo is off). */
+  _drawViewLabel(g, ctx) {
+    const L = this._viewLabelNow();
+    if (!L) return;
+    const s = ctx.scale;
+    const bottom = ctx.h - (8 + (this.settings.display.axes ? (this.gizmo?.size ?? 104) : 0)) * s;
+    g.textAlign = 'left'; g.textBaseline = 'bottom';
+    ctx.text(L.text, 12 * s, bottom - 2 * s, 12, undefined, 600);
+  }
+
+  /** Say the view direction to screen readers (a visually hidden role=status line in the viewer). */
+  _announceView(text) {
+    let el = this._viewStatus;
+    if (!el) {
+      if (!text || typeof document === 'undefined' || typeof this.container?.appendChild !== 'function') return;
+      el = this._viewStatus = document.createElement('div');
+      el.className = 'sr-only';
+      el.setAttribute('role', 'status');
+      el.setAttribute('aria-live', 'polite');
+      this.container.appendChild(el);
+    }
+    // the same words again (N pressed twice) differ by a trailing no-break space, so they are announced again
+    el.textContent = text && el.textContent === text ? `${text}\u00a0` : text;
+  }
+
+  focusAtom(i) {
+    const p = this.model.positions;
+    const c = new THREE.Vector3(p[3 * i], p[3 * i + 1], p[3 * i + 2]);
+    this._camAnim = { t0: performance.now(), dur: 380, p0: this.camera.position.clone(), p1: this.camera.position.clone().add(c.clone().sub(this.controls.target)), u0: this.camera.up.clone(), u1: this.camera.up.clone(), c0: this.controls.target.clone(), c1: c };
+  }
+
+  zoomBy(f) {
+    if (!(f > 0)) return;
+    if (this.camera.isOrthographicCamera) { this.camera.zoom *= f; this.camera.updateProjectionMatrix(); }
+    else { const t = this.controls.target; this.camera.position.sub(t).multiplyScalar(1 / f).add(t); }
+    if (this._camAnim) this._camAnim.p1.sub(this._camAnim.c1).multiplyScalar(this.camera.isOrthographicCamera ? 1 : 1 / f).add(this._camAnim.c1);
+    this.controls.update?.();
+    this._dirty = true;
+    this.emit('camera');
+  }
+
+  /**
+   * Orbit around the target: dAz° to the camera's right (the model turns left), dEl° upwards. Steps
+   * accumulate while a previous one is still animating; elevation stops 5° short of the poles.
+   */
+  orbitBy(dAz = 0, dEl = 0, { animate = true } = {}) {
+    if (!dAz && !dEl) return;
+    this._leaveTempOrtho();
+    const a = this._camAnim;
+    const target = (a ? a.c1 : this.controls.target).clone();
+    const from = (a ? a.p1 : this.camera.position).clone();
+    const up = (a ? a.u1 : this.camera.up).clone().normalize();
+    const off = from.sub(target);
+    if (dAz) off.applyAxisAngle(up, dAz * DEG);
+    if (dEl) {
+      const theta = Math.acos(clamp(off.dot(up) / (off.length() || 1), -1, 1));
+      const next = clamp(theta - dEl * DEG, 5 * DEG, 175 * DEG);
+      const right = new THREE.Vector3().crossVectors(up, off);
+      if (right.lengthSq() > 1e-12) off.applyAxisAngle(right.normalize(), next - theta);
+    }
+    const p1 = target.clone().add(off);
+    if (!animate) {
+      this._camAnim = null;
+      this.camera.position.copy(p1); this.camera.up.copy(up); this.controls.target.copy(target); this.camera.lookAt(target);
+      this.controls.update?.(); this._dirty = true; this.emit('camera'); return;
+    }
+    this._camAnim = { t0: performance.now(), dur: 160, p0: this.camera.position.clone(), p1, u0: this.camera.up.clone(), u1: up, c0: this.controls.target.clone(), c1: target };
+  }
+
+  /**
+   * Turn the model deg° about a screen axis — 'x' (right), 'y' (up) or 'z' (towards the viewer), right-hand
+   * rule — like a trackball, with no pole to stop at (arrow keys, X/Y/Z + right-drag). Steps accumulate
+   * while a previous one is still animating.
+   */
+  rotateScreen(axis, deg, { animate = true } = {}) {
+    if (!deg || !['x', 'y', 'z'].includes(axis)) return;
+    this._leaveTempOrtho();
+    const a = this._camAnim;
+    const target = (a ? a.c1 : this.controls.target).clone();
+    const off = (a ? a.p1 : this.camera.position).clone().sub(target);
+    const back = off.clone().normalize();
+    if (back.lengthSq() < 0.5) return;
+    const right = new THREE.Vector3().crossVectors((a ? a.u1 : this.camera.up), back);
+    if (right.lengthSq() < 1e-12) right.set(1, 0, 0).addScaledVector(back, -back.x);
+    right.normalize();
+    const up = new THREE.Vector3().crossVectors(back, right);
+    // the camera turns the other way round the target
+    const q = new THREE.Quaternion().setFromAxisAngle(axis === 'x' ? right : axis === 'y' ? up : back, -deg * DEG);
+    const p1 = target.clone().add(off.applyQuaternion(q)), u1 = up.applyQuaternion(q);
+    if (!animate) {
+      this._camAnim = null;
+      this.camera.position.copy(p1); this.camera.up.copy(u1); this.controls.target.copy(target); this.camera.lookAt(target);
+      this._syncControlsUp(); this.controls.update?.(); this._dirty = true; this.emit('camera'); return;
+    }
+    this._camAnim = { t0: performance.now(), dur: 200, p0: this.camera.position.clone(), p1, u0: this.camera.up.clone(), u1, c0: this.controls.target.clone(), c1: target };
+  }
+
+  /** Centre a client-space rectangle and zoom until it fills the view (R+drag). */
+  zoomToRect(x0, y0, x1, y1) {
+    const w = Math.abs(x1 - x0), h = Math.abs(y1 - y0);
+    if (!(w >= 2 || h >= 2)) return;
+    const r = this.renderer.domElement.getBoundingClientRect();
+    this.panBy(r.left + r.width / 2 - (x0 + x1) / 2, r.top + r.height / 2 - (y0 + y1) / 2);
+    this.zoomBy(clamp(Math.min(r.width / Math.max(w, 1), r.height / Math.max(h, 1)), 1, 40));
+  }
+
+  /** Move the model on screen by (dx, dy) CSS pixels (+x right, +y down). */
+  panBy(dx = 0, dy = 0) {
+    if (!dx && !dy) return;
+    const cam = this.camera;
+    cam.updateMatrixWorld();
+    const perPx = cam.isOrthographicCamera
+      ? (cam.top - cam.bottom) / (cam.zoom || 1) / this.height
+      : (2 * cam.position.distanceTo(this.controls.target) * Math.tan((cam.fov * DEG) / 2)) / this.height;
+    const right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0);
+    const upv = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1);
+    const delta = right.multiplyScalar(-dx * perPx).addScaledVector(upv, dy * perPx);
+    cam.position.add(delta); this.controls.target.add(delta);
+    const a = this._camAnim;
+    if (a) { a.p0.add(delta); a.p1.add(delta); a.c0.add(delta); a.c1.add(delta); }
+    this.controls.update?.();
+    this._dirty = true;
+    this.emit('camera');
+  }
+
+  /**
+   * Position, up, target and zoom of the scene's camera. During an axis view's temporary orthographic
+   * camera the state is converted to the equivalent perspective framing (zoom 1), because the scene
+   * (and so a reopened project) still uses the perspective camera.
+   */
+  getCameraState() {
+    const cam = this.camera, target = this.controls.target;
+    if (this._tempOrtho && cam.isOrthographicCamera) {
+      const half = (this._orthoHalf ?? 10) / (cam.zoom || 1);
+      const dist = half / Math.tan((this.persp.fov * DEG) / 2);
+      const dir = new THREE.Vector3().subVectors(cam.position, target);
+      if (dir.lengthSq() < 1e-12) dir.set(0, 0, 1);
+      const pos = target.clone().addScaledVector(dir.normalize(), dist);
+      return { position: pos.toArray(), up: cam.up.toArray(), target: target.toArray(), zoom: 1 };
+    }
+    return { position: cam.position.toArray(), up: cam.up.toArray(), target: target.toArray(), zoom: cam.zoom ?? 1 };
+  }
+
+  setCameraState(c) {
+    if (!c?.position) return;
+    this._leaveTempOrtho();   // a saved state describes the scene's own projection
+    this._camAnim = null;
+    this.camera.position.fromArray(c.position); this.camera.up.fromArray(c.up ?? [0, 1, 0]); this.controls.target.fromArray(c.target ?? [0, 0, 0]);
+    if (c.zoom && this.camera.isOrthographicCamera) { this.camera.zoom = c.zoom; this.camera.updateProjectionMatrix(); }
+    this.camera.lookAt(this.controls.target); this._syncControlsUp(); this.controls.update(); this._hasView = true; this._dirty = true;
+  }
+
+  _updateOrtho() {
+    const aspect = this.width / this.height;
+    const h = this._orthoHalf ?? 10;
+    Object.assign(this.ortho, { left: -h * aspect, right: h * aspect, top: h, bottom: -h });
+    this.ortho.updateProjectionMatrix();
+  }
+
+  resize() {
+    const r = this.container.getBoundingClientRect();
+    const w = Math.max(2, Math.floor(r.width)), h = Math.max(2, Math.floor(r.height));
+    this.width = w; this.height = h;
+    if (w > 16 && h > 16) {   // (a hidden or collapsed view keeps the framing of its last real size)
+      const f = this._frameSize;
+      if (f && (f[0] !== w || f[1] !== h)) this._keepFraming(f[0], f[1]);
+      this._frameSize = [w, h];
+    }
+    this.renderer.setSize(w, h, false);
+    const pr = this.renderer.getPixelRatio();
+    this.overlay.width = w * pr; this.overlay.height = h * pr;
+    this.persp.aspect = w / h; this.persp.updateProjectionMatrix();
+    this._updateOrtho();
+    this.resolution.set(w, h);
+    this.root.traverse((o) => { if (o.material?.isLineMaterial) o.material.resolution.set(w, h); });
+    this.post.setSize(w, h);
+    this.controls.handleResize?.();   // TrackballControls measures the view for its rotation centre
+    this._dirty = true;
+  }
+
+  // ------------------------------------------------------------------ picking
+  /**
+   * The pick ray through a point of the page (client coordinates): a THREE.Ray in world coordinates, which are the
+   * drawn coordinates of the model, for the current camera. It starts at the camera position (perspective) or on
+   * the plane through it that faces the view, along the view direction (orthographic). Its direction has unit
+   * length, so a distance t along it is in Å, and t < 0 is behind the camera.
+   */
+  ray(clientX, clientY) {
+    const cam = this.camera;
+    const r = this.renderer.domElement.getBoundingClientRect();
+    const w = r.width > 0 ? r.width : this.width, h = r.height > 0 ? r.height : this.height;
+    const ndc = new THREE.Vector2(((clientX - r.left) / w) * 2 - 1, -((clientY - r.top) / h) * 2 + 1);
+    cam.updateMatrixWorld();
+    const caster = (this._raycaster ??= new THREE.Raycaster());
+    caster.setFromCamera(ndc, cam);
+    return caster.ray.clone();
+  }
+
+  /**
+   * The nearest drawn atom on a pick ray (by default the ray through the point): {index, t}, index into the drawn
+   * model and t the distance along the ray to the front of its sphere (Å), or null. Spheres have the drawn radius,
+   * at least 0.22 Å; those whose centre lies behind the ray origin do not count. Atoms a visibility mask hides are
+   * not in the model, so they are never hit. This does not look at a preview's input lock: pick and pickAtom do.
+   */
+  pickAtomHit(clientX, clientY, ray = this.ray(clientX, clientY)) {
+    const m = this.model;
+    if (!m || !m.n) return null;
+    const o = ray.origin, dv = ray.direction, p = m.positions;
+    let best = -1, bestT = Infinity;
+    for (let i = 0; i < m.n; i++) {
+      const rr = Math.max(this.radii?.[i] ?? 0.3, 0.22);
+      const lx = p[3 * i] - o.x, ly = p[3 * i + 1] - o.y, lz = p[3 * i + 2] - o.z;
+      const tca = lx * dv.x + ly * dv.y + lz * dv.z;
+      if (tca < 0) continue;
+      const d2 = lx * lx + ly * ly + lz * lz - tca * tca;
+      if (d2 > rr * rr) continue;
+      const t = tca - Math.sqrt(rr * rr - d2);
+      if (t < bestT) { bestT = t; best = i; }
+    }
+    return best < 0 ? null : { index: best, t: bestT };
+  }
+
+  /** The drawn atom under a point of the page (index into the drawn model) or −1, as pick() sees it without the overlays (−1 while a preview locks the input). */
+  pickAtom(clientX, clientY) {
+    const hit = this.pick(clientX, clientY, { overlays: false });
+    return hit.kind === 'atom' ? hit.atom.index : -1;
+  }
+
+  /**
+   * What is under a point of the page, the merged pick (F0-A §3.12.2):
+   *   {kind: 'overlay' | 'atom' | 'none', t, point, ray, atom: {index, src, t} | null, overlay: {layer, index, item, t, tier} | null}
+   * The atom is the nearest drawn atom (pickAtomHit; none while a preview locks the input): index into the drawn model,
+   * src the structure atom that copy draws (model.src: the display's own wrapping, cut and copies, U1). An item of an
+   * overlay layer that is visible, pickable and pickable under the current tool (pickIn) wins over it as
+   * Overlays.pick decides: tier B ('top') first, then tier A ('scene') within 0.05 Å behind the atom. `atom` is set
+   * for kind 'atom' only and `overlay` for kind 'overlay' only; t is the distance along `ray` (Å) and point the hit
+   * in drawn coordinates (Infinity and null for 'none'). opts {atoms, overlays}: false leaves that kind out.
+   */
+  pick(clientX, clientY, { atoms = true, overlays = true } = {}) {
+    const ray = this.ray(clientX, clientY);
+    const a = atoms && !this.inputLocked ? this.pickAtomHit(clientX, clientY, ray) : null;
+    const o = overlays && this.overlays ? this.overlays.pick(ray, { tool: this.tool, atom: a, ctx: this._pickContext(clientX, clientY) }) : null;
+    if (o) return { kind: 'overlay', t: o.t, point: ray.at(o.t, new THREE.Vector3()), ray, atom: null, overlay: o };
+    if (a) {
+      const src = this.model.src ? this.model.src[a.index] : a.index;
+      return { kind: 'atom', t: a.t, point: ray.at(a.t, new THREE.Vector3()), ray, atom: { index: a.index, src, t: a.t }, overlay: null };
+    }
+    return { kind: 'none', t: Infinity, point: null, ray, atom: null, overlay: null };
+  }
+
+  /**
+   * The ctx an overlay layer's pick(ray, ctx) receives: {viewer, tool, camera, clientX, clientY, x, y (view pixels from
+   * the top left), width, height, project(x, y, z) → [px, py, z] (view pixels; z −1…1 between the clipping planes),
+   * worldPerPixel(point)}, for layers that test their items in screen space.
+   */
+  _pickContext(clientX, clientY) {
+    const r = this.renderer.domElement.getBoundingClientRect();
+    const w = this.width, h = this.height;
+    return {
+      viewer: this, tool: this.tool, camera: this.camera, clientX, clientY, x: clientX - r.left, y: clientY - r.top, width: w, height: h,
+      project: (x, y, z) => this.project(x, y, z, w, h),
+      worldPerPixel: (point) => this.worldPerPixel(point),
+    };
+  }
+
+  /**
+   * Where the pick ray through a point of the page meets the plane through `point` with normal `normal` (each [x, y, z],
+   * a typed array, a THREE.Vector3 or {x, y, z}, in drawn coordinates): a THREE.Vector3, or null when the ray runs
+   * parallel to the plane (|n·d| < 1e-6 for the unit normal: a plane seen edge-on) or meets it behind the camera.
+   */
+  pointOnPlane(clientX, clientY, point, normal) {
+    const p = this._vec3(point, 'pointOnPlane: point'), n = this._vec3(normal, 'pointOnPlane: normal');
+    const len = n.length();
+    if (!(len > 0)) throw new TypeError('pointOnPlane: normal must not be zero.');
+    n.divideScalar(len);
+    const r = this.ray(clientX, clientY);
+    const nd = n.dot(r.direction);
+    if (Math.abs(nd) < 1e-6) return null;
+    const t = n.dot(p.sub(r.origin)) / nd;
+    return t >= 0 ? r.at(t, new THREE.Vector3()) : null;
+  }
+
+  /**
+   * The point of the line origin + s·dir (drawn coordinates; the forms pointOnPlane takes) closest to the pick ray
+   * through a point of the page, for dragging along an axis: {point: THREE.Vector3, s}, s in units of |dir| (Å for a
+   * unit dir). null when the line runs parallel to the ray (the sine of the angle between them below 1e-6).
+   */
+  pointOnLine(clientX, clientY, origin, dir) {
+    const p = this._vec3(origin, 'pointOnLine: origin'), u = this._vec3(dir, 'pointOnLine: dir');
+    if (!(u.length() > 0)) throw new TypeError('pointOnLine: dir must not be zero.');
+    const r = this.ray(clientX, clientY), d = r.direction;
+    const a = u.dot(u), b = u.dot(d), c = d.dot(d);
+    const denom = a * c - b * b;   // |u|² |d|² sin²(angle)
+    if (!(denom > 1e-12 * a * c)) return null;
+    const w0 = p.clone().sub(r.origin);
+    const s = (b * d.dot(w0) - c * u.dot(w0)) / denom;
+    return { point: p.addScaledVector(u, s), s };
+  }
+
+  /**
+   * Å per CSS pixel of the view at the depth of `point` ([x, y, z], a Vector3 or {x, y, z}; default: the camera's
+   * target): 2 · depth · tan(fov / 2) / zoom / height for the perspective camera, (top − bottom) / zoom / height
+   * (the same at every depth) for the orthographic one. Its inverse is the view's pixels per Å there.
+   */
+  worldPerPixel(point = null) {
+    const cam = this.camera, h = Math.max(1, this.height);
+    if (cam.isOrthographicCamera) return (cam.top - cam.bottom) / (cam.zoom || 1) / h;
+    const p = point == null ? this.controls.target.clone() : this._vec3(point, 'worldPerPixel: point');
+    cam.updateMatrixWorld();
+    const depth = -p.applyMatrix4(cam.matrixWorldInverse).z;
+    return (2 * Math.max(1e-6, depth) * Math.tan(((cam.fov ?? 30) * DEG) / 2)) / (cam.zoom || 1) / h;
+  }
+
+  /** [x, y, z], a typed array, a THREE.Vector3 or {x, y, z} as a new THREE.Vector3; anything else, or a component that is not a finite number, is a TypeError naming `what`. */
+  _vec3(v, what) {
+    const c = Array.isArray(v) || ArrayBuffer.isView(v) ? [v[0], v[1], v[2]] : v && typeof v === 'object' ? [v.x, v.y, v.z] : null;
+    if (!c || !c.every(Number.isFinite)) throw new TypeError(`${what} must be three numbers [x, y, z].`);
+    return new THREE.Vector3(c[0], c[1], c[2]);
+  }
+
+  /**
+   * What drawn atom `d` is, for the hover and selection cards: {display, index (the structure atom), symbol, name,
+   * cn, position (its stored Cartesian coordinates, Float64, current frame: what files and the structure hold),
+   * frac (the stored fractional coordinates as Structure.fracPositions gives them, not wrapped; null without a
+   * cell), image (storedImage: the whole cells from the stored position to this drawn copy), drawn (the drawn
+   * coordinates)}; null for an index that is not drawn.
+   */
+  atomInfo(d) {
+    const m = this.model;
+    if (!m || !Number.isInteger(d) || d < 0 || d >= m.n) return null;
+    const i = m.src[d], s = this.structure;
+    const el = element(m.symbols[d]);
+    const drawn = [m.positions[3 * d], m.positions[3 * d + 1], m.positions[3 * d + 2]];
+    const stored = !!s && i < s.length;
+    const position = stored ? s.pos(i) : drawn;
+    const cell = stored ? s.cell : m.cell;
+    let frac = null;
+    if (cell) { try { frac = cartToFrac(position, inv3(cell)); } catch { frac = null; } }
+    return { display: d, index: i, symbol: el.symbol, name: el.name, cn: this.cn?.[d] ?? 0, position, frac, image: storedImage(m, d), drawn };
+  }
+
+  // ------------------------------------------------------------------ loop
+  _loop(now) {
+    requestAnimationFrame(this._loop);
+    const dt = Math.min(0.1, (now - this._last) / 1000);
+    this._last = now;
+    let moving = false;
+    if (this._camAnim) {
+      const a = this._camAnim;
+      // performance.now(), not the frame timestamp: that can predate an animation started in between frames
+      const t = clamp((performance.now() - a.t0) / a.dur, 0, 1);
+      const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      // interpolate around the target to keep distance smooth
+      const c = a.c0.clone().lerp(a.c1, e);
+      const d0 = a.p0.clone().sub(a.c0), d1 = a.p1.clone().sub(a.c1);
+      const len = d0.length() + (d1.length() - d0.length()) * e;
+      const dir = d0.normalize().lerp(d1.clone().normalize(), e);
+      if (dir.lengthSq() < 1e-8) dir.copy(d1).normalize();
+      dir.normalize();
+      this.camera.position.copy(c).addScaledVector(dir, len);
+      const up = a.u0.clone().lerp(a.u1, e);
+      this.camera.up.copy(up.lengthSq() > 1e-8 ? up.normalize() : a.u1);
+      this.controls.target.copy(c);
+      this.camera.lookAt(c);
+      this._syncControlsUp();
+      if (t >= 1) { this._camAnim = null; this.emit('camera'); }
+      moving = true;
+    }
+    if (this.settings.display.turntable && !this._camAnim) {
+      const t = this.controls.target, up = this.camera.up;
+      const q = new THREE.Quaternion().setFromAxisAngle(up, dt * 0.45);
+      this.camera.position.sub(t).applyQuaternion(q).add(t);
+      this.camera.lookAt(t);
+      moving = true;
+    }
+    if (this.controls.update?.() || this.controlsKind === 'trackball') moving = moving || this._dirty;
+    if (this.playing && this.structure) {
+      this._frameAcc += dt;
+      if (this._frameAcc >= 1 / this.fps) {
+        this._frameAcc = 0;
+        this.setFrame((this.structure.frame + 1) % this.structure.nFrames);
+      }
+    }
+    if (this._dirty || moving) this.render();
+  }
+
+  _updateClipping() {
+    // near and far hold the model and the overlay layers' bounds (a plane preview reaching past the atoms)
+    const b = this.overlays.clipBounds(this.bounds);
+    const D = this.camera.position.distanceTo(b.center);
+    const R = b.radius * 1.4 + 2;
+    const near = Math.max(0.05, D - R * 1.6), far = D + R * 1.6;
+    for (const cam of [this.persp, this.ortho]) { cam.near = cam.isOrthographicCamera ? Math.max(0.01, D - R * 2) : near; cam.far = far; cam.updateProjectionMatrix(); }
+    if (this.scene3.fog) {
+      const s = this.settings.post.fog.strength ?? 0.5;
+      const r = this.bounds.radius;
+      this.scene3.fog.near = D - r * 0.4;
+      this.scene3.fog.far = D + r * (3 - 2 * s);
+      this.scene3.fog.color.copy(this._fogColor);
+    }
+    this.post.setFocus(this.camera.position.distanceTo(this.controls.target));
+    this.post.setViewHeight(2 * this._viewHalfHeight());
+    // a model that fills the frame would turn wide bloom into a full-screen haze: tighten the spread
+    if (this.post.bloom) {
+      const cover = (this.bounds.radius + (this.maxRadius ?? 0)) / Math.max(1e-6, this._viewHalfHeight());
+      this.post.setBloomScale(cover > 0.45 ? Math.max(0.2, 0.45 / cover) : 1);
+    }
+  }
+
+  /** Half the visible height (Å) at the target distance. */
+  _viewHalfHeight() {
+    const cam = this.camera;
+    if (cam.isOrthographicCamera) return (cam.top - cam.bottom) / 2 / (cam.zoom || 1);
+    return cam.position.distanceTo(this.controls.target) * Math.tan((cam.fov * DEG) / 2);
+  }
+
+  render({ gizmo = true, overlay = true } = {}) {
+    this._updateClipping();
+    this.overlays.beforeRender({ camera: this.camera, width: this.width, height: this.height, pxPerA: (point) => this._pxPerAAt(point) });
+    this.lights.update(this.camera);
+    const live = !!this.model;
+    if (this._themeDark !== !!this.overlayDark) this._themeOverlays();
+    // every halo kind shows unless an export leaves it out (_haloHidden, see overlays.exportScope)
+    for (const k in this._halo) this._halo[k].visible = live && !this._haloHidden.has(k);
+    this.overlayGroup.visible = live;
+    if (!live) this.floor.visible = false;
+    try {
+      if (this.post.active) this.post.render();
+      else { this.renderer.setRenderTarget(null); this.renderer.render(this.scene3, this.camera); }
+      if (live) this._renderTop();
+      if (gizmo && this.settings.display.axes) {
+        const cell = this._cell();
+        const dark = { dark: !!this.overlayDark };
+        if (cell) this.gizmo.setAxes(cell, ['a', 'b', 'c'], dark); else this.gizmo.setAxes([[1, 0, 0], [0, 1, 0], [0, 0, 1]], ['x', 'y', 'z'], dark);
+        this.gizmo.render(this.renderer, this.camera, 8, 8);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    this._flushTrash();
+    if (overlay) this.drawOverlay(this.overlay.getContext('2d'), this.renderer.getPixelRatio());
+    this._dirty = !overlay;   // a frame drawn for an export left the overlay canvas on the previous model
+    this.emit('render');
+  }
+
+  /**
+   * Tier B overlays, over the finished frame (after post-processing, so no outlines, ambient occlusion or bloom):
+   * layers with depth 'atoms' after a depth-only pass of the drawn structure (they hide behind atoms), then the
+   * others over everything. Lit by their own ambient light and a light that follows the camera.
+   */
+  _renderTop() {
+    const state = this.overlays.topState();
+    if (!state.any) return;
+    const r = this.renderer, ov = this.overlays, auto = r.autoClear;
+    ov.topLight.position.copy(this.camera.position);
+    ov.topLight.target.position.copy(this.controls.target);
+    r.setRenderTarget(null);
+    r.autoClear = false;
+    try {
+      r.clearDepth();
+      if (state.atoms) {
+        this._depthPrepass();
+        ov.topFree.visible = false;
+        r.render(this.topScene, this.camera);
+        ov.topFree.visible = true;
+        r.clearDepth();
+      }
+      ov.topAtoms.visible = false;
+      r.render(this.topScene, this.camera);
+    } finally {
+      ov.topAtoms.visible = true;
+      r.autoClear = auto;
+    }
+  }
+
+  /** Write the depth of the drawn structure (atoms, bonds, polyhedra; no lines, halos or overlays) into the frame's depth buffer only. */
+  _depthPrepass() {
+    const sc = this.scene3, r = this.renderer;
+    const bg = sc.background, fog = sc.fog, override = sc.overrideMaterial, shadows = r.shadowMap.autoUpdate;
+    const hidden = [];
+    sc.traverse((o) => { if (o.visible && skipInAuxPass(o)) { hidden.push(o); o.visible = false; } });
+    this._depthOnly ??= new THREE.MeshBasicMaterial({ colorWrite: false });
+    sc.background = null; sc.fog = null; sc.overrideMaterial = this._depthOnly;
+    r.shadowMap.autoUpdate = false;
+    try { r.render(sc, this.camera); } finally {
+      sc.background = bg; sc.fog = fog; sc.overrideMaterial = override;
+      r.shadowMap.autoUpdate = shadows;
+      hidden.forEach((o) => { o.visible = true; });
+    }
+  }
+
+  project(x, y, z, w, h) {
+    const v = new THREE.Vector3(x, y, z).project(this.camera);
+    return [(v.x + 1) / 2 * w, (1 - v.y) / 2 * h, v.z];
+  }
+
+  /** Overlay pixels per Å at the target depth (exact for the orthographic camera). */
+  pixelsPerAngstrom(h = this.height) {
+    return h / 2 / Math.max(1e-6, this._viewHalfHeight());
+  }
+
+  /**
+   * Labels, measurement values, cell axis letters, canvas overlay layers, colour legend, overlay legend rows
+   * and scale bar on a 2D canvas. opt.export: drawing into an image export (no status bar to keep clear of);
+   * opt.markers: the export includes markers (canvas layers read it as ctx.markers).
+   */
+  drawOverlay(g, scale = 1, w = this.width * scale, h = this.height * scale, opt = {}) {
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, g.canvas.width, g.canvas.height);
+    const m = this.model;
+    if (!m) return;
+    const d = this.settings.display;
+    const dark = this.overlayDark;
+    const css = this._cssTheme();
+    const fg = dark ? '#f1f3f5' : '#14171b', halo = dark ? 'rgba(10,12,15,.85)' : 'rgba(255,255,255,.9)';
+    const fontFam = css.font;
+    const text = (t, x, y, size, color = fg, weight = 500) => {
+      g.font = `${weight} ${size * scale}px ${fontFam}`;
+      g.lineWidth = 3 * scale; g.strokeStyle = halo; g.lineJoin = 'round';
+      g.strokeText(t, x, y); g.fillStyle = color; g.fillText(t, x, y);
+    };
+    this.camera.updateMatrixWorld();
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    // cell letters reserve their spots first, so atom labels skip them instead of stacking on them
+    const occ = this._occupancy(w, h, scale);
+    if (d.cell?.show && d.cell?.labels && m.cell) this._drawCellLetters(g, scale, w, h, text, fg, occ, opt);
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    if (d.labels && d.labels !== 'none') this._drawLabels(g, scale, w, h, fg, halo, fontFam, occ);
+    g.globalAlpha = 1;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    const accent = css.accentStrong;
+    for (const ms of this.measurements) {
+      // the value sits on the drawn line (ms.points), which a 'floating' measurement has without drawn atoms at its ends
+      if (!ms.valid || !Number.isFinite(ms.value) || !(ms.points?.length >= 6)) continue;
+      const Q = ms.points, P = [];
+      for (let k = 0; 3 * k + 2 < Q.length; k++) P.push(this.project(Q[3 * k], Q[3 * k + 1], Q[3 * k + 2], w, h));
+      const mid = ms.type === 'distance' ? [(P[0][0] + P[1][0]) / 2, (P[0][1] + P[1][1]) / 2] : P[1].slice(0, 2);
+      const label = ms.type === 'distance' ? `${ms.value.toFixed(3)} Å` : `${ms.value.toFixed(1)}°`;
+      text(label, mid[0], mid[1] - 12 * scale, 12.5, accent, 700);
+    }
+    const mode = d.legend === true ? 'always' : d.legend === false ? 'none' : (d.legend ?? 'auto');
+    // canvas overlay layers (tier C), clear of the letters and labels placed above through the occupancy grid
+    this.overlays.drawCanvas(g, {
+      scale, w, h, dark: !!dark, font: fontFam, text, occupancy: occ, export: !!opt.export, markers: !!opt.markers, model: m,
+      project: (x, y, z) => this.project(x, y, z, w, h), pxPerA: (point) => this._pxPerAAt(point, h),
+    });
+    g.globalAlpha = 1;
+    const info = this.colors?.legend;
+    // element chips only with 'always'; a colour bar or category chips also with 'auto'
+    const legend = info && mode !== 'none' && (info.kind !== 'elements' || mode === 'always') ? info : null;
+    // overlay legend rows, their swatch colours resolved as the halos' are ({light, dark}, 'var(--token)')
+    const items = mode !== 'none' ? this.overlays.legendItems({ dark: !!dark, css: (t) => this._cssToken(t) }) : [];
+    const ppa = d.scaleBar ? this.pixelsPerAngstrom(h) : null;
+    if (legend || ppa || items.length) {
+      const traj = !opt.export && (this.structure?.nFrames ?? 1) > 1;
+      drawLegends(g, { legend, items, pxPerAngstrom: ppa, width: w, height: h, scale, dark, font: fontFam, right: opt.export ? 16 : 14, bottom: opt.export ? 16 : (traj ? 96 : 38) });
+    }
+  }
+
+  /**
+   * Atom labels: only atoms whose centre is not covered by a nearer atom, nearest first, skipping any
+   * label that would overlap one already placed (coarse occupancy grid); farther labels fade.
+   */
+  _drawLabels(g, scale, w, h, fg, halo, fontFam, occ = this._occupancy(w, h, scale)) {
+    const m = this.model, d = this.settings.display, cam = this.camera;
+    const showAll = m.n <= 600;
+    const vp = new THREE.Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse).elements;
+    const vw = cam.matrixWorldInverse.elements;
+    const persp = cam.isPerspectiveCamera;
+    const tanH = Math.tan(((cam.fov ?? 30) * DEG) / 2);
+    const orthoHalf = persp ? 0 : (cam.top - cam.bottom) / 2 / (cam.zoom || 1);
+    const p = m.positions, cand = [];
+    for (let i = 0; i < m.n; i++) {
+      if (!showAll && !this.selection.has(m.src[i])) continue;
+      const x = p[3 * i], y = p[3 * i + 1], z = p[3 * i + 2];
+      const cw = vp[3] * x + vp[7] * y + vp[11] * z + vp[15];
+      if (cw <= 0) continue;
+      const nz = (vp[2] * x + vp[6] * y + vp[10] * z + vp[14]) / cw;
+      if (nz < -1 || nz > 1) continue;
+      const sx = ((vp[0] * x + vp[4] * y + vp[8] * z + vp[12]) / cw + 1) / 2 * w;
+      const sy = (1 - (vp[1] * x + vp[5] * y + vp[9] * z + vp[13]) / cw) / 2 * h;
+      const depth = -(vw[2] * x + vw[6] * y + vw[10] * z + vw[14]);
+      const unit = persp ? h / 2 / Math.max(1e-6, depth * tanH) : h / 2 / Math.max(1e-6, orthoHalf);
+      cand.push({ i, sx, sy, depth, r: (this.radii?.[i] ?? 0.3) * unit });
+    }
+    if (!cand.length) return;
+    cand.sort((a, b) => a.depth - b.depth);
+    const dmin = cand[0].depth, dspan = Math.max(1e-6, cand[cand.length - 1].depth - dmin);
+    // nearer atoms' discs by screen cell (occlusion) and placed label boxes (overlap)
+    const C = 32 * scale, cols = Math.max(1, Math.ceil(w / C)), rows = Math.max(1, Math.ceil(h / C));
+    const discs = new Map();
+    const size = (d.labelSize ?? 12) * scale;
+    g.font = `600 ${size}px ${fontFam}`;
+    g.lineWidth = 3 * scale; g.strokeStyle = halo; g.lineJoin = 'round'; g.fillStyle = fg;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (const c of cand) {
+      const ci = Math.floor(c.sx / C), cj = Math.floor(c.sy / C);
+      let hidden = false;
+      const list = ci >= 0 && ci < cols && cj >= 0 && cj < rows ? discs.get(cj * cols + ci) : null;
+      if (list) for (const q of list) if ((q.x - c.sx) ** 2 + (q.y - c.sy) ** 2 < (q.r * 0.92) ** 2) { hidden = true; break; }
+      // register this atom's disc (it hides atoms further back), clipped to a sane footprint
+      const rr = Math.min(c.r, 8 * C);
+      const i0 = Math.max(0, Math.floor((c.sx - rr) / C)), i1 = Math.min(cols - 1, Math.floor((c.sx + rr) / C));
+      const j0 = Math.max(0, Math.floor((c.sy - rr) / C)), j1 = Math.min(rows - 1, Math.floor((c.sy + rr) / C));
+      for (let jj = j0; jj <= j1; jj++) for (let ii = i0; ii <= i1; ii++) {
+        const k = jj * cols + ii;
+        let arr = discs.get(k);
+        if (!arr) discs.set(k, arr = []);
+        arr.push({ x: c.sx, y: c.sy, r: c.r });
+      }
+      if (hidden) continue;
+      const t = d.labels === 'element' ? m.symbols[c.i] : d.labels === 'index' ? String(m.src[c.i]) : `${m.symbols[c.i]}${m.src[c.i]}`;
+      const tw = g.measureText(t).width + 4 * scale, th = size + 2 * scale;
+      const box = [c.sx - tw / 2, c.sy - th / 2, c.sx + tw / 2, c.sy + th / 2];
+      if (!occ.free(...box)) continue;
+      occ.mark(...box);
+      g.globalAlpha = 1 - 0.5 * ((c.depth - dmin) / dspan);
+      g.strokeText(t, c.sx, c.sy); g.fillText(t, c.sx, c.sy);
+    }
+    g.globalAlpha = 1;
+  }
+
+  /** Coarse occupancy grid over the overlay (6 px cells): placed letters and labels reserve their boxes. */
+  _occupancy(w, h, scale) {
+    const L = 6 * scale, cols = Math.max(1, Math.ceil(w / L)), rows = Math.max(1, Math.ceil(h / L));
+    const used = new Uint8Array(cols * rows);
+    const span = (x0, y0, x1, y1) => [Math.max(0, Math.floor(x0 / L)), Math.min(cols - 1, Math.floor(x1 / L)), Math.max(0, Math.floor(y0 / L)), Math.min(rows - 1, Math.floor(y1 / L))];
+    return {
+      free(x0, y0, x1, y1) {
+        const [a0, a1, b0, b1] = span(x0, y0, x1, y1);
+        for (let j = b0; j <= b1; j++) for (let i = a0; i <= a1; i++) if (used[j * cols + i]) return false;
+        return true;
+      },
+      mark(x0, y0, x1, y1) {
+        const [a0, a1, b0, b1] = span(x0, y0, x1, y1);
+        for (let j = b0; j <= b1; j++) for (let i = a0; i <= a1; i++) used[j * cols + i] = 1;
+      },
+    };
+  }
+
+  /**
+   * Screen discs [x, y, r, …] (overlay pixels) of the drawn atoms in front of the camera. Large models
+   * return null plus `pad`: callers then use the projected bounding box, grown by the largest atom.
+   */
+  _screenDiscs(w, h) {
+    const m = this.model, cam = this.camera;
+    const vp = new THREE.Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse).elements;
+    const vw = cam.matrixWorldInverse.elements;
+    const persp = cam.isPerspectiveCamera;
+    const tanH = Math.tan(((cam.fov ?? 30) * DEG) / 2);
+    const orthoUnit = persp ? 0 : h / 2 / Math.max(1e-6, (cam.top - cam.bottom) / 2 / (cam.zoom || 1));
+    const unitAt = (depth) => (persp ? h / 2 / Math.max(1e-6, depth * tanH) : orthoUnit);
+    const proj = (x, y, z) => {
+      const cw = vp[3] * x + vp[7] * y + vp[11] * z + vp[15];
+      if (cw <= 0) return null;
+      return [((vp[0] * x + vp[4] * y + vp[8] * z + vp[12]) / cw + 1) / 2 * w, (1 - (vp[1] * x + vp[5] * y + vp[9] * z + vp[13]) / cw) / 2 * h, -(vw[2] * x + vw[6] * y + vw[10] * z + vw[14])];
+    };
+    if (m.n > LETTER_DISC_LIMIT) {
+      // the 8 corners of the atoms' bounding box; `pad` covers the largest atom at the nearest corner
+      const b = this.bounds, pts = [];
+      let pad = 0;
+      if (b.min && b.max) for (const x of [b.min[0], b.max[0]]) for (const y of [b.min[1], b.max[1]]) for (const z of [b.min[2], b.max[2]]) {
+        const q = proj(x, y, z);
+        if (!q) continue;
+        pts.push([q[0], q[1]]);
+        pad = Math.max(pad, (this.maxRadius ?? 0) * unitAt(q[2]));
+      }
+      return { discs: null, hullPts: pts, pad };
+    }
+    // runs on every frame while letters are shown: plain arithmetic, no per-atom allocations
+    const p = m.positions, radii = this.radii, out = new Float32Array(3 * m.n);
+    let k = 0;
+    for (let i = 0; i < m.n; i++) {
+      const x = p[3 * i], y = p[3 * i + 1], z = p[3 * i + 2];
+      const cw = vp[3] * x + vp[7] * y + vp[11] * z + vp[15];
+      const depth = -(vw[2] * x + vw[6] * y + vw[10] * z + vw[14]);
+      if (cw <= 0 || depth <= 0) continue;
+      out[k++] = ((vp[0] * x + vp[4] * y + vp[8] * z + vp[12]) / cw + 1) / 2 * w;
+      out[k++] = (1 - (vp[1] * x + vp[5] * y + vp[9] * z + vp[13]) / cw) / 2 * h;
+      out[k++] = (radii?.[i] ?? 0.3) * unitAt(depth);
+    }
+    return { discs: out.subarray(0, k), hullPts: [], pad: 0 };
+  }
+
+  /**
+   * O, a, b, c at the ends of the displayed (super)cell edges. Each letter sits on the ray from the view
+   * centre through its edge end, just outside both the cell outline and every atom disc on that ray, so
+   * it never lands on an atom or its label. A letter that would hit another one (or the axis gizmo, or
+   * the canvas edge) turns around the centre in small steps; one far from its edge end gets a faint
+   * leader. The letters' boxes are reserved in `occ` before the atom labels are placed.
+   */
+  _drawCellLetters(g, scale, w, h, text, fg, occ, opt = {}) {
+    const m = this.model, c = this.settings.display.cell;
+    const [A, B, C] = m.cell;
+    const N = c.which === 'supercell' || c.which === 'grid' ? m.supercell : [1, 1, 1];
+    const P = (a, b, cc) => this.project(a * A[0] + b * B[0] + cc * C[0], a * A[1] + b * B[1] + cc * C[1], a * A[2] + b * B[2] + cc * C[2], w, h);
+    const corners = [];
+    for (const a of [0, N[0]]) for (const b of [0, N[1]]) for (const cc of [0, N[2]]) corners.push(P(a, b, cc));
+    if (corners.some((q) => q[2] < -1 || q[2] > 1)) return;
+    const shape = this._screenDiscs(w, h);
+    const hull = convexHull(corners.map((q) => [q[0], q[1]]).concat(shape.hullPts));
+    const D = shape.discs, nd = D ? D.length / 3 : 0;
+    const ctr = this.project(this.bounds.center.x, this.bounds.center.y, this.bounds.center.z, w, h);
+    const rho = 8 * scale, gap = 4 * scale, clear = rho + gap;   // letter half-size and clearance
+    // distance from the centre along (ux, uy) at which a letter clears the outline and every atom
+    const clearAt = (ux, uy) => {
+      let t = (hull.length > 2 ? rayExit(hull, ctr[0], ctr[1], ux, uy) ?? 0 : 0) + shape.pad + clear;
+      for (let k = 0; k < nd; k++) {
+        const dx = D[3 * k] - ctr[0], dy = D[3 * k + 1] - ctr[1], R = D[3 * k + 2] + clear;
+        const tca = dx * ux + dy * uy, d2 = dx * dx + dy * dy - tca * tca;
+        if (d2 >= R * R) continue;
+        const far = tca + Math.sqrt(R * R - d2);
+        if (far > t) t = far;
+      }
+      return t;
+    };
+    // radius of the largest atom drawn over a screen point (the corner atom a leader starts outside of)
+    const coverAt = (x, y) => {
+      let r = 0;
+      for (let k = 0; k < nd; k++) {
+        const dx = D[3 * k] - x, dy = D[3 * k + 1] - y, R = D[3 * k + 2];
+        if (dx * dx + dy * dy < R * R) r = Math.max(r, R - Math.hypot(dx, dy));
+      }
+      return r;
+    };
+    const gz = this.gizmo.size * scale;
+    const gizmo = this.settings.display.axes && (opt.export ? opt.gizmo : true) ? [8 * scale, h - 8 * scale - gz, 8 * scale + gz, h - 8 * scale] : null;
+    const placed = [];
+    const ok = (x, y) => {
+      if (x < rho || y < rho || x > w - rho || y > h - rho) return false;
+      if (gizmo && x + rho > gizmo[0] && x - rho < gizmo[2] && y + rho > gizmo[1] && y - rho < gizmo[3]) return false;
+      return placed.every((p) => Math.hypot(p[0] - x, p[1] - y) >= 2 * rho + 2 * scale);
+    };
+    const STEPS = [0, 15, -15, 30, -30, 45, -45, 60, -60, 90, -90];
+    const place = (q, fallbackDir) => {
+      let ux = q[0] - ctr[0], uy = q[1] - ctr[1];
+      if (Math.hypot(ux, uy) < 1e-3) [ux, uy] = fallbackDir;
+      const base = Math.atan2(uy, ux);
+      let first = null;
+      for (const deg of STEPS) {
+        const ang = base + deg * DEG, vx = Math.cos(ang), vy = Math.sin(ang);
+        const t = clearAt(vx, vy), x = ctr[0] + vx * t, y = ctr[1] + vy * t;
+        first ??= [x, y];
+        if (ok(x, y)) return [x, y];
+      }
+      // no free spot on the canvas: keep the letter on screen next to its edge end (if that is visible)
+      if (q[0] < 0 || q[1] < 0 || q[0] > w || q[1] > h) return null;
+      return [clamp(first[0], rho, w - rho), clamp(first[1], rho, h - rho)];
+    };
+    const draw = (q, spot, label, size, color, weight, leaderColor) => {
+      const [x, y] = spot;
+      const dist = Math.hypot(x - q[0], y - q[1]);
+      const r0 = coverAt(q[0], q[1]);
+      if (leaderColor && dist > r0 + clear + 10 * scale) {
+        // faint leader from the edge end (outside its corner atom) to the letter
+        const vx = (x - q[0]) / dist, vy = (y - q[1]) / dist;
+        g.save();
+        g.strokeStyle = leaderColor; g.globalAlpha = 0.45; g.lineWidth = 1 * scale; g.setLineDash([3 * scale, 3 * scale]);
+        g.beginPath(); g.moveTo(q[0] + vx * r0, q[1] + vy * r0); g.lineTo(x - vx * rho, y - vy * rho); g.stroke();
+        g.restore();
+      }
+      text(label, x, y, size, color, weight);
+      placed.push([x, y]);
+      occ.mark(x - rho, y - rho, x + rho, y + rho);
+    };
+    const O = P(0, 0, 0);
+    const o = place(O, [-1, 1]);
+    if (o) draw(O, o, 'O', 12, fg, 600, fg);
+    const [ca, cb, cc] = axisColors(this.overlayDark);
+    [[[N[0], 0, 0], 'a', ca], [[0, N[1], 0], 'b', cb], [[0, 0, N[2]], 'c', cc]].forEach(([idx, l, col]) => {
+      const q = P(...idx);
+      const spot = place(q, [q[0] - O[0], q[1] - O[1]]);
+      if (spot) draw(q, spot, l, 14, col, 700, col);
+    });
+  }
+
+  // ------------------------------------------------------------------ export
+  /**
+   * High-resolution PNG. Returns a Blob. With `transparent` the background is left out (bloom and
+   * depth of field keep the alpha). Labels, legend and scale bar are drawn in at the same scale.
+   * `selection` keeps the selection halo (default), `markers` adds named highlights and overlay layers
+   * whose export policy is 'marker'; the hover halo and 'never' layers are always left out (overlays.exportScope).
+   */
+  async screenshot({ scale = 2, transparent = false, gizmo = false, maxSize = 8192, selection = true, markers = false } = {}) {
+    const pr0 = this.renderer.getPixelRatio();
+    const w0 = this.width, h0 = this.height;
+    scale = Math.min(scale, maxSize / Math.max(w0, h0));
+    const W = Math.round(w0 * scale), H = Math.round(h0 * scale);
+    const bg = this.scene3.background, clearA = this.renderer.getClearAlpha(), postT = this.post.transparent;
+    this.renderer.setPixelRatio(1);
+    this.renderer.setSize(W, H, false);
+    this.post.setSize(W, H);
+    // fat lines (cell, plane and cell-outline overlays, tier B handles) keep their on-screen width relative to the picture
+    const lineMats = new Map();
+    const widen = (o) => {
+      const mat = o.material;
+      if (!mat?.isLineMaterial || lineMats.has(mat)) return;
+      lineMats.set(mat, [mat.linewidth, mat.resolution.clone()]);
+      mat.resolution.set(W, H); mat.linewidth *= scale;
+    };
+    this.root.traverse(widen);
+    this.topScene.traverse(widen);
+    const ink = this.post.ink;
+    const inkT = ink?.uniforms.thickness.value;
+    if (ink) ink.uniforms.thickness.value = inkT * scale;
+    if (transparent) { this.scene3.background = null; this.renderer.setClearAlpha(0); this.post.setTransparent(true); }
+    const out = document.createElement('canvas');
+    out.width = W; out.height = H;
+    const g = out.getContext('2d');
+    const restore = this.overlays.exportScope('png', { selection, markers });
+    try {
+      this.render({ gizmo, overlay: false });
+      g.drawImage(this.renderer.domElement, 0, 0);
+      const ov = document.createElement('canvas'); ov.width = W; ov.height = H;
+      this.drawOverlay(ov.getContext('2d'), scale, W, H, { export: true, gizmo, markers: !!markers });
+      g.drawImage(ov, 0, 0);
+    } finally {
+      restore();
+      this.scene3.background = bg; this.renderer.setClearAlpha(clearA); this.post.setTransparent(postT);
+      if (ink) ink.uniforms.thickness.value = inkT;
+      // newest first: materials sharing one resolution vector (overlays share the view's) end on the first value seen
+      [...lineMats].reverse().forEach(([mat, [lw, res]]) => { mat.linewidth = lw; mat.resolution.copy(res); });
+      this.renderer.setPixelRatio(pr0);
+      this.resize();
+      this.render();
+    }
+    return new Promise((res) => out.toBlob(res, 'image/png'));
+  }
+
+  /** Small JPEG data URL for project thumbnails: the structure only, without halos or overlay layers. */
+  thumbnail(w = 320, h = 200, quality = 0.82) {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const restore = this.overlays.exportScope('thumbnail');
+    try { this.render({ gizmo: false, overlay: false }); } finally { restore(); }
+    const src = this.renderer.domElement;
+    const s = Math.max(w / src.width, h / src.height);
+    const g = c.getContext('2d');
+    g.fillStyle = '#fff';
+    g.fillRect(0, 0, w, h);
+    g.drawImage(src, (w - src.width * s) / 2, (h - src.height * s) / 2, src.width * s, src.height * s);
+    this.render();   // draw the normal view (gizmo, labels, cell letters) again now, so view and overlay never disagree
+    return c.toDataURL('image/jpeg', quality);
+  }
+
+  /**
+   * Binary glTF (GLB). Meshes are grouped by colour (one material per element colour). Small systems
+   * are merged into plain meshes for maximum compatibility; large ones use EXT_mesh_gpu_instancing
+   * (Blender ≥ 3.6, three.js, Babylon, model-viewer) to keep files small.
+   */
+  async exportGLB({ instanced = 'auto' } = {}) {
+    const m = this.model;
+    const useInst = instanced === 'auto' ? m.n > 1500 : !!instanced;
+    const group = new THREE.Group();
+    group.name = this.structure?.name ?? 'structure';
+    const segs = m.n < 500 ? [28, 18] : m.n < 3000 ? [18, 12] : [12, 8];
+    const sphere = new THREE.SphereGeometry(1, segs[0], segs[1]);
+    const cyl = new THREE.CylinderGeometry(1, 1, 1, m.n < 3000 ? 14 : 8, 1, true);
+    const st = this.settings.style;
+    const mats = new Map();
+    const matFor = (hex) => {
+      if (!mats.has(hex)) mats.set(hex, new THREE.MeshStandardMaterial({ color: new THREE.Color(hex), roughness: st.roughness ?? 0.45, metalness: st.metalness ?? 0.05, name: hex }));
+      return mats.get(hex);
+    };
+    const tmp = new THREE.Matrix4(), col = new THREE.Color();
+    const geos = [];
+    const addGroups = (mesh, baseGeo, label) => {
+      const byColor = new Map();
+      for (let k = 0; k < mesh.count; k++) {
+        mesh.getColorAt(k, col);
+        const hex = '#' + col.clone().convertLinearToSRGB().getHexString();
+        if (!byColor.has(hex)) byColor.set(hex, []);
+        byColor.get(hex).push(k);
+      }
+      for (const [hex, idx] of byColor) {
+        if (useInst) {
+          const inst = new THREE.InstancedMesh(baseGeo, matFor(hex), idx.length);
+          idx.forEach((k, q) => { mesh.getMatrixAt(k, tmp); inst.setMatrixAt(q, tmp); });
+          inst.name = `${label} ${hex}`;
+          group.add(inst);
+        } else {
+          const parts = idx.map((k) => { mesh.getMatrixAt(k, tmp); const g = baseGeo.clone().applyMatrix4(tmp); g.deleteAttribute('uv'); return g; });
+          const merged = mergeGeometries(parts, false);
+          parts.forEach((g) => g.dispose());
+          geos.push(merged);
+          const mm = new THREE.Mesh(merged, matFor(hex));
+          mm.name = `${label} ${hex}`;
+          group.add(mm);
+        }
+      }
+    };
+    this.rep.traverse((o) => {
+      if (!o.isInstancedMesh) return;
+      if (o.userData.role === 'atoms') addGroups(o, sphere, 'atoms');
+      else if (o.userData.role === 'bonds') addGroups(o, cyl, 'bonds');
+    });
+    this.rep.traverse((o) => { if (o.userData.role === 'polyhedra') group.add(new THREE.Mesh(o.geometry.clone(), new THREE.MeshStandardMaterial({ vertexColors: true, transparent: true, opacity: o.material.opacity, side: THREE.DoubleSide, name: 'polyhedra' }))); });
+    if (this.cellObj && m.cell) {
+      const [A, B, C] = m.cell;
+      const P = (a, b, c) => new THREE.Vector3(a * A[0] + b * B[0] + c * C[0], a * A[1] + b * B[1] + c * C[1], a * A[2] + b * B[2] + c * C[2]);
+      const E = [[0, 0, 0, 1, 0, 0], [0, 0, 0, 0, 1, 0], [0, 0, 0, 0, 0, 1], [1, 0, 0, 1, 1, 0], [1, 0, 0, 1, 0, 1], [0, 1, 0, 1, 1, 0], [0, 1, 0, 0, 1, 1], [0, 0, 1, 1, 0, 1], [0, 0, 1, 0, 1, 1], [1, 1, 0, 1, 1, 1], [1, 0, 1, 1, 1, 1], [0, 1, 1, 1, 1, 1]];
+      const pts = E.flatMap((e) => [P(e[0], e[1], e[2]), P(e[3], e[4], e[5])]);
+      const cell = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: this.settings.display.cell.color ?? '#333' }));
+      cell.name = 'unit cell';
+      group.add(cell);
+    }
+    const exporter = new GLTFExporter();
+    const buf = await exporter.parseAsync(group, { binary: true });
+    geos.forEach((g) => g.dispose());
+    sphere.dispose(); cyl.dispose();
+    mats.forEach((mt) => mt.dispose());
+    return new Blob([buf], { type: 'model/gltf-binary' });
+  }
+
+  dispose() {
+    this._ro.disconnect();
+    this.controls.dispose();
+    this.post.dispose();
+    this._flushTrash();
+    this._haloGeo.dispose();
+    for (const k in this._halo) this._halo[k].material.dispose();
+    this.renderer.dispose();
+  }
+}
+
+function luminance(c) { return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b; }
+
+/** 2D convex hull (monotone chain), counter-clockwise in screen coordinates. */
+function convexHull(pts) {
+  const P = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (P.length < 3) return P;
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lower = [], upper = [];
+  for (const p of P) { while (lower.length >= 2 && cross(lower.at(-2), lower.at(-1), p) <= 0) lower.pop(); lower.push(p); }
+  for (let i = P.length - 1; i >= 0; i--) { const p = P[i]; while (upper.length >= 2 && cross(upper.at(-2), upper.at(-1), p) <= 0) upper.pop(); upper.push(p); }
+  return lower.slice(0, -1).concat(upper.slice(0, -1));
+}
+
+/** Distance along the ray (ox, oy) + t·(ux, uy) to where it leaves the convex polygon (origin inside). */
+function rayExit(hull, ox, oy, ux, uy) {
+  let best = null;
+  for (let i = 0; i < hull.length; i++) {
+    const a = hull[i], b = hull[(i + 1) % hull.length];
+    const ex = b[0] - a[0], ey = b[1] - a[1];
+    const den = ux * ey - uy * ex;
+    if (Math.abs(den) < 1e-9) continue;
+    const t = ((a[0] - ox) * ey - (a[1] - oy) * ex) / den;
+    const s = ((a[0] - ox) * uy - (a[1] - oy) * ux) / den;
+    if (t >= 0 && s >= -1e-6 && s <= 1 + 1e-6 && (best === null || t > best)) best = t;
+  }
+  return best;
+}
+
+/** Number of atoms each measurement type takes. */
+// Null prototype: names inherited from Object.prototype ('toString', '__proto__', …) are not measurement types.
+export const MEASURE_ARITY = Object.freeze(Object.assign(Object.create(null), { distance: 2, angle: 3, dihedral: 4 }));
+/** Arity of a measurement type; undefined for anything that is not exactly one of the type names (arrays, objects, symbols…). */
+export const measureArity = (type) => (typeof type === 'string' ? MEASURE_ARITY[type] : undefined);
+
+/**
+ * Distance (Å) or angle / dihedral (°) of points P; NaN for an unknown type or the wrong number of points. A dihedral
+ * has the IUPAC sign of Python's get_dihedral, in (−180°, 180°] (core/geometry.js).
+ */
+export function measureValue(type, P) {
+  if (measureArity(type) !== P?.length) return NaN;
+  if (type === 'distance') return P[0].distanceTo(P[1]);
+  if (type === 'angle') {
+    const a = P[0].clone().sub(P[1]), b = P[2].clone().sub(P[1]);
+    return (a.angleTo(b) * 180) / Math.PI;
+  }
+  const bond = (u, v) => [v.x - u.x, v.y - u.y, v.z - u.z];
+  return signedAngle(dihedralFromVectors(bond(P[0], P[1]), bond(P[1], P[2]), bond(P[2], P[3])));
+}

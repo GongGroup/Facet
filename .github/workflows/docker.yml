@@ -1,0 +1,118 @@
+name: Docker image
+
+# Every push: run the tests, build the image and start it once.
+# Pushes to main and version tags (v1.2.3) also publish the image to the GitHub Container Registry:
+#   ghcr.io/<owner>/facet:latest and :<package version>   from main
+#   ghcr.io/<owner>/facet:1.2.3 and :1.2                  from a tag v1.2.3
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+          cache: pip
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: pip install -e ".[test]"
+      - run: pytest
+        env:
+          FACET_REQUIRE_NODE: '1'
+
+  image:
+    name: Image
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # publish from main and from version tags; other branches only build and try the image
+      PUBLISH: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Package version
+        id: package
+        run: |
+          version=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' facet/_version.py)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF" == refs/tags/v* && "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match the package version $version (facet/_version.py)"
+            exit 1
+          fi
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build the image for this machine
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: facet:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Start it and ask it who it is
+        run: |
+          docker run -d --name facet -p 127.0.0.1:8765:8765 facet:ci
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8765/api/v1/health && break
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8765/api/v1/health | grep -F '"version":"${{ steps.package.outputs.version }}"'
+          curl -fsS http://127.0.0.1:8765/api/v1/info | grep -F '"name":"Facet"'
+          curl -fsS http://127.0.0.1:8765/ | grep -F '<title>Facet</title>'
+          docker exec facet facet --version
+          docker rm -f facet
+
+      - uses: docker/setup-qemu-action@v4
+        if: env.PUBLISH == 'true'
+
+      - uses: docker/login-action@v4
+        if: env.PUBLISH == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image name and tags
+        id: meta
+        if: env.PUBLISH == 'true'
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/facet
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ steps.package.outputs.version }},enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Publish for amd64 and arm64
+        if: env.PUBLISH == 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha

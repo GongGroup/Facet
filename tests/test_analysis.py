@@ -6,7 +6,7 @@ import time
 
 import numpy as np
 
-from crystallume import Structure, analysis, build
+from facet import Structure, analysis, build
 
 
 def _check_offsets(s: Structure) -> None:

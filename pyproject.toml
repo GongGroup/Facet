@@ -3,13 +3,13 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "crystallume"
+name = "facet"
 dynamic = ["version"]
 description = "Visualise and manage atoms, clusters and crystals in the browser — local app or multi-user server."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "Crystallume developers" }]
+authors = [{ name = "Facet developers" }]
 keywords = ["chemistry", "materials", "crystal", "visualization", "molecules", "cif", "poscar", "xyz"]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -33,33 +33,38 @@ dependencies = [
 test = ["pytest>=7", "httpx>=0.27", "httpx2>=2.0"]
 
 [project.scripts]
-crystallume = "crystallume.cli:main"
+facet = "facet.cli:main"
+crystallume = "facet.cli:main"   # the command's former name, kept for existing scripts
 
 # Plugins: third-party packages register themselves under the entry-point group
-# "crystallume.plugins", pointing at a module that defines `register(ctx)`:
+# "facet.plugins", pointing at a module that defines `register(ctx)`:
 #
-#   [project.entry-points."crystallume.plugins"]
-#   myplugin = "my_package.crystallume_plugin"
+#   [project.entry-points."facet.plugins"]
+#   myplugin = "my_package.facet_plugin"
 #
-# Crystallume itself ships no entry-point plugins.
+# Facet itself ships no entry-point plugins.
 
 [tool.setuptools]
 include-package-data = true
 
 [tool.setuptools.dynamic]
-version = { attr = "crystallume._version.__version__" }
+version = { attr = "facet._version.__version__" }
 
 [tool.setuptools.packages.find]
-# atomscope: the package's former name, a thin alias of crystallume for code written before the rename
-include = ["crystallume*", "atomscope"]
+# crystallume, atomscope: the package's former names, thin aliases of facet for code written before the renames
+include = ["facet*", "crystallume", "atomscope"]
 namespaces = false
 
 [tool.setuptools.package-data]
-crystallume = ["web/**/*", "data/*.json", "py.typed"]
+facet = ["web/**/*", "data/*.json", "py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+addopts = "-q -m 'not slow'"
+markers = [
+    "js: needs Node.js >= 22 (skipped when it is missing; FACET_REQUIRE_NODE=1 makes that a failure)",
+    "slow: end-to-end browser tests (run with: pytest -m slow)",
+]
 filterwarnings = [
     "ignore::DeprecationWarning:anyio.*",
     "ignore::DeprecationWarning:starlette.*",

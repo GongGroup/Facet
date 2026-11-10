@@ -1,4 +1,4 @@
-"""Hello plugin — a minimal, complete Crystallume plugin example.
+"""Hello plugin — a minimal, complete Facet plugin example.
 
 It demonstrates every extension point:
 
@@ -11,7 +11,7 @@ It demonstrates every extension point:
 
 Run it with::
 
-    crystallume serve --plugins examples/plugins
+    facet serve --plugins examples/plugins
 
 The ``.hello`` format is deliberately trivial::
 
@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from crystallume import PluginContext, Structure
+from facet import PluginContext, Structure
 
 PLUGIN = {
     "name": "hello",
@@ -107,12 +107,12 @@ router = APIRouter()
 @router.get("/hello", summary="Hello from the example plugin")
 def hello() -> dict:
     """Returns a greeting; mounted at ``/api/v1/ext/hello``."""
-    return {"message": "Hello from the Crystallume hello plugin!", "plugin": PLUGIN["name"], "version": PLUGIN["version"]}
+    return {"message": "Hello from the Facet hello plugin!", "plugin": PLUGIN["name"], "version": PLUGIN["version"]}
 
 
 # ------------------------------------------------------------------ register
 def register(ctx: PluginContext) -> None:
-    """Entry point called by Crystallume's plugin manager."""
+    """Entry point called by Facet's plugin manager."""
     ctx.register_reader("hello", read_hello, extensions=[".hello"], description="Toy .hello format (example plugin)")
     ctx.register_writer("hello", write_hello, extensions=[".hello"], description="Toy .hello format (example plugin)")
     ctx.register_builder("hello-chain", build_chain, CHAIN_META)

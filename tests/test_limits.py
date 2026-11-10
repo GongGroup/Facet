@@ -6,8 +6,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from crystallume.config import Settings
-from crystallume.server import create_app
+from facet.config import Settings
+from facet.server import create_app
 
 NACL = {"symbols": ["Na", "Cl"], "positions": [[0, 0, 0], [2.82, 0, 0]], "cell": [[5.64, 0, 0], [0, 5.64, 0], [0, 0, 5.64]], "pbc": [True, True, True]}
 

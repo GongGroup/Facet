@@ -8,9 +8,9 @@ import time
 
 import pytest
 
-import crystallume as cl
-from crystallume import build
-from crystallume.storage import (
+import facet as cl
+from facet import build
+from facet.storage import (
     LocalFileStore,
     ProjectNotFound,
     ProjectTooLarge,
@@ -39,7 +39,7 @@ def _crud(store, owner="u1"):
     doc = store.create(owner, _project())
     pid = doc["id"]
     assert pid.startswith("p_") and len(pid) == 12
-    assert doc["created"] and doc["updated"] and doc["schema"] == "crystallume.project/1"
+    assert doc["created"] and doc["updated"] and doc["schema"] == "facet.project/1"
     assert doc["scene"] == {"style": {"atomScale": 0.4}, "camera": {"zoom": 2}}  # opaque round trip
 
     summaries = store.list(owner)
@@ -226,7 +226,7 @@ def test_sqlite_users_and_tokens(tmp_path):
 # ---------------------------------------------------------------- optimistic locking & summaries
 @pytest.mark.parametrize("kind", ["local", "sqlite"])
 def test_update_conflicts_and_formula(tmp_path, kind):
-    from crystallume.storage.base import ProjectConflict
+    from facet.storage.base import ProjectConflict
 
     store = LocalFileStore(tmp_path / "p") if kind == "local" else SQLiteStore(tmp_path / "db.sqlite", secret="x")
     doc = store.create("u", {**_project(), "baseUpdated": "junk", "location": {"provider": "server"}})
@@ -320,7 +320,7 @@ def test_search_fields_match_web_app(tmp_path, kind):
 def test_copied_folder_with_same_timestamps_keeps_original_id(tmp_path):
     """A folder copied while the server was stopped ('Copy of …', timestamps preserved) gets the new id."""
     import shutil
-    from crystallume.storage.local import LocalFileStore
+    from facet.storage.local import LocalFileStore
 
     store = LocalFileStore(tmp_path)
     doc = store.create("local", {"name": "study", "structures": []})

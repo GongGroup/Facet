@@ -1,14 +1,15 @@
 # Data formats
 
 The Python server and the web app share two JSON formats: one for a **structure** and one for a
-**project**. Files from before the rename from AtomScope say `"schema": "atomscope.structure/1"` or
-`"atomscope.project/1"`; they are read the same way, and new files always use the `crystallume.*` names.
+**project**. Files written under the app's former names say `"schema": "crystallume.structure/1"`,
+`"crystallume.project/1"`, `"atomscope.structure/1"` or `"atomscope.project/1"`; they are read the same way, and
+new files always use the `facet.*` names.
 
-## Structure — `crystallume.structure/1`
+## Structure — `facet.structure/1`
 
 ```json
 {
-  "schema": "crystallume.structure/1",
+  "schema": "facet.structure/1",
   "name": "Cu fcc 3x3x3",
   "symbols": ["Cu", "Cu"],
   "positions": [[0.0, 0.0, 0.0], [1.805, 1.805, 0.0]],
@@ -27,11 +28,11 @@ The Python server and the web app share two JSON formats: one for a **structure*
   1 to n−1, and each frame may have its own `cell`.
 - `props` holds optional per-atom arrays (as long as `symbols`); `info` is free-form metadata.
 
-## Project — `crystallume.project/1`
+## Project — `facet.project/1`
 
 ```json
 {
-  "schema": "crystallume.project/1",
+  "schema": "facet.project/1",
   "id": "p_8f3a91c2d4",
   "name": "Perovskite study",
   "description": "",

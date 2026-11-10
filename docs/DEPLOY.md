@@ -1,25 +1,25 @@
-# Running Crystallume
+# Running Facet
 
-Crystallume runs in four ways:
+Facet runs in four ways:
 
 | Mode | Good for | Start it with |
 |---|---|---|
-| [Local](#local-mode) | one person on their own computer | `crystallume serve --open` |
-| [Cloud](#cloud-mode) | a group sharing one server, with accounts | `crystallume serve --mode cloud` |
+| [Local](#local-mode) | one person on their own computer | `facet serve --open` |
+| [Cloud](#cloud-mode) | a group sharing one server, with accounts | `facet serve --mode cloud` |
 | [Docker](#docker) | either of the above, in a container | `docker compose up -d` |
 | [Static](#static-website-no-server) | any web host, or a claude.ai artifact; no server needed | `python scripts/build_artifact.py` |
 
-Install first with `pip install .` in this folder. Crystallume needs Python 3.10 or newer, and only four
+Install first with `pip install .` in this folder. Facet needs Python 3.10 or newer, and only four
 packages: fastapi, uvicorn, numpy and python-multipart.
 
 ## Local mode
 
 ```bash
-crystallume serve --open                          # http://127.0.0.1:8765
-crystallume serve --port 9000 --data ~/my-atoms   # another port and data folder
+facet serve --open                          # http://127.0.0.1:8765
+facet serve --port 9000 --data ~/my-atoms   # another port and data folder
 ```
 
-There is no login. Each project is a folder in `~/.crystallume/projects/` (or `<data folder>/projects/`):
+There is no login. Each project is a folder in `~/.facet/projects/` (or `<data folder>/projects/`):
 
 ```
 projects/
@@ -40,7 +40,7 @@ with `--host 0.0.0.0`, anyone who can reach it can read, change and delete your 
 about this when it starts. Use [cloud mode](#cloud-mode) instead, or require a token:
 
 ```bash
-CRYSTALLUME_TOKEN=<long random string> crystallume serve --host 0.0.0.0
+FACET_TOKEN=<long random string> facet serve --host 0.0.0.0
 ```
 
 In the app, sign in as user `local` with the token as the password. API clients send
@@ -51,28 +51,28 @@ The server also protects you in these ways:
 - Wrong tokens count as failed sign-ins. After 10 failures in 5 minutes from one address it answers `429`.
   It warns at start-up about a short token or a placeholder such as `change-me`.
 - Other websites cannot use your browser to change your projects. Write requests from another site get `403`,
-  unless that site is listed in `CRYSTALLUME_CORS_ORIGINS`, and JSON must be sent as `application/json`.
+  unless that site is listed in `FACET_CORS_ORIGINS`, and JSON must be sent as `application/json`.
 - Without a token, a server on `127.0.0.1` only answers to `localhost` names, which blocks DNS rebinding.
-  To reach it under another name, set `CRYSTALLUME_ALLOWED_HOSTS=<name>` or a token.
+  To reach it under another name, set `FACET_ALLOWED_HOSTS=<name>` or a token.
 
 ## Cloud mode
 
 ```bash
-crystallume serve --mode cloud --host 0.0.0.0 --data /srv/crystallume
-crystallume user create alice --data /srv/crystallume     # asks for a password
+facet serve --mode cloud --host 0.0.0.0 --data /srv/facet
+facet user create alice --data /srv/facet     # asks for a password
 ```
 
 - Everyone signs in and sees only their own projects.
-- Accounts and projects are stored in `<data folder>/crystallume.db` (SQLite). Passwords are stored as salted
+- Accounts and projects are stored in `<data folder>/facet.db` (SQLite). Passwords are stored as salted
   scrypt hashes, and only an HMAC of each sign-in token is kept.
 - **Sign-up** is open when the server listens on a loopback address and **closed** on any other address,
-  such as `0.0.0.0`. Create accounts with `crystallume user create` (there are also `user list`,
-  `user passwd` and `user delete`). Change the default with `CRYSTALLUME_ALLOW_REGISTRATION`, or turn sign-up
+  such as `0.0.0.0`. Create accounts with `facet user create` (there are also `user list`,
+  `user passwd` and `user delete`). Change the default with `FACET_ALLOW_REGISTRATION`, or turn sign-up
   off with `--no-registration`.
-- Sign-ins expire after 30 days without use (`CRYSTALLUME_TOKEN_TTL_DAYS`; `0` means never).
+- Sign-ins expire after 30 days without use (`FACET_TOKEN_TTL_DAYS`; `0` means never).
 - Project routes and server-side analyses need `Authorization: Bearer <token>`.
 - Analyses, uploads and request bodies have size limits. Builders make at most 200 000 atoms
-  (`CRYSTALLUME_MAX_ATOMS`).
+  (`FACET_MAX_ATOMS`).
 - **Edits never overwrite each other silently.** When two people, or two tabs, change the same project, a save
   based on an old version is refused with `409`. The app then offers to reload, save a copy or overwrite.
   The protocol is described in [SCHEMA.md](SCHEMA.md#concurrent-edits-etag-if-match-409).
@@ -82,55 +82,72 @@ crystallume user create alice --data /srv/crystallume     # asks for a password
 
 ## Docker
 
+The image is published at `ghcr.io/mastreina/facet` for amd64 and arm64 computers. `latest` follows the main
+branch; version tags such as `0.3.2` stay fixed.
+
+```bash
+docker run -d -p 8765:8765 -v facet-data:/data --name facet ghcr.io/mastreina/facet     # cloud mode
+docker exec facet facet user create alice
+
+# local mode: projects as folders in ./facet-data/projects/, reachable from this computer only
+mkdir -p facet-data
+docker run -p 127.0.0.1:8765:8765 --user "$(id -u):$(id -g)" -v "$PWD/facet-data:/data" \
+  -e FACET_MODE=local -e FACET_TOKEN=<long random string> ghcr.io/mastreina/facet
+```
+
+Or with Docker Compose, from a checkout:
+
 ```bash
 docker compose up -d                                       # cloud mode; data in a Docker volume
-docker compose exec crystallume crystallume user create alice
+docker compose exec facet facet user create alice
 ```
 
-Or with plain Docker:
+Compose pulls the published image, and builds it from the checkout when it cannot. To build it yourself, run
+`docker build -t facet .`.
 
-```bash
-docker build -t crystallume .
-docker run -p 8765:8765 -v crystallume-data:/data crystallume          # cloud mode
-
-# local mode: projects as folders in ./crystallume-data/projects/, reachable from this computer only
-mkdir -p crystallume-data
-docker run -p 127.0.0.1:8765:8765 --user "$(id -u):$(id -g)" -v "$PWD/crystallume-data:/data" \
-  -e CRYSTALLUME_MODE=local -e CRYSTALLUME_TOKEN=<long random string> crystallume
-```
+- While the image is private, sign in first: `docker login ghcr.io` with a GitHub user name and a token that
+  may read packages.
+- To update, pull the image again (`docker pull ghcr.io/mastreina/facet`, or `docker compose pull`) and start
+  a new container on the same volume.
 
 - The image runs as user id 1000. Create a mounted folder before you start, and pass
   `--user "$(id -u):$(id -g)"` so the container uses it as you. Otherwise Docker creates the folder owned
   by root and the server stops with "permission denied".
 - In local mode the token is the sign-in password (user `local`).
-- The compose file stores data in the `atomscope_atomscope-data` volume, a name kept from before the rename.
-  See [Upgrading from AtomScope](#upgrading-from-atomscope).
+- The compose file stores data in the `atomscope_atomscope-data` volume, a name kept from the app's first name.
+  See [Upgrading from Crystallume or AtomScope](#upgrading-from-crystallume-or-atomscope).
+
+### How the image is published
+
+`.github/workflows/docker.yml` runs on every push: it runs the tests, builds the image and starts it once.
+A push to `main` also publishes `latest` and the package version (`facet/_version.py`); a tag such as `v0.4.0`
+publishes `0.4.0` and `0.4`. The tag has to match the package version.
 
 ## Behind a reverse proxy
 
-To serve Crystallume under a path of another site, say `https://lab.example.org/crystallume/`:
+To serve Facet under a path of another site, say `https://lab.example.org/facet/`:
 
 ```bash
-crystallume serve --mode cloud --root-path /crystallume        # or CRYSTALLUME_ROOT_PATH=/crystallume
+facet serve --mode cloud --root-path /facet        # or FACET_ROOT_PATH=/facet
 ```
 
 ```nginx
-location /crystallume/ {
+location /facet/ {
     proxy_pass http://127.0.0.1:8765/;        # strips the prefix; keeping it (no final /) works too
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
-    client_max_body_size 100m;                # match CRYSTALLUME_MAX_UPLOAD_MB
+    client_max_body_size 100m;                # match FACET_MAX_UPLOAD_MB
 }
 ```
 
-- The app uses relative URLs, so nothing else needs changing. `/crystallume` redirects to `/crystallume/`.
+- The app uses relative URLs, so nothing else needs changing. `/facet` redirects to `/facet/`.
 - **Set the proxy's address** when the proxy runs on another host or in another container:
-  `CRYSTALLUME_FORWARDED_ALLOW_IPS=<address or network>` (for example the Docker network `172.28.0.0/16`),
+  `FACET_FORWARDED_ALLOW_IPS=<address or network>` (for example the Docker network `172.28.0.0/16`),
   or `--forwarded-allow-ips`. Sign-in limits count per client address. Without this setting every user seems
   to come from the proxy, and one person's wrong passwords lock everyone out. Never use `*`: any client that
   reaches the port directly could then fake its address to dodge the limits.
-- To show the app in an `<iframe>` on another site, set `CRYSTALLUME_FRAME_ANCESTORS="'self' https://your-site"`.
+- To show the app in an `<iframe>` on another site, set `FACET_FRAME_ANCESTORS="'self' https://your-site"`.
 
 ## Static website (no server)
 
@@ -173,23 +190,23 @@ Command-line flags win over environment variables.
 
 | Variable | Meaning | Default |
 |---|---|---|
-| `CRYSTALLUME_HOST` / `CRYSTALLUME_PORT` | address and port to listen on | `127.0.0.1` / `8765` |
-| `CRYSTALLUME_MODE` | `local` or `cloud` | `local` |
-| `CRYSTALLUME_DATA_DIR` | data folder | `~/.crystallume` |
-| `CRYSTALLUME_PLUGIN_DIRS` | plugin folders, separated by `:` or `,` | — |
-| `CRYSTALLUME_ALLOW_REGISTRATION` | allow sign-up in cloud mode | `true` on a loopback address, else `false` |
-| `CRYSTALLUME_TOKEN` | local mode: require this token | — (no sign-in) |
-| `CRYSTALLUME_TOKEN_TTL_DAYS` | cloud sign-ins expire after this many unused days (`0` = never) | `30` |
-| `CRYSTALLUME_MAX_ATOMS` | most atoms a builder may make | `200000` |
-| `CRYSTALLUME_SECRET` | server secret, used to hash tokens | generated and kept in `secret.key` |
-| `CRYSTALLUME_CORS_ORIGINS` | other origins allowed to call the API, comma separated | — |
-| `CRYSTALLUME_FRAME_ANCESTORS` | sites allowed to show the app in an iframe (CSP `frame-ancestors`) | — (same site only) |
-| `CRYSTALLUME_ROOT_PATH` | URL prefix behind a reverse proxy (`--root-path`) | — |
-| `CRYSTALLUME_FORWARDED_ALLOW_IPS` | reverse-proxy addresses or networks whose `X-Forwarded-For` and `X-Forwarded-Proto` headers are trusted, comma separated (`--forwarded-allow-ips`; avoid `*`) | — (`127.0.0.1` only) |
-| `CRYSTALLUME_ALLOWED_HOSTS` | extra host names a token-less local server on a loopback address answers to, comma separated (`*` = any) | — (localhost names) |
-| `CRYSTALLUME_MAX_PROJECT_MB` / `CRYSTALLUME_MAX_UPLOAD_MB` | size limits for projects and uploads | `50` / `100` |
-| `CRYSTALLUME_WEB_DIR` | serve the web app from another folder (`--web-dir`) | the packaged `crystallume/web` |
-| `CRYSTALLUME_LOG_LEVEL` | log level (`--log-level`) | `info` |
+| `FACET_HOST` / `FACET_PORT` | address and port to listen on | `127.0.0.1` / `8765` |
+| `FACET_MODE` | `local` or `cloud` | `local` |
+| `FACET_DATA_DIR` | data folder | `~/.facet` |
+| `FACET_PLUGIN_DIRS` | plugin folders, separated by `:` or `,` | — |
+| `FACET_ALLOW_REGISTRATION` | allow sign-up in cloud mode | `true` on a loopback address, else `false` |
+| `FACET_TOKEN` | local mode: require this token | — (no sign-in) |
+| `FACET_TOKEN_TTL_DAYS` | cloud sign-ins expire after this many unused days (`0` = never) | `30` |
+| `FACET_MAX_ATOMS` | most atoms a builder may make | `200000` |
+| `FACET_SECRET` | server secret, used to hash tokens | generated and kept in `secret.key` |
+| `FACET_CORS_ORIGINS` | other origins allowed to call the API, comma separated | — |
+| `FACET_FRAME_ANCESTORS` | sites allowed to show the app in an iframe (CSP `frame-ancestors`) | — (same site only) |
+| `FACET_ROOT_PATH` | URL prefix behind a reverse proxy (`--root-path`) | — |
+| `FACET_FORWARDED_ALLOW_IPS` | reverse-proxy addresses or networks whose `X-Forwarded-For` and `X-Forwarded-Proto` headers are trusted, comma separated (`--forwarded-allow-ips`; avoid `*`) | — (`127.0.0.1` only) |
+| `FACET_ALLOWED_HOSTS` | extra host names a token-less local server on a loopback address answers to, comma separated (`*` = any) | — (localhost names) |
+| `FACET_MAX_PROJECT_MB` / `FACET_MAX_UPLOAD_MB` | size limits for projects and uploads | `50` / `100` |
+| `FACET_WEB_DIR` | serve the web app from another folder (`--web-dir`) | the packaged `facet/web` |
+| `FACET_LOG_LEVEL` | log level (`--log-level`) | `info` |
 
 ## REST API
 
@@ -212,25 +229,35 @@ curl -s localhost:8765/api/v1/build/crystal -H 'content-type: application/json' 
 curl -s -F file=@POSCAR localhost:8765/api/v1/io/parse
 ```
 
-From Python, `crystallume.Client` has a method for every endpoint; see
+From Python, `facet.Client` has a method for every endpoint; see
 [PLUGINS.md §7](PLUGINS.md#7-python-api-rest-client-and-cli).
 
-## Upgrading from AtomScope
+## Upgrading from Crystallume or AtomScope
 
-Crystallume used to be called AtomScope. Everything from that version still works: project files
-(`atomscope.project/1`, `*.atomscope.json`), `ATOMSCOPE_*` settings, the `~/.atomscope` data folder (and a
-cloud server's `atomscope.db`), `atomscope.plugins` entry points, `import atomscope`, `window.atomscope` and
-`atomscope:*` embedding messages.
+Facet used to be called Crystallume, and before that AtomScope. Everything from those versions still works:
+
+| | Crystallume | AtomScope |
+|---|---|---|
+| Project and structure files | `crystallume.project/1`, `*.crystallume.json` | `atomscope.project/1`, `*.atomscope.json` |
+| Settings | `CRYSTALLUME_*` | `ATOMSCOPE_*` |
+| Data folder, cloud database | `~/.crystallume`, `crystallume.db` | `~/.atomscope`, `atomscope.db` |
+| Plugins | `crystallume.plugins` entry points | `atomscope.plugins` entry points |
+| Python | `import crystallume`, the `crystallume` command | `import atomscope` |
+| Web page | `window.crystallume`, `crystallume:*` messages | `window.atomscope`, `atomscope:*` messages |
+
+When the same setting is given under several names, `FACET_*` wins, then `CRYSTALLUME_*`, then `ATOMSCOPE_*`.
+An existing data folder keeps being used: `~/.facet` first, then `~/.crystallume`, then `~/.atomscope`.
+New files are written with the `facet.*` names, so older versions cannot open them.
 
 With Docker Compose:
 
-- The service is now called `crystallume`. Run `docker compose up -d --remove-orphans` once, so the old
-  `atomscope` container stops and frees the port.
-- `docker-compose.yml` keeps the old project name `atomscope`, so your data stays in the
+- The service is now called `facet`. Run `docker compose up -d --remove-orphans` once, so the old
+  `crystallume` or `atomscope` container stops and frees the port.
+- `docker-compose.yml` keeps the first project name, `atomscope`, so your data stays in the
   `atomscope_atomscope-data` volume, even if you rename the folder or clone it again.
-- If your old checkout folder had another name, such as `atomscope-main`, that name was the project name.
-  Put `COMPOSE_PROJECT_NAME=<old folder name>` in a `.env` file next to the compose file, or run
+- If your AtomScope checkout folder had another name, such as `atomscope-main`, that name was the project
+  name. Put `COMPOSE_PROJECT_NAME=<old folder name>` in a `.env` file next to the compose file, or run
   `docker compose -p <old folder name> …`. Otherwise compose starts with a new, empty volume and leaves the
   old container running.
-- With `docker run`, keep mounting your old volume (for example `-v atomscope-data:/data`); `-e ATOMSCOPE_*`
-  options still work.
+- With `docker run`, keep mounting your old volume (for example `-v atomscope-data:/data`); `-e CRYSTALLUME_*`
+  and `-e ATOMSCOPE_*` options still work.

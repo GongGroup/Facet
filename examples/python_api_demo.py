@@ -1,4 +1,4 @@
-"""Crystallume Python API tour.
+"""Facet Python API tour.
 
 Run from the repository root::
 
@@ -15,8 +15,8 @@ import argparse
 import tempfile
 from pathlib import Path
 
-import crystallume as cl
-from crystallume import analysis, build
+import facet as cl
+from facet import analysis, build
 
 
 def offline_tour(outdir: Path) -> cl.Structure:
@@ -57,7 +57,7 @@ def offline_tour(outdir: Path) -> cl.Structure:
 
     # 5. Projects -------------------------------------------------------------
     doc = cl.new_project("Demo project", [sto, au55], tags=["demo"])
-    cl.save_project(outdir / "demo.crystallume.json", doc)
+    cl.save_project(outdir / "demo.facet.json", doc)
     print("project saved:", doc["id"], [s["name"] for s in doc["structures"]])
     return sto
 

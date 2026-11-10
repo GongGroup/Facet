@@ -1,21 +1,21 @@
-# Scripting and extending Crystallume
+# Scripting and extending Facet
 
-Crystallume is built from **registries**: lists of file formats, builders, representations, materials,
+Facet is built from **registries**: lists of file formats, builders, representations, materials,
 colour schemes, lighting presets, environment maps, looks, samples, analyses, storage backends, panels and
 commands. A **plugin** adds entries to them. There are two kinds of plugin, and one plugin can be both:
 
 | Kind | Runs in | Can add | Loaded from |
 |---|---|---|---|
-| **Python plugin** | the server and the command line | file readers and writers, structure builders, analyses, REST routes, presets for the app, static files | `--plugins DIR`, `CRYSTALLUME_PLUGIN_DIRS`, entry points |
-| **JavaScript plugin** | the browser | anything in the app (every registry in §3) | a Python plugin's `add_frontend_module`, `plugins.json`, `?plugin=`, `crystallume.plugins.load()` |
+| **Python plugin** | the server and the command line | file readers and writers, structure builders, analyses, REST routes, presets for the app, static files | `--plugins DIR`, `FACET_PLUGIN_DIRS`, entry points |
+| **JavaScript plugin** | the browser | anything in the app (every registry in §3) | a Python plugin's `add_frontend_module`, `plugins.json`, `?plugin=`, `facet.plugins.load()` |
 
 ## Your first plugin
 
 ```bash
-crystallume plugins new my-plugin --dir ./plugins      # writes plugin.py and static/my-plugin.js
-crystallume plugins --plugins ./plugins                # check that it loads (status ok or ERROR)
-crystallume serve --plugins ./plugins                  # open http://127.0.0.1:8765
-crystallume analyze my-plugin-count POSCAR --plugins ./plugins
+facet plugins new my-plugin --dir ./plugins      # writes plugin.py and static/my-plugin.js
+facet plugins --plugins ./plugins                # check that it loads (status ok or ERROR)
+facet serve --plugins ./plugins                  # open http://127.0.0.1:8765
+facet analyze my-plugin-count POSCAR --plugins ./plugins
 ```
 
 The new plugin adds an analysis (shown under Analyses in the Structure panel), a look and a browser module.
@@ -24,10 +24,10 @@ Edit `plugins/my-plugin/plugin.py` and restart the server to see your changes.
 
 **Look things up as you go.** In the app, **Help › Scripting & API** lists every registry entry, command,
 scene setting and event (click one to copy a call), and shows each plugin's status. In the browser console,
-`crystallume.help()` prints the same lists as tables.
+`facet.help()` prints the same lists as tables.
 
 **Contents:** [1. Python plugins](#1-python-plugins) · [2. JavaScript plugins](#2-javascript-plugins) ·
-[3. Registries](#3-registries-and-entry-shapes) · [4. JavaScript API](#4-the-javascript-api-windowcrystallume) ·
+[3. Registries](#3-registries-and-entry-shapes) · [4. JavaScript API](#4-the-javascript-api-windowfacet) ·
 [5. Scene settings](#5-scene-settings) · [6. Embedding](#6-embedding-postmessage) ·
 [7. Python API, REST client and CLI](#7-python-api-rest-client-and-cli)
 
@@ -39,7 +39,7 @@ A Python plugin is a module with a `register(ctx)` function and, optionally, a `
 
 ```python
 # plugins/my_plugin/plugin.py
-from crystallume import PluginContext, Structure
+from facet import PluginContext, Structure
 
 PLUGIN = {"name": "my-plugin", "version": "0.1.0", "description": "What it adds."}
 
@@ -52,17 +52,17 @@ def register(ctx: PluginContext) -> None:
 
 ### How plugins are found and loaded
 
-1. **Found.** Crystallume loads every sub-folder of a plugin folder that contains `plugin.py`, and every
+1. **Found.** Facet loads every sub-folder of a plugin folder that contains `plugin.py`, and every
    top-level `*.py` file (except names starting with `_` or `.`). An installed package can declare an
    entry point instead (a module or a `register` function):
    ```toml
-   [project.entry-points."crystallume.plugins"]
-   myplugin = "my_package.crystallume_plugin"
+   [project.entry-points."facet.plugins"]
+   myplugin = "my_package.facet_plugin"
    ```
-2. **Registered.** `register(ctx)` runs once. Readers and writers join the global `crystallume.io`
+2. **Registered.** `register(ctx)` runs once. Readers and writers join the global `facet.io`
    registry; builders, analyses, routes, presets and frontend modules are kept with the plugin.
 3. **Failed?** If importing the plugin or `register` raises an error, the plugin is listed with
-   `status: "error"` and the message (in `crystallume plugins`, `GET /api/v1/plugins` and one notice in the
+   `status: "error"` and the message (in `facet plugins`, `GET /api/v1/plugins` and one notice in the
    app), and its readers and writers are removed again. A broken plugin never stops the server.
 4. **Used.**
    - The server runs builders at `POST /api/v1/build/custom/{name}` and analyses at
@@ -72,10 +72,11 @@ def register(ctx: PluginContext) -> None:
    - `/api/v1/info` lists everything for the app, where the plugin's formats, builders and analyses appear
      by themselves.
    - The CLI loads the same plugins for `convert`, `info`, `formats`, `build` and `analyze`.
-   - In Python: `crystallume.load_plugins(["./plugins"])`.
+   - In Python: `facet.load_plugins(["./plugins"])`.
 
-Plugins written for AtomScope keep working: the entry-point group `atomscope.plugins` is still searched
-(a package listed in both groups loads once), and `import atomscope` gives the matching `crystallume` module.
+Plugins written for Crystallume or AtomScope keep working: the entry-point groups `crystallume.plugins` and
+`atomscope.plugins` are still searched (a package listed in several groups loads once), and `import crystallume`
+or `import atomscope` gives the matching `facet` module.
 
 ### `PluginContext`
 
@@ -154,9 +155,9 @@ export default async function activate(api) {
    - every entry of `plugins.json` next to `index.html`;
    - without a server only, each same-origin `?plugin=<url>` in the address.
 
-   Any script can load one later with `await crystallume.plugins.load(url, { name })`.
+   Any script can load one later with `await facet.plugins.load(url, { name })`.
 2. **Activated.** The module is imported (relative URLs resolve against the page) and its default export,
-   or `activate`, is called with the API object (`window.crystallume`). It may be `async`. Each URL loads
+   or `activate`, is called with the API object (`window.facet`). It may be `async`. Each URL loads
    only once; loading it again returns the same result.
 3. **Registered.** Every `api.register*` call checks the entry and throws if a required field is missing
    (for example `samples.register: missing build()`).
@@ -167,7 +168,7 @@ export default async function activate(api) {
      brings the old one back.
    - Entries registered during activation are tagged with `plugin: <name>`.
 4. **Failed?** If the import or `activate` throws, its registrations are undone. The plugin is listed with
-   `status: 'error'` in `crystallume.plugins.list()` and in Help › Scripting & API › Server, and the app
+   `status: 'error'` in `facet.plugins.list()` and in Help › Scripting & API › Server, and the app
    shows one notice at start-up.
 
 ### `plugins.json`
@@ -202,7 +203,7 @@ Required fields are **bold**. `api.registry.<name>` exposes each registry with `
 | `registerFormat(f)` | `formats` | **`id`**, `name`, `extensions: ['xyz']`, `filenames: ['POSCAR']`, `mime`, `description`, **`read(text, filename) → Structure`** and/or **`write(structure) → string`** (either may return a Promise; set `server: true` for formats handled by the server) |
 | `registerStyle(s)` | `styles` (representations) | **`id`**, `name`, `description`, `icon` (inline SVG), `defaults` (style settings applied with it), `bonds: bool`, `inPlaceRadii`, **`build(ctx) → THREE.Object3D`** |
 | `registerMaterial(m)` | `materials` | **`id`**, `name`, `description`, `swatch`, **`create(params, { THREE }) → THREE.Material`**, `update?(material, params)`, `transparent`, `prefersDark`; params = `{roughness, metalness, opacity, envIntensity}` |
-| `registerColorScheme(c)` | `colorSchemes` | **`id`**, `name`, `description`, `group: 'Element' \| 'Per atom'`, **`colorFor(symbol, index, ctx) → '#rrggbb'`**, `legend?(ctx) → {colormap, min, max, label}` |
+| `registerColorScheme(c)` | `colorSchemes` | **`id`**, `name`, `description`, `group: 'Element' \| 'Per atom'`, **`colorFor(symbol, index, ctx) → '#rrggbb'`**, `legend?(ctx) → {colormap, min, max, label}` or `{kind: 'categories', label, items: [{label, color}]}`, `dependsOn: ['display.…']` (scene paths whose values recolour the atoms when they change); `ctx` also holds the read-only `structure`, `scene` and `extras` (values the app adds with `app.registerColorExtra(key, app => value)`) |
 | `registerLightingPreset(p)` | `lighting` | **`id`**, `name`, `description`, `swatch`, `key`/`fill`/`rim` `{intensity, color, azimuth, elevation}`, `hemi {intensity, sky, ground}`, `ambient {intensity, color}`, `env {enabled, intensity, map}`, `extra: [light, …]` (omitted parts get defaults) |
 | `registerEnvironmentMap(m)` | `environmentMaps` | **`id`**, `name`, `description`, **`build() → THREE.Scene`** (rendered into a PMREM environment) |
 | `registerLook(l)` | `looks` | **`id`**, `name`, `description`, `swatch` (CSS background), `ball` (optional CSS background of a sphere drawn in the middle of the card; `swatch` is then its backdrop), **`scene`** (partial scene, §5), `backgroundDark`, `cellDark`, `hidden` |
@@ -212,8 +213,19 @@ Required fields are **bold**. `api.registry.<name>` exposes each registry with `
 | `registerStorage(p)` | `storage` | **`id`**, `label`, `icon`, `description`, `where`, `init()`, `available()`, **`list(q?)`**, **`get(id)`**, **`save(project, {force}?)`**, `remove(id)` — `save` rejects with `err.code = 'conflict' \| 'auth' \| 'offline'` |
 | `registerPanel(p)` | `panels.left` | **`id`**, `title`, `icon` (icon name), `tip`, **`render(app, el, shell)`**, `headActions?(app, shell) → [Node]`, `refreshOn: ['project', 'structure', 'selection', 'measure', …]`, `signature?(app) → string` (skip re-renders while it is unchanged) |
 | `registerInspectorTab(t)` | `panels.inspector` | **`id`**, `title`, `icon`, `tip`, **`render(app, el, shell)`** |
+| `registerPanelSection(panelId, s)` | sections of the Surface panel (`'surface'`) and the Structure panel (`'structure'`) | **`id`**, **`title`**, `order` (100), `slot` (Structure panel: `'cell'` after the summary or `'transform'` after the selection), `defaultOpen` (true), **`render(app, el, shell, ctx)`**, `available?(app) → true \| reason`, `emptyActions?(app) → [Node]`, `signature?(app) → string`, `refreshOn` (`['project', 'structure']`), `badge?(app) → string` |
+| `registerSelectionAction(a)` | selection-card buttons and atom-menu items | **`id`**, **`label`**, `short`, `icon`, `tip` (strings or `(app, sel) → string`), `kbd`, `order` (100), `card` (true), `menu` (`true`: atom menu, `'blank'`: menu on empty space, `'both'`, `false`), `when?(app, sel)`, `enabled?(app, sel)`, **`run(app, sel, ctx)`** and/or `items?(app, sel) → [{id, label, …}]`, `rows?(app, sel) → [{label, value}]` |
+| `registerAtomInfo(fn, {order})` | lines of the atom hover card and the selection card | `fn(app, index, { where: 'hover' \| 'card' }) → [{label, value}] \| null` |
 
 Two registries are read-only: `prototypes` and `clusters` (the crystal and cluster builders).
+
+**Panel sections** are collapsible (`details.sec`) and each is drawn again on its own when an event in its `refreshOn`
+changes its `signature`. While `available(app)` returns a reason, the section shows only that sentence and the
+buttons of `emptyActions`; `ui/sections.js` exports `requireCell`, `requireVacuumGap`, `requireNoPreview` and
+`requireBootTask` for this. `openSection(panelId, id, { focus, tab })` (or `shell.openLeft(panelId, { section, focus, tab })`)
+opens a panel at a section. **Selection actions** show on the selection card in `order` (up to 7 buttons, 5 on touch
+and narrow screens, the rest under More) and in the atom menu after *Measure from here*; there `sel` is the whole
+selection when the clicked atom is part of it, else that atom, and `ctx = {source, atom, display}`.
 
 **A representation's `build(ctx)`** receives
 `ctx = { model, colors, radii, settings, atomMaterial, bondMaterial, segments, showBonds, resolution, THREE, helpers }`:
@@ -236,9 +248,9 @@ Two registries are read-only: `prototypes` and `clusters` (the crystal and clust
 
 ---
 
-## 4. The JavaScript API (`window.crystallume`)
+## 4. The JavaScript API (`window.facet`)
 
-`window.atomscope` (the former name) is the same object.
+`window.crystallume` and `window.atomscope` (the former names) are the same object.
 
 | Member | Description |
 |---|---|
@@ -253,28 +265,29 @@ Two registries are read-only: `prototypes` and `clusters` (the crystal and clust
 | `view(axis)`, `resetView()`, `fit()`, `orbit(dAz°, dEl°)`, `rotate(axis, deg°)`, `pan(dx, dy)`, `zoom(factor)`, `getCamera()`, `setCamera(c)` | camera (`rotate` turns the model about a screen axis, `'x'` right, `'y'` up or `'z'` towards the viewer, as the arrow keys do) |
 | `atomsInRect(x0, y0, x1, y1)`, `atomsInPolygon([[x, y], …])` | source indices of the atoms drawn inside a client-space rectangle or polygon (box and lasso selection) |
 | `select(indices, {mode})`, `clearSelection()`, `selectAll()`, `selectSameElement(symbols?)`, `selectNeighbors(indices?, {add})`, `selectFragment(indices?, {add})` | selection (`mode`: `'replace'` (default), `'add'`, `'toggle'` or `'remove'`; the older `{add: true}` toggles) |
+| `highlight(name, indices, {color, grow, opacity, strength, contrast, export})` | a named halo around atoms (structure indices; `null` clears it): `color` is a CSS colour, `{light, dark}` (chosen by the background) or `'var(--token)'`; `export` is `'never'`, `'marker'` (default: in PNG images only with markers) or `'always'`. `app.viewer.overlays.add(layer)` draws other overlays (render/overlays.js) |
 | `measure(type, displayIndices)`, `frame(i)`, `play(on)` | measurements and trajectories |
-| `screenshot({scale, transparent}) → Blob`, `exportText(format) → string \| Promise`, `exportGLB()`, `save(provider)` | output |
+| `screenshot({scale, transparent, selection, markers}) → Blob`, `exportText(format) → string \| Promise`, `exportGLB()`, `save(provider)` | output (`selection`: keep the selection halo, default on; `markers`: add site markers, fixed-atom halos and other marker overlays, default off; the hover halo is never drawn) |
 | `projects.providers()`, `projects.list(provider)`, `projects.open(provider, id)` | storage |
-| `sceneScript()` | the current scene as `crystallume.patch({...})` + `setCamera(...)` (palette: *Copy current scene as script*) |
+| `sceneScript()` | the current scene as `facet.patch({...})` + `setCamera(...)` (palette: *Copy current scene as script*) |
 | `on(event, fn) → off()`, `toast(msg, {type})`, `command(id, ...args)` | events, notices, commands (`command` throws an Error saying why when the command's `when` guard says it cannot run now, e.g. “Load a structure first.”) |
-| `registry.*`, `registerFormat`, `registerStyle`, `registerMaterial`, `registerColorScheme`, `registerLightingPreset`, `registerEnvironmentMap`, `registerLook`, `registerSample`, `registerAnalysis`, `registerCommand`, `registerStorage`, `registerPanel`, `registerInspectorTab` | §3 |
+| `registry.*`, `registerFormat`, `registerStyle`, `registerMaterial`, `registerColorScheme`, `registerLightingPreset`, `registerEnvironmentMap`, `registerLook`, `registerSample`, `registerAnalysis`, `registerCommand`, `registerStorage`, `registerPanel`, `registerInspectorTab`, `registerPanelSection`, `registerSelectionAction`, `registerAtomInfo` | §3 |
 | `plugins.load(url, {name})`, `plugins.list()` | plugin loading and status (`active` / `error`, server plugins included) |
 | `reference()`, `help(topic?)` | everything above as data / console tables (`help('looks')`, `help('scene')`, `help('events')`) |
 
 ```js
-const s = crystallume.build.crystal('perovskite', { elements: ['Ba', 'Ti', 'O'], a: 4.01, repeat: [3, 3, 3] });
-crystallume.load(s);
-crystallume.applyLook('poster');
-crystallume.set('post.outline.enabled', true);              // any scene setting, by its path
-crystallume.view('c');
-const png = await crystallume.screenshot({ scale: 3, transparent: true });
-const g = await crystallume.analyze('rdf', { rmax: 6 });
+const s = facet.build.crystal('perovskite', { elements: ['Ba', 'Ti', 'O'], a: 4.01, repeat: [3, 3, 3] });
+facet.load(s);
+facet.applyLook('poster');
+facet.set('post.outline.enabled', true);              // any scene setting, by its path
+facet.view('c');
+const png = await facet.screenshot({ scale: 3, transparent: true });
+const g = await facet.analyze('rdf', { rmax: 6 });
 ```
 
-The palette command **Copy current scene as script** copies the scene as a `crystallume.patch({...})` call.
+The palette command **Copy current scene as script** copies the scene as a `facet.patch({...})` call.
 
-### Events (`crystallume.on(name, fn)`)
+### Events (`facet.on(name, fn)`)
 
 | Event | Source | Payload | When |
 |---|---|---|---|
@@ -284,7 +297,7 @@ The palette command **Copy current scene as script** copies the scene as a `crys
 | `scene` | app | — | scene settings changed |
 | `tool` | app | — | the tool changed (`app.tool`: `select` / `measure`) |
 | `measure` | app + viewer | viewer: measurement list | a measurement was added or removed |
-| `history` | app | — | undo/redo stacks changed (`app.undoLabel()`, `app.canUndo()`) |
+| `history` | app | — | undo/redo steps changed (`app.undoLabel()`, `app.canUndo()`, `app.history`) |
 | `saveState` | app | `'idle' \| 'dirty' \| 'saving' \| 'saved' \| 'error'` | save state of the open project |
 | `saved` | app | — | the open project was stored |
 | `busy` | app | `{busy, label}` | a long task started or ended |
@@ -306,7 +319,11 @@ The palette command **Copy current scene as script** copies the scene as a `crys
 | `render` | viewer | — | a frame was rendered |
 | `error` | viewer | `Error` | drawing failed or the WebGL context was lost |
 
-The storage manager, `crystallume.registry.storage`, has its own `change` event
+Undo steps are kept in `app.history` (`length`, `redoLength`, `bytes`, `top()`, `has(step)`): up to 80 steps within
+64 MiB (24 MiB on narrow screens and devices with 4 GB of memory or less). `app.undoStack` and `app.redoStack`
+are deprecated read-only copies of its steps.
+
+The storage manager, `facet.registry.storage`, has its own `change` event
 (`registry.storage.on('change', fn)`) for providers being added or removed.
 
 Viewer events and `measure` use **display indices**. They count drawn atoms, including periodic images;
@@ -316,7 +333,7 @@ Viewer events and `measure` use **display indices**. They count drawn atoms, inc
 
 ## 5. Scene settings
 
-`crystallume.set('post.ao.intensity', 1.4)` changes one value, and `crystallume.patch({...})` merges a partial
+`facet.set('post.ao.intensity', 1.4)` changes one value, and `facet.patch({...})` merges a partial
 scene; a look is a partial scene too. The ranges are those of the app's controls (other values are accepted
 but may look odd). Colours are `#rrggbb`, angles are in degrees and lengths in Å.
 
@@ -423,49 +440,50 @@ but may look odd). Colours are `#rrggbb`, angles are in degrees and lengths in �
 | `display.scaleBar` | boolean | false | length scale bar in the view and in exports |
 | `camera` | object \| null | null | `{position, up, target, zoom}` (set with `setCamera`) |
 
-`crystallume.help('scene')` prints this list with the defaults and current values.
+`facet.help('scene')` prints this list with the defaults and current values.
 
 ---
 
 ## 6. Embedding (`postMessage`)
 
-To show Crystallume inside another page, put it in an `<iframe>` and talk to it with `postMessage`:
+To show Facet inside another page, put it in an `<iframe>` and talk to it with `postMessage`:
 
 ```html
-<iframe id="viewer" src="https://your-host/crystallume/"></iframe>
+<iframe id="viewer" src="https://your-host/facet/"></iframe>
 <script>
   const viewer = document.getElementById('viewer').contentWindow;
   addEventListener('message', (e) => {
-    if (e.data?.type === 'crystallume:ready') viewer.postMessage({ type: 'crystallume:load', text: cif, name: 'NaCl.cif' }, '*');
-    if (e.data?.type === 'crystallume:event') console.log(e.data.name, e.data.detail);
+    if (e.data?.type === 'facet:ready') viewer.postMessage({ type: 'facet:load', text: cif, name: 'NaCl.cif' }, '*');
+    if (e.data?.type === 'facet:event') console.log(e.data.name, e.data.detail);
   });
 </script>
 ```
 
 The frame accepts messages from its parent window only, and replies to the sender's origin with the same
 `type` and `id`. To embed it on another site, start the server with
-`CRYSTALLUME_FRAME_ANCESTORS="'self' https://your-site"`.
+`FACET_FRAME_ANCESTORS="'self' https://your-site"`.
 
 | Message | Reply |
 |---|---|
-| `{type: 'crystallume:load', text \| structure, format?, name?, look?, newProject?}` — opens in a fresh project unless `newProject: false` | `{ok: true}` |
-| `{type: 'crystallume:look', id}` / `{type: 'crystallume:set', path, value}` / `{type: 'crystallume:view', axis}` | `{ok: true}` |
-| `{type: 'crystallume:screenshot', scale?, transparent?, id}` | `{dataURL}` |
-| `{type: 'crystallume:call', method, args: [...], id}` | `{result}` or `{error}` |
-| `{type: 'crystallume:get', what: 'scene' \| 'summary' \| 'selection' \| 'camera', id}` | `{result}` |
-| `{type: 'crystallume:subscribe', events: ['selection', ...]}` / `'crystallume:unsubscribe'` | `{ok, events}`, then `{type: 'crystallume:event', name, detail}` per event |
+| `{type: 'facet:load', text \| structure, format?, name?, look?, newProject?}` — opens in a fresh project unless `newProject: false` | `{ok: true}` |
+| `{type: 'facet:look', id}` / `{type: 'facet:set', path, value}` / `{type: 'facet:view', axis}` | `{ok: true}` |
+| `{type: 'facet:screenshot', scale?, transparent?, id}` | `{dataURL}` |
+| `{type: 'facet:call', method, args: [...], id}` | `{result}` or `{error}` |
+| `{type: 'facet:get', what: 'scene' \| 'summary' \| 'selection' \| 'camera', id}` | `{result}` |
+| `{type: 'facet:subscribe', events: ['selection', ...]}` / `'facet:unsubscribe'` | `{ok, events}`, then `{type: 'facet:event', name, detail}` per event |
 
-- **`crystallume:call`** accepts these methods: `setRepresentation`, `setLighting`, `applyLook`, `patch`,
+- **`facet:call`** accepts these methods: `setRepresentation`, `setLighting`, `applyLook`, `patch`,
   `set`, `sample`, `setCamera`, `getCamera`, `fit`, `resetView`, `select`, `frame`, `command`, `exportText`.
   Scene paths or keys containing `__proto__`, `constructor` or `prototype` are refused.
 - **Event details** are plain data: `selection` → indices, `structure` → a summary, `camera` → the camera
   state (at most every 100 ms), and `scene`, `project`, `model` and `render` → `null` (ask with
-  `crystallume:get`).
+  `facet:get`).
 - **Ready message:** once the frame has started and shows its first structure, it posts
-  `{type: 'crystallume:ready', version}`. A `load` sent after that stays on screen.
-- **Older pages:** pages written for AtomScope keep working. `'atomscope:*'` messages are accepted (replies
-  repeat that `type`), the frame also posts `{type: 'atomscope:ready', version}`, and a parent that
-  subscribed with `'atomscope:subscribe'` receives `{type: 'atomscope:event', name, detail}`.
+  `{type: 'facet:ready', version}`. A `load` sent after that stays on screen.
+- **Older pages:** pages written for Crystallume or AtomScope keep working. `'crystallume:*'` and `'atomscope:*'`
+  messages are accepted (replies repeat that `type`), the frame also posts `{type: 'crystallume:ready', version}`
+  and `{type: 'atomscope:ready', version}`, and a parent that subscribed with `'crystallume:subscribe'` or
+  `'atomscope:subscribe'` receives its events as `'crystallume:event'` or `'atomscope:event'`.
 
 ---
 
@@ -474,8 +492,8 @@ The frame accepts messages from its parent window only, and replies to the sende
 ### Python API
 
 ```python
-import crystallume as cl
-from crystallume import build, analysis
+import facet as cl
+from facet import build, analysis
 
 s = cl.read("POSCAR")                       # format detected automatically; multi-frame files fill s.frames
 s = cl.read("traj.xyz", index=-1)           # only the last frame
@@ -508,13 +526,13 @@ File formats:
 - `poscar`: VASP 4 and 5, Direct or Cartesian, selective dynamics, negative scale factors.
 - `cif`: symmetry operators are applied when reading; written as P1.
 - `pdb`: `CRYST1`, `MODEL` frames.
-- `json`: the Crystallume structure format ([SCHEMA.md](SCHEMA.md)).
+- `json`: the Facet structure format ([SCHEMA.md](SCHEMA.md)).
 
 Plugins can add more formats.
 
 ### REST client
 
-`crystallume.Client` is a REST client that needs only the standard library. It has a method for every
+`facet.Client` is a REST client that needs only the standard library. It has a method for every
 endpoint (the test suite checks this):
 
 ```python
@@ -535,25 +553,25 @@ at `/docs`; [DEPLOY.md](DEPLOY.md#rest-api) has an overview.
 ### Command line
 
 ```bash
-crystallume serve [--host H] [--port P] [--mode local|cloud] [--data DIR] [--plugins DIR ...] \
+facet serve [--host H] [--port P] [--mode local|cloud] [--data DIR] [--plugins DIR ...] \
                   [--no-registration] [--open] [--cors ORIGIN ...] [--root-path /PREFIX]
-crystallume convert input.cif POSCAR                    # formats from the names; or --from / --to
-crystallume build crystal fcc Cu --a 3.61 --repeat 3 3 3 -o cu.xyz
-crystallume build cluster icosahedron Au --size 3 -o au55.xyz
-crystallume build molecule caffeine -o caffeine.pdb
-crystallume build custom hello-chain --param n=12 --param element=Ag -o chain.xyz --plugins ./plugins
-crystallume analyze rdf structure.cif --param rmax=6    # summary, coordination, rdf or a plugin analysis (JSON)
-crystallume info structure.cif [--bonds] [--json]
-crystallume user create NAME [--password PW] [--data DIR]   # also: user list, passwd, delete
-crystallume plugins [--plugins DIR] [--json]            # plugins and their status
-crystallume plugins new NAME [--dir DIR]                # a plugin skeleton that loads right away
-crystallume formats
-python -m crystallume ...                               # the same
+facet convert input.cif POSCAR                    # formats from the names; or --from / --to
+facet build crystal fcc Cu --a 3.61 --repeat 3 3 3 -o cu.xyz
+facet build cluster icosahedron Au --size 3 -o au55.xyz
+facet build molecule caffeine -o caffeine.pdb
+facet build custom hello-chain --param n=12 --param element=Ag -o chain.xyz --plugins ./plugins
+facet analyze rdf structure.cif --param rmax=6    # summary, coordination, rdf or a plugin analysis (JSON)
+facet info structure.cif [--bonds] [--json]
+facet user create NAME [--password PW] [--data DIR]   # also: user list, passwd, delete
+facet plugins [--plugins DIR] [--json]            # plugins and their status
+facet plugins new NAME [--dir DIR]                # a plugin skeleton that loads right away
+facet formats
+python -m facet ...                               # the same
 ```
 
 `convert`, `info`, `formats`, `build` and `analyze` load plugins first, so plugin formats work on the command
-line too (for example `crystallume convert t.hello out.xyz --plugins examples/plugins`).
+line too (for example `facet convert t.hello out.xyz --plugins examples/plugins`).
 - **Choosing plugin folders:** on these commands, `--plugins` takes one folder per flag and may go anywhere on
   the line. To load several, repeat it (`--plugins ./a --plugins ./b`) or join the folders with the path
   separator (`./a:./b`; `;` on Windows).
-- **Default:** without `--plugins`, `CRYSTALLUME_PLUGIN_DIRS` is used, plus installed entry-point plugins.
+- **Default:** without `--plugins`, `FACET_PLUGIN_DIRS` is used, plus installed entry-point plugins.

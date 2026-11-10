@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 import os
 
-import crystallume as cl
-from crystallume.cli import main
-from crystallume.storage import SQLiteStore
+import facet as cl
+from facet.cli import main
+from facet.storage import SQLiteStore
 
 from .conftest import EXAMPLE_PLUGINS
 
@@ -54,7 +54,7 @@ def test_user_create_and_list(tmp_path, capsys):
     assert main(["user", "create", "carol", "--password", "carolpass", "--data", str(data)]) == 0
     assert main(["user", "list", "--data", str(data)]) == 0
     assert "carol" in capsys.readouterr().out
-    store = SQLiteStore(data / "crystallume.db")
+    store = SQLiteStore(data / "facet.db")
     assert store.authenticate("carol", "carolpass") is not None
     store.close()
     assert main(["user", "create", "carol", "--password", "another1", "--data", str(data)]) == 1
@@ -82,8 +82,8 @@ def test_plugin_formats_on_the_command_line(tmp_path, capsys, monkeypatch):
     assert json.loads(capsys.readouterr().out)["natoms"] == 2
     assert main(["formats", "--plugins", str(EXAMPLE_PLUGINS)]) == 0
     assert "[plugin hello]" in capsys.readouterr().out
-    # CRYSTALLUME_PLUGIN_DIRS is the fallback for --plugins
-    monkeypatch.setenv("CRYSTALLUME_PLUGIN_DIRS", str(EXAMPLE_PLUGINS))
+    # FACET_PLUGIN_DIRS is the fallback for --plugins
+    monkeypatch.setenv("FACET_PLUGIN_DIRS", str(EXAMPLE_PLUGINS))
     back = tmp_path / "back.hello"
     assert main(["convert", str(out), str(back)]) == 0
     assert back.read_text().startswith("HELLO")
@@ -143,8 +143,68 @@ def test_plugins_new_scaffolds_a_loadable_plugin(tmp_path, capsys):
 
 def test_serve_passes_root_path(monkeypatch):
     seen = {}
-    import crystallume.server as server
+    import facet.server as server
 
     monkeypatch.setattr(server, "serve", lambda **kw: seen.update(kw))
-    assert main(["serve", "--root-path", "/crystallume", "--port", "9999"]) == 0
-    assert seen["root_path"] == "/crystallume" and seen["settings"].port == 9999
+    assert main(["serve", "--root-path", "/facet", "--port", "9999"]) == 0
+    assert seen["root_path"] == "/facet" and seen["settings"].port == 9999
+
+
+# ------------------------------------------------------------------ export check and vacuum gap (F0-D T6)
+CONTCAR_LOSES = ("facet: warning: 18 atom(s) are fixed or partly fixed (selective dynamics), but CIF cannot "
+                 "store constraints; use POSCAR, Extended XYZ or Facet JSON to keep them")
+
+
+def test_convert_prints_the_export_check(tmp_path, data_dir, capsys):
+    src = data_dir / "surface" / "contcar_pt111.vasp"
+    out = tmp_path / "slab.cif"
+    assert main(["convert", str(src), str(out)]) == 0
+    err = capsys.readouterr().err.splitlines()
+    assert err[0].startswith("converted ") and err[1:] == [CONTCAR_LOSES]
+    assert cl.read(out).formula == "Pt36"
+    assert main(["convert", str(src), str(tmp_path / "again.vasp")]) == 0
+    assert "facet: warning" not in capsys.readouterr().err  # POSCAR keeps the flags
+    mixed = tmp_path / "mixed.xyz"
+    mixed.write_text('3\nLattice="4 0 0 0 4 0 0 0 4" Properties=species:S:1:pos:R:3 pbc="T T T"\n'
+                     "O 0 0 0\nTi 2 2 2\nO 1 1 1\n")
+    assert main(["convert", str(mixed), str(tmp_path / "POSCAR")]) == 0
+    err = capsys.readouterr().err
+    assert "facet: note: POSCAR groups atoms by element" in err and "warning" not in err
+
+
+def test_convert_warns_once(tmp_path, data_dir, capsys, recwarn):
+    """The CLI prints the warnings itself: write()'s ExportWarning is silenced, not shown twice."""
+    assert main(["convert", str(data_dir / "surface" / "contcar_pt111.vasp"), str(tmp_path / "x.cif")]) == 0
+    assert capsys.readouterr().err.count("cannot store constraints") == 1
+    assert not [w for w in recwarn if issubclass(w.category, cl.io.ExportWarning)]
+
+
+def test_build_prints_the_export_check(tmp_path, capsys):
+    out = tmp_path / "graphene.vasp"
+    assert main(["build", "crystal", "graphene", "C", "--a", "2.46", "--c", "20", "-o", str(out)]) == 0
+    err = capsys.readouterr().err.splitlines()
+    assert err[0].startswith("wrote 2 atoms") and len(err) == 2
+    assert err[1].startswith("facet: note: POSCAR is always periodic: c was not periodic and is written as a "
+                             "cell vector with a 20.0 Å gap between periodic images")
+    assert main(["build", "crystal", "fcc", "Cu", "--a", "3.61", "--format", "xyz"]) == 0
+    res = capsys.readouterr()
+    assert res.out.startswith("4\n")
+    assert res.err == "facet: warning: plain XYZ does not store the unit cell; use Extended XYZ to keep it\n"
+    assert main(["build", "crystal", "fcc", "Cu", "--a", "3.61", "-o", str(tmp_path / "cu.cif")]) == 0
+    assert "facet: warning" not in capsys.readouterr().err
+
+
+def test_info_prints_the_vacuum_gap_of_any_structure(tmp_path, data_dir, capsys):
+    slab = data_dir / "surface" / "contcar_pt111.vasp"
+    assert main(["info", str(slab)]) == 0
+    out = capsys.readouterr().out
+    assert "Vacuum gap  : 15.00 Å along c" in out.splitlines()
+    assert "PBC         : T T T" in out  # reading changes no pbc (design decision U1)
+    assert main(["info", str(slab), "--json"]) == 0
+    info = json.loads(capsys.readouterr().out)
+    assert info["vacuumGap"]["axis"] == 2 and abs(info["vacuumGap"]["width"] - 14.9998) < 1e-4
+    assert info["pbc"] == [True, True, True]
+    assert main(["info", str(data_dir / "NaCl.cif")]) == 0
+    assert "Vacuum gap" not in capsys.readouterr().out
+    assert main(["info", str(data_dir / "NaCl.cif"), "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["vacuumGap"] is None
