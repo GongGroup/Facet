@@ -17,6 +17,26 @@
  * | `flagTolerance` | 1e-6 | relative | constraint flags under a change of cell basis |
  * | `overlapDistance` | 0.5 | Å | atoms closer than this overlap (export check) |
  * | `micTie` | 1e-8 | Å | equal-length candidates of the minimum-image search |
+ * // --- surface-modeling M1 ---
+ * // --- end M1 ---
+ *
+ * // --- surface-modeling M2 ---
+ * // --- end M2 ---
+ *
+ * // --- surface-modeling M3 ---
+ * // --- end M3 ---
+ *
+ * // --- surface-modeling M4 ---
+ * // --- end M4 ---
+ *
+ * // --- surface-modeling M5-adsorbates ---
+ * // --- end M5-adsorbates ---
+ *
+ * // --- surface-modeling M5-sites ---
+ * // --- end M5-sites ---
+ *
+ * // --- surface-modeling M6 ---
+ * // --- end M6 ---
  */
 export const SURFACE_DEFAULTS = Object.freeze({
   vacuumGapMin: 5.0,
@@ -28,4 +48,24 @@ export const SURFACE_DEFAULTS = Object.freeze({
   flagTolerance: 1e-6,
   overlapDistance: 0.5,
   micTie: 1e-8,
+  // --- surface-modeling M1 ---
+  // --- end M1 ---
+
+  // --- surface-modeling M2 ---
+  // --- end M2 ---
+
+  // --- surface-modeling M3 ---
+  // --- end M3 ---
+
+  // --- surface-modeling M4 ---
+  // --- end M4 ---
+
+  // --- surface-modeling M5-adsorbates ---
+  // --- end M5-adsorbates ---
+
+  // --- surface-modeling M5-sites ---
+  // --- end M5-sites ---
+
+  // --- surface-modeling M6 ---
+  // --- end M6 ---
 });

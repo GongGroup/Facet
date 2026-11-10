@@ -301,3 +301,9 @@ function gcd(a, b) {
   while (b) [a, b] = [b, a % b];
   return a;
 }
+
+// --- surface-modeling M1 ---
+// --- end M1 ---
+
+// --- surface-modeling M2 ---
+// --- end M2 ---

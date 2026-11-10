@@ -7,6 +7,55 @@ import './ui/panels/build.js';
 import './ui/panels/structure.js';
 import './ui/panels/surface.js';
 import './ui/panels/appearance.js';
+
+// --- surface-modeling M1-sections ---
+// --- end M1-sections ---
+
+// --- surface-modeling M1-commands ---
+// --- end M1-commands ---
+
+// --- surface-modeling M2-cleave ---
+// --- end M2-cleave ---
+
+// --- surface-modeling M2-slab ---
+// --- end M2-slab ---
+
+// --- surface-modeling M3-commands ---
+// --- end M3-commands ---
+
+// --- surface-modeling M3-layers ---
+// --- end M3-layers ---
+
+// --- surface-modeling M3-constraints ---
+// --- end M3-constraints ---
+
+// --- surface-modeling M3-atomselection ---
+// --- end M3-atomselection ---
+
+// --- surface-modeling M4-move ---
+// --- end M4-move ---
+
+// --- surface-modeling M4-commands ---
+// --- end M4-commands ---
+
+// --- surface-modeling M4-transform ---
+// --- end M4-transform ---
+
+// --- surface-modeling M4-clipboard ---
+// --- end M4-clipboard ---
+
+// --- surface-modeling M4-place ---
+// --- end M4-place ---
+
+// --- surface-modeling M5-adsorbates ---
+// --- end M5-adsorbates ---
+
+// --- surface-modeling M5-sitepick ---
+// --- end M5-sitepick ---
+
+// --- surface-modeling M6-interface ---
+// --- end M6-interface ---
+
 import { commands } from './core/commands.js';
 import { samples } from './build/samples.js';
 import { pickFiles, probeDownloads, canDownload, NO_DOWNLOADS, isArtifact } from './storage/files.js';

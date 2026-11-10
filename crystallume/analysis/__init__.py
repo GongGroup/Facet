@@ -32,6 +32,24 @@ from .vacuum import (
     vacuum_gap_hint,
 )
 
+# --- surface-modeling M1 ---
+# --- end M1 ---
+
+# --- surface-modeling M3 ---
+# --- end M3 ---
+
+# --- surface-modeling M4 ---
+# --- end M4 ---
+
+# --- surface-modeling M5-sites ---
+# --- end M5-sites ---
+
+# --- surface-modeling M5-topbottom ---
+# --- end M5-topbottom ---
+
+# --- surface-modeling M6 ---
+# --- end M6 ---
+
 __all__ = [
     "NeighborList",
     "neighbor_arrays",
@@ -57,4 +75,21 @@ __all__ = [
     "contiguous_shifts",
     "make_contiguous",
     "close_contacts",
+    # --- surface-modeling M1 ---
+    # --- end M1 ---
+
+    # --- surface-modeling M3 ---
+    # --- end M3 ---
+
+    # --- surface-modeling M4 ---
+    # --- end M4 ---
+
+    # --- surface-modeling M5-sites ---
+    # --- end M5-sites ---
+
+    # --- surface-modeling M5-topbottom ---
+    # --- end M5-topbottom ---
+
+    # --- surface-modeling M6 ---
+    # --- end M6 ---
 ]
