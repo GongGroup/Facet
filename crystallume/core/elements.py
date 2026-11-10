@@ -15,6 +15,11 @@ Algorithms that need a radius (overlap checks, adsorbate heights, layer spacings
 use :func:`covalent_radius` or :func:`bondi_radius`, which the web app has with the
 same values (``covalentRadius`` and ``bondiRadius`` in ``web/js/core/elements.js``);
 :func:`vdw_radius` and the app's display radii differ and are not for algorithms.
+
+The Pauling electronegativities are the web app's ``PAULING`` table, element by element
+(none for He, Ne and Ar), so formulas list their elements in the same order in both
+languages.  :data:`METALS` and :data:`ANIONS` are the element sets of the web app's
+``METALS`` and ``ANIONS`` (the bond rules and the formal charges use them).
 """
 
 from __future__ import annotations
@@ -42,6 +47,8 @@ __all__ = [
     "jmol_color",
     "vesta_color",
     "electronegativity",
+    "METALS",
+    "ANIONS",
 ]
 
 DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "elements.json"
@@ -50,6 +57,19 @@ DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "elements.json"
 DEFAULT_COVALENT_RADIUS = 0.5
 DEFAULT_VDW_RADIUS = 2.0
 DEFAULT_COLOR = "#FF1493"
+
+#: The metals.  The "smart" bond rule leaves out bonds between two metals that also bond to a non-metal, and a
+#: compound of metals alone carries no ionic charges.  The same elements as ``METALS`` in
+#: ``web/js/core/elements.js`` (a test compares the two).
+METALS: frozenset[str] = frozenset(
+    ("Li Be Na Mg Al K Ca Sc Ti V Cr Mn Fe Co Ni Cu Zn Ga Rb Sr Y Zr Nb Mo Tc Ru Rh Pd Ag Cd In Sn "
+     "Cs Ba La Ce Pr Nd Pm Sm Eu Gd Tb Dy Ho Er Tm Yb Lu Hf Ta W Re Os Ir Pt Au Hg Tl Pb Bi Po "
+     "Fr Ra Ac Th Pa U Np Pu Am Cm").split()
+)
+
+#: The non-metals that count as anions in the bond and coordination rules.  The same elements as ``ANIONS`` in
+#: ``web/js/core/elements.js``.
+ANIONS: frozenset[str] = frozenset("O F S Cl N Se Br I Te P C H As".split())
 
 
 @lru_cache(maxsize=1)
@@ -185,6 +205,6 @@ def vesta_color(symbol: str) -> str:
 
 
 def electronegativity(symbol: str) -> float | None:
-    """Pauling electronegativity, or ``None`` when undefined/unknown."""
+    """Pauling electronegativity, or ``None`` when undefined/unknown (the values of the web app's ``PAULING``)."""
     rec = get_element(symbol)
     return rec.get("electronegativity") if rec else None
