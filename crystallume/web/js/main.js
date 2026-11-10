@@ -1,6 +1,7 @@
 /** Bootstrap: build the app, register commands and shortcuts, load plugins and the first structure. */
 import { App } from './app.js';
 import { Shell } from './ui/shell.js';
+import './api/latticeapi.js';
 import './ui/panels/projects.js';
 import './ui/panels/library.js';
 import './ui/panels/build.js';
@@ -156,6 +157,27 @@ function registerCommands(app, shell) {
   R({ id: 'view.zoomOut', title: 'Zoom out', category: 'View', key: '-', repeat: true, when: hasS, run: () => app.viewer.zoomBy(1 / 1.2) });
   for (const ax of ['a', 'b', 'c']) R({ id: `view.${ax}`, title: `Look along ${ax}`, category: 'View', key: ax, shortcutGroup: 'Look along a, b, c', when: per, run: () => app.viewer.setView(ax) });
   for (const ax of ['x', 'y', 'z']) R({ id: `view.${ax}`, title: `Look along ${ax}`, category: 'View', key: ax, shortcutGroup: 'Look along x, y, z', when: hasS, run: () => app.viewer.setView(ax) });
+  // N looks down on the top surface, Shift+N up at the bottom one (surfaceNormal: the vacuum gap; without one c*, and
+  // a note says so, U1); Look along… takes a lattice direction, the normal of a plane or a vector (one of them)
+  const noCell = () => (app.structure ? 'Looking along the surface normal needs a unit cell.' : null);
+  const lookAlong = (target) => { const r = app.viewer.viewAlong(target); if (r.note) toast(r.note); return r; };
+  R({ id: 'view.normal', title: 'Look along the surface normal', category: 'View', key: 'n', keywords: 'top surface plane perpendicular from above', when: per, whyNot: noCell, run: () => lookAlong('normal') });
+  R({ id: 'view.normalBelow', title: 'Look at the bottom surface', category: 'View', key: 'shift+n', keywords: 'bottom surface underside from below normal', when: per, whyNot: noCell, run: () => lookAlong('-normal') });
+  R({
+    id: 'view.along', title: 'Look along a direction or plane…', category: 'View', keywords: 'uvw hkl miller zone axis direction plane normal vector', when: hasS,
+    params: [
+      { name: 'uvw', label: 'Direction [u v w]', type: 'vector', integer: true, nonzero: true },
+      { name: 'hkl', label: 'Plane (h k l)', type: 'miller' },
+      { name: 'vector', label: 'Vector', type: 'vector', nonzero: true },
+    ],
+    run: (_, p) => {
+      if (p === undefined) return shell.viewAlongDialog();
+      const given = p && typeof p === 'object' && !Array.isArray(p) ? ['uvw', 'hkl', 'vector'].filter((k) => p[k] != null) : [];
+      if (given.length !== 1) throw Object.assign(new Error('Look along: give exactly one of uvw, hkl or vector.'), { code: 'invalid-params' });
+      const [k] = given, v = p[k];
+      return lookAlong(k === 'vector' ? v : k === 'hkl' && v?.length === 4 ? { hkil: v } : { [k]: v });
+    },
+  });
   R({ id: 'view.projection', title: 'Toggle perspective / orthographic', category: 'View', key: 'p', run: () => app.set('display.projection', app.scene.display.projection === 'orthographic' ? 'perspective' : 'orthographic') });
   R({ id: 'view.turntable', title: 'Toggle turntable', category: 'View', key: 't', keywords: 'spin rotate animate', run: () => app.set('display.turntable', !app.scene.display.turntable) });
   R({ id: 'view.cell', title: 'Toggle unit cell', category: 'View', key: 'u', run: () => app.set('display.cell.show', !app.scene.display.cell.show) });

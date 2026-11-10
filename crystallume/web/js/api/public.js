@@ -262,7 +262,17 @@ export function createAPI(app, shell) {
     applyLook: (id) => app.applyLook(id),
     setRepresentation: (id) => app.setRepresentation(id),
     setLighting: (id) => app.setLightingPreset(id),
-    view: (axis) => app.viewer.setView(axis),
+    /**
+     * Look along a direction (viewer.viewAlong): an axis name ('a' … '-z'), 'normal' or '-normal' (the surface normal,
+     * from above or below; without a vacuum gap c*, with a note), [x, y, z], {uvw}, {uvtw}, {hkl} or {hkil} of the
+     * current cell; opts {up, ortho, animate, refit}. Returns {dir, up, label, note}. view() is the same call.
+     */
+    viewAlong: (target, opts) => {
+      const r = app.viewer.viewAlong(target, opts);
+      if (r?.note) toast(r.note);
+      return r;
+    },
+    view: (target, opts) => api.viewAlong(target, opts),
     resetView: () => app.viewer.resetView(),
     fit: () => app.viewer.fitView(),
     /** Orbit the camera by dAz° (to the right) and dEl° (upwards). */

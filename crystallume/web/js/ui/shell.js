@@ -858,13 +858,78 @@ export class Shell {
     const app = this.app;
     const per = !!app.structure?.cell;
     const v = (axis) => () => app.viewer.setView(axis);
+    const cmd = (id) => () => this.runCommand(id);
     showMenu(anchor, [
       { header: 'Look along' },
+      // the surface normal (N, Shift+N) is offered for every structure with a cell: without a vacuum gap it is c* (U1)
+      ...(per ? [{ label: 'Surface normal', kbd: keyLabel('n'), run: cmd('view.normal') }, { label: 'Bottom surface', kbd: keyLabel('shift+n'), run: cmd('view.normalBelow') }, { separator: true }] : []),
       ...(per ? [{ label: 'a axis', kbd: 'A', run: v('a') }, { label: 'b axis', kbd: 'B', run: v('b') }, { label: 'c axis', kbd: 'C', run: v('c') }, { separator: true }] : []),
       { label: 'x axis', kbd: 'X', run: v('x') }, { label: 'y axis', kbd: 'Y', run: v('y') }, { label: 'z axis', kbd: 'Z', run: v('z') },
       { separator: true },
+      { label: per ? 'Direction or plane…' : 'Direction…', run: cmd('view.along') },
       { label: 'Default view', kbd: keyLabel('Home'), run: () => app.viewer.resetView() },
-    ], { label: 'View along an axis' });
+    ], { label: 'Look along' });
+  }
+
+  /**
+   * The dialog of Look along a direction or plane… (command view.along without parameters): the normal of a plane
+   * (h k l) of the current cell (four boxes h k i l on a hexagonal cell), a lattice direction [u v w] or a Cartesian
+   * vector (the only choice without a cell). The choice and the values are kept for the session.
+   */
+  async viewAlongDialog() {
+    const app = this.app;
+    const [{ millerInput, vec3Input }, { hklToHkil }] = await Promise.all([import('./inputs.js'), import('../core/lattice.js')]);
+    const cell = app.structure?.cell ?? null;
+    const last = (this._alongLast ??= { mode: null, hkl: [1, 1, 1], uvw: [1, 1, 0], vector: [0, 0, 1] });
+    const modes = cell ? ['hkl', 'uvw', 'vector'] : ['vector'];
+    const NAMES = { hkl: 'Plane normal', uvw: 'Direction', vector: 'Vector' };
+    const make = {
+      hkl: () => millerInput({ label: 'Plane (h k l)', cell, value: last.hkl, app, required: true, key: 'along:hkl' }),
+      uvw: () => vec3Input({ label: 'Direction [u v w]', labels: ['u', 'v', 'w'], integer: true, nonzero: true, unit: '', value: last.uvw, required: true, key: 'along:uvw' }),
+      vector: () => vec3Input({ label: 'Vector', nonzero: true, unit: '', value: last.vector, required: true, key: 'along:vector' }),
+    };
+    let mode = modes.includes(last.mode) ? last.mode : modes[0];
+    let ctl = null;
+    const slot = h('div');
+    const err = h('p.err-text', { hidden: true, role: 'alert' });
+    const show = (m) => { mode = m; ctl = make[m](); slot.replaceChildren(ctl.el); err.hidden = true; };
+    const seg = modes.length > 1 ? h('div.seg', { role: 'group', 'aria-label': 'Look along' }, modes.map((m) => {
+      const b = h('button', { type: 'button', 'aria-pressed': String(m === mode) }, NAMES[m]);
+      b.addEventListener('click', () => {
+        if (m === mode) return;
+        for (const x of b.parentElement.children) x.setAttribute('aria-pressed', String(x === b));
+        show(m);
+        ctl.focus();
+      });
+      return b;
+    })) : null;
+    show(mode);
+    const go = () => {
+      if (ctl.validate()) { ctl.focus(); return false; }
+      const value = ctl.value;
+      last.mode = mode; last[mode] = value;
+      // four indices on screen (a hexagonal cell) are said in four in the direction label too
+      const four = mode === 'hkl' && ctl.el.querySelector('.triple')?.dataset.n === '4';
+      const target = mode === 'vector' ? value : mode === 'uvw' ? { uvw: value } : four ? { hkil: hklToHkil(value) } : { hkl: value };
+      try {
+        const r = app.viewer.viewAlong(target);
+        if (r.note) toast(r.note);
+        return true;
+      } catch (e) { err.hidden = false; err.textContent = e.message; return false; }
+    };
+    const d = dialog({
+      title: 'Look along a direction or plane',
+      body: h('div', { style: { display: 'grid', gap: '10px' } }, seg, slot,
+        h('p.hint', `The view turns to look down this direction. ${keyLabel('n')} looks along the surface normal.`), err),
+      actions: [{ label: 'Cancel' }, { label: 'Look along', primary: true, run: go }],
+    });
+    // Enter in a box looks along it at once
+    d.el.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || e.isComposing || e.target?.tagName !== 'INPUT') return;
+      e.preventDefault();
+      if (go()) d.close();
+    });
+    return d;
   }
 
   helpMenu(anchor) {
