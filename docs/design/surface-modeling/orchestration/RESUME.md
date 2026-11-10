@@ -4,7 +4,7 @@
 
 ## 现在到哪了
 
-**2026-11-10 改名：** 软件已改名为 Facet（包目录 `facet/`，命令 `facet`，版本 0.3.2），本目录和设计文档里的路径都已改成 `facet/…`；仓库和检出目录仍叫 `crystallume`。改名前开出的分支要先在其中运行 `rename_to_facet.py`、`git mv crystallume facet` 并提交，再变基到主开发分支。
+**2026-11-10 改名：** 软件已改名为 Facet（包目录 `facet/`，命令 `facet`，版本 0.3.2），本目录和设计文档里的路径都已改成 `facet/…`；仓库已转移到 `GongGroup/Facet`（原 `Mastreina/crystallume`），镜像名随之变为 `ghcr.io/gonggroup/facet`；本目录里出现的 `/home/user/crystallume` 是当时会话容器里的检出路径，换环境时按实际路径改。改名前开出的分支要先在其中运行 `rename_to_facet.py`、`git mv crystallume facet` 并提交，再变基到主开发分支。
 
 
 - 设计全部完成并入库（上一级目录：架构约定、两份接口账本、8 个模块规格、M7 总纲、验收场景、负责人决定 L-01…L-26）。
