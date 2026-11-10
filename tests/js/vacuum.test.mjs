@@ -47,11 +47,14 @@ const fracAlong = (s, k) => { const f = s.fracPositions(); return Array.from({ l
 const contcar = () => parseStructure(readFileSync(repoPath('tests/data/surface/contcar_pt111.vasp'), 'utf8'), 'CONTCAR');
 
 describe('SURFACE_DEFAULTS and core/lattice.js', () => {
-  test('the nine wave-0 constants, frozen, no vacuum default', () => {
-    assert.deepEqual(SURFACE_DEFAULTS, {
+  test('the nine wave-0 constants come first, frozen, no vacuum default', () => {
+    // later modules append their own keys after these nine
+    const wave0 = {
       vacuumGapMin: 5.0, surfaceHintGapMin: 2.0, blockGapMin: 3.5, smallBlockFraction: 0.5, gapWrapEps: 1e-6,
       positionTolerance: 1e-5, flagTolerance: 1e-6, overlapDistance: 0.5, micTie: 1e-8,
-    });
+    };
+    for (const [key, value] of Object.entries(wave0)) assert.equal(SURFACE_DEFAULTS[key], value, key);
+    assert.deepEqual(Object.keys(SURFACE_DEFAULTS).slice(0, 9), Object.keys(wave0));
     assert.ok(Object.isFrozen(SURFACE_DEFAULTS));
     assert.ok(!('vacuum' in SURFACE_DEFAULTS));
     assert.throws(() => { SURFACE_DEFAULTS.vacuumGapMin = 4; }, TypeError);   // ES modules are strict

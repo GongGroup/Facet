@@ -118,15 +118,16 @@ EXPECTED_DEFAULTS = {
 
 
 def test_surface_defaults_values():
-    assert dict(SURFACE_DEFAULTS) == EXPECTED_DEFAULTS
-    assert list(SURFACE_DEFAULTS) == list(EXPECTED_DEFAULTS)
+    # the nine wave-0 keys come first, in this order; later modules append their own keys after them
+    assert {k: SURFACE_DEFAULTS[k] for k in EXPECTED_DEFAULTS} == EXPECTED_DEFAULTS
+    assert list(SURFACE_DEFAULTS)[:len(EXPECTED_DEFAULTS)] == list(EXPECTED_DEFAULTS)
     assert "vacuum" not in SURFACE_DEFAULTS  # U4: the vacuum of a slab has no default
     assert SURFACE_DEFAULTS.vacuum_gap_min > 4.34  # bcc Cs d110 must not count as vacuum
 
 
 def test_surface_defaults_access_and_read_only():
     D = SURFACE_DEFAULTS
-    assert isinstance(D, Mapping) and isinstance(D, Defaults) and len(D) == 9
+    assert isinstance(D, Mapping) and isinstance(D, Defaults) and len(D) >= 9
     assert D.vacuum_gap_min == D["vacuum_gap_min"] == 5.0 and D.get("nope", 1) == 1
     with pytest.raises(AttributeError, match=r"^SURFACE_DEFAULTS has no key 'vacuum'$"):
         D.vacuum  # noqa: B018
@@ -152,7 +153,14 @@ def test_surface_defaults_match_js(js):
     camel = {k: v for k, v in got["values"].items()}
     snake = {"".join("_" + ch.lower() if ch.isupper() else ch for ch in k): v for k, v in camel.items()}
     assert got["frozen"]
-    assert snake == EXPECTED_DEFAULTS and list(snake) == list(EXPECTED_DEFAULTS)
+    assert {k: snake[k] for k in EXPECTED_DEFAULTS} == EXPECTED_DEFAULTS
+    assert list(snake)[:len(EXPECTED_DEFAULTS)] == list(EXPECTED_DEFAULTS)
+
+    # every key of every module: the same words, values and order in both languages (snake_case <-> camelCase)
+    def words(key: str) -> str:
+        return key.replace("_", "").lower()
+
+    assert [(words(k), v) for k, v in camel.items()] == [(words(k), v) for k, v in SURFACE_DEFAULTS.items()]
     assert "vacuum" not in camel
 
 
