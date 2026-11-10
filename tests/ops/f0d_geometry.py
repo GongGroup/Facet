@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from crystallume.analysis.geometry import mic_vector
+from facet.analysis.geometry import mic_vector
 
 from ..cases import CaseInput, op
 

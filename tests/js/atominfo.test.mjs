@@ -1,8 +1,8 @@
-// Atom-info lines for the hover card and the selection card (crystallume/web/js/ui/atominfo.js, F0-A T10, ledger L-F0-50).
+// Atom-info lines for the hover card and the selection card (facet/web/js/ui/atominfo.js, F0-A T10, ledger L-F0-50).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { registerAtomInfo, atomInfoRows } = await import(new URL('../../crystallume/web/js/ui/atominfo.js', import.meta.url));
+const { registerAtomInfo, atomInfoRows } = await import(new URL('../../facet/web/js/ui/atominfo.js', import.meta.url));
 
 const app = { structure: { symbols: ['Pt', 'Pt', 'C', 'O'] } };
 

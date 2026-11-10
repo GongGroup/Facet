@@ -38,11 +38,11 @@
 - **关键字参数**：所有新选项在 Python 中仅限关键字（04 报告 §2.1），JS 用选项对象；位置参数只保留 ASE 兼容所需的（M4 K1、M5 `add_adsorbate` 的 ASE 形式）。
 - **真空**（U4，§1 R-F05）：凡是名为 `vacuum` 的参数都指"slab（或叠层）与其下一个周期像之间、沿表面法向的**总间隙**（Å）"，必填、无默认值、从不预填；`SURFACE_DEFAULTS` 中不得有任何以真空间隙为值的键（含"仅供预览"的键）。现有的 `Structure.center(vacuum=)` 与 `build.crystal(..., vacuum=)`（二维原型，`c = 厚度 + 2·vacuum`，`build/crystal.py:329-331`）都是**每侧**的量，保持不变，文档写明差别（负责人决定 L-02，§1.5）。
 - **数字进入名字、标签与文案**：一律用 L-M1-15 的 `round_half_up`/`format_decimal`/`format_sig3`/`format_angle`；不得用 `toFixed`、`f"{x:.1f}"`、`round()`（二进制恰为半数时两种语言结果不同，附录 A-2）。
-- **化学式**：约化式用 M2 的 `reduced_formula`（L-M2-07）；不约化的式子用现有 `crystallume.project.display_formula(symbols)` 与 JS `structure.formula()` 的同一顺序（Pauling，C 与 H 同在时 Hill；F0 账本 E-38）；不用 Python `Structure.get_formula()`（含 C 时一律 Hill）。
+- **化学式**：约化式用 M2 的 `reduced_formula`（L-M2-07）；不约化的式子用现有 `facet.project.display_formula(symbols)` 与 JS `structure.formula()` 的同一顺序（Pauling，C 与 H 同在时 Hill；F0 账本 E-38）；不用 Python `Structure.get_formula()`（含 C 时一律 Hill）。
 - **`info.surface` 的读写**：读取方必须容忍任何字段缺失、`kind` 缺失或未知；写入方必须保留不认识的键（L-X-01）。
 - **帧**：Python `frame=None` → 第 0 帧，JS 缺省当前帧（F0 账本 §0.3）；改变晶格或原子集合的操作只作用于一帧并丢弃其余帧（C11）：网页 `editActive(..., {singleFrame: true})`，Python 核心函数在多帧输入上报 `<what> needs a single-frame structure (this one has 40 frames); select one frame first`（M1 §3.1 的句式，所有模块共用）。
 - **REST**：结构 → 结构在 `/build/*`，结构 → 数据在 `/analysis/*`；字段 camelCase；**本期新增的请求模型一律 `model_config = ConfigDict(extra="forbid")`**（拼错的字段 → 422；已有模型不收紧，§1 R-F14）；科学代码的 `ValueError`/`TypeError` → 400，schema → 422；原子数超 `max_atoms` → 400 `This would create about N atoms (limit L).`（`server/routes/build.py:28-29`）。每个端点都有客户端方法并进 `tests/test_client.py` 的 `ROUTE_METHODS`。
-- **CLI**（§1 R-F13，M7 收尾时只做汇总、不改这些规则）：写结构的命令（`build …`、`transform`、`edit …`、`adsorb`）用 `--from FMT`（输入格式）、`-o/--output OUT`、`--format FMT`（输出格式，与现有 `build` 组一致，`cli.py:462-463`）；只读的命令（`layers`、`sites`、`terminations`，与现有 `info`、`analyze` 一致）用 `--format FMT` 表示**输入**格式、`--json` 输出 JSON；帧选择一律 `--index N`（单个整数，缺省 −1 = 最后一帧，与 `convert --index` 同名）；警告 `crystallume: warning: …`、提示 `crystallume: note: …` 打到 stderr；`ValueError` 退出码 1，参数错误退出码 2；多值参数用 `nargs=2/3/4` 或可重复的单值参数，不用 `nargs="+"`。
+- **CLI**（§1 R-F13，M7 收尾时只做汇总、不改这些规则）：写结构的命令（`build …`、`transform`、`edit …`、`adsorb`）用 `--from FMT`（输入格式）、`-o/--output OUT`、`--format FMT`（输出格式，与现有 `build` 组一致，`cli.py:462-463`）；只读的命令（`layers`、`sites`、`terminations`，与现有 `info`、`analyze` 一致）用 `--format FMT` 表示**输入**格式、`--json` 输出 JSON；帧选择一律 `--index N`（单个整数，缺省 −1 = 最后一帧，与 `convert --index` 同名）；警告 `facet: warning: …`、提示 `facet: note: …` 打到 stderr；`ValueError` 退出码 1，参数错误退出码 2；多值参数用 `nargs=2/3/4` 或可重复的单值参数，不用 `nargs="+"`。
 - **网页**：公共 API 成员一律经 F0 账本 L-F0-53 的 `defineApi(path, fn, {owner})` 注册，**不改** `api/public.js`；分区经 L-F0-49 `registerPanelSection`；命令经 L-F0-52 `commands.register`（在模块自己的文件里，`main.js` 只为每个模块入口文件加一行 `import`）；启动前要加载的数据经 L-F0-56 `registerBootTask`；不新增公共事件（`api/public.js` 的 `EVENTS` 不变，模块内部事件只在 `app` 上发）。
 - **错误文案**：核心函数的 `ValueError`/JS `Error` 文本两种语言逐字相同、小写开头、无句末句号；界面显示时首字母大写加句号（F0 账本 §0.3）。
 
@@ -50,19 +50,19 @@
 
 | 文件 | 建立者 | 之后追加者（不改已冻结的签名） |
 |---|---|---|
-| `crystallume/core/intmath.py`、`web/js/core/intmath.js` | M1 T1 | M2 T1（`plane_basis`、`normalize_miller`、`miller_to_primitive`） |
-| `crystallume/core/lattice.py`、`web/js/core/lattice.js` | F0-D T7 → F0-A T7a | M1 T2（L-M1-02…07 的晶格函数、`mesh_label`）、M2 T1b（`conventional_cell_hint`） |
-| `crystallume/core/naming.py`、`web/js/core/naming.js` | F0-D T1/T2 | M1 T2（L-M1-15 的数字格式化、`rename_after_cell_change`）、M2 T4/T6b（`reduced_formula`、`surface_label`、`adsorbate_suffix`、`surface_name`、`refresh_auto_name`）、M6 T4/T5（`interface_name`） |
-| `crystallume/core/infohandlers.py`、`web/js/core/infohandlers.js`（**[新]** 文件） | M1 T10（注册表、`update_surface_geometry`、`surface` 几何处理器） | M2 T4/T5（`surface` 处理器的 M2 字段段落）、M5 T6（`surface.adsorbates` 处理器） |
-| `crystallume/core/cellops.py`、`web/js/core/cellops.js` | M1 T3a | M1 T3b、T10（从 `infohandlers` 重新导出注册表函数） |
-| `crystallume/core/webdata.py`、`web/js/core/webdata.js`（**[改]** 归属） | **M2 T2**（代码按 M5 §4.2 原样） | 无（M5 T1 只加 `web/data/adsorbates.json`） |
-| `crystallume/core/elements.py` 的 `METALS`、`ANIONS`、电负性表对齐（**[改]**） | **M2 T2**（F0 账本 L-F0-22 已定） | 无；M3、M4、M5、M6 一律从这里导入 |
-| `crystallume/web/data/oxidation_states.json` | M2 T2 | 无 |
-| `crystallume/web/data/adsorbates.json` | M5 T1 | M5 T13（系数与几何） |
-| `crystallume/analysis/layers.py`、`web/js/core/layers.js` | M3 T1 | M3 T3a（**[新]** `cluster_heights`、`tags_convention`）、M3 T3b、T4 |
-| `crystallume/analysis/neighbors.py`（追加）、`web/js/core/bondgraph.js` | M3 T3a（**[新]** `periodic_components` 也在这里） | 无 |
-| `crystallume/analysis/latticematch.py`、`web/js/core/latticematch.js` | M6 T1/T2 | 无 |
-| `crystallume/core/defaults.py`、`web/js/core/defaults.js` | F0-D T7 | 每个模块在自己的任务里追加自己的键（L-X-08），两份同时改 |
+| `facet/core/intmath.py`、`web/js/core/intmath.js` | M1 T1 | M2 T1（`plane_basis`、`normalize_miller`、`miller_to_primitive`） |
+| `facet/core/lattice.py`、`web/js/core/lattice.js` | F0-D T7 → F0-A T7a | M1 T2（L-M1-02…07 的晶格函数、`mesh_label`）、M2 T1b（`conventional_cell_hint`） |
+| `facet/core/naming.py`、`web/js/core/naming.js` | F0-D T1/T2 | M1 T2（L-M1-15 的数字格式化、`rename_after_cell_change`）、M2 T4/T6b（`reduced_formula`、`surface_label`、`adsorbate_suffix`、`surface_name`、`refresh_auto_name`）、M6 T4/T5（`interface_name`） |
+| `facet/core/infohandlers.py`、`web/js/core/infohandlers.js`（**[新]** 文件） | M1 T10（注册表、`update_surface_geometry`、`surface` 几何处理器） | M2 T4/T5（`surface` 处理器的 M2 字段段落）、M5 T6（`surface.adsorbates` 处理器） |
+| `facet/core/cellops.py`、`web/js/core/cellops.js` | M1 T3a | M1 T3b、T10（从 `infohandlers` 重新导出注册表函数） |
+| `facet/core/webdata.py`、`web/js/core/webdata.js`（**[改]** 归属） | **M2 T2**（代码按 M5 §4.2 原样） | 无（M5 T1 只加 `web/data/adsorbates.json`） |
+| `facet/core/elements.py` 的 `METALS`、`ANIONS`、电负性表对齐（**[改]**） | **M2 T2**（F0 账本 L-F0-22 已定） | 无；M3、M4、M5、M6 一律从这里导入 |
+| `facet/web/data/oxidation_states.json` | M2 T2 | 无 |
+| `facet/web/data/adsorbates.json` | M5 T1 | M5 T13（系数与几何） |
+| `facet/analysis/layers.py`、`web/js/core/layers.js` | M3 T1 | M3 T3a（**[新]** `cluster_heights`、`tags_convention`）、M3 T3b、T4 |
+| `facet/analysis/neighbors.py`（追加）、`web/js/core/bondgraph.js` | M3 T3a（**[新]** `periodic_components` 也在这里） | 无 |
+| `facet/analysis/latticematch.py`、`web/js/core/latticematch.js` | M6 T1/T2 | 无 |
+| `facet/core/defaults.py`、`web/js/core/defaults.js` | F0-D T7 | 每个模块在自己的任务里追加自己的键（L-X-08），两份同时改 |
 
 ### 0.5 本账本的裁决一览（详见第 1 章与各条"已解决的冲突"）
 
@@ -174,14 +174,14 @@
 | 轴的语法 | 同一语法：`"abc"` 的非空子集，或 `"z"`、`"xy"`、`"xyz"` 等可经 `cartesian_to_lattice_flags` 精确换算的笛卡尔名（M3 §3.12.3） | 同左 |
 | "中间 N 层" | **[改]** 要求 `L − N` 为偶数，否则 `fix_middle 2 can't be centred in 7 layers; use an odd number`（L 为偶数时写 `an even number`） | `middle 2 can't be centred in 7 layers; use an odd number`（同一规则） |
 | 层的来源 | 构建层号（与 `tags` 严格一致，不重新聚类） | `find_layers`（设定语义：目标恰好固定 `axes`，slab 其余放开，吸附物不动） |
-| REST / CLI | `fixBottom`、`fixMiddle`、`fixAxes: str`（**[改]**：不是 `Literal`，按上面语法校验）；`--fix-bottom N \| --fix-middle N --axes AXES` | `crystallume edit fix FILE --bottom N … --axes AXES` |
+| REST / CLI | `fixBottom`、`fixMiddle`、`fixAxes: str`（**[改]**：不是 `Literal`，按上面语法校验）；`--fix-bottom N \| --fix-middle N --axes AXES` | `facet edit fix FILE --bottom N … --axes AXES` |
 
 两者在未弛豫的 slab 上结果相同（测试 `test_cleave_fix_equals_fix_layers`）。M3 v1 §10.3-4 的"切面时调用 `fix_layers`"撤回（M2 v2 K13，M3 确认）。
 
 ### 1.10 R-F10 吸附物编号与 R-F11 M4/M5 的复用
 
 - **各方**：F0 账本 L-F0-14 `next_adsorbate_id`；M3 §3.13 `promote_adsorbates`；M4 K6/K10、§3.10.5（表面放置：新片段新 id、SD 重置、tags 0、追加在末尾，粘贴完整源吸附物时复制记录）；M4 §3.9.8"M5 放吸附物可直接用 `extend(..., adsorbate=True)`"；M5 v2 K10、§4.3（`apply_placements`：promote、一放置一 id、按块插入、`sort_by_species`、OC20 tags 2，直接用 F0-D `_remap`）。
-- **裁决**：L-X-05 的 R-ADS 是唯一规则，M3（标记）、M4（表面放置）、M5（放置）、M6（合并）都遵守；M5 不经 M4 的 `extend(adsorbate=True)`（M4 按成键片段分 id，两个相邻的放置会被并成一个 id；M5 一次 remap 插入整批），两者都直接建在 F0-D 的 `_remap`/`extend`/`sort_by_species` 上。**[改] M4**：表面放置的新原子在 OC20 约定的结构上写 `tags = 2`；原来按元素分块时插入后 `sort_by_species()`（与 M5 相同，导出 POSCAR 不再出 N1 说明）。几何：M4 `site_point(…, bond=d)` 与 M5 `place_adsorbate(单原子, bond_length=d)` 在同一位点给出同一高度（两者都是闭式接触抬升 `t = max_j [h_j + sqrt(d² − ρ_j²)]`；测试 `test_m4_m5_single_atom_height`）；默认键长（**[改]** 负责人决定 L-05）：要放的元素是吸附物库里的单原子条目（`adsorbate(el)` 按元素符号能查到）时，M4 的 `Add atom › Above selection` 与 Place 工具调用 M5 的 `adsorbate_target_distance`（L-M5-05，即 M5 §3.10.3 的目标距离），读数写 `bond 1.94 Å (adsorbate library)`；库里没有的元素用 `place_bond_factor`（1.0）× 共价半径之和，读数写 `bond 1.98 Å (covalent radii)`。O 在 Cu(100) 4 重位、H 在 Pt(111) fcc 因此两条路径给出同一高度（验收 G-18）。M5 复用 M4 的移动工具与 `crystallume.tools.get('move').registerSnapTargets`。
+- **裁决**：L-X-05 的 R-ADS 是唯一规则，M3（标记）、M4（表面放置）、M5（放置）、M6（合并）都遵守；M5 不经 M4 的 `extend(adsorbate=True)`（M4 按成键片段分 id，两个相邻的放置会被并成一个 id；M5 一次 remap 插入整批），两者都直接建在 F0-D 的 `_remap`/`extend`/`sort_by_species` 上。**[改] M4**：表面放置的新原子在 OC20 约定的结构上写 `tags = 2`；原来按元素分块时插入后 `sort_by_species()`（与 M5 相同，导出 POSCAR 不再出 N1 说明）。几何：M4 `site_point(…, bond=d)` 与 M5 `place_adsorbate(单原子, bond_length=d)` 在同一位点给出同一高度（两者都是闭式接触抬升 `t = max_j [h_j + sqrt(d² − ρ_j²)]`；测试 `test_m4_m5_single_atom_height`）；默认键长（**[改]** 负责人决定 L-05）：要放的元素是吸附物库里的单原子条目（`adsorbate(el)` 按元素符号能查到）时，M4 的 `Add atom › Above selection` 与 Place 工具调用 M5 的 `adsorbate_target_distance`（L-M5-05，即 M5 §3.10.3 的目标距离），读数写 `bond 1.94 Å (adsorbate library)`；库里没有的元素用 `place_bond_factor`（1.0）× 共价半径之和，读数写 `bond 1.98 Å (covalent radii)`。O 在 Cu(100) 4 重位、H 在 Pt(111) fcc 因此两条路径给出同一高度（验收 G-18）。M5 复用 M4 的移动工具与 `facet.tools.get('move').registerSnapTargets`。
 
 ### 1.11 R-F12 `hnf_matrices_2d`、`hermite_normal_form_2d` 与 `deform`
 
@@ -216,7 +216,7 @@
 | R-F33 | `surface_label(info)`（M6 v2 §4.4、§10.4）vs `surface_label(structure)`（M2 v2 §6.1） | 接受两者：`surface_label(x)`，x 为 Structure 或一个 `info.surface` 字典（L-M2-07） |
 | R-F34 | 记录字段 `firstAtom`：M5 v2 删除，M6 v2 §4.1 仍按 `firstAtom + q·N` 改写 | 没有 `firstAtom`；M6 只改写 `id` |
 | R-F35 | M6 读 `info.surface.polarity.tasker`（M6 v2 §4.2 W12） | M2 字段为 `info.surface.tasker`（晶面的 Tasker 类型）；`asBuilt.polarity` 是创建时的极性 |
-| R-F36 | JS 公共 `crystallume.build.supercell(s, P)`（M1 v2 §6.2）与 Python 现有 `build.supercell(s, nx, ny, nz)`（= `repeat`）同名不同义 | JS 公共名改为 `crystallume.build.makeSupercell(s, P, {wrap})`，与 Python `build.make_supercell` 同词 |
+| R-F36 | JS 公共 `facet.build.supercell(s, P)`（M1 v2 §6.2）与 Python 现有 `build.supercell(s, nx, ny, nz)`（= `repeat`）同名不同义 | JS 公共名改为 `facet.build.makeSupercell(s, P, {wrap})`，与 Python `build.make_supercell` 同词 |
 | R-F37 | `rename_after_supercell`（F0 账本 L-F0-12 消费方说明、M2 v2 §3.13、M5 v2 §10）vs M1 v2 的 `rename_after_cell_change` | 只有 `rename_after_cell_change`（L-M1-15）；`supercell_label`、`wood_label`、`matrix_label`、`mesh_label` 在 `core/lattice.*`，不在 `core/naming` |
 | R-F38 | M2 命令参数 `wood`（字符串）与 JS `buildSurface({wood})`；Python `surface()` 没有 `wood`；M1 命令/REST 的同一概念叫 `spec` | 文本形式一律叫 `spec`（命令参数、REST 的 `supercell` 字段接受文本）；JS `buildSurface` 删除 `wood`，`supercell` 接受矩阵、对角简写或文本（与 Python 相同） |
 
@@ -236,7 +236,7 @@
 | L-07 界面配位 | G-21 | `info.surface.interface.registry = {preset, sites}`；**[新]** M5 `nearest_sites`；状态行为必须 | L-X-03、L-M5-03、L-M6-03、L-M6-06 |
 | L-08 表面网格倍数提示 | G-24 | `Using the input cell: the surface cell has N times the area of the smallest one, <Wood>.` | L-M2-08 |
 | L-09 多元素位点摘要 | G-25 | `4 site atoms (Ti2O2)` | §1.6、L-M5-09 |
-| L-10 CLI 删除原子 | G-28 | **[新]** `crystallume edit delete IN --atoms SPEC … -o OUT` | L-M4-08 |
+| L-10 CLI 删除原子 | G-28 | **[新]** `facet edit delete IN --atoms SPEC … -o OUT` | L-M4-08 |
 | L-11 体相名两种语言不同 | G-30 | 跨语言比较排除 `info.surface.bulk.name` | L-X-01 |
 | L-12 自动名哨兵 | G-32 | 只有 `autoName`，**删去**本账本早先的 `baseName`；`auto_name_state` + `refresh_auto_name(s, before, …)` | R-F15、L-X-01、L-X-07、L-M2-07 |
 | L-13 已有结构 `set_vacuum(0)` | G-33 | 一致（E12d） | §1.5、L-M2-03 |
@@ -279,7 +279,7 @@
   | `stacking` | `"vacuum"` \| `"bulk"` | cleave、vacuum | M2 改真空工具（写 `"vacuum"`） | `"bulk"` = V = 0 的体相堆垛（L-M2-02） |
   | `position` / `offset` | str / float | cleave、vacuum、interface | M2 改真空工具 | `"center"` \| `"bottom"` \| `"keep"`；贴底时底层离晶胞底面的距离 |
   | `adsorbates` | list | 任意 | L-X-04 | 吸附物记录 |
-  | `generator` | str | cleave、interface | — | 如 `"crystallume 0.4.0"`（跨语言比较时两边取自同一版本源） |
+  | `generator` | str | cleave、interface | — | 如 `"facet 0.4.0"`（跨语言比较时两边取自同一版本源） |
   | `interface` | object | interface | —（来源记录） | L-X-03 |
   | `bulk` | object | cleave | — | `{name, formula, reducedFormula, natoms, cell, spacegroup, source}`；网页另写 `entryId`（跨语言比较时排除）；`name` 两种语言暂不相同（Python `Pt fcc`、JS `Pt (Face-centred cubic)`），M7 统一之前跨语言比较也排除 `bulk.name`（负责人决定 L-11） |
   | `miller` | int[3] | cleave | M2 `flip_slab`（取反） | 约化后，相对输入体相晶胞 |
@@ -527,7 +527,7 @@ M1 自己用到的第 0 波接口按 F0 账本：`_adopt`（L-F0-07）、`write_
 
 ### L-M1-01 整数运算
 
-- **提供方**：M1 T1。**文件**：`crystallume/core/intmath.py`、`web/js/core/intmath.js`（M2 T1 之后追加 `plane_basis`）。
+- **提供方**：M1 T1。**文件**：`facet/core/intmath.py`、`web/js/core/intmath.js`（M2 T1 之后追加 `plane_basis`）。
 - **Python**：
   ```python
   def egcd(a: int, b: int) -> tuple[int, int, int]                     # a·x + b·y = g ≥ 0
@@ -655,7 +655,7 @@ M1 自己用到的第 0 波接口按 F0 账本：`_adopt`（L-F0-07）、`write_
 - **JS**：`makeSupercell(s, P, { wrap = true, label = null } = {}) → { structure, src, indexMap, imageShift, matrix, label, notes, changed, latticeChanged, rotation, moved }`（`core/cellops.js`，不 import `structure.js`）；`Structure.prototype.makeSupercell(P, { wrap = true } = {}) → Structure`。
 - **语义**（M1 §3.3）：P 为 3×3 整数、三个重复数或 2×2 面内矩阵（嵌入真空轴以外的两轴）；`det = 0` E-SC1；`|det| > max_supercell_det` E-SC3；把右手胞变成左手 E-SC2；非周期轴混入 E-SC5；多帧 E-FR。原子顺序**按像优先**（像 q 的原子 a 的新下标 = q·N + a，q = 0 为 (0,0,0)）。包裹（K3，**[改]** 按 F0 账本的切口）：只包裹 `changed_axes(P)`；真空轴 k 上用 `cut = display_cuts(out)[k]`，`shift_k = floor(f_k − cut.lo)`，`cut` 为 None 时退回 `floor(f_k + 1e-12)`；其余轴 `floor(f + 1e-12)`。然后依次：`apply_basis_change`、`adsorbate_id` 按像重编号、`mark_edited(out, "repeat" if 对角 else "cell")`、`update_supercell_matrix`（L-X-02）、`apply_info_handlers({kind: "supercell", …})`（L-M1-14）、命名（L-X-07）。`label` 只填 `CellOpResult.label`（读数与 toast），**名字里的标签只由矩阵算出**。notes：N-SC1、N-SC2、N-LH、N-WR1（文案见 M1 §3.17；N-WR1 改为 `The slab crosses the cell boundary along c and was kept in one piece; centre the slab to move it to the middle.`，不写按钮路径）。
 - **与 `repeat` 的关系**（**[改]**，R-F24）：`make_supercell(diag, wrap=False)` 与 F0-D `repeat` 在**没有 `info.surface`、没有 `adsorbate_id`** 的单帧结构上坐标、props、info、名字逐项相同（E20 的测试限于这类结构）；`repeat` 不重编号 `adsorbate_id`、不调用 info 处理器，是低层旧接口。网页（Supercell 分区、`cell.bakeRepeat`）与 REST `/build/supercell` 的单帧 `repeat` 请求一律走 `make_supercell(diag, wrap=False)`；多帧的 `repeat` 请求照旧走 `repeat`（平铺每一帧）。
-- **网页**：命令 `cell.supercell`（参数 `matrix | repeat | preset | spec` 恰好一个，`N`、`n`、`m`、`relativeTo: 'reference' | 'current'`、`wrap`；M1 §5.7）；公共 API `crystallume.edit.makeSupercell(matrixOrRepeat | { preset, N, n, m } | { spec }, { wrap, relativeTo })`（可撤销）与 **`crystallume.build.makeSupercell(s, P, { wrap }) → Structure`**（**[改]**，不加入项目）。
+- **网页**：命令 `cell.supercell`（参数 `matrix | repeat | preset | spec` 恰好一个，`N`、`n`、`m`、`relativeTo: 'reference' | 'current'`、`wrap`；M1 §5.7）；公共 API `facet.edit.makeSupercell(matrixOrRepeat | { preset, N, n, m } | { spec }, { wrap, relativeTo })`（可撤销）与 **`facet.build.makeSupercell(s, P, { wrap }) → Structure`**（**[改]**，不加入项目）。
 - **消费方**：M2（切面时的表面超胞，用 cellops 版本取 `src`；Slab 分区内嵌的超胞编辑器经 `cell.supercell` 命令调用它）；M5（Coverage › Apply：`commands.run('cell.supercell', {matrix})`）；M6（每层的面内超胞，`P = embed(M @ T)`）；M1 自己的界面、REST、CLI。
 - **已解决的冲突**：R-F04、R-F24、R-F36（JS 公共名 `build.supercell` → `build.makeSupercell`；Python 现有 `build.supercell(s, nx, ny, nz)` 不变，= `repeat`）；M2 v1 的自有超胞实现、预设表与 50/2500 限额删除；M2 E11 的 `det < 0` 文案 → M1 E-SC2。
 
@@ -711,7 +711,7 @@ M1 自己用到的第 0 波接口按 F0 账本：`_adopt`（L-F0-07）、`write_
 
 ### L-M1-12 平移对称性与原胞：`identity_classes`、`find_translations`、`primitive_cell`
 
-- **提供方**：M1 T4。**文件**：`crystallume/analysis/translations.py`（加入 `analysis.__all__`）、`web/js/core/translations.js`。
+- **提供方**：M1 T4。**文件**：`facet/analysis/translations.py`（加入 `analysis.__all__`）、`web/js/core/translations.js`。
 - **Python**：
   ```python
   @dataclass
@@ -744,7 +744,7 @@ M1 自己用到的第 0 波接口按 F0 账本：`_adopt`（L-F0-07）、`write_
 
 ### L-M1-14 info 处理器注册表 `register_info_handler`、`apply_info_handlers`、`update_surface_geometry`
 
-- **提供方**：M1 T10。**文件**：**[新]** `crystallume/core/infohandlers.py`、`web/js/core/infohandlers.js`（注册表与内置处理器都在这里，导入时静态注册，没有导入顺序问题）；`core/cellops.*` 重新导出三个函数。
+- **提供方**：M1 T10。**文件**：**[新]** `facet/core/infohandlers.py`、`web/js/core/infohandlers.js`（注册表与内置处理器都在这里，导入时静态注册，没有导入顺序问题）；`core/cellops.*` 重新导出三个函数。
 - **Python**：
   ```python
   def register_info_handler(key: str, fn, *, replace: bool = False) -> None     # key：info 的顶层键或点分路径
@@ -791,7 +791,7 @@ M1 自己用到的第 0 波接口按 F0 账本：`_adopt`（L-F0-07）、`write_
 - **提供方**：M1 T6。**文件**：`server/models.py`、`server/routes/build.py`、`client.py`、`cli.py`。
 - **REST**（M1 §6.3）：`POST /api/v1/build/supercell`（扩展；`repeat`、`matrix`、`preset`、`spec` 恰好一个；**[改]** 单帧的 `repeat` 走 `make_supercell(diag, wrap=False)`）、`POST /api/v1/build/transform`（新；操作名 `supercell`、`redefine`、`right-handed`、`lattice-parameters`、`set-cell`、`strain`、`strain-tensor`、`reduce`、`primitive`、`conventional`、`reorient`、`shift-origin`、`wrap`；新模型 `extra="forbid"`）。
 - **客户端**：`supercell(self, structure, repeat=None, *, matrix=None, preset=None, spec=None, N=None, n=1, m=1, relative_to="reference", wrap=True)`、`transform(self, structure, operations)`、`transform_detailed(self, structure, operations) -> dict`。
-- **CLI**：`crystallume transform INPUT [--from FMT] [--index N] [-o OUT] [--format FMT] [--plugins DIR] OPS...`（修饰选项作用于紧邻的前一个操作，M1 §6.5）；表面超胞 `--surface-cell SPEC [--relative-to current]`。
+- **CLI**：`facet transform INPUT [--from FMT] [--index N] [-o OUT] [--format FMT] [--plugins DIR] OPS...`（修饰选项作用于紧邻的前一个操作，M1 §6.5）；表面超胞 `--surface-cell SPEC [--relative-to current]`。
 - **已解决的冲突**：R-F13（`--index` 只接受单个整数；输入格式 `--from`、输出格式 `--format`）。
 
 ---
@@ -816,7 +816,7 @@ M1 自己用到的第 0 波接口按 F0 账本：`_adopt`（L-F0-07）、`write_
 
 ### L-M2-02 切面：`surface`、`surface_analysis`、`terminations`、`oriented_cell`、`surfaces`、`estimate_surface_atoms`
 
-- **提供方**：M2 T3（分析，Python）、T4（组装与命名，Python）、T6a/T6b（JS）。**文件**：`crystallume/build/surface.py`（`build/__init__.py` 导出）、`web/js/build/surface.js`。
+- **提供方**：M2 T3（分析，Python）、T4（组装与命名，Python）、T6a/T6b（JS）。**文件**：`facet/build/surface.py`（`build/__init__.py` 导出）、`web/js/build/surface.js`。
 - **Python**：
   ```python
   def surface(bulk: Structure, miller: Sequence[int], *, vacuum: float,
@@ -895,7 +895,7 @@ M1 自己用到的第 0 波接口按 F0 账本：`_adopt`（L-F0-07）、`write_
 
 ### L-M2-06 共用数据：`webdata`、氧化态、元素集合与电负性表
 
-- **提供方**：M2 T2（第 1 波）。**文件**：`crystallume/core/webdata.py`、`web/js/core/webdata.js`（**[改]** 归属：M5 v2 说 F0-D，F0 账本未列，R-F30）；`crystallume/web/data/oxidation_states.json`；`crystallume/core/elements.py`（`METALS`、`ANIONS`、电负性）；`web/js/core/elements.js`（只补电负性缺项）。
+- **提供方**：M2 T2（第 1 波）。**文件**：`facet/core/webdata.py`、`web/js/core/webdata.js`（**[改]** 归属：M5 v2 说 F0-D，F0 账本未列，R-F30）；`facet/web/data/oxidation_states.json`；`facet/core/elements.py`（`METALS`、`ANIONS`、电负性）；`web/js/core/elements.js`（只补电负性缺项）。
 - **Python**：`load_web_data(name: str) -> Any`（M5 §4.2 的代码原样：文件名须匹配 `^[a-z0-9_]+\.json$`，否则 `ValueError("invalid data file name 'x'")`；缓存、返回深拷贝）；`load_oxidation_states() -> dict`；`estimate_oxidation_states(symbols) -> dict[str, float] | None`；`METALS: frozenset[str]`、`ANIONS: frozenset[str]`（与 JS `core/elements.js:160-166` 逐项相同，测试核对）。
 - **JS**：`loadWebData(name) → Promise`、`webData(name) → value | null`、`setWebData(name, value)`（M5 §4.2 原样）；`loadOxidationStates() → Promise`、`estimateOxidationStates(symbols)`（表未加载且未给 `charges` 时抛错）。启动：`registerBootTask('oxidation-states', loadOxidationStates)`（L-F0-56；M2 不改 `main.js` 的启动顺序）。
 - **电负性**（**[新]**，M5 v2 §10 F0-D 行的"请求（更正）"，F0 账本未列）：Python 的 Pauling 电负性表与 JS `PAULING` 逐项相同，JS 补上 Pm、Rn、Am–Lr；`display_formula` 与 JS `formula()` 的元素顺序因此在全部元素上一致。
@@ -936,17 +936,17 @@ M1 自己用到的第 0 波接口按 F0 账本：`_adopt`（L-F0-07）、`write_
 - **客户端**：`surface(self, structure, miller, *, vacuum, **kw)`、`set_vacuum(self, structure, vacuum, **kw)`、`terminations(self, structure, miller, **kw)`；`ROUTE_METHODS` 三条。
 - **CLI**（**[改]** 按 §0.3）：
   ```
-  crystallume build surface BULK (--hkl H K L | --hkil H K I L) --vacuum V [--from FMT] [--index N]
+  facet build surface BULK (--hkl H K L | --hkil H K I L) --vacuum V [--from FMT] [--index N]
           [--layers N | --periods N | --thickness A] [--conventional-indices] [--termination N|LABEL] [--cut K] [--symmetric]
           [--position center|bottom] [--offset A] [--surface-cell SPEC] [--no-primitive] [--translation-tol T]
           [--fix-bottom N | --fix-middle N] [--axes AXES] [--layer-tol A] [--charges "Sr=2,Ti=4,O=-2"] [--keep-molecules]
           [--name NAME] [-o OUT] [--format FMT]
-  crystallume terminations BULK (--hkl H K L | --hkil H K I L) [--format FMT] [--index N] [--conventional-indices]
+  facet terminations BULK (--hkl H K L | --hkil H K I L) [--format FMT] [--index N] [--conventional-indices]
           [--no-primitive] [--translation-tol T] [--layer-tol A] [--charges …] [--json]
-  crystallume edit vacuum IN --vacuum V [--axis a|b|c] [--position center|bottom|keep] [--offset A]
+  facet edit vacuum IN --vacuum V [--axis a|b|c] [--position center|bottom|keep] [--offset A]
           [--keep-c-direction] [--no-reorient] [--from FMT] [--index N] [-o OUT] [--format FMT]
-  crystallume edit flip IN [--from FMT] [--index N] [-o OUT] [--format FMT]
-  crystallume edit center-slab IN [--from FMT] [--index N] [-o OUT] [--format FMT]
+  facet edit flip IN [--from FMT] [--index N] [-o OUT] [--format FMT]
+  facet edit center-slab IN [--from FMT] [--index N] [-o OUT] [--format FMT]
   ```
   `--supercell NX NY`、`--supercell-matrix …`、`--wood TEXT` 删除（`--surface-cell 3x3`、`--surface-cell "2 1; -1 1"`、`--surface-cell "(√3×√3)R30°"` 代替）；`terminations` 的输入格式是 `--format`（只读命令）。
 - **已解决的冲突**：R-F13、R-F14。
@@ -957,7 +957,7 @@ M1 自己用到的第 0 波接口按 F0 账本：`_adopt`（L-F0-07）、`write_
 
 ### L-M3-01 方向解析与层分析：`find_layers`、`Layers`
 
-- **提供方**：M3 T1。**文件**：`crystallume/analysis/layers.py`（`analysis.__all__`）、`web/js/core/layers.js`。
+- **提供方**：M3 T1。**文件**：`facet/analysis/layers.py`（`analysis.__all__`）、`web/js/core/layers.js`。
 - **Python**：
   ```python
   def find_layers(structure, direction=None, tolerance=None, *, indices=None, skip_adsorbates=False,
@@ -982,7 +982,7 @@ M1 自己用到的第 0 波接口按 F0 账本：`_adopt`（L-F0-07）、`write_
 
 ### L-M3-03 化学键图：`bond_graph`、`coordination_numbers`、`periodic_components`
 
-- **提供方**：M3 T3a（第 1 波）。**文件**：`crystallume/analysis/neighbors.py`（追加）、`web/js/core/bondgraph.js`（新）。
+- **提供方**：M3 T3a（第 1 波）。**文件**：`facet/analysis/neighbors.py`（追加）、`web/js/core/bondgraph.js`（新）。
 - **Python**：
   ```python
   @dataclass(frozen=True)
@@ -1014,7 +1014,7 @@ M1 自己用到的第 0 波接口按 F0 账本：`_adopt`（L-F0-07）、`write_
 - **JS**：`findAdsorbates(s, { direction, tolerance, details = false })`、`promoteAdsorbates(s)`、`markAdsorbates(s, indices)`、`unmarkAdsorbates(s, indices = null)`、`tagsConvention(s)`。
 - **语义**：识别顺序 `adsorbate_id` > tags（OC20 约定、ASE 约定）> 几何猜测 > 无（M3 §3.8）。`tags_convention`：没有 `tags` 键 → None；M3 §3.8 第 2a 条成立（值域 ⊆ {0, 1, 2}、含 2、含 0 或 1，且 tag 2 的原子不构成无限延伸的块）→ `"oc20"`；否则 → `"ase"`。标记与取消标记**不写吸附物记录**、不删记录、不调用 `mark_edited`（R-ADS 第 5、6 条）。
 - **消费方**：M2（`slab_extent(exclude_adsorbates=True)`）；M4（基底掩码第一来源；第一次写 id 前 `promote_adsorbates`）；M5（吸附物与基底、R-ADS 的 promote、新原子的 tags；**"Mark as adsorbate"就是本条**）；M6（参考网格的 `exclude`、合并前对层副本 promote）；M1 无。
-- **已解决的冲突**：R-F21（M5 v2 的 `mark_adsorbate(slab, indices, name)` 与 `crystallume.edit.markAdsorbate` 删除，名字参数不提供）；R-F25（`tags_convention`）。
+- **已解决的冲突**：R-F21（M5 v2 的 `mark_adsorbate(slab, indices, name)` 与 `facet.edit.markAdsorbate` 删除，名字参数不提供）；R-F25（`tags_convention`）。
 
 ### L-M3-05 暴露原子 `surface_atoms`
 
@@ -1027,7 +1027,7 @@ M1 自己用到的第 0 波接口按 F0 账本：`_adopt`（L-F0-07）、`write_
 
 ### L-M3-06 几何选择与查询：`select_layers`、`select_height`、`select_fractional`、`select_within`、`select_where`
 
-- **提供方**：M3 T1（`select_layers`）、T5（其余与查询引擎）。**文件**：`analysis/layers.py`（`select_layers`）、`crystallume/analysis/selection.py`、`web/js/core/selection.js`。
+- **提供方**：M3 T1（`select_layers`）、T5（其余与查询引擎）。**文件**：`analysis/layers.py`（`select_layers`）、`facet/analysis/selection.py`、`web/js/core/selection.js`。
 - **签名**：M3 §6.1/§6.2 原文（`select_height(s, lo=None, hi=None, *, relative_to="absolute", …)`、`select_fractional(s, axis, lo, hi)`、`select_within(s, centers=None, radius=3.0, *, point=None, centroid=False)`、`parse_query(query)`、`select_where(s, query, *, selection=None)`、`combine_selection(current, matches, mode="replace")`、`QUERY_VERSION = 1`、`QUERY_PROPS`；JS 同名 camelCase）。
 - **语义**：只读，返回升序下标；长度比较带 `position_tolerance`；`select_within` 用 F0-D 的精确最小像（L-F0-20）；`select_fractional` 用 `wrap_fractional`（L-F0-19）。查询 JSON 的属性含 `adsorbate`（`adsorbate_id > 0`）与 `adsorbateId`（M5 需要）。
 - **消费方**：M5（Atom Selection 选吸附物）；M4（"Select fragment"之外的选择）；公共 API。
@@ -1075,13 +1075,13 @@ M1 自己用到的第 0 波接口按 F0 账本：`_adopt`（L-F0-07）、`write_
 - **REST**：`POST /api/v1/analysis/layers`（`LayersRequest`，**[改]** `extra="forbid"`；`skipAdsorbates: bool = True`）；可选 `POST /api/v1/analysis/select`。**客户端**：`layers(self, structure, direction=None, tolerance=None, skip_adsorbates=True, group="planes", surface=False, probe=None) -> dict`。
 - **CLI**（**[改]** 按 §0.3）：
   ```
-  crystallume layers FILE [--format FMT] [--index N] [--direction {auto,normal,a,b,c,x,y,z}] [--vector X Y Z]
+  facet layers FILE [--format FMT] [--index N] [--direction {auto,normal,a,b,c,x,y,z}] [--vector X Y Z]
                           [--hkl H K L | --hkil H K I L] [--layer-tol T] [--include-adsorbates] [--group {planes,units}]
                           [--surface] [--probe K] [--json]
-  crystallume edit fix FILE (--bottom N | --top N | --middle N | --all-but-top N | --layers 1,2 | --depth D | --bottom-thickness T
+  facet edit fix FILE (--bottom N | --top N | --middle N | --all-but-top N | --layers 1,2 | --depth D | --bottom-thickness T
                             | --atoms SPEC) [--axes AXES] [--keep-other] [--group {planes,units}] [--direction …] [--layer-tol T]
                             [--from FMT] [--index N] [-o OUT] [--format FMT]
-  crystallume edit free FILE (--all | --atoms SPEC) [--axes AXES] [--from FMT] [--index N] [-o OUT] [--format FMT]
+  facet edit free FILE (--all | --atoms SPEC) [--axes AXES] [--from FMT] [--index N] [-o OUT] [--format FMT]
   ```
   `--frame N` → `--index N`；`--to FMT` → `--format FMT`；`SPEC` 为 0 起的下标（`0-35,40`），`--layers` 的层号从顶层 1 起。
 - **已解决的冲突**：R-F13、R-F14。
@@ -1117,7 +1117,7 @@ M4 用到的第 0 波接口按 F0 账本 §6 M4（`mic_vector`/`micVector` 由 F
 
 ### L-M4-03 几何辅助：`rotation_matrix`、`align_rotation`
 
-- **提供方**：M4 T1。**文件**：`crystallume/analysis/geometry.py`、`web/js/core/geometry.js`（F0-D T9 建立，M4 追加；`mic_vector`/`micVector` 是 F0-D 的）。
+- **提供方**：M4 T1。**文件**：`facet/analysis/geometry.py`、`web/js/core/geometry.js`（F0-D T9 建立，M4 追加；`mic_vector`/`micVector` 是 F0-D 的）。
 - **Python**：`rotation_matrix(axis, angle) -> ndarray(3, 3)`（右手 Rodrigues，度）、`align_rotation(src, dst) -> ndarray(3, 3)`（两矢量形式）。**JS**：`rotationMatrix(axis, angleDeg)`、`alignRotation(src, dst)`。
 - **语义**：旋转矩阵作用于列矢量 `p' = R @ p`，行矢量数组 `P' = P @ R.T`（M4 §3.1）；轴长 < 1e-12 报错。
 - **消费方**：M4；M5（可选：取向中的"把 A 转到 B"）。
@@ -1125,7 +1125,7 @@ M4 用到的第 0 波接口按 F0 账本 §6 M4（`mic_vector`/`micVector` 由 F
 
 ### L-M4-04 编辑坐标系与片段：`edit_frame`、`vacuum_aware_vector`、`substrate_mask`、`molecule_of`、`moving_group`、`unwrap_group`、`component`、`chain_images`
 
-- **提供方**：M4 T2–T4。**文件**：`crystallume/analysis/fragments.py`、`web/js/core/fragments.js`。
+- **提供方**：M4 T2–T4。**文件**：`facet/analysis/fragments.py`、`web/js/core/fragments.js`。
 - **签名**：M4 §6.2/§6.3 原文，**[改]** 去掉 `fragments` 里的 `BondGraph`/`bond_graph`（用 M3 的 L-M3-03，`metal_pairs="all"`）；`METALS` 从 `core/elements` 导入（L-M2-06）。
 - **语义**：`edit_frame(s)`：`cuts = display_cuts(s)`，有切口的轴 `shift_i,k = −floor(f_i,k − cuts[k].lo)`、不取最小像；其余周期轴为 `mic_axes`（F0 账本 §6 M4 第 2 条）。`substrate_mask` 以 M3 `find_adsorbates` 为第一来源；`moving_group` 按 M4 §3.6（基底优先，约束不决定移动哪一侧）。
 - **消费方**：M4 的移动工具、数值变换、设定几何、粘贴；M5（可选：`molecule_of`、`unwrap_group` 用于自定义吸附物"Use selection"）。
@@ -1133,7 +1133,7 @@ M4 用到的第 0 波接口按 F0 账本 §6 M4（`mic_vector`/`micVector` 由 F
 
 ### L-M4-05 放置：`site_point`、`surface_side`、`anchor_point`、`orient_rotation`、`parse_element`
 
-- **提供方**：M4 T5。**文件**：`crystallume/analysis/placement.py`、`web/js/core/placement.js`。
+- **提供方**：M4 T5。**文件**：`facet/analysis/placement.py`、`web/js/core/placement.js`。
 - **Python**：`site_point(structure, atoms, *, images=None, bond=None, height=None, side="auto", symbol=None) -> SitePoint`（`SitePoint(point, normal, side, height, bond, contacts, label)`）、`surface_side(structure, points, side="auto")`、`anchor_point(structure, mode="binding", *, normal=None)`、`orient_rotation(structure, mode, normal, *, anchor)`、`parse_element(text) -> str`。**JS**：`sitePoint(s, atoms, { bond, height, side, symbol })`、`surfaceSide`、`anchorPoint`、`orientRotation`、`parseElement`。
 - **语义**：M4 §3.9：接触抬升的闭式解 `t* = max_j [h_j + sqrt(d² − ρ_j²)]`（j 为面内距离 ρ_j < d 的基底原子，取离 c 最近的像），默认键长（**[改]** 负责人决定 L-05）：X 是吸附物库里的单原子条目时逐个接触原子取 `d_j = adsorbate_target_distance(s, X, j, site_kind=k)["distance"]`（L-M5-05；`k` 由所选原子数定：1 → `"top"`，2 → `"bridge"`，≥ 3 → `"hollow"`），闭式解相应写成 `t* = max_j [h_j + sqrt(d_j² − ρ_j²)]`，读数 `bond 1.94 Å (adsorbate library)`；否则 `d = place_bond_factor·(r_cov(X) + r_cov(M))`，读数 `bond 1.98 Å (covalent radii)`；用户填了键长时用用户的值；找不到可接触的原子时回退 `add_height`。M4 T5（第 2 波）先实现共价半径一支；M5 T5（第 3 波）提供 `adsorbate_target_distance` 并在同一任务里把 M4 `site_point` 取缺省键长的一处接上（测试 `test_m4_default_bond_from_library`：O 在 Cu(100) 4 重位、H 在 Pt(111) fcc，M4 与 M5 同一高度）。位点标签（`top`/`bridge`/`3-fold hollow (fcc|hcp)`/`4-fold hollow`）只用于读数，位点的分类与等价性属于 M5。
 - **一致性**（**[新]**，R-F11）：对同一个单原子吸附物、同一个位点点 c、同一个键长 d，M4 `site_point(…, bond=d)` 的高度与 M5 `place_adsorbate(…, bond_length=d)` 的高度相差 ≤ 1e-9 Å（测试 `test_m4_m5_single_atom_height`，Pt(111) 的 top/bridge/fcc/hcp 与 Cu(100) 4 重位）。
@@ -1143,22 +1143,22 @@ M4 用到的第 0 波接口按 F0 账本 §6 M4（`mic_vector`/`micVector` 由 F
 ### L-M4-06 剪贴板
 
 - **提供方**：M4 T6。**文件**：`web/js/io/clipboard.js`、`web/js/core/edits.js`。
-- **JS**：`CLIP_MIME = 'application/x-crystallume-atoms+json'`、`encodeClipboard(structure, indices, meta) → { json, text, payload }`、`decodeClipboard({ json, text }, memory) → payload | null`、`planPaste`、`pasteDefault`。
-- **语义**：M4 §3.10；表面放置的粘贴按 R-ADS；完整的源吸附物复制其 `info.surface.adsorbates` 记录（`id` 改为新 id、`site = null`、`bonds = []`、`side` 为新的面；**不写 `firstAtom`**，R-F34）；目标没有 `info.surface` 时建 `kind: "adsorbates"` 的块（`autoName = 目标名`；M4 不改名，L-X-07）。extxyz 文本里的 `crystallume_clip=<id>` 按普通字符串往返（L-F0-24）。
+- **JS**：`CLIP_MIME = 'application/x-facet-atoms+json'`、`encodeClipboard(structure, indices, meta) → { json, text, payload }`、`decodeClipboard({ json, text }, memory) → payload | null`、`planPaste`、`pasteDefault`。
+- **语义**：M4 §3.10；表面放置的粘贴按 R-ADS；完整的源吸附物复制其 `info.surface.adsorbates` 记录（`id` 改为新 id、`site = null`、`bonds = []`、`side` 为新的面；**不写 `firstAtom`**，R-F34）；目标没有 `info.surface` 时建 `kind: "adsorbates"` 的块（`autoName = 目标名`；M4 不改名，L-X-07）。extxyz 文本里的 `facet_clip=<id>` 按普通字符串往返（L-F0-24）。
 - **消费方**：M4；M5（复制来的记录在列表里显示，`site = null` 时不显示"placed on"）。
 - **已解决的冲突**：R-F34。
 
 ### L-M4-07 网页：移动工具、放置工具、Transform 分区与公共 API
 
 - **提供方**：M4 T7–T10。**文件**：`web/js/render/tools/move.js`、`render/tools/place.js`、`ui/panels/transform.js` 等（M4 §9）。
-- **要点**：`tools.register({ id: 'move', key: 'G', toolbar: true, selects: true, cursor: 'grab', touch: 'claim', … })`（L-F0-41）；`registerPanelSection('structure', { id: 'transform', slot: 'transform', order: 10 })`；选区动作 Move…（60）、Rotate…（61）；**吸附目标** `crystallume.tools.get('move').registerSnapTargets(provider: (structure) → [{ position: [x, y, z], label }]) → unregister`（M5 注册当前位点集合的 `position`）。
+- **要点**：`tools.register({ id: 'move', key: 'G', toolbar: true, selects: true, cursor: 'grab', touch: 'claim', … })`（L-F0-41）；`registerPanelSection('structure', { id: 'transform', slot: 'transform', order: 10 })`；选区动作 Move…（60）、Rotate…（61）；**吸附目标** `facet.tools.get('move').registerSnapTargets(provider: (structure) → [{ position: [x, y, z], label }]) → unregister`（M5 注册当前位点集合的 `position`）。
 - **公共 API**（`defineApi`，owner `M4`）：M4 §6.4 的 `edit.translate`、`edit.moveAlongNormal`、`edit.moveTo`、`edit.rotate`、`edit.align`、`edit.setDistance`、`edit.setAngle`、`edit.setDihedral`、`edit.setTilt`、`edit.setAzimuth`、`edit.setGeometry`、`edit.movingGroup`、`edit.addAtom`、`edit.copy`、`edit.cut`、`edit.paste`、`edit.insert`、`edit.clipboard`；`analysis.sitePoint`。
 - **已解决的冲突**：F0 账本 §6 M4 第 3、6 条。
 
 ### L-M4-08 CLI（应该）
 
 - **提供方**：M4 T11。
-- **CLI**（M4 §6.6，**[改]** 补上 §0.3 的输入输出选项）：`crystallume edit translate|rotate|set-distance|set-angle|set-dihedral|add-atom|merge IN … [--from FMT] [--index N] -o OUT [--format FMT]`；**[新]**（负责人决定 L-10，第 2 波，随 `edit` 组）`crystallume edit delete IN --atoms SPEC [--from FMT] [--index N] -o OUT [--format FMT]`：删除这些原子（`Structure.delete`，吸附物记录按 L-X-04 的"删除原子"规则保留、孤儿由 M5 回收），stderr `crystallume: note: deleted 1 atom (35 left)`；`SPEC` 与 M3 `edit fix --atoms` 同一写法（0 起的下标，`"0-35, 40"`，范围含两端）；越界 → 退出码 1，`atom index 40 out of range (structure has 36 atoms)`（与现有 `frame index … out of range` 同一句式，`core/structure.py:356`）。不加 REST（M4 K8）。
+- **CLI**（M4 §6.6，**[改]** 补上 §0.3 的输入输出选项）：`facet edit translate|rotate|set-distance|set-angle|set-dihedral|add-atom|merge IN … [--from FMT] [--index N] -o OUT [--format FMT]`；**[新]**（负责人决定 L-10，第 2 波，随 `edit` 组）`facet edit delete IN --atoms SPEC [--from FMT] [--index N] -o OUT [--format FMT]`：删除这些原子（`Structure.delete`，吸附物记录按 L-X-04 的"删除原子"规则保留、孤儿由 M5 回收），stderr `facet: note: deleted 1 atom (35 left)`；`SPEC` 与 M3 `edit fix --atoms` 同一写法（0 起的下标，`"0-35, 40"`，范围含两端）；越界 → 退出码 1，`atom index 40 out of range (structure has 36 atoms)`（与现有 `frame index … out of range` 同一句式，`core/structure.py:356`）。不加 REST（M4 K8）。
 - **已解决的冲突**：R-F13（`edit` 组与 M2、M3 共用同一套输入输出选项）。
 
 ---
@@ -1167,23 +1167,23 @@ M4 用到的第 0 波接口按 F0 账本 §6 M4（`mic_vector`/`micVector` 由 F
 
 ### L-M5-01 吸附物库：`adsorbates.json`、加载与查找
 
-- **提供方**：M5 T1（第 2 波起即可开工）。**文件**：`crystallume/web/data/adsorbates.json`（schema `crystallume.adsorbates/1`，52 个条目，M5 §4.1）、`build/adsorbate.py`（库部分）、`web/js/build/adsorbates.js`（库部分）。读取经 L-M2-06 的 `webdata`（**[改]** 不是 F0-D 的任务）。
+- **提供方**：M5 T1（第 2 波起即可开工）。**文件**：`facet/web/data/adsorbates.json`（schema `facet.adsorbates/1`，52 个条目，M5 §4.1）、`build/adsorbate.py`（库部分）、`web/js/build/adsorbates.js`（库部分）。读取经 L-M2-06 的 `webdata`（**[改]** 不是 F0-D 的任务）。
 - **Python**：`ADSORBATES: Mapping[str, dict]`（只读元数据视图）、`adsorbate_library() -> dict`（惰性、缓存、深拷贝；校验失败 `RuntimeError`）、`adsorbate_names() -> list[str]`、`adsorbate(name, mode=None, *, library=None) -> Adsorbate`、`adsorbate_from_dict(entry, mode=None)`、`adsorbate_from_structure(structure, binding=0, *, indices=None, kind=None, keep_orientation=False, normal=None, name=None)`；`Adsorbate`（M5 §6.1 的字段）的 `to_structure(cell=None, *, vacuum=None) -> Structure`。
 - **JS**：`loadAdsorbateLibrary() → Promise<Library>`、`adsorbateLibrary() → Library | null`、`setAdsorbateLibrary(lib)`、`listAdsorbates(lib)`、`adsorbate(name, { mode, library })`（库未加载时抛 `The adsorbate library is not loaded yet.`）、`adsorbateFromDict`、`adsorbateFromStructure`。
 - **语义**：查找顺序：与 `id` 完全相同 → 与元素符号完全相同（单原子）→ 不区分大小写匹配 `id`、`aliases`、`formula`、`name`；未知 → E20。**[改]** `to_structure`：`cell` 与 `vacuum` 都缺省 → 分子（无晶胞，`pbc = [F, F, F]`）；给 `cell` → 放进该晶胞（pbc 同输入的晶胞所属结构，缺省 `[T, T, T]`）；给 `vacuum` → **装箱：沿三根晶胞矢量与周期像之间的总间隙都是 `vacuum` Å**（盒长 = 分子在该方向的厚度 + `vacuum`，分子居中，`pbc = [T, T, T]`），不是"每侧 `vacuum`"（U4）；`0 ≤ vacuum ≤ max_vacuum`。网页启动：`registerBootTask('adsorbates', loadAdsorbateLibrary)`（L-F0-56，R-F31）。
 - **消费方**：M5 放置与界面；脚本；M6 无。
 - **已解决的冲突**：R-F30、R-F31；M5 v2 §6.1 `to_structure` 的"`vacuum` Å on every side"→ 总间隙（§9 合规）。
 
-### L-M5-02 位点识别：`adsorption_sites`、`site_atoms`、`find_sites`、`SiteSet`、`crystallume.sites/1`
+### L-M5-02 位点识别：`adsorption_sites`、`site_atoms`、`find_sites`、`SiteSet`、`facet.sites/1`
 
-- **提供方**：M5 T3、T4。**文件**：`crystallume/analysis/sites.py`（`analysis.__all__` 导出 `adsorption_sites`、`site_atoms`、`find_sites`、`find_top_bottom_operation`、`assign_sites`、`site_presets`、`SiteSet`、`Site`、`SiteClass`）、`web/js/core/sites.js`、`core/delaunay.py`、`web/js/core/delaunay.js`。
+- **提供方**：M5 T3、T4。**文件**：`facet/analysis/sites.py`（`analysis.__all__` 导出 `adsorption_sites`、`site_atoms`、`find_sites`、`find_top_bottom_operation`、`assign_sites`、`site_presets`、`SiteSet`、`Site`、`SiteClass`）、`web/js/core/sites.js`、`core/delaunay.py`、`web/js/core/delaunay.js`。
 - **Python**：`adsorption_sites(structure, *, side="top", method="auto", layers=None, window=None, probe=None, indices=None, exclude=None, include_adsorbates=False, fingerprint_adsorbates=False, top_normal="surface", kinds=("top", "bridge", "hollow"), tolerance=None, distance=None, frame=None, symmetry="fingerprint") -> SiteSet`；`site_atoms(structure, *, side="top", method="auto", …, details=False)`；`find_sites(site_set, key, side=None) -> list[Site]`（= `SiteSet.find`）。数据类按 M5 v2 §6.1。
 - **JS**：`adsorptionSites(s, opts) → SiteSet`、`siteAtoms(s, opts)`、`findSites(siteSet, key, side)`、`siteSetToJSON(siteSet, { detail })`、`surfaceSetup(s, side, opts)`。
 - **语义**（M5 §3）：
   - **[改]** 法向与切口：`ads = find_adsorbates(s).indices`（L-M3-04）∪ 有限片段 `loose`（L-M3-03 `periodic_components` 在基底子图上的非周期块，原子数 ≤ 基底的一半）；`sn = surface_normal(s, frame=frame, exclude=ads ∪ loose)`（L-F0-17 的 `exclude`，R-F27），`sn.surface` 为假 → E3（文案 `vacuum_gap_hint(s, exclude=…)`）；展开 `m_t = −floor(f_t − sn.cut.lo)`（= `unwrap_along_gap`）。只含基底的 `view(s, sub)` 仍用于 M5 自己的几何（配位数、Delaunay、指纹），不再用来求法向。
   - 位点原子 `method`：`auto`（缺省，M5 §3.2.1；层号用 L-M3-02 `cluster_heights(h, layer_tolerance, descending=True)`）、`exposed`（L-M3-05 `surface_atoms`）、`indices`、`layers`、`window`。M5 的概念叫**位点原子**，不叫"表面原子"（R-F06）。
   - 数字与标签一律用 L-M1-15（`format_decimal` 等）；`Site.point` 在 M5 §3.1 的展开坐标里，可能与存储坐标差整数个 `a_k`。
-  - `crystallume.sites/1` 的字段按 M5 v2 §4.8（camelCase，坐标 6 位小数，`detail: "classes"` 时省略逐位点数组）。
+  - `facet.sites/1` 的字段按 M5 v2 §4.8（camelCase，坐标 6 位小数，`detail: "classes"` 时省略逐位点数组）。
 - **消费方**：M5 放置；M6-S1（位点菜单与错位报告）；M4 的吸附目标（经 M5 注册）；公共 API。
 - **已解决的冲突**：R-F06、R-F27；M5 v1 的 `findAdsorptionSites`、`getAdsorbate(lib, name)` → 上面的同词名字（M5 v2 已改）。
 
@@ -1255,10 +1255,10 @@ M4 用到的第 0 波接口按 F0 账本 §6 M4（`mic_vector`/`micVector` 由 F
 
 - **提供方**：M5 T8、T9。**文件**：`web/js/ui/panels/surface-adsorbates.js`、`web/js/render/sitemarkers.js`、`web/js/render/tools/sitepick.js`；**不改** `api/public.js`、`ui/shell.js`、`ui/selectioncard.js`、`main.js` 的启动顺序。
 - **位点摘要**（负责人决定 L-09）：`9 site atoms (Pt) · 54 sites in 4 classes`；多元素表面的组成与类标签括号里的写法相同（如 `hollow (Ti2O2)`）：`4 site atoms (Ti2O2) · …`。
-- **要点**：`registerPanelSection('surface', { id: 'adsorbates', order: 40 })`；标记 `viewer.overlays.add({ id: 'adsorption-sites', tier: 'top', export: 'marker', pickable: true, pickIn: ['site-pick'], … })` + `drawnCopies(points, model, { repeat: true })`；悬停与选中位点的幽灵用 `ghostLayer`（**不开会话**，L-F0-35/38）；工具 `tools.register({ id: 'site-pick', icon: 'target', toolbar: false, selects: false, cursor: 'crosshair', touch: 'claim', … })`；吸附目标经 `crystallume.tools.get('move').registerSnapTargets`；`registerSelectionAction`、`registerAtomInfo`。
+- **要点**：`registerPanelSection('surface', { id: 'adsorbates', order: 40 })`；标记 `viewer.overlays.add({ id: 'adsorption-sites', tier: 'top', export: 'marker', pickable: true, pickIn: ['site-pick'], … })` + `drawnCopies(points, model, { repeat: true })`；悬停与选中位点的幽灵用 `ghostLayer`（**不开会话**，L-F0-35/38）；工具 `tools.register({ id: 'site-pick', icon: 'target', toolbar: false, selects: false, cursor: 'crosshair', touch: 'claim', … })`；吸附目标经 `facet.tools.get('move').registerSnapTargets`；`registerSelectionAction`、`registerAtomInfo`。
 - **命令**：`sites.find`、`adsorbate.add`、`tool.sitePick`（ID 由 L-F0-52 固定）及 `sites.toggle`、`adsorbate.all`、`adsorbate.fill`、`adsorbate.eachClass`、`adsorbate.select`、`adsorbate.remove`、`adsorbate.fromSelection`；**[改]** 删除 `adsorbate.mark`（与 M3 的 `sel.markAdsorbate` 重复；分区里的"Mark as adsorbate"按钮调用后者）。
 - **公共 API**（`defineApi`，owner `M5`）：`build.adsorbates()`、`build.adsorbate(name, { mode })`、`build.adsorptionStructures(name, opts)`、`analysis.sites(s?, opts)`、`analysis.assignSites(s?, opts)`、`edit.addAdsorbate(name | Adsorbate, opts)`、`edit.addAdsorbates(...)`、`edit.removeAdsorbates(ids?)`、`surface.showSites(on, opts)`、`surface.coverage(opts)`；**[改]** 没有 `edit.markAdsorbate`。
-- **事件**：**[改]** `sites` 只是 `app` 的内部事件，不加入 `api/public.js` 的 `EVENTS`（R-F26）；嵌入页用 `crystallume.analysis.sites()` 取结果。
+- **事件**：**[改]** `sites` 只是 `app` 的内部事件，不加入 `api/public.js` 的 `EVENTS`（R-F26）；嵌入页用 `facet.analysis.sites()` 取结果。
 - **已解决的冲突**：R-F21、R-F26、R-F31。
 
 ### L-M5-10 REST、客户端、CLI
@@ -1268,15 +1268,15 @@ M4 用到的第 0 波接口按 F0 账本 §6 M4（`mic_vector`/`micVector` 由 F
 - **客户端**：`adsorption_sites(self, structure, **params) -> dict`、`add_adsorbate(self, structure, adsorbate, **params) -> Structure | list[Structure]`、`adsorbates(self) -> dict`；`ROUTE_METHODS` 三条。
 - **CLI**（**[改]** 按 §0.3）：
   ```
-  crystallume sites SLAB [--format FMT] [--index N] [--side top|bottom|both] [--method auto|exposed|layers|window] [--layers N]
+  facet sites SLAB [--format FMT] [--index N] [--side top|bottom|both] [--method auto|exposed|layers|window] [--layers N]
                          [--window Å] [--probe K] [--kind K]... [--tolerance Å] [--distinguish-adsorbates] [--assign] [--all] [--json] [--plugins DIR]
-  crystallume adsorb SLAB ADSORBATE [--from FMT] [--index N] [--mode MODE]
+  facet adsorb SLAB ADSORBATE [--from FMT] [--index N] [--mode MODE]
                          (--site SITE [--site-index K] | --position X Y | --frac U V | --each-class [--class LABEL]...)
                          [--all | --coverage THETA [--per cell|site-atom|EL] [--min-separation Å] | --count N]
                          [--side top|bottom] [--both-sides] [--height Å | --bond-length Å] [--bond-factor F] [--rotation DEG] [--tilt DEG]
                          [--method …] [--no-skip-blocked] [-o OUT | -o DIR/] [--format FMT] [--plugins DIR]
-  crystallume adsorb SLAB (--substitute EL | --vacancy) [--class LABEL]... -o DIR/ [--format FMT]
-  crystallume adsorb --list [--category C] [--json]
+  facet adsorb SLAB (--substitute EL | --vacancy) [--class LABEL]... -o DIR/ [--format FMT]
+  facet adsorb --list [--category C] [--json]
   ```
   `--count N` 的帮助按 L-M5-05（本次新增 N 个，负责人决定 L-18）。`adsorb` 的输入格式 `--format` → `--from`、输出格式 `--to` → `--format`；选同类第 K 个位点的 `--index K` 改名 `--site-index K`（`--index` 是帧选择）。
 - **已解决的冲突**：R-F13、R-F14。
@@ -1287,7 +1287,7 @@ M4 用到的第 0 波接口按 F0 账本 §6 M4（`mic_vector`/`micVector` 由 F
 
 ### L-M6-01 晶格匹配核心：`Mesh2D`、`lattice_rotations`、`match_meshes`、`match_from_matrices`、`auto_twist_area`
 
-- **提供方**：M6 T1（Python）、T2（JS）。**文件**：`crystallume/analysis/latticematch.py`（`analysis.__all__`）、`web/js/core/latticematch.js`。
+- **提供方**：M6 T1（Python）、T2（JS）。**文件**：`facet/analysis/latticematch.py`（`analysis.__all__`）、`web/js/core/latticematch.js`。
 - **Python**：
   ```python
   class Mesh2D:
@@ -1386,7 +1386,7 @@ M4 用到的第 0 波接口按 F0 账本 §6 M4（`mic_vector`/`micVector` 由 F
 - **提供方**：M6 T6。
 - **REST**（M6 v2 §6.3）：`POST /api/v1/analysis/interface`（登录）、`POST /api/v1/build/interface`（需要搜索时登录；只给两个矩阵时公开）；**[改]** `InterfaceBuildRequest.vacuum: float = Field(..., ge=0, le=1000)`；新模型 `extra="forbid"`；`shift`、`shiftCart` 长度 2、`distance` 数值 0.5–20 Å。
 - **客户端**：`interface_matches(self, substrate, overlayer, **search) -> dict`、`build_interface(self, substrate, overlayer, *, vacuum: float, **options) -> Structure`；`ROUTE_METHODS` 两条。
-- **CLI**（按 §0.3）：`crystallume build interface SUBSTRATE OVERLAYER --vacuum Å [--from FMT] [--index N] [--list [--json]] [--pick N] [--variant K] [--max-strain PCT] [--max-area A2|auto] [--max-atoms N] [--twist DEG] [--twist-tol DEG] [--max-aspect R] [--engine auto|zsl|twist] [--flip] [--flip-substrate] [--no-primitive] [--substrate-matrix A B C D | --keep-input-cell] [--overlayer-matrix A B C D] [--strain-to overlayer|substrate|both] [--strain-weight W] [--distance vdw|covalent|bulk|Å] [--shift U V | --shift-site top|bridge|short-bridge|long-bridge|fcc|hcp|hollow] [--no-constraints] [--keep-overlayer-tags] [--parts] [--name NAME] [-o OUT] [--format FMT]`；`--vacuum` 为 `required=True`，只有 `--list` 不构建、不需要它。
+- **CLI**（按 §0.3）：`facet build interface SUBSTRATE OVERLAYER --vacuum Å [--from FMT] [--index N] [--list [--json]] [--pick N] [--variant K] [--max-strain PCT] [--max-area A2|auto] [--max-atoms N] [--twist DEG] [--twist-tol DEG] [--max-aspect R] [--engine auto|zsl|twist] [--flip] [--flip-substrate] [--no-primitive] [--substrate-matrix A B C D | --keep-input-cell] [--overlayer-matrix A B C D] [--strain-to overlayer|substrate|both] [--strain-weight W] [--distance vdw|covalent|bulk|Å] [--shift U V | --shift-site top|bridge|short-bridge|long-bridge|fcc|hcp|hollow] [--no-constraints] [--keep-overlayer-tags] [--parts] [--name NAME] [-o OUT] [--format FMT]`；`--vacuum` 为 `required=True`，只有 `--list` 不构建、不需要它。
 - **已解决的冲突**：R-F05、R-F13、R-F14。
 
 ---
@@ -1444,9 +1444,9 @@ M4 用到的第 0 波接口按 F0 账本 §6 M4（`mic_vector`/`micVector` 由 F
   7. §10 F0-A 表 `surfaceNormal(structure, { frame })`（F0-A）→ F0-D 的 `surfaceNormal(s, { frame, requireGap, exclude })`（`core/vacuum.js`，`core/lattice.js` 重新导出）。
 - **V-F11 M2**：
   1. §3.14 第 5 步（`M2.md:753`）`pbc[2] 为真 → F0-D make_contiguous(s, 2, gap=切口)，切口 = sn.cut（W14 时为最宽间隙）；返回每个原子的整数平移 s_i（网页 imageShift）` → `pbc[2] 为真 → shifts = contiguous_shifts(s, 2, cut=切口)；make_contiguous(s, 2, cut=切口)；切口 = sn.cut（W14 时为窗口起点 lo，见 L-M2-03）；shifts 即网页 imageShift 的 c 分量`；`M2.md:779` 与 §10.1 的 `return_shifts=True` 请求删除。
-  2. §10.2 启动顺序一行 `main.js 在注册 Cleave 分区与发出 crystallume ready 之前 await loadOxidationStates()（§3.9.1；T2 改 main.js，与 F0-A 的启动代码协调）` → `registerBootTask('oxidation-states', loadOxidationStates)`（L-F0-56；M2 不改 \`main.js\`）。
+  2. §10.2 启动顺序一行 `main.js 在注册 Cleave 分区与发出 facet ready 之前 await loadOxidationStates()（§3.9.1；T2 改 main.js，与 F0-A 的启动代码协调）` → `registerBootTask('oxidation-states', loadOxidationStates)`（L-F0-56；M2 不改 \`main.js\`）。
   3. §6.1.1 `surface_normal(s).surface 为假 → ValueError(f"'{s.name}' has no vacuum gap or non-periodic axis; cleave a surface first")` → `surface_normal(s).surface 为假 → ValueError(f"'{s.name}': {vacuum_gap_hint(s)}")`。
-  4. §3.14 第 1 步、§10.2 把 `surface_normal` 记为 F0-A 的 → F0-D T7（L-F0-17）；Python 在 `crystallume.analysis`。
+  4. §3.14 第 1 步、§10.2 把 `surface_normal` 记为 F0-A 的 → F0-D T7（L-F0-17）；Python 在 `facet.analysis`。
 - **V-F12 M3**：
   1. §3.3 表 `periodic，方向是 slab 轴` 一行：`slab = surface_normal(s, require_gap=True) 非空且 slab.axis == axis：gap = find_vacuum_gap(s, axis, min_width=0)（F0-D，全部原子参与）；f' = unwrap_along_gap(f_axis, gap)（F0-D：f − floor(f − cut)，cut 为间隙中点映射到 (−0.5, 0.5]）` → `sn = surface_normal(s, require_gap=True) 非空且 sn.axis == axis：f' = unwrap_along_gap(f_axis, sn.cut)（L-F0-16，窗口 [cut.lo, cut.lo + 1)）`；同节"与显示同一个切口"一段中的 `unwrap_along_gap(f, find_vacuum_gap(s, k))` → `display_cuts(s)[k]`。
   2. §3.16（`M3.md:618`）`没有间隙时用 F0-A \`requireVacuumGap\` 的同一文案（\`No vacuum gap found along a, b or c. …\`，E27）` → `没有间隙时报 \`vacuum_gap_hint(s)\`（L-F0-17，经 \`require_gap\`）`。
@@ -1487,7 +1487,7 @@ M4 用到的第 0 波接口按 F0 账本 §6 M4（`mic_vector`/`micVector` 由 F
 1. `gauss_reduce_2d(a, b, *, angle="obtuse" | "acute" | None) -> (u, v, M)` 的 `angle=None` 分支按 §1.1 冻结（M6 依赖它的平局与容差，附录 A-1）；M2、M5 用缺省 `"obtuse"`（L-M1-02）。
 2. `PrimitiveResult` 加 `transform = {num, den}`（新 = T @ 旧）与 `supercell_matrix`（旧 = S @ 新，整数），`matrix` 恒为 `None`（R-F02，L-M1-12）。
 3. 1×1 网格只有 `reference_mesh(s, *, exclude=None)` 一处：只在 `kind ∈ {cleave, interface}` 时信任 `info.supercellMatrix`；新键 `reference_mesh_tolerance` = 0.3 Å（R-F17，L-M1-07，L-X-08）。§3.6.4 改为引用它。
-4. 超胞只有 `cellops.make_supercell`：网页、REST 单帧与 `cell.bakeRepeat` 的对角重复走 `make_supercell(diag, wrap=False)`（R-F24）；JS 公共名 `crystallume.build.makeSupercell(s, P, { wrap })`（R-F36，L-M1-08）。
+4. 超胞只有 `cellops.make_supercell`：网页、REST 单帧与 `cell.bakeRepeat` 的对角重复走 `make_supercell(diag, wrap=False)`（R-F24）；JS 公共名 `facet.build.makeSupercell(s, P, { wrap })`（R-F36，L-M1-08）。
 5. **超胞编辑器**（负责人决定 L-16）：`web/js/ui/cellsupercell.js` 导出 `supercellEditor(el, app, { owner, surface = false })` 供 M2 的 Slab 分区内嵌（M1 §5.1 已这样写，保留）；删除本账本早先的 `openSection(…, { tab: 'surface' })` 深链；测试 `test_supercell_two_mounts`（L-M1-16）。
 6. **名字**（负责人决定 L-19、L-12）：D13"从预设创建时名字用预设自己的标签"撤回，名字里的网格标签只由矩阵算出；toast 写 `Made a c(2×2) = (√2×√2)R45° supercell: 8 atoms`（相同时只写一次）；`rename_after_cell_change(name, P, *, cell, previous=None)` 去掉 `label` 参数（L-M1-15）；K5、§3.5.4 的 `info.surface.name` → `autoName`，并改为"操作前 `auto_name_state`，`apply_info_handlers` 之后 `refresh_auto_name(s, before, cell_change=…)`，返回 False 时 `rename_after_cell_change`"（L-X-07）。
 7. info 处理器放进新文件 `core/infohandlers.*`（静态注册）；`ctx` 加 `lattice_points` 与 `id_map`；内置的只有 `surface` 几何处理器与 M5 的 `surface.adsorbates`；K16 的"M2 注册 `surface`（replace）""M6 注册 `interface`"删除（L-M1-14）。
@@ -1527,7 +1527,7 @@ M4 用到的第 0 波接口按 F0 账本 §6 M4（`mic_vector`/`micVector` 由 F
 2. **默认键长**（负责人决定 L-05）：`Add atom › Above selection` 与 Place 工具对吸附物库里的单原子元素用 M5 `adsorbate_target_distance`，读数注明 `(adsorbate library)`；其余元素 `place_bond_factor` × 共价半径之和，读数注明 `(covalent radii)`。M4 T5 先实现后一支，M5 T5 接上前一支（L-M4-05）。M4 规格里写死的键长与高度数字（如"键长默认 1.98 Å"）改为"按 M5 §3.10 现算"（负责人决定 L-15）。
 3. `site_contact_tol` → `place_contact_tol`（L-X-08）；`fragments` 里不再定义 `BondGraph`/`bond_graph`（用 M3 的），`METALS` 从 `core/elements` 导入（L-M4-04）。
 4. 剪贴板：只为完整的源吸附物复制记录（`site = null`、`bonds = []`，不写 `firstAtom`）；目标没有块时建 `kind: "adsorbates"`、`autoName = 目标名`；M4 不改名（L-M4-06）。
-5. **新 CLI**（负责人决定 L-10，第 2 波）：`crystallume edit delete IN --atoms SPEC [--from FMT] [--index N] -o OUT [--format FMT]`；`edit` 组其余命令补上 §0.3 的输入输出选项（L-M4-08）。
+5. **新 CLI**（负责人决定 L-10，第 2 波）：`facet edit delete IN --atoms SPEC [--from FMT] [--index N] -o OUT [--format FMT]`；`edit` 组其余命令补上 §0.3 的输入输出选项（L-M4-08）。
 6. 一致性测试 `test_m4_m5_single_atom_height`（R-F11）；吸附目标的提供接口 `registerSnapTargets`（L-M4-07）；§8.2 的标题与写法（V-F06）；F0 名字 V-F13。
 
 ### 10.5 M5（吸附物）

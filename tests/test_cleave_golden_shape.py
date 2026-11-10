@@ -23,9 +23,9 @@ from typing import Any
 import numpy as np
 import pytest
 
-from crystallume import Structure
-from crystallume.analysis.vacuum import surface_normal
-from crystallume.io import read
+from facet import Structure
+from facet.analysis.vacuum import surface_normal
+from facet.io import read
 
 from . import ops  # noqa: F401  (registers every op and recipe)
 from .cases import DATA, OPS, RECIPES, load_cases
@@ -124,7 +124,7 @@ def test_files_load_with_the_shared_loader():
     assert len(CASES) >= 150
     assert {c["op"] for c in CASES} == set(CONTRACT)
     for name in FILES:
-        assert (CLEAVE / name).read_text(encoding="utf-8").startswith('{\n  "schema": "crystallume.cases/1"'), name
+        assert (CLEAVE / name).read_text(encoding="utf-8").startswith('{\n  "schema": "facet.cases/1"'), name
     inputs = sorted(p.name for p in (CLEAVE / "inputs").iterdir())
     assert inputs and all(n.endswith(".vasp") for n in inputs)
     used = {c["input"]["file"].rsplit("/", 1)[1] for c in CASES if "file" in c.get("input", {})}

@@ -1,4 +1,4 @@
-// Runs every shared case (tests/data/**/*.json with schema crystallume.cases/1) against the web modules — the
+// Runs every shared case (tests/data/**/*.json with schema facet.cases/1) against the web modules — the
 // Python side is tests/test_cases.py — and tests the JS half of the case shell (registries, inputs, runner).
 // Run: node --test tests/js/cases.test.mjs (or through pytest: tests/test_js_unit.py).
 import { test, describe, after } from 'node:test';
@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { Structure } from '../../crystallume/web/js/core/structure.js';
+import { Structure } from '../../facet/web/js/core/structure.js';
 import { CaseFileError, DATA, approx, compare, loadCases } from './helpers.mjs';
 import { OPS, RECIPES, CaseInput, loadOps, op, recipe, resolveInput, runCase } from './cases.mjs';
 
@@ -17,7 +17,7 @@ try { cases = loadCases(); } catch (err) { loadError = err; }
 
 test('case files load', () => {
   if (loadError) throw loadError;
-  assert.ok(cases.length > 0, `no crystallume.cases/1 cases under ${DATA}`);
+  assert.ok(cases.length > 0, `no facet.cases/1 cases under ${DATA}`);
 });
 
 describe('shared cases', () => {
@@ -44,7 +44,7 @@ const scratchOp = (name, fn) => { scratch.push(['op', name]); return op(name, fn
 const scratchRecipe = (name, fn) => { scratch.push(['recipe', name]); return recipe(name, fn); };
 after(() => { for (const [kind, name] of scratch) (kind === 'op' ? OPS : RECIPES).delete(name); });
 
-const tmp = mkdtempSync(path.join(tmpdir(), 'crystallume-cases-'));
+const tmp = mkdtempSync(path.join(tmpdir(), 'facet-cases-'));
 after(() => rmSync(tmp, { recursive: true, force: true }));
 
 const kase = (extra) => ({ id: 'js-case', op: 'jsEcho', expect: { value: 1 }, _root: DATA, ...extra });
@@ -165,7 +165,7 @@ describe('case shell', () => {
   test('loadCases reports malformed files with CaseFileError', () => {
     const root = path.join(tmp, 'bad');
     mkdirSync(root, { recursive: true });
-    writeFileSync(path.join(root, 'a.json'), JSON.stringify({ schema: 'crystallume.cases/1', cases: [{ id: 'x', op: 'load', expected: {} }] }));
+    writeFileSync(path.join(root, 'a.json'), JSON.stringify({ schema: 'facet.cases/1', cases: [{ id: 'x', op: 'load', expected: {} }] }));
     assert.throws(() => loadCases(root), (err) => err instanceof CaseFileError
       && err.message.startsWith('a.json: case "x": unknown key "expected" (allowed: args, expect, id, input, note, op, skip, tol, xfail)'));
     assert.throws(() => loadCases(path.join(tmp, 'missing')), /not a directory/);

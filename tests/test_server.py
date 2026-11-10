@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import json
 
-from crystallume import __version__, build
-from crystallume.io.capabilities import WRITER_CAPABILITIES
-from crystallume.server.models import ExportResponse
+from facet import __version__, build
+from facet.io.capabilities import WRITER_CAPABILITIES
+from facet.server.models import ExportResponse
 
 POSCAR_TEXT = """Si8 diamond
 5.431
@@ -31,7 +31,7 @@ def test_health_and_info(local_client):
     r = local_client.get("/api/v1/health")
     assert r.status_code == 200 and r.json() == {"status": "ok", "version": __version__}
     info = local_client.get("/api/v1/info").json()
-    assert info["name"] == "Crystallume" and info["mode"] == "local"
+    assert info["name"] == "Facet" and info["mode"] == "local"
     assert info["authRequired"] is False and info["allowRegistration"] is False
     readers = {f["name"] for f in info["formats"]["readers"]}
     writers = {f["name"] for f in info["formats"]["writers"]}
@@ -49,7 +49,7 @@ def test_meta_misc(local_client):
     assert local_client.get("/openapi.json").status_code == 200
     assert local_client.get("/docs").status_code == 200
     page = local_client.get("/")
-    assert page.status_code == 200 and "Crystallume" in page.text  # placeholder without frontend
+    assert page.status_code == 200 and "Facet" in page.text  # placeholder without frontend
     assert local_client.get("/api/v1/does-not-exist").status_code == 404
 
 
@@ -88,10 +88,10 @@ def test_local_projects_crud(local_client):
     dl = c.get(f"/api/v1/projects/{pid}/download")
     assert dl.status_code == 200
     assert "attachment" in dl.headers["content-disposition"]
-    assert ".crystallume.json" in dl.headers["content-disposition"]
+    assert ".facet.json" in dl.headers["content-disposition"]
     assert dl.json()["id"] == pid
 
-    imp = c.post("/api/v1/projects/import", files={"file": ("x.crystallume.json", dl.content, "application/json")})
+    imp = c.post("/api/v1/projects/import", files={"file": ("x.facet.json", dl.content, "application/json")})
     assert imp.status_code == 201 and imp.json()["id"] != pid and imp.json()["name"] == "Copper 铜"
     imp2 = c.post("/api/v1/projects/import", files={"file": ("POSCAR", POSCAR_TEXT.encode())})
     assert imp2.status_code == 201 and imp2.json()["structures"][0]["structure"]["symbols"] == ["Si"] * 8
@@ -154,8 +154,8 @@ def test_cloud_auth_and_isolation(cloud_client):
 def test_cloud_registration_disabled(tmp_path):
     from fastapi.testclient import TestClient
 
-    from crystallume.config import Settings
-    from crystallume.server import create_app
+    from facet.config import Settings
+    from facet.server import create_app
 
     s = Settings(mode="cloud", data_dir=tmp_path, allow_registration=False, entry_point_plugins=False)
     with TestClient(create_app(s)) as c:
@@ -200,7 +200,7 @@ def test_io_export_and_convert(local_client, data_dir):
 
 
 CONSTRAINTS_LOST = ("18 atom(s) are fixed or partly fixed (selective dynamics), but CIF cannot store constraints; "
-                    "use POSCAR, Extended XYZ or Crystallume JSON to keep them")
+                    "use POSCAR, Extended XYZ or Facet JSON to keep them")
 ORDER_NOTE = ("POSCAR groups atoms by element, so the atom order in the file differs from the order in the structure; "
               "sort the atoms by species to make them match")
 
@@ -244,9 +244,9 @@ def test_plugin_writers_declare_capabilities(tmp_path):
 
     from fastapi.testclient import TestClient
 
-    from crystallume import io as cl_io
-    from crystallume.config import Settings
-    from crystallume.server import create_app
+    from facet import io as cl_io
+    from facet.config import Settings
+    from facet.server import create_app
 
     d = tmp_path / "plugins"
     d.mkdir()
@@ -284,7 +284,7 @@ def test_plugin_writers_declare_capabilities(tmp_path):
             assert r["warnings"] == ["Caps format holds one frame: wrote frame 1 of 2"] and r["notes"] == []
             r = c.post("/api/v1/io/export", json={"structure": traj, "format": "capsvel"}).json()
             assert r["notes"] == ["the atoms have velocities, but Caps format cannot store them; use POSCAR, "
-                                  "Extended XYZ or Crystallume JSON to keep them"]
+                                  "Extended XYZ or Facet JSON to keep them"]
     finally:
         for name in ("capsfmt", "capsvel", "badfirst", "badcaps"):
             cl_io.unregister_writer(name)
@@ -294,8 +294,8 @@ def test_supercell_estimate_counts_every_frame(tmp_path):
     """Defect E-63: repeat() tiles every frame, so the atom estimate counts them all."""
     from fastapi.testclient import TestClient
 
-    from crystallume.config import Settings
-    from crystallume.server import create_app
+    from facet.config import Settings
+    from facet.server import create_app
 
     si = build.crystal("diamond", "Si")
     traj = si.to_dict()
@@ -314,8 +314,8 @@ def test_pair_limit_is_a_fixed_constant():
     """Defect E-64: no setting overrides MAX_PAIRS (the comment that said so is gone)."""
     from types import SimpleNamespace
 
-    from crystallume.config import Settings
-    from crystallume.server.routes import analysis
+    from facet.config import Settings
+    from facet.server.routes import analysis
 
     assert analysis.MAX_PAIRS == 50_000_000 and not hasattr(Settings(), "max_pairs")
     analysis._guard_work(build.crystal("fcc", "Cu"), 5.0, SimpleNamespace(max_pairs=1, max_atoms=None))
@@ -374,18 +374,18 @@ def test_analysis_endpoints(local_client):
 def test_frontend_served_with_spa_fallback(tmp_path):
     from fastapi.testclient import TestClient
 
-    from crystallume.config import Settings
-    from crystallume.server import create_app
+    from facet.config import Settings
+    from facet.server import create_app
 
     web = tmp_path / "web"
     (web / "assets").mkdir(parents=True)
-    (web / "index.html").write_text("<!doctype html><title>Crystallume UI</title>")
+    (web / "index.html").write_text("<!doctype html><title>Facet UI</title>")
     (web / "assets" / "app.js").write_text("console.log('hi')")
     s = Settings(data_dir=tmp_path / "d", web_dir=web, entry_point_plugins=False)
     with TestClient(create_app(s)) as c:
-        assert "Crystallume UI" in c.get("/").text
+        assert "Facet UI" in c.get("/").text
         assert c.get("/assets/app.js").text == "console.log('hi')"
-        assert "Crystallume UI" in c.get("/projects/some-route").text  # SPA fallback
+        assert "Facet UI" in c.get("/projects/some-route").text  # SPA fallback
         assert c.get("/assets/missing.js").status_code == 404
         assert c.get("/api/v1/health").json()["status"] == "ok"
 
@@ -393,8 +393,8 @@ def test_frontend_served_with_spa_fallback(tmp_path):
 def test_cors(tmp_path):
     from fastapi.testclient import TestClient
 
-    from crystallume.config import Settings
-    from crystallume.server import create_app
+    from facet.config import Settings
+    from facet.server import create_app
 
     s = Settings(data_dir=tmp_path, cors_origins=["http://localhost:5173"], entry_point_plugins=False)
     with TestClient(create_app(s)) as c:

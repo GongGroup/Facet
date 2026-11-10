@@ -1,22 +1,22 @@
 // Looking along any direction (F0-A §3.14.1, ledger L-F0-45): viewer.viewAlong's targets, its screen-up rules (a
 // surface seen from the side has its top surface up, seen along its normal its first in-plane cell vector runs from
 // left to right, otherwise the shortest perpendicular lattice vector is "right"), the direction labels and their
-// status line, reduced motion, the temporary orthographic camera; and the public API of F0-A T7b: crystallume.view /
-// viewAlong and the lattice helpers of api/latticeapi.js (crystallume.lattice.* and analysis.surfaceNormal, M7 N-15).
+// status line, reduced motion, the temporary orthographic camera; and the public API of F0-A T7b: facet.view /
+// viewAlong and the lattice helpers of api/latticeapi.js (facet.lattice.* and analysis.surfaceNormal, M7 N-15).
 // The viewer methods run on a Viewer prototype instance holding only what they use (the constructor needs WebGL).
 // Run: node --test tests/js/view_along.test.mjs (or through pytest: tests/test_js_unit.py).
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import * as THREE from '../../crystallume/web/vendor/three/three.module.js';
-import { Viewer } from '../../crystallume/web/js/render/viewer.js';
-import { Overlays } from '../../crystallume/web/js/render/overlays.js';
-import { makeScene } from '../../crystallume/web/js/render/settings.js';
-import { Structure } from '../../crystallume/web/js/core/structure.js';
-import * as lattice from '../../crystallume/web/js/core/lattice.js';
-import { surfaceNormal } from '../../crystallume/web/js/core/vacuum.js';
-import { LATTICE_API, surfaceNormalOf } from '../../crystallume/web/js/api/latticeapi.js';
-import { createAPI } from '../../crystallume/web/js/api/public.js';
-import { apiMembers } from '../../crystallume/web/js/api/namespaces.js';
+import * as THREE from '../../facet/web/vendor/three/three.module.js';
+import { Viewer } from '../../facet/web/js/render/viewer.js';
+import { Overlays } from '../../facet/web/js/render/overlays.js';
+import { makeScene } from '../../facet/web/js/render/settings.js';
+import { Structure } from '../../facet/web/js/core/structure.js';
+import * as lattice from '../../facet/web/js/core/lattice.js';
+import { surfaceNormal } from '../../facet/web/js/core/vacuum.js';
+import { LATTICE_API, surfaceNormalOf } from '../../facet/web/js/api/latticeapi.js';
+import { createAPI } from '../../facet/web/js/api/public.js';
+import { apiMembers } from '../../facet/web/js/api/namespaces.js';
 import { fake2d } from './fake2d.mjs';
 
 const MINUS = '−';
@@ -537,7 +537,7 @@ describe('the direction label', () => {
 });
 
 // ------------------------------------------------------------------------------------------------ public API
-describe('public API: crystallume.view, viewAlong, lattice.* and analysis.surfaceNormal', () => {
+describe('public API: facet.view, viewAlong, lattice.* and analysis.surfaceNormal', () => {
   /** What createAPI and reference() read of the app; viewer.viewAlong records its calls. */
   function fakeApp(structure = null) {
     const calls = [];
@@ -556,7 +556,7 @@ describe('public API: crystallume.view, viewAlong, lattice.* and analysis.surfac
     assert.deepEqual(app.calls, [['a', undefined], [{ hkl: [1, 1, 1] }, { animate: false }], ['normal', { up: [0, 1, 0] }]]);
   });
 
-  test('crystallume.lattice has the eight helpers of core/lattice.js, and no surfaceNormal (N-15)', () => {
+  test('facet.lattice has the eight helpers of core/lattice.js, and no surfaceNormal (N-15)', () => {
     const api = createAPI(fakeApp(), null);
     const names = ['millerNormal', 'latticeDirection', 'isHexagonalCell', 'hklToHkil', 'hkilToHkl', 'uvwToUvtw', 'uvtwToUvw', 'centeredCellHint'];
     assert.deepEqual(Object.keys(LATTICE_API), names);
@@ -567,14 +567,14 @@ describe('public API: crystallume.view, viewAlong, lattice.* and analysis.surfac
     assert.deepEqual(api.lattice.uvwToUvtw([1, 0, 0], { integer: true }), [2, -1, -1, 0]);
   });
 
-  test('crystallume.analysis.surfaceNormal(s?, opts): the vacuum module, the active structure by default', (t) => {
+  test('facet.analysis.surfaceNormal(s?, opts): the vacuum module, the active structure by default', (t) => {
     const slab = pt111();
     const app = fakeApp(slab);
     const api = createAPI(app, null);
     assert.equal(api.analysis.surfaceNormal, surfaceNormalOf);
-    const had = Object.getOwnPropertyDescriptor(globalThis, 'crystallume');
-    t.after(() => { if (had) Object.defineProperty(globalThis, 'crystallume', had); else delete globalThis.crystallume; });
-    globalThis.crystallume = api;
+    const had = Object.getOwnPropertyDescriptor(globalThis, 'facet');
+    t.after(() => { if (had) Object.defineProperty(globalThis, 'facet', had); else delete globalThis.facet; });
+    globalThis.facet = api;
     assert.deepEqual(api.analysis.surfaceNormal(), surfaceNormal(slab));
     assert.equal(api.analysis.surfaceNormal().source, 'vacuum');
     assert.deepEqual(api.analysis.surfaceNormal(fccBulk()).normal, [0, 0, 1]);

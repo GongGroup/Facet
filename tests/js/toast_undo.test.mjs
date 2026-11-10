@@ -62,7 +62,7 @@ const press = (t, label) => click(buttonsOf(t).find((b) => b.textContent === lab
 const said = (from) => toastEls(from).map(msgOf);
 const settle = () => new Promise((r) => realSetTimeout(r, 0));
 
-const web = (rel) => new URL(`../../crystallume/web/js/${rel}`, import.meta.url);
+const web = (rel) => new URL(`../../facet/web/js/${rel}`, import.meta.url);
 const { toast } = await import(web('ui/overlays.js'));
 const { keyLabel } = await import(web('ui/keys.js'));
 const { App } = await import(web('app.js'));

@@ -13,7 +13,7 @@
   3. slab 工具（改真空、重新居中等）。
   **slab 与非 slab 不做任何其他区分**：没有"slab 模式"、没有 slab 标记或徽章、没有不同的菜单或面板行为；
   需要真空间隙的工具对任何有间隙的结构都可用，没有间隙时给出说明。
-- **U2（修订 C5）slab 的周期性。** Crystallume 生成的 slab（切面、界面、改真空）一律保持 `pbc = [true, true, true]`，
+- **U2（修订 C5）slab 的周期性。** Facet 生成的 slab（切面、界面、改真空）一律保持 `pbc = [true, true, true]`，
   与 VASP 和 Materials Studio 一致；仍采用标准取向：a 沿 x，c 垂直于表面且平行于 z，真空沿 c。
   现有的二维原型（石墨烯等，`pbc = [T, T, F]`）保持原样；导入的文件保留文件里声明的 pbc。
 - **U3（原 D4）界面与异质结（M6）纳入本期**，作为第 4 波开发，不可砍；M6 规格必须与其他模块同样完整
@@ -37,7 +37,7 @@
 
 ## 0. 目标与范围
 
-**目标**：在 Crystallume 里打通催化和表界面研究最常用的建模闭环：
+**目标**：在 Facet 里打通催化和表界面研究最常用的建模闭环：
 体相 → 切面（hkl）→ slab（层数、终止面、真空、表面超胞）→ 固定底层 → 放吸附物 → 导出 VASP 等可用的文件。
 对标 Materials Studio 的 Build › Surfaces › Cleave Surface、Build › Crystals › Build Vacuum Slab、
 Supercell / Redefine Lattice / Lattice Parameters、Modify › Constraints、Edit › Atom Selection、
@@ -76,7 +76,7 @@ Supercell / Redefine Lattice / Lattice Parameters、Modify › Constraints、Edi
   （是否另存一份由用户用现有的 Duplicate 决定，见 D2）。
 - **P5 只用 Float64 结构坐标计算。** 视图里绘制用的坐标是 Float32，并且经过了包裹和周期像（03 报告 §2.3），
   只能用 `src`/`img` 映射回结构原子，不能拿来算几何。
-- **P6 功能处处可用。** 每个功能都提供：界面、命令面板命令、JS 公共 API（`window.crystallume`）、
+- **P6 功能处处可用。** 每个功能都提供：界面、命令面板命令、JS 公共 API（`window.facet`）、
   Python API；凡是有意义的，再加 REST 端点、客户端方法和 CLI。
 - **P7 文案。** 应用界面用英文（与现有界面一致），文档沿用现有的简明英文风格；设计文档用中文，标识符用英文。
 
@@ -105,7 +105,7 @@ Supercell / Redefine Lattice / Lattice Parameters、Modify › Constraints、Edi
 - **C4 标签。** `props.tags`（整数），沿用 ASE 约定：1 = 顶层，2 = 次层……，0 = 吸附物或未标记。切面时写入层号（从顶层数起）；
   之后不自动重算（层由实时的层分析给出）。吸附物分组用另一个整数属性 `props.adsorbate_id`
   （0 = 不是吸附物，1…n = 第几个吸附物）。新增原子默认 `tags = 0`。
-- **C5 slab 的周期性与取向（已按 U1、U2 修订）。** Crystallume 生成的 slab 保持 `pbc = [true, true, true]`，真空沿 c，
+- **C5 slab 的周期性与取向（已按 U1、U2 修订）。** Facet 生成的 slab 保持 `pbc = [true, true, true]`，真空沿 c，
   c 垂直于表面且与 z 平行，a 沿 x（标准取向）。"pbc T T T 时底层原子在真空顶部多画一份"的显示问题（03 报告 §2.3）
   由内部的真空间隙检测在显示层解决（U1），不靠改 pbc。slab 与非 slab 不做其他区分。
 - **C6 来源信息。** `info.surface`（JSON 对象）记录切面参数，至少包括：体相名称与化学式、`miller`（以及六方时的 `hkil`）、
@@ -129,11 +129,11 @@ Supercell / Redefine Lattice / Lattice Parameters、Modify › Constraints、Edi
 
 | 内容 | Python | JavaScript |
 |---|---|---|
-| 精确整数运算（扩展 gcd、整数行列式、伴随矩阵、Hermite 标准形、超胞内的格点、平面内的格矢） | 新 `crystallume/core/intmath.py`（纯 Python int） | 新 `crystallume/web/js/core/intmath.js`（检查 `Number.isSafeInteger`） |
-| 浮点晶格运算（倒格子、晶面法向与间距、hkl↔hkil、2D Gauss 约化、Niggli、LLL、带容差的分数坐标包裹） | 扩展 `crystallume/core/lattice.py` | 新 `crystallume/web/js/core/lattice.js`（重新导出 `util.js` 里的晶格函数） |
-| 层分析 | 新 `crystallume/analysis/layers.py` | 新 `crystallume/web/js/core/layers.js` |
-| 平移对称性、原胞、最小表面网格 | 新 `crystallume/analysis/translations.py` | 新 `crystallume/web/js/core/translations.js` |
-| 吸附位点 | 新 `crystallume/analysis/sites.py` | 新 `crystallume/web/js/core/sites.js` |
+| 精确整数运算（扩展 gcd、整数行列式、伴随矩阵、Hermite 标准形、超胞内的格点、平面内的格矢） | 新 `facet/core/intmath.py`（纯 Python int） | 新 `facet/web/js/core/intmath.js`（检查 `Number.isSafeInteger`） |
+| 浮点晶格运算（倒格子、晶面法向与间距、hkl↔hkil、2D Gauss 约化、Niggli、LLL、带容差的分数坐标包裹） | 扩展 `facet/core/lattice.py` | 新 `facet/web/js/core/lattice.js`（重新导出 `util.js` 里的晶格函数） |
+| 层分析 | 新 `facet/analysis/layers.py` | 新 `facet/web/js/core/layers.js` |
+| 平移对称性、原胞、最小表面网格 | 新 `facet/analysis/translations.py` | 新 `facet/web/js/core/translations.js` |
+| 吸附位点 | 新 `facet/analysis/sites.py` | 新 `facet/web/js/core/sites.js` |
 | 生成器 | 新 `build/surface.py`、`build/adsorbate.py`、`build/interface.py` | 新 `web/js/build/surface.js`、`build/adsorbates.js`、`build/interface.js` |
 | 不改变"是哪个结构"的编辑 | `core/structure.py` 的新方法 | `core/structure.js` 的新方法 |
 | 网页编辑原语 | — | `web/js/app.js` |
@@ -144,7 +144,7 @@ Supercell / Redefine Lattice / Lattice Parameters、Modify › Constraints、Edi
 - 命名：Python 用 snake_case，JS 用同一组词的 camelCase（`make_supercell` ↔ `makeSupercell`、`find_layers` ↔ `findLayers`）；
   有 ASE 名称的沿用 ASE（`make_supercell`、`set_cell(cell, scale_atoms=)`、`surface`、`add_adsorbate`、`add_vacuum`、`niggli_reduce`）。
   不要沿用旧的不对称命名（`append`/`addAtom` 等）。原位修改返回 `self`/`this`；生成新结构返回新对象。
-- 共享数据（如吸附物库）尽量只保留一份：放在 `crystallume/web/data/*.json`，Python 用 `importlib.resources` 读取
+- 共享数据（如吸附物库）尽量只保留一份：放在 `facet/web/data/*.json`，Python 用 `importlib.resources` 读取
   （包数据已包含 `web/**/*`），浏览器用 `fetch(new URL(..., import.meta.url))`，Node 测试里用 `fs` 读取。最终方案由 M5 定。
 - 跨模块 API（先在此约定签名，实现归属见括号）：
   - `find_layers(structure, direction=None|"normal"|"a"|"b"|"c"|"x"|"y"|"z"|vector, tolerance=SURFACE_DEFAULTS.layer_tolerance)`
@@ -191,12 +191,12 @@ Supercell / Redefine Lattice / Lattice Parameters、Modify › Constraints、Edi
 ## 5. API 约定
 
 - REST：结构 → 结构放在 `/build/*`（云模式下公开），结构 → 数据放在 `/analysis/*`（需要登录）。科学代码的 ValueError → 400，
-  schema 不符 → 422。服务器在构建前估算原子数，超过 `CRYSTALLUME_MAX_ATOMS` 就拒绝。每个端点都要有客户端方法
+  schema 不符 → 422。服务器在构建前估算原子数，超过 `FACET_MAX_ATOMS` 就拒绝。每个端点都要有客户端方法
   （`tests/test_client.py` 的 `ROUTE_METHODS` 检查）。
-- CLI（M7 统一）：例如 `crystallume build surface BULK --hkl 1 1 1 --layers 4 --vacuum 15 --supercell 3 3 -o POSCAR`、
-  `crystallume transform`、`crystallume layers`、`crystallume sites`、`crystallume adsorb`。
-- JS 公共 API：`crystallume.build.surface(...)`、`crystallume.build.adsorbates()`、`crystallume.analysis.layers(s?)`、
-  `crystallume.analysis.sites(s?)`，以及走编辑原语、可撤销的 `crystallume.edit.*`（fix、free、translate、rotate、setCell、makeSupercell……）。
+- CLI（M7 统一）：例如 `facet build surface BULK --hkl 1 1 1 --layers 4 --vacuum 15 --supercell 3 3 -o POSCAR`、
+  `facet transform`、`facet layers`、`facet sites`、`facet adsorb`。
+- JS 公共 API：`facet.build.surface(...)`、`facet.build.adsorbates()`、`facet.analysis.layers(s?)`、
+  `facet.analysis.sites(s?)`，以及走编辑原语、可撤销的 `facet.edit.*`（fix、free、translate、rotate、setCell、makeSupercell……）。
 - 文档：README、`docs/PLUGINS.md`（JS/Python API、REST）、`docs/SCHEMA.md`（props、`info.surface`）、`docs/DEPLOY.md`（REST 表）、
   应用内帮助、快捷键对话框和导览。
 
@@ -205,8 +205,8 @@ Supercell / Redefine Lattice / Lattice Parameters、Modify › Constraints、Edi
 ## 6. 测试约定
 
 - 采用 04 报告 §6 的跨语言测试桥（原型在 `scratchpad/python-api/parity/`）：`tests/js_bridge.py`、`tests/conftest.py` 里的 `js` fixture、
-  `tests/test_js_parity.py`、`tests/js/*.test.mjs`（`node --test`），并加 `crystallume/web/js/package.json` = `{"type": "module"}`。
-  没有 Node 时跳过；`CRYSTALLUME_REQUIRE_NODE=1` 时失败。
+  `tests/test_js_parity.py`、`tests/js/*.test.mjs`（`node --test`），并加 `facet/web/js/package.json` = `{"type": "module"}`。
+  没有 Node 时跳过；`FACET_REQUIRE_NODE=1` 时失败。
 - 金标数据放在 `tests/data/surface/*.json`（输入、操作、参数、期望），两种语言都对照。期望值优先用解析解
   （层间距 d_hkl、面内格矢长度与夹角、每层原子数、面积），其次用开发时经 ASE/pymatgen 交叉核对后固化的数据。
 - 端到端：用预装的 Chromium 和 Playwright 做少量冒烟测试（切面建 slab、固定底层、放吸附物、导出带 SD 的 POSCAR），

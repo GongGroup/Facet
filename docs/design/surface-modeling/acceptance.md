@@ -31,7 +31,7 @@
 
 | 脚本 | 内容 |
 |---|---|
-| `slabkit.py` | 独立实现的切面器（自写，不是 M2 原型的移植）：平移搜索求原胞 → 整数面内基（120°/钝角约定、右手）→ 0.3 Å 周期单链分层 → 两级指纹去重终止面 → 断键数（smart 金属规则）→ slab 组装（`pbc = T T T`、总真空、居中、顶层首原子在面内原点、F0-D K14 的 `canonical_order`、tags、固定底层）→ 面内超胞；体相取自仓库 `crystallume.build.crystal`（只读导入） |
+| `slabkit.py` | 独立实现的切面器（自写，不是 M2 原型的移植）：平移搜索求原胞 → 整数面内基（120°/钝角约定、右手）→ 0.3 Å 周期单链分层 → 两级指纹去重终止面 → 断键数（smart 金属规则）→ slab 组装（`pbc = T T T`、总真空、居中、顶层首原子在面内原点、F0-D K14 的 `canonical_order`、tags、固定底层）→ 面内超胞；体相取自仓库 `facet.build.crystal`（只读导入） |
 | `scen.py` | 场景 S1–S13 的 slab 数字；位点分类调用 M5 原型 `proto/m5/sites.py`，放置高度调用 `proto/m5/place.py` 并用自写的接触抬升 `lift()` 复核 |
 | `pt211_place.py` | Pt(211) 空位按 M5 规格（三维外接圆心、局部法向）放 O，修正 M5 v1 原型的偏差（§4.2 G-16） |
 | `v2_heights.py` | 按 M5 v2 K9 的有效金属半径（slab 里金属–金属键长中位数的一半）重算全部吸附高度与键长 |
@@ -46,12 +46,12 @@ M5 原型的位点计数在本文所有理想 slab 上与 M5 v2 §7.3 的原型�
 ### 0.3 公共前置条件
 
 - 所有模块合入分支 `claude/clever-thompson-5wtccp` 之后执行。
-- 网页：**静态版**（P1：网页端全部在浏览器里算，不依赖服务器）：`python3 -m http.server 8765 --directory crystallume/web`，打开 `http://127.0.0.1:8765/index.html`，
-  等 `document.body.dataset.ready === 'true'`（`web/js/main.js:65`）。另在 `crystallume serve` 下抽查一次 S1（服务器模式不得改变结果）。
+- 网页：**静态版**（P1：网页端全部在浏览器里算，不依赖服务器）：`python3 -m http.server 8765 --directory facet/web`，打开 `http://127.0.0.1:8765/index.html`，
+  等 `document.body.dataset.ready === 'true'`（`web/js/main.js:65`）。另在 `facet serve` 下抽查一次 S1（服务器模式不得改变结果）。
 - 每个场景从**新会话**开始（新标签页；`localStorage` 清空），以便检查 U4 的"真空框初始为空"。
 - 体相一律在 Build 面板（Shift+3）用原型加**显式**晶格常数建（表 0.4）。原因：F0-D §3.15.2 的参考表在 JS 端落地前，两种语言的默认晶格常数不同（JS 任何 fcc 元素都是 3.615 Å）。
-- Python：`import crystallume as cl; from crystallume import build; from crystallume.analysis import adsorption_sites, find_layers`。
-- CLI：`crystallume …`（M7 统一前按各模块 §6.5 的提议写；`--vacuum` 一律必填，见 U4）。
+- Python：`import facet as cl; from facet import build; from facet.analysis import adsorption_sites, find_layers`。
+- CLI：`facet …`（M7 统一前按各模块 §6.5 的提议写；`--vacuum` 一律必填，见 U4）。
 
 ### 0.4 体相与晶格常数
 
@@ -92,7 +92,7 @@ M5 原型的位点计数在本文所有理想 slab 上与 M5 v2 §7.3 的原型�
 | U1-b | 没有 slab 模式、slab 徽章或 slab 专属菜单；Surface 面板的分区对任何结构都在，条件不满足时就地说明原因；分区 `badge` 只放参数（如 `(1 1 1)`） | U1；F0-A §5.2 |
 | U1-c | 显示：沿有真空的轴以间隙为切口包裹，底层不在真空顶部多画一份，跨晶胞边界的 slab 画成一块；只改显示，不改结构 | U1；F0-A §3.8.2 |
 | U1-d | 层分析、位点的上下表面用同一个间隙切口 | U1；M3 §3.3、M5 §3.1 |
-| U2-a | Crystallume 生成的 slab 与界面 `pbc = [true, true, true]`；a ∥ x，c ⊥ 表面且 ∥ z，真空沿 c | U2、C5 |
+| U2-a | Facet 生成的 slab 与界面 `pbc = [true, true, true]`；a ∥ x，c ⊥ 表面且 ∥ z，真空沿 c | U2、C5 |
 | U2-b | 内置二维原型保持 `[T, T, F]`；导入文件保留文件的 pbc；改真空不改 pbc | U2 |
 | U3 | Surface › Interface 分区、`build.make_interface`、REST、CLI 都在（S15） | U3 |
 | U4-a | 真空输入框第一次出现时为空、没有占位数字，主按钮（Create slab / Apply / Create）在填写前不可用；切面与界面构建里填 0 合法（M2 v2 对已有结构的 Set vacuum 拒绝 0，§4.1 G-33） | U4；F0-A §5.6 `numberInput({required})`；M2 §5.2 |
@@ -165,7 +165,7 @@ M5 原型的位点计数在本文所有理想 slab 上与 M5 v2 §7.3 的原型�
     相距 3.20 Å、4.23 Å 的 6 个顶位没有警告。`Coverage` 块 `Fill to θ` 填 0.22 → `Fill`（M5 v2 §3.12.2：目标 round(0.22 × 9) = 2 个，只加 1 个，取离 CO #1 最远的顶位，面内 4.23 Å），
     toast `Added 1 CO (θ = 0.22 ML per 1×1 cell)`。手动做法（E2E-1 用它）：`Next site` 翻到没有 ⚠ 的顶位 → `Place`，toast `Added CO on top (Pt)`，这时 S1-7 只断言面内距离 ∈ {3.2007, 4.2341} 且没有警告。
     名称 `Pt(111) p(3×3) 4L + 2CO`；`Coverage` 块 `θ = 0.22 ML (per 1×1 cell) · 0.22 per site atom`（M5 v2 K12、§5.6）。
-15. 导出：File › Export › POSCAR（或命令面板，或 `crystallume.exportText('poscar')`）→ toast `Saved <name>.vasp`，没有 `Details`/`Notes` 按钮。
+15. 导出：File › Export › POSCAR（或命令面板，或 `facet.exportText('poscar')`）→ toast `Saved <name>.vasp`，没有 `Details`/`Notes` 按钮。
 16. 导出 extxyz：toast 无警告。
 17. 撤销三次（Ctrl/⌘+Z）：依次撤掉第二个 CO、第一个 CO、Create；体相回到活动结构，项目只剩 1 个结构。
 
@@ -184,15 +184,15 @@ cl.write("slab.extxyz", slab)
 **CLI**
 
 ```
-crystallume build crystal fcc Pt --a 3.92 -o Pt.json
-crystallume build surface Pt.json --hkl 1 1 1 --layers 4 --vacuum 15 --supercell 3 3 --fix-bottom 2 -o slab.json
-crystallume sites slab.json
-crystallume adsorb slab.json CO --site "fcc (Pt3)" -o slab_co.json
-crystallume adsorb slab_co.json CO --site "top (Pt)" --coverage 0.22 -o slab_2co.json
-crystallume convert slab_2co.json POSCAR
+facet build crystal fcc Pt --a 3.92 -o Pt.json
+facet build surface Pt.json --hkl 1 1 1 --layers 4 --vacuum 15 --supercell 3 3 --fix-bottom 2 -o slab.json
+facet sites slab.json
+facet adsorb slab.json CO --site "fcc (Pt3)" -o slab_co.json
+facet adsorb slab_co.json CO --site "top (Pt)" --coverage 0.22 -o slab_2co.json
+facet convert slab_2co.json POSCAR
 ```
 
-stderr：`wrote 36 atoms (Pt36) to slab.json`；最后一步没有 `crystallume: warning:`。
+stderr：`wrote 36 atoms (Pt36) to slab.json`；最后一步没有 `facet: warning:`。
 
 **期望结果**
 
@@ -251,10 +251,10 @@ build.add_adsorbates(p2, "O", site_class="hollow (Cu4)", coverage=0.5)
 **CLI**
 
 ```
-crystallume build surface Cu.json --hkl 1 0 0 --layers 4 --vacuum 15 --fix-bottom 2 --wood "c(2x2)" -o cu_c2x2.json
-crystallume adsorb cu_c2x2.json O --site hollow -o cu_c2x2_O.json
-crystallume transform cu_1x1.json --surface-cell p2x2 -o cu_p2x2.json
-crystallume adsorb cu_p2x2.json O --site hollow --coverage 0.5 -o cu_p2x2_O.json
+facet build surface Cu.json --hkl 1 0 0 --layers 4 --vacuum 15 --fix-bottom 2 --wood "c(2x2)" -o cu_c2x2.json
+facet adsorb cu_c2x2.json O --site hollow -o cu_c2x2_O.json
+facet transform cu_1x1.json --surface-cell p2x2 -o cu_p2x2.json
+facet adsorb cu_p2x2.json O --site hollow --coverage 0.5 -o cu_p2x2_O.json
 ```
 
 **期望结果**
@@ -298,8 +298,8 @@ build.add_adsorbate(s3, "Cl", site="fcc")
 build.coverage_supercells(s1, 3)[0]["wood"]          # "(√3×√3)R30°"
 ```
 
-**CLI**：`crystallume build surface Ag.json --hkl 1 1 1 --layers 4 --vacuum 15 --fix-bottom 2 --axes c --wood "sqrt3xsqrt3R30" -o ag.json`；
-`crystallume adsorb ag.json Cl --site fcc -o ag_cl.json`。
+**CLI**：`facet build surface Ag.json --hkl 1 1 1 --layers 4 --vacuum 15 --fix-bottom 2 --axes c --wood "sqrt3xsqrt3R30" -o ag.json`；
+`facet adsorb ag.json Cl --site fcc -o ag_cl.json`。
 
 **期望结果**
 
@@ -338,8 +338,8 @@ build.add_adsorbate(a, "N", site="fcc"); build.add_adsorbate(b, "N", site="hcp")
 c = slab.copy(); c.fix(find_layers(c).top_layer(3), axes="c")
 ```
 
-**CLI**：`crystallume build surface Ru.json --hkil 0 0 0 1 --layers 4 --vacuum 15 --supercell 2 2 --fix-bottom 2 -o ru.json`；
-`crystallume adsorb ru.json N --site fcc -o ru_n_fcc.json`；`crystallume adsorb ru.json N --site hcp -o ru_n_hcp.json`。
+**CLI**：`facet build surface Ru.json --hkil 0 0 0 1 --layers 4 --vacuum 15 --supercell 2 2 --fix-bottom 2 -o ru.json`；
+`facet adsorb ru.json N --site fcc -o ru_n_fcc.json`；`facet adsorb ru.json N --site hcp -o ru_n_hcp.json`。
 
 **期望结果**
 
@@ -370,7 +370,7 @@ c = slab.copy(); c.fix(find_layers(c).top_layer(3), axes="c")
 
 **Python**：`slab = build.surface(pt, (1, 1, 0), vacuum=15.0, layers=6, supercell=(2, 2), fix_bottom=3)`；
 `build.add_adsorbate(slab, "CO", site="shortbridge")`；`build.add_adsorbate(slab, "O", site="longbridge")`。
-**CLI**：`crystallume build surface Pt.json --hkl 1 1 0 --layers 6 --vacuum 15 --supercell 2 2 --fix-bottom 3 -o pt110.json`；`crystallume adsorb pt110.json CO --site shortbridge …`。
+**CLI**：`facet build surface Pt.json --hkl 1 1 0 --layers 6 --vacuum 15 --supercell 2 2 --fix-bottom 3 -o pt110.json`；`facet adsorb pt110.json CO --site shortbridge …`。
 
 **期望结果**
 
@@ -402,7 +402,7 @@ c = slab.copy(); c.fix(find_layers(c).top_layer(3), axes="c")
 5. O 放 `hollow (Pt4)`；（Duplicate 后）O 放 `fcc (Pt3) CN 9·10·10`；CO 放 `top (Pt) CN 7`。
 
 **Python**：`s = build.surface(pt, (2, 1, 1), vacuum=15.0, layers=12)`；`s.fix_height(4.4)`；`build.add_adsorbate(s, "O", site="hollow (Pt4)")`。
-**CLI**：`crystallume build surface Pt.json --hkl 2 1 1 --layers 12 --vacuum 15 -o pt211.json`；`crystallume edit fix pt211.json --depth 4.4 -o pt211f.json`；`crystallume sites pt211f.json`。
+**CLI**：`facet build surface Pt.json --hkl 2 1 1 --layers 12 --vacuum 15 -o pt211.json`；`facet edit fix pt211.json --depth 4.4 -o pt211f.json`；`facet sites pt211f.json`。
 
 **期望结果**
 
@@ -427,7 +427,7 @@ c = slab.copy(); c.fix(find_layers(c).top_layer(3), axes="c")
 `Find sites` → 放 `H` 到 `hollow (Fe3)`。
 
 **Python**：`build.surface(fe, (1, 1, 0), vacuum=15.0, layers=4, supercell=(2, 2))`；`build.add_adsorbate(s, "H", site="hollow")`。
-**CLI**：`crystallume build surface Fe.json --hkl 1 1 0 --layers 4 --vacuum 15 --supercell 2 2 -o fe110.json`。
+**CLI**：`facet build surface Fe.json --hkl 1 1 0 --layers 4 --vacuum 15 --supercell 2 2 -o fe110.json`。
 
 | # | 检查 | 期望 | 容差 | 来源 |
 |---|---|---|---|---|
@@ -467,8 +467,8 @@ sel = cl.analysis.select_where(slab, {"version": 1, "match": "all", "conditions"
       {"prop": "cn", "op": "<", "value": 6}]})
 ```
 
-**CLI**：`crystallume terminations TiO2.json --hkl 1 1 0`（打印 M2 §6.5 的表）；`crystallume build surface TiO2.json --hkl 1 1 0 --periods 3 --vacuum 15 --supercell 2 1 -o tio2.json`；
-`crystallume edit fix tio2.json --bottom 1 --group units -o tio2f.json`。
+**CLI**：`facet terminations TiO2.json --hkl 1 1 0`（打印 M2 §6.5 的表）；`facet build surface TiO2.json --hkl 1 1 0 --periods 3 --vacuum 15 --supercell 2 1 -o tio2.json`；
+`facet edit fix tio2.json --bottom 1 --group units -o tio2f.json`。
 
 **期望结果**
 
@@ -512,7 +512,7 @@ s8 = build.surface(sto, (0, 0, 1), vacuum=15.0, termination="TiO2", layers=8)
 t7.fix_layers(middle=3)                     # 或 surface(..., fix_middle=3)
 ```
 
-**CLI**：`crystallume terminations STO.json --hkl 0 0 1`；`crystallume build surface STO.json --hkl 0 0 1 --termination TiO2 --symmetric --layers 7 --vacuum 15 -o sto_t7.json`。
+**CLI**：`facet terminations STO.json --hkl 0 0 1`；`facet build surface STO.json --hkl 0 0 1 --termination TiO2 --symmetric --layers 7 --vacuum 15 -o sto_t7.json`。
 
 **期望结果**
 
@@ -537,7 +537,7 @@ t7.fix_layers(middle=3)                     # 或 surface(..., fix_middle=3)
 `Slab › Surface supercell…` → `Structure › Cell › Supercell` 预设 `p(2×2)` → `Create supercell` → `Adsorbates › Find sites`。
 
 **Python**：`s = build.surface(ceo2, (1, 1, 1), vacuum=15.0, periods=3)`；`s.fix_layers(bottom=1, group="units")`；`s2 = build.make_supercell(s, [[2, 0], [0, 2]])`；`adsorption_sites(s2)`。
-**CLI**：`crystallume build surface CeO2.json --hkl 1 1 1 --periods 3 --vacuum 15 -o ceo2.json`；`crystallume transform ceo2.json --surface-cell p2x2 -o ceo2_22.json`；`crystallume sites ceo2_22.json`。
+**CLI**：`facet build surface CeO2.json --hkl 1 1 1 --periods 3 --vacuum 15 -o ceo2.json`；`facet transform ceo2.json --surface-cell p2x2 -o ceo2_22.json`；`facet sites ceo2_22.json`。
 
 | # | 检查 | 期望 | 容差 | 来源 |
 |---|---|---|---|---|
@@ -563,7 +563,7 @@ t7.fix_layers(middle=3)                     # 或 surface(..., fix_middle=3)
 5. `Thickness` 6 layers（3 个周期）、`Vacuum` 15 → Create（`ZnO(10-10) ZnO-A-term 6L`）。
 
 **Python**：`build.surface(zno, (1, 0, -1, 0), vacuum=15.0, layers=6)`；`build.surface(zno, (1, 0, 0, 0), …)` → `ValueError("miller: in (h k i l), i must be −(h + k) = -1.")`。
-**CLI**：`crystallume build surface ZnO.json --hkil 1 0 -1 0 --layers 6 --vacuum 15 -o zno.json`。
+**CLI**：`facet build surface ZnO.json --hkil 1 0 -1 0 --layers 6 --vacuum 15 -o zno.json`。
 
 | # | 检查 | 期望 | 容差 | 来源 |
 |---|---|---|---|---|
@@ -585,7 +585,7 @@ t7.fix_layers(middle=3)                     # 或 surface(..., fix_middle=3)
 另做一次 `Vacuum` = 0（U4 允许）→ 摘要第二行 `no vacuum (bulk stacking)`，`Position` 灰显，Create 可用（NaCl(100) 每周期 1 层，任何层数都是整周期；对照：SrTiO3(001) 7 层 + V = 0 时 Create 不可用，就地显示 E12b）。
 
 **Python**：`build.surface(nacl, (1, 0, 0), vacuum=15.0, layers=4)`；`build.surface(nacl, (1, 0, 0), vacuum=0.0, layers=4)`；`build.surface(sto, (0, 0, 1), vacuum=0.0, layers=7)` → `ValueError`（E12b `a vacuum of 0 Å needs a whole number of periods (this slab has 3.5); …`）。
-**CLI**：`crystallume build surface NaCl.json --hkl 1 0 0 --layers 4 --vacuum 0 -o nacl_v0.json`。
+**CLI**：`facet build surface NaCl.json --hkl 1 0 0 --layers 4 --vacuum 0 -o nacl_v0.json`。
 
 | # | 检查 | 期望 | 容差 | 来源 |
 |---|---|---|---|---|
@@ -623,8 +623,8 @@ g3 = build.make_supercell(g, [[2, 1], [-1, 1]])
 build.add_adsorbate(g3, "Li", site="hollow")
 ```
 
-**CLI**：`crystallume build crystal graphene C --a 2.46 -o g.json`；`crystallume edit vacuum g.json --vacuum 20 -o g20.json`；
-`crystallume transform g20.json --surface-cell sqrt3 -o g3.json`；`crystallume adsorb g3.json Li --site hollow -o g3li.json`。
+**CLI**：`facet build crystal graphene C --a 2.46 -o g.json`；`facet edit vacuum g.json --vacuum 20 -o g20.json`；
+`facet transform g20.json --surface-cell sqrt3 -o g3.json`；`facet adsorb g3.json Li --site hollow -o g3li.json`。
 （不要用 `build crystal graphene --vacuum 10`：现有的这个参数是**每侧**真空，c = 2 × 10，§4.1 G-12。）
 
 | # | 检查 | 期望 | 容差 | 来源 |
@@ -674,8 +674,8 @@ s.delete([k])                                                     # F0-D remap�
 cl.write("edited.vasp", s)
 ```
 
-**CLI**：`crystallume convert contcar_pt111.vasp rt.vasp`（第 4 步）；`crystallume edit fix contcar_pt111.vasp --layers 2 --axes c --keep-other -o e1.vasp`；
-`crystallume adsorb e1.vasp CO --site ontop -o e2.vasp`；`crystallume layers e2.vasp`（打印 4 层，吸附物 2 个原子被排除）。
+**CLI**：`facet convert contcar_pt111.vasp rt.vasp`（第 4 步）；`facet edit fix contcar_pt111.vasp --layers 2 --axes c --keep-other -o e1.vasp`；
+`facet adsorb e1.vasp CO --site ontop -o e2.vasp`；`facet layers e2.vasp`（打印 4 层，吸附物 2 个原子被排除）。
 
 **"内容逐字节等价"的定义（规范形，测试按它比较）**：每行按空白切成记号；注释行原样（空白归一）；数值记号解析为浮点后用 10 位小数重写，`-0.0000000000` 写成 `0.0000000000`；
 比例因子与晶格同样处理；物种行、计数行原样；有 SD 时写一行 `Selective dynamics`；坐标模式只取首字母大写；每个原子一行 3 个坐标 + 3 个标志（取首字母大写）；
@@ -722,7 +722,7 @@ cl.write("edited.vasp", s)
 
 **Python**：`ni = build.surface(build.crystal("fcc", "Ni", a=3.52), (1, 1, 1), vacuum=15.0, layers=4, fix_bottom=2)`；`gr = build.crystal("graphene", "C", a=2.46)`；
 `res = build.interface_matches(ni, gr)`（`res["total"] == 561`、`res["paretoCount"] == 8`）；`s = build.make_interface(ni, gr, match=0, distance=2.10, shift="top", vacuum=15.0)`，另两次 `shift="fcc"`、`shift="hcp"`。
-**CLI**：`crystallume build interface ni111.json g.json --list`（列表不需要 `--vacuum`）；`crystallume build interface ni111.json g.json --pick 1 --distance 2.10 --shift-site top --vacuum 15 -o POSCAR`；构建时省略 `--vacuum` → 退出码 2（M6 v2 §6.4）。
+**CLI**：`facet build interface ni111.json g.json --list`（列表不需要 `--vacuum`）；`facet build interface ni111.json g.json --pick 1 --distance 2.10 --shift-site top --vacuum 15 -o POSCAR`；构建时省略 `--vacuum` → 退出码 2（M6 v2 §6.4）。
 
 | # | 检查 | 期望 | 容差 | 来源 |
 |---|---|---|---|---|
@@ -742,7 +742,7 @@ cl.write("edited.vasp", s)
 toast `Built MoS2 p(4×4)/Au(111) (√19×√19)R23.4° — 124 atoms`（M6 v2 §5.4 的原例）。
 
 **Python**：`s = build.make_interface(au, mos2, match=2, distance=2.80, vacuum=15.0)`（0 起；或传入列表里 `atoms == 124 and twist > 0` 的那一项）。
-**CLI**：`crystallume build interface au111.json mos2.json --pick 3 --distance 2.80 --vacuum 15 -o mos2_au.vasp`。
+**CLI**：`facet build interface au111.json mos2.json --pick 3 --distance 2.80 --vacuum 15 -o mos2_au.vasp`。
 
 | # | 检查 | 期望 | 容差 | 来源 |
 |---|---|---|---|---|
@@ -756,7 +756,7 @@ toast `Built MoS2 p(4×4)/Au(111) (√19×√19)R23.4° — 124 atoms`（M6 v2 �
 `Interlayer distance` Custom 3.35 → `Vacuum` 15 → Create。另：`Twist` `Any`、400 Å² → 21 类，第 1 类是 4 原子 AA 堆垛（0°），第 2、3 类 28 原子 ±21.787°。
 
 **Python**：`build.make_interface(gr, gr, twist=21.8, twist_tolerance=0.5, max_strain=0.0, distance=3.35, vacuum=15.0)`。
-**CLI**：`crystallume build interface g.json g.json --twist 21.8 --twist-tol 0.5 --max-strain 0 --distance 3.35 --vacuum 15 -o tblg.vasp`。
+**CLI**：`facet build interface g.json g.json --twist 21.8 --twist-tol 0.5 --max-strain 0 --distance 3.35 --vacuum 15 -o tblg.vasp`。
 
 | # | 检查 | 期望 | 容差 | 来源 |
 |---|---|---|---|---|
@@ -814,12 +814,12 @@ toast `Built MoS2 p(4×4)/Au(111) (√19×√19)R23.4° — 124 atoms`（M6 v2 �
 
 规则：
 
-- **金标文件**用 F0-D K12 的公共外壳 `crystallume.cases/1`（F0-D §7.1、账本 L-F0-27），新增一个 op `pipeline`，按账本的 op 归属放在 `tests/ops/acceptance.py` 与 `tests/js/ops/acceptance.mjs`（M7 的任务，不改 `tests/cases.py`）；`input.recipe` 给体相原型与参数（账本的配方输入，S16 这类大结构不存坐标），或 `input.file`（S14 用唯一的夹具 `tests/data/surface/contcar_pt111.vasp`），
+- **金标文件**用 F0-D K12 的公共外壳 `facet.cases/1`（F0-D §7.1、账本 L-F0-27），新增一个 op `pipeline`，按账本的 op 归属放在 `tests/ops/acceptance.py` 与 `tests/js/ops/acceptance.mjs`（M7 的任务，不改 `tests/cases.py`）；`input.recipe` 给体相原型与参数（账本的配方输入，S16 这类大结构不存坐标），或 `input.file`（S14 用唯一的夹具 `tests/data/surface/contcar_pt111.vasp`），
   `args.steps` 依次列出 `surface`、`setVacuum`、`makeSupercell`、`fixLayers`、`fix`、`fixHeight`、`delete`、`sites`、`addAdsorbate`、`addAdsorbates`、`read`、`write`、
   `interfaceMatches`、`makeInterface`，每步可 `save` 一个中间结果；`expect` 用公共比较器（`structure`、`value`、`text`、`warnings`、`error`）。
   Python 由 `tests/test_cases.py`、JS 由 `tests/js/cases.test.mjs` 各跑一遍（不需要 Node 的那一半总是运行）；`tests/test_js_parity.py` 另对全部原子列表做 P6 比较。
 - 期望值的来源按简报 §6：解析解（本文各表的"解析"项）> 本文原型数字 > 开发期 ASE/pymatgen 核对后固化。生成脚本 `scripts/gen_acceptance_fixtures.py` 只在开发期运行。
-- `test_sNN_*`（`tests/test_acceptance_surface.py`）走**公开 API**（`crystallume.build`、`analysis`、`Structure` 方法、`cl.read/write`），另有
+- `test_sNN_*`（`tests/test_acceptance_surface.py`）走**公开 API**（`facet.build`、`analysis`、`Structure` 方法、`cl.read/write`），另有
   `tests/test_acceptance_cli.py`（用 `subprocess` 跑 S1、S9、S14 的 CLI 序列，检查 stdout/stderr 与退出码，含 U4-c：省略 `--vacuum` 退出码 2）与
   `tests/test_acceptance_rest.py`（`TestClient` 跑 S1：`/build/surface` → `/analysis/sites` → `/build/adsorbate` → `/io/export`；U4-c：缺 `vacuum` → 422）。
 - S8 的空位计数（G-15）、自动名哨兵的键名（G-32）、c(2×2) 预设得到的名字（G-39）标为 `xfail(strict=True, reason="§4.1 G-nn")`，裁决并更新金标后去掉标记；
@@ -831,24 +831,24 @@ toast `Built MoS2 p(4×4)/Au(111) (√19×√19)R23.4° — 124 atoms`（M6 v2 �
 
 - 用 Node 版 Playwright（本机预装 1.63.0：`/opt/node22/lib/node_modules/playwright`，另有 `/opt/node-tools/node_modules/playwright`）和预装 Chromium（`/opt/pw-browsers/chromium`）。
   测试文件 `tests/e2e/*.spec.mjs`，共用 `tests/e2e/harness.mjs`；pytest 包装 `tests/test_e2e.py`（标记 `slow`，`pytest -m slow` 时运行），
-  它启动 `python -m http.server <空闲端口> --directory crystallume/web`（静态版，P1），把地址放进 `CRYSTALLUME_E2E_URL`，再逐个运行 `node tests/e2e/<name>.spec.mjs`，
-  断言退出码 0。找不到 Node、Playwright 或 Chromium 时跳过；`CRYSTALLUME_REQUIRE_E2E=1` 时失败。
-- `harness.mjs`：`chromium.launch({ headless: true, executablePath: process.env.CRYSTALLUME_CHROMIUM ?? '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] })`
+  它启动 `python -m http.server <空闲端口> --directory facet/web`（静态版，P1），把地址放进 `FACET_E2E_URL`，再逐个运行 `node tests/e2e/<name>.spec.mjs`，
+  断言退出码 0。找不到 Node、Playwright 或 Chromium 时跳过；`FACET_REQUIRE_E2E=1` 时失败。
+- `harness.mjs`：`chromium.launch({ headless: true, executablePath: process.env.FACET_CHROMIUM ?? '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] })`
   （以 root 运行时必须 `--no-sandbox`；SwiftShader 参数与 `scratchpad/viewerprobe/probe.js` 相同）；视口 1280×800；收集 `pageerror` 与 `console.error`，测试结束时必须为空；
   `page.goto(URL)` 后 `waitForFunction(() => document.body.dataset.ready === 'true', null, { timeout: 60000 })`；
   `section(name)` = 标题为 name 的 `details.sec`；控件一律按可访问名称定位（`getByRole`/`getByLabel`，名称取各模块 §5 的控件表；F0-A §5.11 要求每个输入有 `aria-label`）；
   每个关键步骤 `page.screenshot({ path: 'tests/e2e/out/<spec>-<step>.png' })`，供审查。
-- 数值断言读 `window.crystallume`（`structure`、`project`、`exportText`、`exportReport`、`analysis.*`）；界面断言读可访问文本。
+- 数值断言读 `window.facet`（`structure`、`project`、`exportText`、`exportReport`、`analysis.*`）；界面断言读可访问文本。
 - 共用工具 `tests/e2e/poscar_canon.mjs` 与 Python `tests/poscar_canon.py`：S14 的规范形，两份实现由 `tests/test_js_parity.py` 对夹具与 3 个导出样例互相核对。
 
 **E2E-1 切面 → 固定 → 吸附 → 导出（S1）**
 
-1. `crystallume.load(crystallume.build.crystal('fcc', { elements: ['Pt'], a: 3.92 }))`；记 `n0 = crystallume.project.structures.length`。
+1. `facet.load(facet.build.crystal('fcc', { elements: ['Pt'], a: 3.92 }))`；记 `n0 = facet.project.structures.length`。
 2. 按 Shift+5。断言 `section('Cleave')`、`section('Slab')`、`section('Layers')`、`section('Adsorbates')`、`section('Interface')` 都存在；所有分区标题文本不含 `slab`/`bulk` 字样的徽章（U1-b）。
 3. Cleave：`Plane` 三个框的值为 `1`、`1`、`1`；`getByLabel('Vacuum')` 的值为 `''`，`placeholder` 不含数字；`getByRole('button', { name: 'Create slab' })` 为 disabled（U4-a）。
 4. 断言摘要含 `vacuum not set`、`Preview` 的 `Slab` 选项 disabled；填 `Vacuum` = `15`；勾 `Fix layers`，断言其数值框为 `2`、`Bottom` 为按下状态；`Surface supercell` 选 `p(3×3)`。
 5. 断言摘要（`section('Cleave').getByRole('status')`）含 `Pt(111) p(3×3) 4L — 36 atoms` 与 `8.32 × 8.32 × 21.79 Å`。
-6. 记 `h0 = crystallume.app.history.length`、`d0 = crystallume.app.dirty`；点 `Preview` 的 `Slab`：断言 `getByRole('region', { name: 'Preview' })` 可见、状态栏含 `Preview · 36 atoms`、
+6. 记 `h0 = facet.app.history.length`、`d0 = facet.app.dirty`；点 `Preview` 的 `Slab`：断言 `getByRole('region', { name: 'Preview' })` 可见、状态栏含 `Preview · 36 atoms`、
    `history.length === h0`、`dirty === d0`；截图 `preview`；点 `Planes`，断言预览条消失。
 7. 点 `Create slab`：toast 含 `Created Pt(111) p(3×3) 4L (36 atoms)`；`project.structures.length === n0 + 1`；活动结构 36 原子、`pbc` 全 `true`、`cell[2]` 与 `[0, 0, 21.7896]` 差 ≤ 1e-4、
    `cell[0][1]`、`cell[0][2]`、`cell[1][2]`、`cell[2][0]`、`cell[2][1]` 绝对值 ≤ 1e-12；`selective_dynamics` 中全 `false` 的 18 项；`tags` 计数 {1: 9, 2: 9, 3: 9, 4: 9}。
@@ -858,22 +858,22 @@ toast `Built MoS2 p(4×4)/Au(111) (√19×√19)R23.4° — 124 atoms`（M6 v2 �
     页面里 `(await import('/js/build/adsorbates.js')).placeAdsorbate(…)`（M5 v2 §6.2 的纯函数）对同一位点算出的键长、高度在 ±0.005 内一致（当前库系数下为 `2.10`、`1.36`；不写死数字，避免 T13 再校准后改测试）；点 `Place`；toast 含 `Added CO on fcc (Pt3)`；
     放置后 C 到 3 个系综 Pt 的距离两两相差 ≤ 1e-3 Å，且等于读数的键长 ±0.005。
 11. 点类 `top (Pt)`；最多 9 次：若 Placement 里有 `p.hint.warn` 就点 `getByRole('button', { name: 'Next site' })`；然后点 `Place`；toast 含 `Added CO on top (Pt)`；
-    结构名为 `Pt(111) p(3×3) 4L + 2CO`；`crystallume.structure.symbols` 末 4 项为 `C, C, O, O`。
-12. `t = await crystallume.exportText('poscar')`：第 6、7 行记号为 `Pt C O` 与 `36 2 2`；第 8 行 `Selective dynamics`；40 个坐标行，前 18 行以 `F F F` 结尾，其余以 `T T T` 结尾；
-    `crystallume.exportReport('poscar')` 为 `{ warnings: [], notes: [] }`。
-13. `crystallume.exportText('extxyz')` 第 2 行含 `move_mask:L:1`，不含 `selective_dynamics`。
-14. `crystallume.screenshot()` 与 `crystallume.screenshot({ markers: true })` 的像素差 > 0（标记默认不进 PNG）；截图 `sites`。
+    结构名为 `Pt(111) p(3×3) 4L + 2CO`；`facet.structure.symbols` 末 4 项为 `C, C, O, O`。
+12. `t = await facet.exportText('poscar')`：第 6、7 行记号为 `Pt C O` 与 `36 2 2`；第 8 行 `Selective dynamics`；40 个坐标行，前 18 行以 `F F F` 结尾，其余以 `T T T` 结尾；
+    `facet.exportReport('poscar')` 为 `{ warnings: [], notes: [] }`。
+13. `facet.exportText('extxyz')` 第 2 行含 `move_mask:L:1`，不含 `selective_dynamics`。
+14. `facet.screenshot()` 与 `facet.screenshot({ markers: true })` 的像素差 > 0（标记默认不进 PNG）；截图 `sites`。
 15. Ctrl+Z 三次：`project.structures.length === n0`，活动结构 4 原子。
 
 **E2E-2 CONTCAR 往返（S14）**
 
-1. `const [fc] = await Promise.all([page.waitForEvent('filechooser'), page.evaluate(() => crystallume.command('file.open'))]); await fc.setFiles('tests/data/surface/contcar_pt111.vasp')`。
-2. 断言：`page.locator('dialog[open]')` 数为 0；toast 文本恰为 `Loaded contcar_pt111.vasp — 36 atoms`；`crystallume.structure.pbc` 为 `[true, true, true]`；
+1. `const [fc] = await Promise.all([page.waitForEvent('filechooser'), page.evaluate(() => facet.command('file.open'))]); await fc.setFiles('tests/data/surface/contcar_pt111.vasp')`。
+2. 断言：`page.locator('dialog[open]')` 数为 0；toast 文本恰为 `Loaded contcar_pt111.vasp — 36 atoms`；`facet.structure.pbc` 为 `[true, true, true]`；
    每个原子的分数坐标与夹具差 ≤ 1e-12（夹具在 node 里用 `poscar_canon.mjs` 的解析函数读出）。
-3. 显示：对两个 f_c = 0.99999 的原子，`crystallume.viewer.model` 中 `src` 指向它们的绘制副本的 z 都 < 0.01 Å（画在底层，不在顶部）；截图 `contcar`。
-4. `canon(await crystallume.exportText('poscar')) === canon(fixtureText)`；`exportReport('poscar')` 为空。
+3. 显示：对两个 f_c = 0.99999 的原子，`facet.viewer.model` 中 `src` 指向它们的绘制副本的 z 都 < 0.01 Å（画在底层，不在顶部）；截图 `contcar`。
+4. `canon(await facet.exportText('poscar')) === canon(fixtureText)`；`exportReport('poscar')` 为空。
 5. Layers 第 2 行点击 → 选区卡片 `Fix` 的下拉 → `Fix z only`；Adsorbates `Find sites` 摘要 `9 site atoms (Pt) · 54 sites in 4 classes`；`CO` → 类 `top (Pt)` → `Place`；
-   `crystallume.select([k])`（k = 不在 CO 下面的第一个顶层原子）→ 按 Delete。
+   `facet.select([k])`（k = 不在 CO 下面的第一个顶层原子）→ 按 Delete。
 6. 导出 POSCAR：物种 `Pt C O`、计数 `35 1 1`；标志序列为 18 × `F F F`、9 × `T T F`、8 × `T T T`、2 × `T T T`；前 18 个坐标行的规范形与夹具前 18 行相同；
    `exportReport('extxyz').warnings[0]` 以 `Extended XYZ stores these constraints as ASE FixCartesian masks` 开头。
 7. Ctrl+Z 三次，`canon(exportText('poscar')) === canon(fixtureText)`。
@@ -886,7 +886,7 @@ toast `Built MoS2 p(4×4)/Au(111) (√19×√19)R23.4° — 124 atoms`（M6 v2 �
 4. Layers：`Fix` 模式选 `middle`、数值 3 → `Apply`；`selective_dynamics` 中全 `false` 的 7 项。
 5. Adsorbates › Placement：`Both sides` 可用。
 6. `page.reload()`；载入 STO；Cleave 的 `Vacuum` 为 `''`；`Object.keys(localStorage)` 的值里没有出现 `"vacuum"`（U4-b）。
-7. 用 `crystallume.command('surface.cleave', { … })` 不给 `vacuum`：抛出 `{ code: 'invalid-params' }`，`message` 含 `vacuum`（不区分大小写；账本 L-F0-52 的包装函数校验 `required: true`），项目不变（U4-c）。
+7. 用 `facet.command('surface.cleave', { … })` 不给 `vacuum`：抛出 `{ code: 'invalid-params' }`，`message` 含 `vacuum`（不区分大小写；账本 L-F0-52 的包装函数校验 `required: true`），项目不变（U4-c）。
 8. 载入 ZnO（wurtzite，u 0.382）：`Plane` 显示 4 个框，第 3 个 `aria-readonly="true"`；粘贴 `1 0 0 0` 到第一个框 → `role=alert` 文本 `Plane: in (h k i l), i must be −(h + k) = -1.`；
    改为 h = 1、k = 0、l = 0 → `i` 显示 `-1`，读数行含 `of the current cell`。
 
@@ -903,15 +903,15 @@ toast `Built MoS2 p(4×4)/Au(111) (√19×√19)R23.4° — 124 atoms`（M6 v2 �
 
 1. 载入石墨烯；Shift+5，展开 `Interface`；`Substrate`、`Overlayer` 都选它；`Max strain` 0；`Twist` 选 `Target`，填 21.8 与 0.5；等状态行（`aria-live`）出现 `2 matches`（≤ 10 s）。
 2. 选第一项；`Interlayer distance` 选 `Custom`、填 3.35；`Vacuum` 为空时 `Create` disabled → 填 15 → `Create`；新结构 28 原子、`pbc` 全 `true`、`|cell[0]|` = 6.5085 ± 1e-4、`cell[2][2]` = 18.35 ± 1e-4。
-3. 用命令建 Ni(111)：`crystallume.command('surface.cleave', { miller: [1, 1, 1], layers: 4, vacuum: 15, fixBottom: 2 })`（体相 Ni 3.52）；`Substrate` 选它、`Overlayer` 选石墨烯；
+3. 用命令建 Ni(111)：`facet.command('surface.cleave', { miller: [1, 1, 1], layers: 4, vacuum: 15, fixBottom: 2 })`（体相 Ni 3.52）；`Substrate` 选它、`Overlayer` 选石墨烯；
    `Max strain` 3、`Max area` 400、`Twist` `Any`；状态行出现 `561 matches · 8 best trade-offs`（≤ 15 s，软件 GL 不影响搜索）；第一项文本含 `6 atoms`。
 4. 距离 `Custom` 2.10，`Vacuum` 15 → `Create`：6 原子；`exportText('poscar')` 含 `Selective dynamics` 与 2 个 `F F F` 行。
 
 **E2E-6 性能（S16，`slow`）**
 
-在页面里用 `performance.now()` 计时（不经界面，只测计算）：`crystallume.build.surface(bulkPt, { miller: [1, 1, 1], layers: 6, vacuum: 15, supercell: [[41, 0], [0, 41]] })` → 10 086 原子，≤ 120 ms；
-`crystallume.analysis.layers(s)` ≤ 40 ms；`crystallume.analysis.sites(s)` ≤ 800 ms 且 `counts` = {top: 1681, bridge: 5043, hollow: 3362}；`crystallume.load(s)` 后
-50 次交替 `crystallume.edit.fixLayers({ bottom: 2 })`/`({ bottom: 3 })` 每次 ≤ 120 ms、`app.history.bytes` ≤ 64 MiB（断言用 2× 预算，CI 再放宽到 3×）。
+在页面里用 `performance.now()` 计时（不经界面，只测计算）：`facet.build.surface(bulkPt, { miller: [1, 1, 1], layers: 6, vacuum: 15, supercell: [[41, 0], [0, 41]] })` → 10 086 原子，≤ 120 ms；
+`facet.analysis.layers(s)` ≤ 40 ms；`facet.analysis.sites(s)` ≤ 800 ms 且 `counts` = {top: 1681, bridge: 5043, hollow: 3362}；`facet.load(s)` 后
+50 次交替 `facet.edit.fixLayers({ bottom: 2 })`/`({ bottom: 3 })` 每次 ≤ 120 ms、`app.history.bytes` ≤ 64 MiB（断言用 2× 预算，CI 再放宽到 3×）。
 
 ### 3.3 手动演示检查（每次发布前由人走一遍，截图入审查）
 
@@ -924,7 +924,7 @@ toast `Built MoS2 p(4×4)/Au(111) (√19×√19)R23.4° — 124 atoms`（M6 v2 �
 | MD-5 | S15 | 结果列表键盘导航与 120 ms 预览、搜索进度与 `Stop`、真空未填时的预览条 `Build layers — vacuum not set (shown with 10 Å)`、graphene/Cu 的 1×1 提示与 `Use it anyway` |
 | MD-6 | S16 与窄屏 | 216 原子上一切操作无可感知延迟；390×844 视口：面板为底部抽屉、预览条、行高 ≥ 44 px；读屏播报摘要与预览开始/结束 |
 | MD-7 | 命令面板 | 搜 `Cleave Surface`、`Build Vacuum Slab`、`Supercell`、`Redefine Lattice`、`Modify Constraints`、`Atom Selection`、`Add Adsorbate`、`Find Adsorption Sites`、`Build Layers` 都能找到并显示 MS 名称（F0-A US7） |
-| MD-8 | 服务器模式 | `crystallume serve` 下重复 S1；`Client.surface`、`Client.add_adsorbate`、`Client.layers` 的结果与本地 API 相同；云模式下 `/analysis/*` 要登录、`/build/*` 公开 |
+| MD-8 | 服务器模式 | `facet serve` 下重复 S1；`Client.surface`、`Client.add_adsorbate`、`Client.layers` 的结果与本地 API 相同；云模式下 `/analysis/*` 要登录、`/build/*` 公开 |
 
 ---
 
@@ -946,7 +946,7 @@ toast `Built MoS2 p(4×4)/Au(111) (√19×√19)R23.4° — 124 atoms`（M6 v2 �
 | G-21 | 未覆盖（部分） | M6 v2 已写死锚原子（基底 z 最大、覆盖层 z 最小的非吸附物原子，并列取最小下标）、错位单位（基底 1×1 参考网格）、预设名（`Top`/`Bridge`/`fcc hollow`/`hcp hollow`，§3.8.3）与物理上不同的取向变体（§3.6.6）；但第二个 C 落在 fcc 还是 hcp 取决于所选变体，报告配位的状态行 `anchor C on top, second C on fcc hollow` 只是"应该"（M6-S1），`info.surface.interface` 也不记录配位 | S15a | 状态行升为"必须"，并在 `info.surface.interface.registry` 记录覆盖层最下层每个原子的配位（top/bridge/fcc/hcp）；验收按 S15a-3 只断言集合与锚 C | M6 |
 | G-24 | 未覆盖 | M2 v2 的提示 `the surface cell is a 2 × 2 multiple …` 只对平方数面积比成立；NaCl(100)、fcc(100) 的面积比是 2 | S12 | 通用文案 `Using the input cell: the surface cell has 2 times the area of the smallest one`，能写 Wood 记号时附上 `(√2×√2)R45°` | M2 |
 | G-25 | 未覆盖 | 位点摘要 `4 site atoms (Pt)` 在多元素表面上的写法未定义（M5 v2 §5.2 只给单元素例子） | S8–S12 | 用与类标签相同的组成写法，如 `4 site atoms (Ti2O2)` | M5 |
-| G-28 | 未覆盖 | CLI 没有删除原子的命令（S8、S14 的删除只能用 Python）；M4 K8 的 `crystallume edit` 组是"应该" | S8、S14 | M7 决定是否提供 `crystallume edit delete FILE --atoms SPEC`；不提供就在文档里写 Python 写法 | M4、M7 |
+| G-28 | 未覆盖 | CLI 没有删除原子的命令（S8、S14 的删除只能用 Python）；M4 K8 的 `facet edit` 组是"应该" | S8、S14 | M7 决定是否提供 `facet edit delete FILE --atoms SPEC`；不提供就在文档里写 Python 写法 | M4、M7 |
 | G-30 | 未定 | 体相名两种语言不同（Python `Pt fcc`，JS `Pt (Face-centred cubic)`；账本 L-F0-29：本期不动，M7 定），`info.surface.bulk.name` 与 Bulk 行因此不同 | C-9 | 跨语言比较暂时排除 `bulk.name`；M7 统一名字后恢复 | M7 |
 | G-32 | 冲突（新） | 自动名哨兵的键名：M2 v2 §3.13、§4.2 写 `info.surface.autoName`（"唯一的自动名键"，并请 M5 改用它）；M1 v2 K5、§3.5.4 与 M5 v2 K10、§4.5、§10 用 `info.surface.name`，M5 v2 还写"v1 的 `baseName`、`autoName` 删除"——照字面实现，M5 放吸附物时会删掉 M2 写的哨兵；M6 v2 §4.1 仍提 M5 的 `baseName/autoName` | S1、S2、S3、S13、S15 | 只留一个键。建议 `info.surface.autoName`（M2 是 `info.surface` 的属主，v1 → v2 的迁移也落在它上面）：M1 §3.5.4、M5 K10/§4.5/§10、M6 §4.1 改名，M5 要删的只是 v1 自己的 `baseName`；`test_adsorbate_naming` 与 M1 T5 的命名金标用同一个键。裁决前验收只断言 `structure.name` | M2（裁决）、M1、M5、M6 |
 | G-33 | 冲突（U4） | U4 写"允许 0"；M2 v2 K11、§3.14、Q10 让已有结构的 `set_vacuum(0)` 报 E12d（`a vacuum of 0 Å is only possible when cleaving …`），只有切面（以及 M6 构建界面）时 V = 0 有定义 | S12、S13、E2E-4 | 负责人按 U6 确认 M2 的决定，并在 M2 修订记录写明"U4 的'允许 0'指切面与界面构建；已有结构请用 V = 0 切面或 `oriented_cell`"；本文按现行 M2 v2（E12d）写期望 | M2（负责人确认） |
@@ -974,7 +974,7 @@ toast `Built MoS2 p(4×4)/Au(111) (√19×√19)R23.4° — 124 atoms`（M6 v2 �
 | G-13 | 化合物表面三重位的名称 | M5 v2 K6：fcc/hcp 只用于金属密排三角，其余写 `hollow (X3) over Y` | S10、S11 |
 | G-14 | fcc(110) 的微面三重位 | M5 v2 K4、§3.4：`auto` 补上金属、两两成键、近正三角形的微面三重位 | S5-3、S5-4′ |
 | G-16 | M5 v1 原型 `place()` 用全局法向与二维外接圆心 | M5 v2 §3.4（三维外接圆心的平均）、§3.5（按类的局部法向）；v2 原型 `checks_place.py` 给台阶 4 重位 4 × Pt–O | S6-6、S6-7（`pt211_place.py` 的数值） |
-| G-20 | 金标格式不统一 | 账本 L-F0-27：所有跨语言用例用 `crystallume.cases/1` 外壳，op 放各模块自己的 `tests/ops/<module>.py`、`tests/js/ops/<module>.mjs`，用例放 `tests/data/<area>/`，另有配方输入；M5 v2 §7.3、M6 v2 §7.2 的金标按此套外壳 | §3.1 |
+| G-20 | 金标格式不统一 | 账本 L-F0-27：所有跨语言用例用 `facet.cases/1` 外壳，op 放各模块自己的 `tests/ops/<module>.py`、`tests/js/ops/<module>.mjs`，用例放 `tests/data/<area>/`，另有配方输入；M5 v2 §7.3、M6 v2 §7.2 的金标按此套外壳 | §3.1 |
 | G-22 | 界面结果没有顶层 `info.surface`，名称未定 | M6 v2 §4.2：`info.surface.kind = "interface"` 与 `info.surface.interface`；§4.4 名称定稿 | S15b-3、S15c-3 |
 | G-23 | 默认层间距（contact + Bondi）受质疑 | M6 v2 §3.9：默认 vdW 接触（Bondi，缺的元素用 Mantina），另有 Covalent contact、Bulk spacing、Custom，菜单写出控制距离的原子对 | S15 一律用 `Custom`；默认值由 M6 §7.6 的基准另行核对 |
 | G-26 | `info.surface.adsorbates[].firstAtom` 在排序后失效 | M5 v2 §4.4 删除该字段（M6 v2 仍写它，见 G-37） | S1-8 |

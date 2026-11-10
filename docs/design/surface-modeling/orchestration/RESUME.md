@@ -4,6 +4,9 @@
 
 ## 现在到哪了
 
+**2026-11-10 改名：** 软件已改名为 Facet（包目录 `facet/`，命令 `facet`，版本 0.3.2），本目录和设计文档里的路径都已改成 `facet/…`；仓库和检出目录仍叫 `crystallume`。改名前开出的分支要先在其中运行 `rename_to_facet.py`、`git mv crystallume facet` 并提交，再变基到主开发分支。
+
+
 - 设计全部完成并入库（上一级目录：架构约定、两份接口账本、8 个模块规格、M7 总纲、验收场景、负责人决定 L-01…L-26）。
 - 开发按依赖图推进：共 120 条链，`merged.txt` 里的 23 条已合并进本分支并通过全量测试（Python 全套 + Node 测试 2488 个，0 失败）。
 - `running.txt` 是快照时正在开发的链。**它们的半成品只在当时那台机器的本地 worktree 里，没有推送**；会话丢失后，这些链按任务说明重新开工即可。
@@ -26,7 +29,7 @@
 ## 怎么接着做
 
 1. 准备环境：建一个带测试依赖的虚拟环境（`pip install fastapi uvicorn numpy python-multipart pytest httpx httpx2`），Node 22 以上。
-   全量测试：`CRYSTALLUME_REQUIRE_NODE=1 python -m pytest -q -p no:cacheprovider`，以及 `node --test tests/js/*.test.mjs`。
+   全量测试：`FACET_REQUIRE_NODE=1 python -m pytest -q -p no:cacheprovider`，以及 `node --test tests/js/*.test.mjs`。
 2. 把本目录复制到一个工作目录。`dev-handbook.md` 和 `prepare_batch.py` 里写的是原会话的临时目录路径
    （`/tmp/claude-0/-home-user-crystallume/f118e1c6-ea51-5594-ad44-3edbe2cba708/scratchpad`），换成新的路径；
    设计文档在仓库的 `docs/design/surface-modeling/`。

@@ -1,6 +1,6 @@
 # M2 golden cases: cleaving, slabs and the vacuum tools
 
-Shared cases (`crystallume.cases/1`, see `../README.md`) for the cleave-and-slab module of the surface-modeling design
+Shared cases (`facet.cases/1`, see `../README.md`) for the cleave-and-slab module of the surface-modeling design
 (M2): Python and JS run the same expectations, so a case that passes on both sides is a parity check. They were written
 before the code (M2-T7a) so that the Python and JS implementations can each be checked against them.
 
@@ -27,7 +27,7 @@ before the code (M2-T7a) so that the Python and JS implementations can each be c
 tasks" below). `--check` compares instead, and reports files it did not write only in its own subdirectories
 (`analysis/`, `inputs/`, `slab/`, `tools/`) and at the top level. It keeps the run state of the files on disk: a skip
 removed by hand stays removed and an `xfail` stays (`--reset-skips` writes every skip again). The tests never run it.
-It needs numpy and this checkout's `crystallume` (to check the `bulk` recipe against the builders and the radii
+It needs numpy and this checkout's `facet` (to check the `bulk` recipe against the builders and the radii
 against `core/elements.py`).
 
 Expected values come from three sources (plan.md M2-T7a: only analytic formulas, or numbers that acceptance or the
@@ -55,7 +55,7 @@ specs have already checked):
 
 Registered in `tests/ops/m2_recipes.py` and `tests/js/ops/m2_recipes.mjs` for the whole repository: other modules use
 it and do not register their own (registering a name twice raises). It calls `build.crystal` in Python and
-`buildCrystal` (`crystallume/web/js/build/crystal.js`) in JS with every lattice constant given (acceptance §0.4):
+`buildCrystal` (`facet/web/js/build/crystal.js`) in JS with every lattice constant given (acceptance §0.4):
 
 ```json
 "input": {"recipe": {"name": "bulk", "args": {"prototype": "rutile", "elements": ["Ti", "O"], "a": 4.594, "c": 2.959, "u": 0.305}}}
@@ -63,7 +63,7 @@ it and do not register their own (registering a name twice raises). It calls `bu
 
 | Argument | Meaning |
 |---|---|
-| `prototype` | required: a prototype id of `crystallume.build.crystal.PROTOTYPES` (`fcc`, `bcc`, `hcp`, `diamond`, `zincblende`, `wurtzite`, `rocksalt`, `cscl`, `fluorite`, `perovskite`, `rutile`, `graphene`, `hbn`, `mos2`, `graphite`, `sc`); aliases such as `nacl` are refused |
+| `prototype` | required: a prototype id of `facet.build.crystal.PROTOTYPES` (`fcc`, `bcc`, `hcp`, `diamond`, `zincblende`, `wurtzite`, `rocksalt`, `cscl`, `fluorite`, `perovskite`, `rutile`, `graphene`, `hbn`, `mos2`, `graphite`, `sc`); aliases such as `nacl` are refused |
 | `elements` | required: one element symbol per role of the prototype, in role order |
 | `a` | required, Å, above 0.5 |
 | `c` | Å, above 0.5: required for the prototypes with a c axis (hexagonal, tetragonal, 2D: the cell height), refused for the others |

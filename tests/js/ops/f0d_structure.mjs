@@ -5,9 +5,9 @@
 // `sourceMap` (a list, or null). Python names map to the web ones: append → addAtom, delete → deleteAtoms,
 // copy → clone, _adopt → _adopt, _set_source → setSource.
 import { op } from '../cases.mjs';
-import * as core from '../../../crystallume/web/js/core/structure.js';
-import { Structure } from '../../../crystallume/web/js/core/structure.js';
-import * as naming from '../../../crystallume/web/js/core/naming.js';
+import * as core from '../../../facet/web/js/core/structure.js';
+import { Structure } from '../../../facet/web/js/core/structure.js';
+import * as naming from '../../../facet/web/js/core/naming.js';
 
 const TABLES = ['PROP_DEFAULTS', 'PROP_SYMBOL_DEFAULT', 'PROP_SHAPED_ZERO', 'RESULT_PROPS', 'RESULT_INFO', 'SYMMETRY_INFO_KEYS',
   'BUILD_INFO_KEYS', 'CARTESIAN_VECTOR_PROPS', 'EDIT_KINDS'];

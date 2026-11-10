@@ -61,45 +61,45 @@ class Group(NamedTuple):
 
 #: The files and their groups, in file order (both __init__ files and both defaults files have two groups each).
 FILES: dict[str, tuple[Group, ...]] = {
-    "crystallume/core/defaults.py": (
+    "facet/core/defaults.py": (
         Group(DEFAULTS, "the key table of the module docstring, after the F0 keys",
               opens=r"``[a-z][a-z0-9_]*``\s", closes=r"=+\s+=+"),
         Group(DEFAULTS, "the SURFACE_DEFAULTS source table, after the F0 keys", "    ",
               opens=r"SURFACE_DEFAULTS = Defaults\(", closes=r"\}\)$"),
     ),
-    "crystallume/web/js/core/defaults.js": (
+    "facet/web/js/core/defaults.js": (
         Group(DEFAULTS, "the key table of the doc comment, after the F0 keys", " * ",
               opens=r" \* \| `[a-z][A-Za-z0-9]*` \|", closes=r" \*/$"),
         Group(DEFAULTS, "the SURFACE_DEFAULTS source table, after the F0 keys", "  ",
               opens=r"export const SURFACE_DEFAULTS = ", closes=r"\}\);$"),
     ),
-    "crystallume/core/structure.py": (
+    "facet/core/structure.py": (
         Group(STRUCTURE, "the end of the class Structure body", "    ", opens=r"class Structure\b", closes=r"[^\s#]"),
     ),
-    "crystallume/web/js/core/structure.js": (
+    "facet/web/js/core/structure.js": (
         Group(STRUCTURE, "the end of the class Structure body", "  ", opens=r"export class Structure\b", closes=r"\}$"),
     ),
-    "crystallume/core/naming.py": (Group(NAMING, "the end of the file"),),
-    "crystallume/web/js/core/naming.js": (Group(NAMING, "the end of the file"),),
-    "crystallume/core/lattice.py": (Group(LATTICE, "the end of the file"),),
-    "crystallume/web/js/core/lattice.js": (Group(LATTICE, "the end of the file"),),
-    "crystallume/build/__init__.py": (
+    "facet/core/naming.py": (Group(NAMING, "the end of the file"),),
+    "facet/web/js/core/naming.js": (Group(NAMING, "the end of the file"),),
+    "facet/core/lattice.py": (Group(LATTICE, "the end of the file"),),
+    "facet/web/js/core/lattice.js": (Group(LATTICE, "the end of the file"),),
+    "facet/build/__init__.py": (
         Group(BUILD, "after the imports", opens=r"(?:from|import) ", closes=r"__all__ = \[", last=True),
         Group(BUILD, "the end of the __all__ list", "    ", opens=r"__all__ = \[", closes=r"\]$"),
     ),
-    "crystallume/analysis/__init__.py": (
+    "facet/analysis/__init__.py": (
         Group(ANALYSIS, "after the imports", opens=r"(?:from|import) ", closes=r"__all__ = \[", last=True),
         Group(ANALYSIS, "the end of the __all__ list", "    ", opens=r"__all__ = \[", closes=r"\]$"),
     ),
-    "crystallume/web/js/main.js": (
+    "facet/web/js/main.js": (
         Group(MAIN, "after the panel imports (ui/panels/surface.js among them)",
               opens=r"import '\./ui/panels/[^']+\.js';$", closes=r"(?:async )?function ", last=True),
     ),
-    "crystallume/web/css/app.css": (Group(CSS, "the end of the file"),),
-    "crystallume/web/js/ui/icons.js": (
+    "facet/web/css/app.css": (Group(CSS, "the end of the file"),),
+    "facet/web/js/ui/icons.js": (
         Group(ICONS, "the icon table P", "  ", opens=r"const P = \{$", closes=r"\};$"),
     ),
-    "crystallume/web/js/app.js": (
+    "facet/web/js/app.js": (
         Group(APP, "the end of the class App body", "  ", opens=r"export class App\b", closes=r"\}$"),
     ),
 }
@@ -172,7 +172,7 @@ def test_the_table_has_the_ten_groups_of_plan_md():
     assert sum(len(groups) for groups in FILES.values()) == 18
     for py, js in (("core/defaults.py", "web/js/core/defaults.js"), ("core/structure.py", "web/js/core/structure.js"),
                    ("core/naming.py", "web/js/core/naming.js"), ("core/lattice.py", "web/js/core/lattice.js")):
-        assert [g.names for g in FILES[f"crystallume/{py}"]] == [g.names for g in FILES[f"crystallume/{js}"]]
+        assert [g.names for g in FILES[f"facet/{py}"]] == [g.names for g in FILES[f"facet/{js}"]]
     for groups in FILES.values():
         for g in groups:
             assert len(set(g.names)) == len(g.names)

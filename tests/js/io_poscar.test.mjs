@@ -6,9 +6,9 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { Structure } from '../../crystallume/web/js/core/structure.js';
-import { readPOSCAR, writePOSCAR } from '../../crystallume/web/js/io/poscar.js';
-import { detectFormat, exportStructure, formats, parseStructure } from '../../crystallume/web/js/io/index.js';
+import { Structure } from '../../facet/web/js/core/structure.js';
+import { readPOSCAR, writePOSCAR } from '../../facet/web/js/io/poscar.js';
+import { detectFormat, exportStructure, formats, parseStructure } from '../../facet/web/js/io/index.js';
 import { poscarCanonical } from './ops/f0d_poscar.mjs';
 import { repoPath } from './helpers.mjs';
 

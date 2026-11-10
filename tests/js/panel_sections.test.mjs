@@ -1,9 +1,9 @@
-// Panel sections and the Surface panel (crystallume/web/js/ui/sections.js, ui/panels/surface.js; F0-A §3.17, §5.2, §5.3,
+// Panel sections and the Surface panel (facet/web/js/ui/sections.js, ui/panels/surface.js; F0-A §3.17, §5.2, §5.3,
 // ledger L-F0-49). The drawing itself needs a browser; these tests cover the registry, the reasons and the refresh rules.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const web = (rel) => new URL(`../../crystallume/web/js/${rel}`, import.meta.url);
+const web = (rel) => new URL(`../../facet/web/js/${rel}`, import.meta.url);
 const S = await import(web('ui/sections.js'));
 const { SURFACE_SECTIONS, surfaceSignature } = await import(web('ui/panels/surface.js'));
 const { leftPanels, Shell } = await import(web('ui/shell.js'));

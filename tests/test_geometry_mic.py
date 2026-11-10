@@ -16,9 +16,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from crystallume import Structure
-from crystallume.analysis import geometry
-from crystallume.analysis.geometry import (
+from facet import Structure
+from facet.analysis import geometry
+from facet.analysis.geometry import (
     dihedral_from_vectors,
     distance_matrix,
     mic_vector,

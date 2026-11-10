@@ -1,8 +1,8 @@
 // Overlay building blocks (F0-A §3.11.4, ledger L-F0-38): markerLayer, planeLayer, cellOutlineLayer, ghostLayer, textLayer.
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import * as THREE from '../../crystallume/web/vendor/three/three.module.js';
-import { Overlays, markerLayer, planeLayer, cellOutlineLayer, ghostLayer, textLayer, drawTextItems, cellEdges } from '../../crystallume/web/js/render/overlays.js';
+import * as THREE from '../../facet/web/vendor/three/three.module.js';
+import { Overlays, markerLayer, planeLayer, cellOutlineLayer, ghostLayer, textLayer, drawTextItems, cellEdges } from '../../facet/web/js/render/overlays.js';
 import { fake2d, quietErrors } from './fake2d.mjs';
 
 function stubViewer(extra = {}) {

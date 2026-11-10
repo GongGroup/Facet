@@ -1,7 +1,7 @@
 // F0-D T9 (geometry): the JS half of the op in tests/ops/f0d_geometry.py (see its docstring), for the shared cases in
 // tests/data/geometry/mic.json, with the same argument errors.
 import { op } from '../cases.mjs';
-import { micVector } from '../../../crystallume/web/js/core/geometry.js';
+import { micVector } from '../../../facet/web/js/core/geometry.js';
 
 const ARGS = ['axes', 'cell', 'pbc', 'v', 'vectors'];
 

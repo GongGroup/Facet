@@ -6,22 +6,22 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import * as core from '../../crystallume/web/js/core/structure.js';
-import * as naming from '../../crystallume/web/js/core/naming.js';
+import * as core from '../../facet/web/js/core/structure.js';
+import * as naming from '../../facet/web/js/core/naming.js';
 import {
   Structure, PROP_DEFAULTS, PROP_SYMBOL_DEFAULT, PROP_SHAPED_ZERO, RESULT_PROPS, RESULT_INFO, SYMMETRY_INFO_KEYS,
   BUILD_INFO_KEYS, CARTESIAN_VECTOR_PROPS, EDIT_KINDS, addWarning, canonicalOrder, composeSourceMaps, concatStructures,
   copyValue, defaultFor, fixDegenerateCell, getWarnings, invalidateBuildInfo, invalidateResults, invalidateSymmetryInfo,
   invertSourceMap, markEdited, newWarnings, normalizePbc, normalizeWarnings, poscarOrder, rotateVectorProps,
-} from '../../crystallume/web/js/core/structure.js';
-import { TIMES, addRepeatSuffix, formatRepeat } from '../../crystallume/web/js/core/naming.js';
-import * as C from '../../crystallume/web/js/core/constraints.js';
-import { makeContiguous } from '../../crystallume/web/js/core/vacuum.js';
+} from '../../facet/web/js/core/structure.js';
+import { TIMES, addRepeatSuffix, formatRepeat } from '../../facet/web/js/core/naming.js';
+import * as C from '../../facet/web/js/core/constraints.js';
+import { makeContiguous } from '../../facet/web/js/core/vacuum.js';
 import { compare, loadCases, repoPath } from './helpers.mjs';
 
 /**
  * The tables of F0-D §3.2 and §3.7 as one JSON block, with the values (and key order) of the Python twin's tables
- * in crystallume/core/structure.py; the tests below compare the web module with it entry by entry.
+ * in facet/core/structure.py; the tests below compare the web module with it entry by entry.
  */
 const TABLES = JSON.parse(`{
   "PROP_DEFAULTS": {"selective_dynamics": [true, true, true], "tags": 0, "adsorbate_id": 0, "occupancy": 1.0,
@@ -105,7 +105,7 @@ describe('module', () => {
   });
 
   test('the masses of new atoms are the standard atomic weights of elements.json', () => {
-    const data = JSON.parse(readFileSync(repoPath('crystallume/data/elements.json'), 'utf8'));
+    const data = JSON.parse(readFileSync(repoPath('facet/data/elements.json'), 'utf8'));
     assert.equal(data.elements.length, 103);
     for (const e of data.elements) assert.equal(defaultFor('masses', e.symbol, null), e.mass, e.symbol);
     assert.equal(defaultFor('masses', 'X', null), 0);

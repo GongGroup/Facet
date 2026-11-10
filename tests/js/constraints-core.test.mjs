@@ -6,14 +6,14 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { Structure } from '../../crystallume/web/js/core/structure.js';
-import { SURFACE_DEFAULTS } from '../../crystallume/web/js/core/defaults.js';
-import * as C from '../../crystallume/web/js/core/constraints.js';
+import { Structure } from '../../facet/web/js/core/structure.js';
+import { SURFACE_DEFAULTS } from '../../facet/web/js/core/defaults.js';
+import * as C from '../../facet/web/js/core/constraints.js';
 import {
   FLAG_RE, FLAG_TOL, MOVE_FLAGS_KEY, applyBasisChange, axisLabels, cartesianName, cartesianToLatticeFlags,
   clearConstraints, constraintSummary, latticeToCartesianMask, moveFlags, nextAdsorbateId, setMoveFlags,
   transformMoveFlags,
-} from '../../crystallume/web/js/core/constraints.js';
+} from '../../facet/web/js/core/constraints.js';
 import { repoPath } from './helpers.mjs';
 
 const P = (name) => [...name].map((c) => c === 'T');
@@ -60,7 +60,7 @@ describe('module', () => {
   });
 
   test('imports only defaults.js (core/structure.js will import this module)', () => {
-    const src = readFileSync(repoPath('crystallume/web/js/core/constraints.js'), 'utf8');
+    const src = readFileSync(repoPath('facet/web/js/core/constraints.js'), 'utf8');
     assert.deepEqual([...src.matchAll(/^import .* from '(.*)';$/gm)].map((m) => m[1]), ['./defaults.js']);
   });
 });

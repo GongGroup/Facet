@@ -1,9 +1,9 @@
-// Start-up data tasks (crystallume/web/js/core/boot.js, F0-A T10, ledger L-F0-56).
+// Start-up data tasks (facet/web/js/core/boot.js, F0-A T10, ledger L-F0-56).
 // The tests share the module's task list (node runs each test file in its own process), so they run in order.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const boot = await import(new URL('../../crystallume/web/js/core/boot.js', import.meta.url));
+const boot = await import(new URL('../../facet/web/js/core/boot.js', import.meta.url));
 const { registerBootTask, bootTasks, bootTaskStatus, bootFailureMessage, BOOT_TIMEOUT } = boot;
 
 /** Run fn with console.error captured; returns the captured calls. */

@@ -15,10 +15,10 @@ import math
 import numpy as np
 import pytest
 
-from crystallume import Structure
-from crystallume.analysis.geometry import mic_vector, signed_angle
-from crystallume.analysis.neighbors import neighbor_arrays
-from crystallume.core.elements import bondi_radius, covalent_radius, elements
+from facet import Structure
+from facet.analysis.geometry import mic_vector, signed_angle
+from facet.analysis.neighbors import neighbor_arrays
+from facet.core.elements import bondi_radius, covalent_radius, elements
 
 A_PT = 3.92
 FCC = np.array([[0, 0, 0], [0.5, 0.5, 0], [0.5, 0, 0.5], [0, 0.5, 0.5]]) * A_PT
@@ -43,7 +43,7 @@ def test_dihedral_angles_agree_with_get_dihedral(js):
       const g = await web('core/geometry.js');
       const { measureValue } = await web('render/viewer.js');
       const { geometryValue } = await web('ui/selectioncard.js');
-      const THREE = await repo('crystallume/web/vendor/three/three.module.js');
+      const THREE = await repo('facet/web/vendor/three/three.module.js');
       const sub = (u, v) => [u[0] - v[0], u[1] - v[1], u[2] - v[2]];
       const bonds = (P) => [sub(P[1], P[0]), sub(P[2], P[1]), sub(P[3], P[2])];
       const plain = input.quads.map((P) => [g.dihedralFromVectors(...bonds(P)), geometryValue(P),

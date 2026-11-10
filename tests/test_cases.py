@@ -1,4 +1,4 @@
-"""The shared cross-language cases (``tests/data/**/*.json``, schema ``crystallume.cases/1``) and their shell.
+"""The shared cross-language cases (``tests/data/**/*.json``, schema ``facet.cases/1``) and their shell.
 
 ``test_case`` runs every case against the Python implementation; the same cases run against the web modules in
 ``tests/js/cases.test.mjs`` (through ``tests/test_js_unit.py``).  The other tests cover the loader, the comparator
@@ -15,7 +15,7 @@ from typing import Any
 import numpy as np
 import pytest
 
-from crystallume import Structure, build
+from facet import Structure, build
 
 from . import ops
 from .cases import (
@@ -113,15 +113,15 @@ def _without(key: str) -> dict[str, Any]:
 #: the same verdict with the same message (``test_js_loader_agrees``).
 LOADER_DOCS: list[tuple[str, dict[str, Any], str | None]] = [
     ("good", {"a.json": _with()}, None),
-    ("other-json-ignored", {"s.json": {"schema": "crystallume.structure/1", "symbols": []}, "a.json": _with()}, None),
+    ("other-json-ignored", {"s.json": {"schema": "facet.structure/1", "symbols": []}, "a.json": _with()}, None),
     ("array-and-broken-json-ignored", {"x.json": "[1, 2]", "y.json": "{not json", "a.json": _with()}, None),
-    ("hidden-dirs-ignored", {".cache/a.json": '{"schema": "crystallume.cases/1", "cases": [',
+    ("hidden-dirs-ignored", {".cache/a.json": '{"schema": "facet.cases/1", "cases": [',
                              "sub/.b.json": _with(), "a.json": _with()}, None),
-    ("broken-case-file", {"a.json": '{"schema": "crystallume.cases/1", "cases": ['}, "a.json: not valid JSON ("),
-    ("nan-is-not-json", {"a.json": '{"schema": "crystallume.cases/1", "cases": [{"id": "a", "op": "x", '
+    ("broken-case-file", {"a.json": '{"schema": "facet.cases/1", "cases": ['}, "a.json: not valid JSON ("),
+    ("nan-is-not-json", {"a.json": '{"schema": "facet.cases/1", "cases": [{"id": "a", "op": "x", '
                                    '"expect": {"value": NaN}}]}'}, "a.json: not valid JSON ("),
-    ("other-version", {"a.json": {"schema": "crystallume.cases/2", "cases": []}},
-     'a.json: unsupported schema "crystallume.cases/2" (this loader reads "crystallume.cases/1")'),
+    ("other-version", {"a.json": {"schema": "facet.cases/2", "cases": []}},
+     'a.json: unsupported schema "facet.cases/2" (this loader reads "facet.cases/1")'),
     ("no-cases", {"a.json": {"schema": SCHEMA, "cases": []}}, 'a.json: "cases" must be a non-empty list'),
     ("case-not-object", {"a.json": {"schema": SCHEMA, "cases": [1]}}, "a.json: cases[0]: must be an object"),
     ("empty-id", {"a.json": _with(id="")}, 'a.json: cases[0]: "id" must be a non-empty string without spaces'),
@@ -231,7 +231,7 @@ def test_repository_cases_are_where_the_ledger_puts_them():
 
 
 # -------------------------------------------------------------------- comparing
-DOC_H = {"schema": "crystallume.structure/1", "name": "h", "symbols": ["H"], "positions": [[0, 0, 0.74]], "cell": None,
+DOC_H = {"schema": "facet.structure/1", "name": "h", "symbols": ["H"], "positions": [[0, 0, 0.74]], "cell": None,
          "pbc": [False, False, False], "props": {"tags": [1]}, "info": {"energy": -1.0, "source": "test"}}
 DOC_W = {**DOC_H, "info": {"warnings": ["one note"]}}
 DOC_LEGACY = {**DOC_H, "info": {"warning": "old style; one string"}}

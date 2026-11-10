@@ -1,6 +1,6 @@
 # M3 golden cases: layers, adsorbates, bonds, exposed atoms
 
-Shared cases (`crystallume.cases/1`, see `../README.md`) for the layer analysis of the surface-modeling design
+Shared cases (`facet.cases/1`, see `../README.md`) for the layer analysis of the surface-modeling design
 (module M3): Python and JS run the same expectations, so a case that passes on both sides is a parity check.
 
 | File | Op | Content |
@@ -25,7 +25,7 @@ a plain re-implementation of M3 §3 as amended by the ledgers. The script assert
 and refuses values that lie within 1e-6 of a threshold. Cross-checks made while writing the files: rows and heights,
 every kappa* and every adsorbate set agree with the independent M3 v2 prototype on the 145 comparable cases (the
 stoichiometric units are not among them: decision 3), and the `all`-rule bond graphs (degrees and distances) agree
-with `crystallume.analysis.neighbors.neighbor_arrays`. The script writes the skips itself, from the ops registered
+with `facet.analysis.neighbors.neighbor_arrays`. The script writes the skips itself, from the ops registered
 now, and keeps an `xfail` a task added to a case (see Skips); `--check` compares the cases, not the layout.
 
 ## Op contracts

@@ -1,7 +1,7 @@
 """Timing budget of the exact minimum image (F0-D T9, ledger section 5.4), Python side; the JS side is
 ``tests/perf/geometry.perf.mjs``.
 
-``minimum_image_vectors`` on 10 000 vectors within 10 ms, times ``CRYSTALLUME_PERF_FACTOR`` (default 2), in a slab
+``minimum_image_vectors`` on 10 000 vectors within 10 ms, times ``FACET_PERF_FACTOR`` (default 2), in a slab
 cell, a skewed bulk cell (the reduced-basis branch) and a tall p(1x1) slab cell, for all three axes and for a and b
 only.  Marked ``slow``, so the default run leaves it out: ``pytest -m slow tests/perf/test_geometry_perf.py``.
 """
@@ -14,11 +14,11 @@ import time
 import numpy as np
 import pytest
 
-from crystallume.analysis.geometry import mic_vector, minimum_image_vectors
+from facet.analysis.geometry import mic_vector, minimum_image_vectors
 
 pytestmark = pytest.mark.slow
 
-FACTOR = float(os.environ.get("CRYSTALLUME_PERF_FACTOR") or 2)
+FACTOR = float(os.environ.get("FACET_PERF_FACTOR") or 2)
 BUDGET_MS = 10.0
 CELLS = {
     "Pt(111) p(3x3) slab": [[8.316, 0, 0], [4.158, 7.2019, 0], [0, 0, 21.79]],

@@ -1,13 +1,13 @@
 // Timing budget of the exact minimum image (F0-D T9, ledger section 5.4), JS side; the Python side is
-// tests/perf/test_geometry_perf.py. 10 000 micVector calls within 20 ms, times CRYSTALLUME_PERF_FACTOR (default 2), in
+// tests/perf/test_geometry_perf.py. 10 000 micVector calls within 20 ms, times FACET_PERF_FACTOR (default 2), in
 // a slab cell, a skewed bulk cell (the reduced-basis branch) and a tall p(1x1) slab cell, for all three axes and for
 // a and b only. Not part of the default run (perf tests stay out of tests/js/*.test.mjs):
 // node --test tests/perf/geometry.perf.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { micVector } from '../../crystallume/web/js/core/geometry.js';
+import { micVector } from '../../facet/web/js/core/geometry.js';
 
-const FACTOR = Number(process.env.CRYSTALLUME_PERF_FACTOR) || 2;
+const FACTOR = Number(process.env.FACET_PERF_FACTOR) || 2;
 const BUDGET_MS = 20;
 const CELLS = {
   'Pt(111) p(3x3) slab': [[8.316, 0, 0], [4.158, 7.2019, 0], [0, 0, 21.79]],

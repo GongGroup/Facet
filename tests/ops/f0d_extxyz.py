@@ -19,8 +19,8 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
-from crystallume.io import parse_text
-from crystallume.io.xyz import convert_value, extxyz_columns, format_info_value, kv_tokenize, write_extxyz
+from facet.io import parse_text
+from facet.io.xyz import convert_value, extxyz_columns, format_info_value, kv_tokenize, write_extxyz
 
 from ..cases import CaseInput, op
 

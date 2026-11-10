@@ -65,14 +65,14 @@ const toastsSince = (from) => elements.slice(from).filter((el) => el.tag === 'sp
 const buttonsSince = (from) => elements.slice(from).filter((el) => el.tag === 'button');
 const click = (el) => el.listeners.click?.forEach((fn) => fn());
 
-const THREE = await import('../../crystallume/web/vendor/three/three.module.js');
-const { Structure } = await import('../../crystallume/web/js/core/structure.js');
-const { makeScene } = await import('../../crystallume/web/js/render/settings.js');
-const { buildDisplayModel, estimateDisplayCount } = await import('../../crystallume/web/js/render/display.js');
-const { Viewer } = await import('../../crystallume/web/js/render/viewer.js');
-const { App } = await import('../../crystallume/web/js/app.js');
-const { Shell } = await import('../../crystallume/web/js/ui/shell.js');
-const { selectAll, hiddenInSelection, confirmHiddenSelection, deleteSelection, selectionPoints } = await import('../../crystallume/web/js/ui/selectioncard.js');
+const THREE = await import('../../facet/web/vendor/three/three.module.js');
+const { Structure } = await import('../../facet/web/js/core/structure.js');
+const { makeScene } = await import('../../facet/web/js/render/settings.js');
+const { buildDisplayModel, estimateDisplayCount } = await import('../../facet/web/js/render/display.js');
+const { Viewer } = await import('../../facet/web/js/render/viewer.js');
+const { App } = await import('../../facet/web/js/app.js');
+const { Shell } = await import('../../facet/web/js/ui/shell.js');
+const { selectAll, hiddenInSelection, confirmHiddenSelection, deleteSelection, selectionPoints } = await import('../../facet/web/js/ui/selectioncard.js');
 
 const DISPLAY = makeScene().display;
 const D_LAYER = 3.92 / Math.sqrt(3);

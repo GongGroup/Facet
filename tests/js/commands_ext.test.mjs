@@ -1,4 +1,4 @@
-// Commands of the surface tools (crystallume/web/js/core/commands.js; F0-A §3.16, §5.8, ledger L-F0-52, defect E-50,
+// Commands of the surface tools (facet/web/js/core/commands.js; F0-A §3.16, §5.8, ledger L-F0-52, defect E-50,
 // M7 §5.2 KC-06): parameter schemas checked in the wrapper that register makes, whatever the caller; the atom
 // limits and the large-structure confirmation; `edits` guards; keys commands must not take; MS aliases; and the
 // fallbacks that open the panel section of each M1–M6 command until its module registers it.
@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-const web = (rel) => new URL(`../../crystallume/web/js/${rel}`, import.meta.url);
+const web = (rel) => new URL(`../../facet/web/js/${rel}`, import.meta.url);
 const C = await import(web('core/commands.js'));
 const { commands, LIMITS, MAX_ATOMS_LIMIT, CommandError, commandTitle, atomLimit, checkAtoms, confirmAtoms, canEdit, editWhyNot,
   previewSession, keyProblem, SECTION_COMMANDS, sectionFallbacks, CANCEL_PREVIEW } = C;
@@ -59,7 +59,7 @@ describe('parameters are checked by the wrapper that register makes', () => {
     const ways = [
       ['commands.run', () => commands.run('test.cleave', {})],
       ['commands.get(id).run', () => commands.get('test.cleave').run({})],
-      ['crystallume.command (embedding pages call it)', () => api.command('test.cleave', { miller: [1, 1, 1] })],
+      ['facet.command (embedding pages call it)', () => api.command('test.cleave', { miller: [1, 1, 1] })],
     ];
     for (const [how, call] of ways) {
       assert.throws(call, (e) => e instanceof CommandError && e.code === 'invalid-params' && e.message === 'Cleave surface: Vacuum: enter a value.', how);
@@ -215,7 +215,7 @@ describe('estimate, LIMITS and the confirmation', () => {
     let answer = false;
     commands.setConfirm(async (o) => { asked.push(o); return answer; });
     const { calls } = reg(BIG((p) => p.n));
-    // a script (crystallume.command, embedding pages, plugins): no question, the command runs at once
+    // a script (facet.command, embedding pages, plugins): no question, the command runs at once
     assert.equal(commands.run('test.big', { n: 40_000 }), 'ran');
     assert.equal(asked.length, 0);
     // a panel asks for it with { interactive: true }: declined → run() is not called, the Promise gives undefined
@@ -347,7 +347,7 @@ describe('keys commands must not take', () => {
   });
 
   test('no key that main.js binds is forbidden', () => {
-    const src = readFileSync(new URL('../../crystallume/web/js/main.js', import.meta.url), 'utf8');
+    const src = readFileSync(new URL('../../facet/web/js/main.js', import.meta.url), 'utf8');
     const keys = [...src.matchAll(/\bkey: (\[[^\]]*\]|'[^']*'|`[^`]*`)/g)].flatMap(([, v]) => [...v.matchAll(/'([^']*)'|`([^`]*)`/g)].map((m) => m[1] ?? m[2]));
     assert.ok(keys.length > 20, keys.join(' '));
     for (const k of keys) assert.equal(keyProblem(k.replace('${i + 1}', '5')), null, k);

@@ -1,4 +1,4 @@
-"""Planar Delaunay triangulation (``crystallume.core.delaunay``, M5 §3.3.2): properties, degenerate grids, errors.
+"""Planar Delaunay triangulation (``facet.core.delaunay``, M5 §3.3.2): properties, degenerate grids, errors.
 
 ``tests/js/delaunay.test.mjs`` runs the same checks on the JavaScript twin ``web/js/core/delaunay.js``.  Both files
 hold the same JSON constant ``PARITY_CASES`` (between the BEGIN and END PARITY_CASES lines): point sets with the exact
@@ -20,9 +20,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from crystallume.core import delaunay as D
-from crystallume.core.defaults import SURFACE_DEFAULTS
-from crystallume.core.delaunay import circumcenter, delaunay
+from facet.core import delaunay as D
+from facet.core.defaults import SURFACE_DEFAULTS
+from facet.core.delaunay import circumcenter, delaunay
 
 JS_TESTS = Path(__file__).resolve().parent / "js" / "delaunay.test.mjs"
 #: ``site_merge_ratio`` of the site finder (M5 §3.3.3): two triangles across an edge merge when their circumcentres

@@ -1,8 +1,8 @@
 // F0-D T5 (extended XYZ): JS halves of the ops in tests/ops/f0d_extxyz.py (see its docstring), with the same
 // argument errors. The case file tests/data/surface/f0d/extxyz.json also uses read, write and roundtrip (f0d.mjs).
 import { op } from '../cases.mjs';
-import { parseStructure } from '../../../crystallume/web/js/io/index.js';
-import { convertValue, extxyzColumns, formatInfoValue, kvTokenize, writeXYZ } from '../../../crystallume/web/js/io/xyz.js';
+import { parseStructure } from '../../../facet/web/js/io/index.js';
+import { convertValue, extxyzColumns, formatInfoValue, kvTokenize, writeXYZ } from '../../../facet/web/js/io/xyz.js';
 
 function take(args, name, allowed, required = []) {
   const unknown = Object.keys(args).filter((k) => !allowed.includes(k)).sort();

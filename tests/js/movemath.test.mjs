@@ -8,13 +8,13 @@
 // Run: node --test tests/js/movemath.test.mjs (or through pytest: tests/test_js_unit.py).
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { SURFACE_DEFAULTS } from '../../crystallume/web/js/core/defaults.js';
-import * as MM from '../../crystallume/web/js/render/tools/movemath.js';
+import { SURFACE_DEFAULTS } from '../../facet/web/js/core/defaults.js';
+import * as MM from '../../facet/web/js/render/tools/movemath.js';
 import {
   DRAG_KINDS, FRAMES, FRAME_LABELS, HANDLE_PRIORITY, HANDLE_SETS, MOVE_TOOL, PLANE_AXES,
   accumulateAngle, angleAbout, axisParam, beginDrag, directDragPlane, dragTo, frameAxes, frameComponents,
   handleVisibility, hitHandle, latticeSnapSteps, pressTarget, snapToStep, snapToTarget,
-} from '../../crystallume/web/js/render/tools/movemath.js';
+} from '../../facet/web/js/render/tools/movemath.js';
 
 const DEG = Math.PI / 180;
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];

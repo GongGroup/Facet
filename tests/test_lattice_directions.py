@@ -1,4 +1,4 @@
-"""Lattice directions in ``crystallume.core.lattice`` (F0-A T7a): plane normals and lattice directions in the current
+"""Lattice directions in ``facet.core.lattice`` (F0-A T7a): plane normals and lattice directions in the current
 cell, hexagonal-cell detection, (h k l) <-> (h k i l) and [u v w] <-> [U V T W], and the fcc/bcc primitive-cell hint.
 
 The shared cases ``tests/data/surface/directions.json`` run in both languages (``tests/test_cases.py``,
@@ -17,8 +17,8 @@ import math
 import numpy as np
 import pytest
 
-from crystallume.core import lattice
-from crystallume.core.lattice import (
+from facet.core import lattice
+from facet.core.lattice import (
     cellpar_to_cell,
     centered_cell_hint,
     hkil_to_hkl,
@@ -89,7 +89,7 @@ def test_all_lists_the_new_functions_after_the_f0d_ones():
 
 def test_golden_file_runs_in_both_languages():
     doc = json.loads((DATA / "surface" / "directions.json").read_text(encoding="utf-8"))
-    assert doc["schema"] == "crystallume.cases/1"
+    assert doc["schema"] == "facet.cases/1"
     ops = {c["op"] for c in doc["cases"]}
     assert ops == {"reciprocalCell", "millerNormal", "latticeDirection", "isHexagonalCell", "hklToHkil", "hkilToHkl",
                    "uvwToUvtw", "uvtwToUvw", "centeredCellHint", "primitiveMiller"}

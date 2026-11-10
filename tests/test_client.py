@@ -6,10 +6,10 @@ import socket
 
 import pytest
 
-from crystallume import Client, build, read
-from crystallume.client import ClientError, ExportResult
-from crystallume.config import Settings
-from crystallume.server import BackgroundServer, create_app
+from facet import Client, build, read
+from facet.client import ClientError, ExportResult
+from facet.config import Settings
+from facet.server import BackgroundServer, create_app
 
 from .conftest import EXAMPLE_PLUGINS
 
@@ -149,7 +149,7 @@ def test_client_local(servers, data_dir):
     assert isinstance(res, ExportResult) and res.text.startswith("# Generated") and res.notes == []
     assert (res.filename, res.mimetype) == ("Pt_111_p_3x3_4L_relaxed.cif", "chemical/x-cif")
     assert res.warnings == ["18 atom(s) are fixed or partly fixed (selective dynamics), but CIF cannot store "
-                            "constraints; use POSCAR, Extended XYZ or Crystallume JSON to keep them"]
+                            "constraints; use POSCAR, Extended XYZ or Facet JSON to keep them"]
     clean = c.export_structure_with_warnings(slab.to_dict(), "poscar")
     assert clean.warnings == [] and clean.notes == [] and "Selective dynamics" in clean.text
     assert c.summary(si)["formula"] == "Si16"

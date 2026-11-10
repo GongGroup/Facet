@@ -1,7 +1,7 @@
 """Timing budget of the constraint flags core (F0-D §7.6), Python side; the JS side is ``tests/perf/constraints.perf.mjs``.
 
 ``transform_move_flags`` within 1 ms for 216 atoms and 15 ms for 10 000, and ``apply_basis_change`` (the same rule on a
-structure) within the same budget, times ``CRYSTALLUME_PERF_FACTOR`` (default 2).  Marked ``slow``, so the default run
+structure) within the same budget, times ``FACET_PERF_FACTOR`` (default 2).  Marked ``slow``, so the default run
 leaves it out: ``pytest -m slow tests/perf/test_constraints_perf.py``.
 """
 
@@ -14,12 +14,12 @@ import time
 import numpy as np
 import pytest
 
-from crystallume import Structure
-from crystallume.core.constraints import apply_basis_change, transform_move_flags
+from facet import Structure
+from facet.core.constraints import apply_basis_change, transform_move_flags
 
 pytestmark = pytest.mark.slow
 
-FACTOR = float(os.environ.get("CRYSTALLUME_PERF_FACTOR") or 2)
+FACTOR = float(os.environ.get("FACET_PERF_FACTOR") or 2)
 ALL8 = [list(p) for p in itertools.product((True, False), repeat=3)]
 TILTED = np.array([[3.0, 0, 0], [0, 4.0, 0], [1.5, 0.8, 20.0]])
 ORTHO = np.diag([3.0, 4.0, 20.0])

@@ -1,8 +1,8 @@
-// Selection actions: card buttons and atom menus (crystallume/web/js/ui/selectioncard.js, F0-A §5.4, ledger L-F0-50).
+// Selection actions: card buttons and atom menus (facet/web/js/ui/selectioncard.js, F0-A §5.4, ledger L-F0-50).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const S = await import(new URL('../../crystallume/web/js/ui/selectioncard.js', import.meta.url));
+const S = await import(new URL('../../facet/web/js/ui/selectioncard.js', import.meta.url));
 const { registerSelectionAction, selectionActions, actionView, actionRows, actionMenuItems, menuTarget, splitCardActions, CARD_LIMITS } = S;
 
 const app = { structure: { symbols: ['Pt', 'Pt', 'Pt', 'C', 'O'], length: 5 } };

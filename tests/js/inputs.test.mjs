@@ -195,11 +195,11 @@ globalThis.getComputedStyle = (el) => el.style;
 const realSetTimeout = globalThis.setTimeout;
 globalThis.setTimeout = (fn, ms, ...a) => { const t = realSetTimeout(fn, ms, ...a); t?.unref?.(); return t; };   // menus' timers must not keep node alive
 
-const { numberInput, vec3Input, millerInput, imatrixInput, setInvalid } = await import('../../crystallume/web/js/ui/inputs.js');
-const { paramForm } = await import('../../crystallume/web/js/ui/paramform.js');
-const { closeMenu } = await import('../../crystallume/web/js/ui/overlays.js');
-const { cellFromParams } = await import('../../crystallume/web/js/core/util.js');
-const { Structure } = await import('../../crystallume/web/js/core/structure.js');
+const { numberInput, vec3Input, millerInput, imatrixInput, setInvalid } = await import('../../facet/web/js/ui/inputs.js');
+const { paramForm } = await import('../../facet/web/js/ui/paramform.js');
+const { closeMenu } = await import('../../facet/web/js/ui/overlays.js');
+const { cellFromParams } = await import('../../facet/web/js/core/util.js');
+const { Structure } = await import('../../facet/web/js/core/structure.js');
 
 // ------------------------------------------------------------------------------------------- helpers
 const MINUS = '\u2212';
@@ -399,15 +399,15 @@ describe('vec3Input', () => {
     const copy = slab.cell.map((r) => r.slice());
     assert.deepEqual(shown(vec3Input({ label: 'Move', value: [2, 0, 1.5], frames: ['cartesian', 'surface'], cell: copy, structure: slab })), ['0', '0.5', '2'],
       'an equal cell is the structure\'s cell; `structure` overrides the app');
-    const prev = globalThis.crystallume;
-    globalThis.crystallume = { app: { structure: slab } };
+    const prev = globalThis.facet;
+    globalThis.facet = { app: { structure: slab } };
     try {
-      assert.deepEqual(shown(vec3Input({ label: 'Move', value: [2, 0, 1.5], frames: ['cartesian', 'surface'], cell: slab.cell })), ['0', '0.5', '2'], 'the page\'s crystallume.app');
+      assert.deepEqual(shown(vec3Input({ label: 'Move', value: [2, 0, 1.5], frames: ['cartesian', 'surface'], cell: slab.cell })), ['0', '0.5', '2'], 'the page\'s facet.app');
       const other = [[2, 0, 0], [0, 2, 0], [1, 0, 20]];
       assert.deepEqual(shown(vec3Input({ label: 'Move', value: [0, 0, 1.5], frames: ['cartesian', 'surface'], cell: other })), ['0', '0', '1.5'],
         'another cell than the structure\'s: the normal of a × b, h along z');
     } finally {
-      if (prev === undefined) delete globalThis.crystallume; else globalThis.crystallume = prev;
+      if (prev === undefined) delete globalThis.facet; else globalThis.facet = prev;
     }
     const flipped = vec3Input({ label: 'Move', value: [0, 0, -2], frames: ['cartesian', 'surface'], cell: [[2, 0, 0], [0, 2, 0], [0, 0, -20]] });
     assert.deepEqual(shown(flipped), ['0', '0', '2'], 'no structure: a × b turned to the +c side');
@@ -608,27 +608,27 @@ describe('imatrixInput', () => {
     btn.click();
     assert.deepEqual(calls[1].value, [[1, 1], [-1, 2]], 'ctx.value is the current matrix');
   });
-  test('presets(ctx) without a structure option get the current structure of the app (`app`, else crystallume.app)', () => {
+  test('presets(ctx) without a structure option get the current structure of the app (`app`, else facet.app)', () => {
     const seen = [];
     const presets = (ctx) => { seen.push(ctx); return []; };
     const open = (ctl, label) => { byLabel(ctl.el, `${label} presets`).click(); closeMenu(); return seen.at(-1); };
     const zno = { cell: hex, name: 'ZnO' };
     let ctx = open(imatrixInput({ label: 'Surface cell', size: 2, value: [[1, 0], [0, 1]], app: { structure: zno }, presets }), 'Surface cell');
     assert.deepEqual([ctx.structure, ctx.cell, ctx.value], [zno, hex, [[1, 0], [0, 1]]]);
-    const prev = globalThis.crystallume;
+    const prev = globalThis.facet;
     const pt = { cell: cubic, name: 'Pt' };
-    globalThis.crystallume = { app: { structure: pt } };
+    globalThis.facet = { app: { structure: pt } };
     try {
       const ctl = imatrixInput({ label: 'Supercell', presets });
       ctx = open(ctl, 'Supercell');
       assert.deepEqual([ctx.structure, ctx.cell], [pt, cubic], 'the page\'s app, as the ledger\'s options have no structure');
-      globalThis.crystallume.app.structure = zno;
+      globalThis.facet.app.structure = zno;
       ctx = open(ctl, 'Supercell');
       assert.equal(ctx.structure, zno, 'the structure when the menu opens');
       ctx = open(imatrixInput({ label: 'Own', presets, structure: pt, cell: hex }), 'Own');
       assert.deepEqual([ctx.structure, ctx.cell], [pt, hex], '`structure` and `cell` override');
     } finally {
-      if (prev === undefined) delete globalThis.crystallume; else globalThis.crystallume = prev;
+      if (prev === undefined) delete globalThis.facet; else globalThis.facet = prev;
     }
     ctx = open(imatrixInput({ label: 'Alone', presets }), 'Alone');
     assert.deepEqual([ctx.structure, ctx.cell], [null, null], 'no app: nothing');

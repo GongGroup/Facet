@@ -92,8 +92,8 @@ from typing import Any, Callable, Sequence
 
 import numpy as np
 
-from crystallume import Structure
-from crystallume.core.elements import is_element
+from facet import Structure
+from facet.core.elements import is_element
 
 __all__ = [
     "MAX_ATOMS",

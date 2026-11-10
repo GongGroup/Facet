@@ -1,14 +1,14 @@
 """M2 (cleave and slab): the shared recipe ``bulk``.  The JS half is ``tests/js/ops/m2_recipes.mjs``.
 
 ``bulk`` builds a bulk crystal from a built-in prototype of the crystal builders (``build.crystal`` in Python,
-``buildCrystal`` in ``crystallume/web/js/build/crystal.js``) with the lattice constants given explicitly, so that a
+``buildCrystal`` in ``facet/web/js/build/crystal.js``) with the lattice constants given explicitly, so that a
 case never depends on the reference tables of the builders (acceptance §0.4)::
 
     "input": {"recipe": {"name": "bulk", "args": {"prototype": "fcc", "elements": ["Pt"], "a": 3.92}}}
 
 Arguments (``tests/data/surface/cleave/README.md`` documents them for every module that reuses the recipe):
 
-- ``prototype`` (required): a prototype id of ``crystallume.build.crystal.PROTOTYPES`` (``fcc``, ``hcp``, ``rutile``,
+- ``prototype`` (required): a prototype id of ``facet.build.crystal.PROTOTYPES`` (``fcc``, ``hcp``, ``rutile``,
   ``graphene``, ...); aliases such as ``nacl`` are refused;
 - ``elements`` (required): one element symbol per role of the prototype, in role order (``["Sr", "Ti", "O"]``);
 - ``a`` (required) and ``c`` (required for the prototypes with a c axis, refused for the others), in Å, above 0.5;
@@ -28,8 +28,8 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from crystallume import Structure, build
-from crystallume.build.crystal import PROTOTYPES
+from facet import Structure, build
+from facet.build.crystal import PROTOTYPES
 
 from ..cases import recipe
 

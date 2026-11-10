@@ -1,15 +1,15 @@
 # F0-A 应用、视图与界面地基（模块规格 v2）
 
-> **范围**：`crystallume/web/js` 的编辑原语（原位编辑、预览会话、新增结构、绑定到自己那一步的 Undo）、撤销存储、
+> **范围**：`facet/web/js` 的编辑原语（原位编辑、预览会话、新增结构、绑定到自己那一步的 Undo）、撤销存储、
 > 叠加层 A/B/C 与导出策略、合并拾取与工具钩子、工具注册表、高亮与逐原子可见性、位置快速更新、真空间隙显示（U1）、
 > 测量引用、沿任意方向观察、输入控件与参数 schema 新类型、Surface 面板外壳与 Structure 面板分区、命令注册（MS 别名、守卫、参数校验）。
-> Python 侧只有：参数 schema 的同步（新 `crystallume/core/params.py`、CLI `--param`、REST 插件参数规范化）、少量晶格方向函数（`core/lattice.py`）
-> 和 `surface_normal`（追加到 F0-D 的 `crystallume/analysis/vacuum.py`）。
+> Python 侧只有：参数 schema 的同步（新 `facet/core/params.py`、CLI `--param`、REST 插件参数规范化）、少量晶格方向函数（`core/lattice.py`）
+> 和 `surface_normal`（追加到 F0-D 的 `facet/analysis/vacuum.py`）。
 >
 > **依据**：简报 `00-architecture.md`（U1–U6、P1–P7、C1–C12、D1–D7、§3 布局表、§4 网页约定、§9 模板）；报告 01–07；
 > 接口对照用了 `specs/F0-D.md`、`M1.md`–`M6.md` 的 v1 文本（§10）。两份审查：`reviews/F0-A-domain.md`（D1–D17）、`reviews/F0-A-engineering.md`（E1–E34），
 > 逐条处理见 §11 修订记录与 §12 未采纳的意见。所有 `文件:行号` 都在源码（HEAD `1bb366f`，仓库未改动）中重新核对过；
-> 路径相对 `crystallume/web/js/`，以 `crystallume/`、`docs/`、`tests/` 开头的除外。
+> 路径相对 `facet/web/js/`，以 `facet/`、`docs/`、`tests/` 开头的除外。
 >
 > **原型（都已运行）**，在 `scratchpad/proto/`：
 > - v1：`undo_cost.mjs`（撤销快照）、`fastpath.mjs`/`fastpath_bonds.mjs`（位置快速路径）、`display_masked.mjs`（可见性掩码）、
@@ -45,7 +45,7 @@
 | A-D8 | 合并拾取 `viewer.pick()`：B 层命中优先（`depth: 'atoms'` 的层只有不被原子挡住时才算命中），其余按射线距离取最近，标记与原子相差 ≤ 0.05 Å 时标记优先；层可声明 `pickIn`（在哪些工具下可拾取）。 | 简报 §4；位点标记紧贴原子；显示位点时 Select 工具仍要能点中表面原子（D11）。 |
 | A-D9 | 工具注册表 `render/tools/index.js`；工具钩子采用**延迟认领**：`down()` 认领后，指针移动超过点击阈值才调用 `begin()` 开始拖动；没有移动就按普通点击处理（选择、Shift 加选、双击选分子照旧）。右键旋转、中键/Alt 平移、滚轮与双键缩放、R+拖动缩放框在所有工具里不变。 | v1 的接缝会吞掉被认领按下的点击、双击和多选（E5）；"双击 CO 选中分子再拖动"必须可用。 |
 | A-D10 | `viewer.viewAlong(target)`：支持 `[x,y,z]`、`{uvw}`、`{uvtw}`、`{hkl}`、`{hkil}`、`'normal'`、`'-normal'` 和原来的 `'a'…'-z'`；结构有表面且是侧视时，屏幕"上"取表面法向（顶面朝上）；俯视/仰视时"右" = 第一根面内晶轴（标准取向即 a）。**N = 沿法向俯视顶面，Shift+N = 看底面**；方向标签按法向来源给出（体相显示 "along c* (normal to a and b)"）。 | 简报 §4 预留 N；v1 的侧视有一半方向把 slab 画倒（D8）；体相按 N 时不能说"表面法向"（D13）。 |
-| A-D11 | 参数 schema 新增 `vector`、`miller`、`imatrix`，`int`/`float` 增加 `unit`、`required`（必填、初始为空，U4）。解析、校验与英文报错文案在 JS（`core/params.js`）和 Python（`crystallume/core/params.py`）中逐字相同；`coerceParam` 只接受 JSON 类型，CLI 先把字符串转成 JSON 值；REST 插件端点按插件声明的 schema 规范化参数。 | 简报 §4"与 Python/CLI 同步"；字符串语义与三种入口要一致（E18、E25）。 |
+| A-D11 | 参数 schema 新增 `vector`、`miller`、`imatrix`，`int`/`float` 增加 `unit`、`required`（必填、初始为空，U4）。解析、校验与英文报错文案在 JS（`core/params.js`）和 Python（`facet/core/params.py`）中逐字相同；`coerceParam` 只接受 JSON 类型，CLI 先把字符串转成 JSON 值；REST 插件端点按插件声明的 schema 规范化参数。 | 简报 §4"与 Python/CLI 同步"；字符串语义与三种入口要一致（E18、E25）。 |
 | A-D12 | 命令新增 `params`（在 `register` 的包装函数里校验，任何调用路径都经过）、`aliases`（MS 名称）、`estimate`（预估原子数，超过上限拒绝）、`edits`（自动加编辑守卫）。 | 嵌入页能带任意参数调用任何命令（`api/embed.js:21, 82-90`）；`commands.get(id).run(params)` 原来绕过校验（E26）。 |
 | A-D13 | Surface 面板和 Structure 面板的新分区通过 `registerPanelSection(panelId, section)` 由各模块填充，**每个分区渲染在自己的容器里、按自己的签名单独重绘**；面板不按 slab/非 slab 改变行为（U1）；选区动作通过 `registerSelectionAction()` 加入。 | 各模块并行开发互不改同一文件；整面板重绘会丢掉正在预览的分区里的控件状态（E27）。 |
 | A-D14 | **U1 显示规则 v2**：沿每根有真空的周期轴，在"主块（原子最多的一块）正下方"的空隙中点切开（小于主块一半原子数的漂浮块并入真空），绘制窗口取"相对 [0, 1) 包裹移动原子最少"的一侧，该轴不复制边界原子。"有真空"指切口所在真空区的空隙总宽 ≥ 5 Å（结构的 `info.surface.axis` 指向该轴时 ≥ 2 Å）。切口函数 `gapCut` 两种语言同一算法，显示、`surfaceNormal`、M3 的层、M5 的位点共用。 | v1 规则在分子越过真空中点时把整块 slab 画到晶胞外、把分子翻到 slab 下方（D2）；单层 pbc T T T 的石墨烯会被画到晶胞顶面（本次核对新发现，§3.8.2 表）；v2 在全部场景中 slab 主体留在晶胞轮廓内，脱附轨迹中 slab 0 次跳动；上层原子更多的异质结也不会被拆开。 |
@@ -75,7 +75,7 @@
 - **US6 看表面。** 按 N 俯视表面且 a 从左到右；Shift+N 看底面（检查固定层）；对从 VASP CONTCAR 导入的 slab（pbc T T T、c 倾斜、底层在分数 z = 0）也给出正确法向（a×b 而不是 c）；
   沿 [1 0 0]、[1 1̄ 0]、[2 1 0] 等侧视时顶面总在上方。对体相按 N 时标签为 "along c* (normal to a and b)"，并提示没有真空间隙。
 - **US7 MS 名称。** 在命令面板输入 "Cleave Surface"、"Redefine Lattice"、"Build Vacuum Slab"、"Modify Constraints" 能找到对应命令，并看到匹配的 MS 名称。
-- **US8 嵌入页。** 父页面 `postMessage({type:'crystallume:call', method:'command', args:['surface.cleave', {hkl:[1,1,1], layers:'4'}]})`
+- **US8 嵌入页。** 父页面 `postMessage({type:'facet:call', method:'command', args:['surface.cleave', {hkl:[1,1,1], layers:'4'}]})`
   得到可读的错误 `Cleave surface: Layers: enter a whole number.`（命令标题去掉结尾的省略号），而不是 TypeError 或静默失败。
 - **US9 四指数。** 体相是 ZnO 纤锌矿时 Miller 控件自动显示 (h k i l)；输入 (1 0 1̄ 0) 存为 (1 0 0)；输入 (1 0 0 0) 时提示 `i must be −(h + k) = -1`；
   粘贴应用自己显示的 "(1 0 1̄ 0)"（带上划线）或 "1 0 −1 0"（U+2212）也能识别。
@@ -93,7 +93,7 @@
 
 ### 1.2 与 Materials Studio 的对照
 
-| 方面 | Materials Studio | Crystallume（本规格） | 不同之处与理由 |
+| 方面 | Materials Studio | Facet（本规格） | 不同之处与理由 |
 |---|---|---|---|
 | 工具窗口 | 非模态对话框；Cleave Surface 点 Cleave 后不关闭，源晶体 3D 视图里画蓝色虚线框作预览（06 §2.2 [V]） | 侧边面板分区 + 实时预览 + 明确的 Create/Apply/Cancel；视图顶部有预览条 | 网页里浮动对话框会和侧面板、手机底部抽屉冲突；预览条保证面板被关掉时仍能确认或取消 |
 | 切面结果 | 新文档 `<source>(h k l).xsd`（[V]） | 新结构加入同一项目，体相保留 | 简报 P4；项目相当于 MS 的文档集合 |
@@ -119,7 +119,7 @@
 | A1 | `app.editActive(label, fn, opts)`（改） | 原位编辑当前结构，一步撤销；`fn(s)` 同步执行、原地修改；可给 `indexMap`（旧→新）或 `src`（新→旧）；都没给时用 F0-D 的 `trackChanges()` 自动求映射；`rebuild: 'full' \| 'appearance' \| 'none'`（默认 `'full'`）；`refit`（默认 `true`）；`latticeChanged`；`imageShift(oldIndex) → [ka, kb, kc]`（存储坐标被整数格矢平移的编辑用，§3.9）；`singleFrame`（默认 `false`；为真时先只保留当前帧，C11）；`snapshot: 'full' \| {positions}`；`toast`（带绑定 Undo 的提示）；`cameraTransform`。返回 `EditResult = {entry, value, map}`；`fn` 返回 `{select: [...]}` 时提交后把选区设为它。`fn` 抛错或视图重建失败则完全回滚、不留历史。§3.2 |
 | A2 | `app.addStructure(s, {replaceProject})` | `'auto'`（默认，现有行为）、`true`、`false`（总是加入当前项目，一步撤销）；`label`、`activate`（默认 `true`）、`name`；`newProject: true` 等价于 `replaceProject: true`。返回 `{entry, historyEntry}`。§3.3 |
 | A3 | `app.toastUndo(msg, opts)`、`app.undoEntry(entry)`、`app.lastEdit`（改） | toast 的 Undo 绑定到产生它的那条历史；可附加其他动作（`actions: [{label, run}]`，如 M4 的 "Open as new structure"）；异步调用点必须显式传 `entry`；清空历史、切换项目时 `lastEdit` 复位。§3.4 |
-| A4 | `Structure.rev` 进入 `structureKey` | F0-D 保证每个修改方法调用 `touch()` 递增 `rev`；`structureKey(app)` 加 `:${rev}`；脚本直接改 props 后调用 `crystallume.edit.touch()`。§3.5 |
+| A4 | `Structure.rev` 进入 `structureKey` | F0-D 保证每个修改方法调用 `touch()` 递增 `rev`；`structureKey(app)` 加 `:${rev}`；脚本直接改 props 后调用 `facet.edit.touch()`。§3.5 |
 | A5 | 撤销存储 v2（改） | 只快照被改动的结构条目；二进制快照；P-pos 提交只存移动原子的旧/新坐标；总字节预算 64 MiB（窄屏或 `navigator.deviceMemory ≤ 4` 时 24 MiB）+ 最多 80 步；整数打包范围检查；`replaceTop/popTop`（View 合并）、`detach/attach`（项目切换与回退）。§3.1 |
 | A6 | `app.beginStructureEdit(label, opts)` 预览会话（改） | 三种 `kind`：`'positions'`、`'structure'`、`'ghost'`；`preview()`、`commit()`、`cancel()`；`transient`（工具拖动用，不显示预览条）；`singleFrame`（P-pos 默认 `true`）；P-swap 的 `preview(s, {sameAtoms, src, indexMap, latticeChanged})` 在 `commit()` 时沿用最后一次的选项；预览期间不写历史、不标记未保存、不自动保存、不重新取景、不更新缩略图、暂停轨迹播放。§3.6 |
 | A7 | 视图预览 API（改） | `viewer.previewPositions()`（只写受影响的实例，换集合时先复原）、`viewer.previewStructure()`（完整暂存已提交的绘制对象）、`viewer.previewGhost()`、`viewer.endPreview()`；P-swap 输入锁；预览更新按 rAF 合并。§3.7 |
@@ -137,12 +137,12 @@
 | A19 | Structure 面板分区插槽 | 摘要之后的 `cell` 插槽（M1）、选区之后的 `transform` 插槽（M4）。§5.3 |
 | A20 | 选区动作注册（改） | `registerSelectionAction({id, label, short, icon, tip, when, run, order, card, menu})`；桌面最多显示 7 个、窄屏 5 个，其余进 "More"；顺序号是契约（Fix/Free 排在 Replace 之前）。§5.4 |
 | A21 | 命令表 | §5.8 列出的全部新命令；F0-A 注册 `panel.surface`、`view.*`、`edit.*Preview` 与"打开分区"的回退实现。 |
-| A22 | JS 公共 API（改） | `crystallume.edit.{run, begin, touch, session}`、`view(target)` 扩展、`viewAlong`、`highlight`、`setVisibility`、`tools.{list, get, set}`、`registerPanelSection`、`registerSelectionAction`、`EVENTS` 新事件（`preview`、`overlayhover`、`overlayclick`、`visibility`）。§6.2 |
+| A22 | JS 公共 API（改） | `facet.edit.{run, begin, touch, session}`、`view(target)` 扩展、`viewAlong`、`highlight`、`setVisibility`、`tools.{list, get, set}`、`registerPanelSection`、`registerSelectionAction`、`EVENTS` 新事件（`preview`、`overlayhover`、`overlayclick`、`visibility`）。§6.2 |
 | A23 | 真空间隙显示规则 v2（改，U1） | `buildDisplayModel` 对每根周期轴调用 `gapCut`（F0-D 的 `core/vacuum.js`，算法见 §3.8.2），沿有切口的轴用 `unwrapAlongGap` 包裹、不复制边界原子；切口结果按"结构对象 + rev + 帧"缓存；P-pos 预览中不重算；`estimateDisplayCount` 用同一缓存。 |
 | A24 | 测量引用 v2（新） | 测量记录 `{type, refs}`，`refs` 为 `"i:a,b,c"`（相对存储坐标的像，首个为 0）；数值用 Float64；旧 `keys` 在加载时迁移；画线时先找完全对应的绘制副本，找不到按首个原子的家副本平移；`model.home`、`storedImage(model, d)`、`refOf(model, d)` 导出给 M4。§3.9 |
-| A25 | `surfaceNormal` v2（新） | 间隙优先，`info.surface.axis` 只作校验过的提示；顶面 = +a_k 一侧；返回 `{normal, axis, source, surface, vacuumAxes, cut}`；JS 在 `core/vacuum.js`（`core/lattice.js` 重新导出），Python 在 `crystallume/analysis/vacuum.py`。§3.14.2 |
+| A25 | `surfaceNormal` v2（新） | 间隙优先，`info.surface.axis` 只作校验过的提示；顶面 = +a_k 一侧；返回 `{normal, axis, source, surface, vacuumAxes, cut}`；JS 在 `core/vacuum.js`（`core/lattice.js` 重新导出），Python 在 `facet/analysis/vacuum.py`。§3.14.2 |
 | A26 | 悬停卡与选区卡的存储坐标（新） | `viewer.atomInfo(d)` 返回存储坐标（Float64）、存储分数坐标与绘制副本的像；卡片按它显示，P-pos 预览中显示预览坐标。§3.12.3 |
-| A27 | 会话与其他入口（新） | 会话期间：轨迹播放暂停、`traj.*` 不可用；`projectToJSON` 沿用旧缩略图；`crystallume.screenshot()` 与嵌入页截图报 `Apply or cancel the preview first.`；导出菜单项禁用。§3.6.3 |
+| A27 | 会话与其他入口（新） | 会话期间：轨迹播放暂停、`traj.*` 不可用；`projectToJSON` 沿用旧缩略图；`facet.screenshot()` 与嵌入页截图报 `Apply or cancel the preview first.`；导出菜单项禁用。§3.6.3 |
 | A28 | 与 F0-D 的联合接口（新） | §10.1 的表：版本号、`trackChanges`、`setPositions`、`keepFrame`、`core/vacuum.js` 的四个函数、`SURFACE_DEFAULTS` 键名、`core/lattice.js` 归属与合并顺序、撤掉导入时的 slab 识别（U1）。 |
 
 ### 2.2 应该
@@ -173,7 +173,7 @@
 | C1 | 着色型高亮 `style: 'tint'` | 不画光环，而是改实例颜色，用于"按层着色"；Color by constraint 的标准做法改由 B13 的配色方案实现。 |
 | C2 | 触屏长按 | 长按原子打开原子菜单；长按位点标记发 `overlaycontext`（M5 请求，500 ms）。 |
 | C3 | 轨迹播放走位置快速路径 | 帧之间原子数和顺序不变时，用 P-pos 的写法代替完整重建（报告 03 §7.4）。 |
-| C4 | 插件工具 | `crystallume.registerTool(t)` 走 `registerIn('tools', …)`，与其他注册表一样可撤销注册。内置模块（M4、M5）用内部的 `tools.register`，不依赖它。 |
+| C4 | 插件工具 | `facet.registerTool(t)` 走 `registerIn('tools', …)`，与其他注册表一样可撤销注册。内置模块（M4、M5）用内部的 `tools.register`，不依赖它。 |
 | C5 | slab 上用体相指数观察 | M2 在 `info.surface` 里记录体相 → slab 的整数变换后，`viewAlong` 接受 `{uvw, basis: 'bulk'}`。 |
 | C6 | 浮动卡片助手（M3 请求） | `shell.floatingCard({id, title, render, onClose, anchor, draggable})`，手机上变为无遮罩的底部 sheet；M3 的 Atom Selection 可以先自己实现。 |
 
@@ -462,7 +462,7 @@ undoEntry(entry) {
 - `structureKey(app)`（`core/analyses.js:103-107`）返回 `${active}:${serial}:${length}:${frame}:${rev}:${digest}`；`structureDigest`（73-95）不变，
   它仍然兜住脚本直接改坐标的情况。
 - 面板签名：Structure 面板（`ui/panels/structure.js:75-85`）已含 `structureKey`；Surface 面板见 §3.17；分析缓存 `runKey` 自动受益。
-- 脚本：直接改 `crystallume.structure.props.x` 后调用 `crystallume.edit.touch()` = `app.notifyStructureChanged()`：`touch()`、
+- 脚本：直接改 `facet.structure.props.x` 后调用 `facet.edit.touch()` = `app.notifyStructureChanged()`：`touch()`、
   比较 `structureDigest` 与上次重建时的值——坐标、晶胞、元素或原子数变了就 `'full'`，否则 `'appearance'`——再 `markDirty()`、发 `structure`；
   **不写历史**（文档里说明，E20）。
 
@@ -549,7 +549,7 @@ preview(x, o = {}) {
 | 选区卡片 | 实时坐标（B2）；动作禁用 | 隐藏 | 不变 |
 | 相机 | 不取景 | 不取景（预览条提供 "Fit"） | 不取景 |
 | 轨迹 | 播放暂停，`traj.*` 不可用（`viewer.setFrame` 会作用到预览结构，`viewer.js:638-643`） | 同左 | 同左 |
-| 导出 PNG/GLB/结构文件、导出菜单项、`crystallume.screenshot()`、嵌入页 `crystallume:screenshot` | 不可用（拖动中不可能触发） | 不可用：命令的 `when` 加 `!app.session`；菜单项 `disabled`（`shell.js:729-750`）；API 抛 `Apply or cancel the preview first.` | 同左 |
+| 导出 PNG/GLB/结构文件、导出菜单项、`facet.screenshot()`、嵌入页 `facet:screenshot` | 不可用（拖动中不可能触发） | 不可用：命令的 `when` 加 `!app.session`；菜单项 `disabled`（`shell.js:729-750`）；API 抛 `Apply or cancel the preview first.` | 同左 |
 | 缩略图 | `projectToJSON` 在有会话时一律沿用旧缩略图（含手动保存 Ctrl+S，`app.js:219-224`） | 同左 | 同左 |
 | `markDirty` / 历史 | 不调用 | 不调用 | 不调用 |
 
@@ -742,7 +742,7 @@ v2 画出 C 1.85 / O 4.5、取消后回到 1.85 / 3.0。
 
 #### 3.8.2 真空间隙与切口（用户决定 U1）
 
-U1 的三个用途（显示、层与位点的上下表面、slab 工具）必须用同一个切口。下面的函数由 **F0-D 在 `web/js/core/vacuum.js` 与 `crystallume/analysis/vacuum.py` 实现**
+U1 的三个用途（显示、层与位点的上下表面、slab 工具）必须用同一个切口。下面的函数由 **F0-D 在 `web/js/core/vacuum.js` 与 `facet/analysis/vacuum.py` 实现**
 （两种语言同一算法、同一常量、同一并列规则；联合接口见 §10.1），F0-A 的显示、`surfaceNormal`、M3、M5 都调用它们。
 F0-D v2（§3.13，与本次修订同期定稿）已有 `find_vacuum_gap`、`find_vacuum_gaps`、`find_surface_gap`、`gap_cut`、`unwrap_along_gap`、`vacuum_gap_hint`、`make_contiguous`：
 前两个与 `vacuum_gap_hint` 照原样采用；**`gap_cut`、`unwrap_along_gap`、`find_surface_gap` 按本节改**——F0-D v2 的 `gap_cut(gap)` 正是本规格 v1 的"中点映射到 (−0.5, 0.5]"规则，
@@ -1277,7 +1277,7 @@ uvw/hkl 不是整数 → `Lattice directions and Miller indices must be whole nu
 在 `_leaveTempOrtho`、相机控件 `start`（228-233）、`orbitBy`、`rotateScreen` 时清除；导出时不画（`export: 'never'`，除非 `gizmo: true`）。
 同时更新一个视觉隐藏的 `role=status` 元素（"Looking along the surface normal"），供读屏器。
 
-#### 3.14.2 表面法向 `surfaceNormal`（JS `core/vacuum.js`，`core/lattice.js` 重新导出；Python `crystallume/analysis/vacuum.py`）
+#### 3.14.2 表面法向 `surfaceNormal`（JS `core/vacuum.js`，`core/lattice.js` 重新导出；Python `facet/analysis/vacuum.py`）
 
 ```text
 surfaceNormal(s, {frame}) → { normal: [x, y, z], axis: k, source, surface: boolean, vacuumAxes: k[], cut: GapCut | null } | null
@@ -1334,7 +1334,7 @@ surface = source ∈ {'info', 'pbc'}，或 source = 'vacuum' 且只有一根真�
 `This is a primitive cell: (1 0 0) here is the conventional (1̄ 1 1) plane. Use Cell › Conventional cell first, or enter indices for this cell.`（"Cell › Conventional cell" 由 M1 提供）；
 其他心格（菱方、底心……）由 M1 的 `millerBasisNote(cell, hkl)` 经 `describe` 给出。指数不会被悄悄换算；`directions.json` 加上表的用例（期望值按原胞基矢）。
 
-### 3.15 参数 schema 的新类型（JS `core/params.js`，Python `crystallume/core/params.py`）
+### 3.15 参数 schema 的新类型（JS `core/params.js`，Python `facet/core/params.py`）
 
 **schema 字段**：
 
@@ -1384,7 +1384,7 @@ export function validateParams(schema, values, { strict = false, title = null } 
 export function defaultParams(schema, structure = null)     // 从 core/analyses.js:43-55 移来，analyses.js 重新导出
 ```
 ```python
-# crystallume/core/params.py
+# facet/core/params.py
 class ParamError(ValueError): ...
 def parse_indices(text: str, *, fractions: bool = False) -> list
 def parse_cli_value(spec: dict, text: str) -> Any
@@ -1395,7 +1395,7 @@ def default_params(schema) -> dict
 
 `paramForm`（`ui/paramform.js:27-78`）：新类型用 `ui/inputs.js` 的控件渲染；`unit` 显示为后缀；`required` 为空时 `validate()` 返回 "enter a value."；
 返回对象新增 `valid`（getter）与 `onValidity(cb)`，面板据此让主按钮不可用（U4）。
-CLI：`crystallume/cli.py` 的 `_coerce`（73-92）改为 `parse_cli_value` + `coerce_param`；`parse_params`（94-107）把整个 spec 传进去；
+CLI：`facet/cli.py` 的 `_coerce`（73-92）改为 `parse_cli_value` + `coerce_param`；`parse_params`（94-107）把整个 spec 传进去；
 缺少必填参数时报 `--param <key>: enter a value.`；报错只加一次前缀（现写法会成为 `--param hkl: hkl: …`，cli.py:103-106）。
 REST：插件构建器/分析声明了 `params` 时，`/build/custom/{name}`（`server/routes/build.py:126-147`）与 `/analysis/custom/{name}` 先调用
 `validate_params(spec.params, body, strict=False)`：未知的类型原样放行，失败返回 422（文案同上表），成功把规范化后的值（四指数换成三指数等）传给插件（E25）。
@@ -1409,10 +1409,10 @@ REST：插件构建器/分析声明了 `params` 时，`/build/custom/{name}`（`
   嵌入页还是插件——都先：
   1. 参数必须是普通对象，否则 `<title>: pass the parameters as an object.`；
   2. `validateParams(c.params, params, { strict: true, title })`，有错误就抛 `{ code: 'invalid-params', message: errors[0] }`；
-  3. `estimate` 超过 `LIMITS.maxAtoms`（默认 200 000，与服务器 `DEFAULT_MAX_ATOMS` 相同，`crystallume/config.py:64`；偏好 `maxAtoms` 可调到 2 000 000）时抛
+  3. `estimate` 超过 `LIMITS.maxAtoms`（默认 200 000，与服务器 `DEFAULT_MAX_ATOMS` 相同，`facet/config.py:64`；偏好 `maxAtoms` 可调到 2 000 000）时抛
      `{ code: 'too-large', message: '<title>: this would make <n> atoms; the limit is <max>.' }`；超过 30 000 时交互调用先确认（M2 请求）；
   4. 调用 `run(app, cleanParams)`。不带参数时照旧 `run(app)`，由命令打开对应面板分区（交互式）。`title` 去掉结尾的 `…`。
-- 命令面板、快捷键调用 `c.run()` 不带参数，不受影响；嵌入页的 `crystallume:call command`（`api/embed.js:82-90`）与 `api.command` 走同一个包装，因此被校验。
+- 命令面板、快捷键调用 `c.run()` 不带参数，不受影响；嵌入页的 `facet:call command`（`api/embed.js:82-90`）与 `api.command` 走同一个包装，因此被校验。
 - "打开分区"的回退实现（§5.8）只在该 id 还没有注册时注册（`if (!commands.get(id))`），并在 `main.js` 里先于模块导入执行，模块的真实实现总能覆盖它（E26）。
 - `view.along` 的"恰好一个参数"在 `run` 中检查：`Look along: give exactly one of uvw, hkl or vector.`。
 - 排序：`rankCommands`（`shell.js:73-101`）移到纯模块 `ui/rank.js`（shell.js 重新导出），别名按标题的同样规则打分（1000/900/800），比同类标题匹配低 5 分；
@@ -1661,7 +1661,7 @@ README "Mouse and keys"（README.md:29-49）与快捷键对话框的 Mouse 区�
 ### 6.1 Python
 
 ```python
-# crystallume/core/params.py（新）
+# facet/core/params.py（新）
 class ParamError(ValueError): ...
 def parse_indices(text: str, *, fractions: bool = False) -> list     # "1,0,-1,0" | "2 1; -1 1" | "(1 0 1̅ 0)" | JSON
 def parse_cli_value(spec: dict, text: str) -> Any                     # CLI 字符串 → JSON 值
@@ -1669,7 +1669,7 @@ def coerce_param(spec: dict, value) -> Any                            # int/floa
 def validate_params(schema: Sequence[dict], values: dict, *, strict: bool = False, title: str | None = None) -> tuple[dict, list[str], list[str]]
 def default_params(schema: Sequence[dict]) -> dict
 
-# crystallume/core/lattice.py（扩展；F0-D 先加 wrap_fractional；__all__ 同步；reciprocal_cell/plane_spacings 也从 crystallume.core 重新导出）
+# facet/core/lattice.py（扩展；F0-D 先加 wrap_fractional；__all__ 同步；reciprocal_cell/plane_spacings 也从 facet.core 重新导出）
 def miller_normal(cell, hkl) -> np.ndarray                   # 单位矢量
 def lattice_direction(cell, uvw) -> np.ndarray               # 单位矢量
 def is_hexagonal_cell(cell, length_tol=1e-3, angle_tol=0.1) -> dict | None   # {"axis": k, "gamma": 120 | 60}
@@ -1679,13 +1679,13 @@ def uvw_to_uvtw(uvw, *, integer=False) -> tuple              # integer=True：�
 def uvtw_to_uvw(uvtw) -> tuple[float, float, float]
 def centered_cell_hint(cell) -> dict | None                  # {"kind": "fcc" | "bcc", "to_conventional": 3×3 int}
 
-# crystallume/analysis/vacuum.py（F0-D 建立：find_vacuum_gap、find_vacuum_gaps、find_surface_gap、gap_cut、unwrap_along_gap、vacuum_gap_hint、make_contiguous，
-#   其中 gap_cut、unwrap_along_gap、find_surface_gap 按 §3.8.2/§3.14.2 的语义；F0-A 追加 surface_normal；均从 crystallume.analysis 导出）
+# facet/analysis/vacuum.py（F0-D 建立：find_vacuum_gap、find_vacuum_gaps、find_surface_gap、gap_cut、unwrap_along_gap、vacuum_gap_hint、make_contiguous，
+#   其中 gap_cut、unwrap_along_gap、find_surface_gap 按 §3.8.2/§3.14.2 的语义；F0-A 追加 surface_normal；均从 facet.analysis 导出）
 def surface_normal(structure, *, frame=None) -> dict | None  # {"normal": [x, y, z], "axis": k, "source": "info"|"vacuum"|"pbc"|"ab-plane", "surface": bool, "vacuum_axes": [...], "cut": {...} | None}
 ```
 
-- CLI（`crystallume/cli.py`）：`_coerce`（73-92）改为 `parse_cli_value` + `coerce_param`；`parse_params(pairs, schema)`（94-107）传入完整 spec；
-  例：`crystallume build custom my-slab --param hkl=1,0,-1,0 --param P="2 1 0; -1 1 0; 0 0 1"`。
+- CLI（`facet/cli.py`）：`_coerce`（73-92）改为 `parse_cli_value` + `coerce_param`；`parse_params(pairs, schema)`（94-107）传入完整 spec；
+  例：`facet build custom my-slab --param hkl=1,0,-1,0 --param P="2 1 0; -1 1 0; 0 0 1"`。
 - REST：**无新端点**。`/build/custom/{name}`、`/analysis/custom/{name}` 在插件声明了 `params` 时按 schema 规范化参数（非严格，未知类型放行），失败 422（§3.15）。客户端方法不变。
 
 ### 6.2 JavaScript
@@ -1701,7 +1701,7 @@ get session() → EditSession | null ; get committedModel() → model
 toastUndo(message, { entry, actions = [], timeout, type } = {}) → toast element
 undoEntry(entry) → label | null
 get lastEdit() → { entry, label, at } | null
-notifyStructureChanged()                                     // crystallume.edit.touch()
+notifyStructureChanged()                                     // facet.edit.touch()
 setTool(id, opts = {}) → boolean ; get toolDef()
 exportImage({ scale, transparent, selection, markers } = {})
 startTask(label) → { set(label | fraction), end() }          // B16
@@ -1764,27 +1764,27 @@ reciprocalCell, millerNormal, latticeDirection, isHexagonalCell, hklToHkil, hkil
 **公共 API（`api/public.js`）**
 
 ```js
-crystallume.edit = {
+facet.edit = {
   run(label, fn, opts) ,            // = app.editActive，返回 { entry, value }（entry 序列化为 { id, label }）
   begin(label, opts) ,              // = app.beginStructureEdit
   touch() ,                         // = app.notifyStructureChanged
   get session() ,
   // F0-D 注册：sortBySpecies(order?)、clearNotes()；各模块追加：fix, free, translate, rotate, setCell, makeSupercell, setVacuum, addAdsorbate …
 }
-crystallume.view(target, opts)      // 原来只接受轴字符串，现在接受 viewAlong 的全部输入（兼容）
-crystallume.viewAlong(target, opts)
-crystallume.highlight(name, indices, opts) ; crystallume.setVisibility(name, spec)
-crystallume.tools = { list, get, set: (id, opts) => app.setTool(id, opts) }
-crystallume.registerPanelSection(panelId, s, o) ; crystallume.registerSelectionAction(a, o) ; crystallume.registerAtomInfo(fn, o)
-crystallume.registerTool(t, o)      // C4（可选）：registerIn('tools', …)
-crystallume.params = { parse: parseIndices, coerce: coerceParam, validate: validateParams }
-crystallume.lattice = { millerNormal, latticeDirection, isHexagonalCell, hklToHkil, hkilToHkl, uvwToUvtw, uvtwToUvw, centeredCellHint, surfaceNormal }
-crystallume.screenshot(opts)        // 会话期间抛 'Apply or cancel the preview first.'
+facet.view(target, opts)      // 原来只接受轴字符串，现在接受 viewAlong 的全部输入（兼容）
+facet.viewAlong(target, opts)
+facet.highlight(name, indices, opts) ; facet.setVisibility(name, spec)
+facet.tools = { list, get, set: (id, opts) => app.setTool(id, opts) }
+facet.registerPanelSection(panelId, s, o) ; facet.registerSelectionAction(a, o) ; facet.registerAtomInfo(fn, o)
+facet.registerTool(t, o)      // C4（可选）：registerIn('tools', …)
+facet.params = { parse: parseIndices, coerce: coerceParam, validate: validateParams }
+facet.lattice = { millerNormal, latticeDirection, isHexagonalCell, hklToHkil, hkilToHkl, uvwToUvtw, uvtwToUvw, centeredCellHint, surfaceNormal }
+facet.screenshot(opts)        // 会话期间抛 'Apply or cancel the preview first.'
 ```
 
 `EVENTS`（`api/public.js:37-65`）新增：`preview`（app，`{state, label, kind, owner}`）、`visibility`（viewer）、`overlayhover`、`overlayclick`（viewer）；
 `tool` 的说明改为 `The tool changed (app.tool: select | measure | move | site-pick | plugin tools)`。嵌入页 `ALLOWED`（`api/embed.js:21`）不变（`command` 已覆盖），
-`crystallume:view` 的 `axis` 现在也可以是 `{hkl}` 等对象，由 `viewAlong` 校验；`crystallume:screenshot` 在会话期间返回同一错误。
+`facet:view` 的 `axis` 现在也可以是 `{hkl}` 等对象，由 `viewAlong` 校验；`facet:screenshot` 在会话期间返回同一错误。
 
 ---
 
@@ -1828,14 +1828,14 @@ crystallume.screenshot(opts)        // 会话期间抛 'Apply or cancel the prev
 
 ### 7.4 端到端（Playwright + 预装 Chromium，标记为慢测试，可选运行；每项保存截图供审查）
 
-1. 启动示例上用 `crystallume.build.surface` 的桩（或 Duplicate）测 `replaceProject: false`：项目里两个结构，撤销一步回到一个。
+1. 启动示例上用 `facet.build.surface` 的桩（或 Duplicate）测 `replaceProject: false`：项目里两个结构，撤销一步回到一个。
 2. 拖动预览：脚本开 P-pos 会话、连续 60 次 `preview`、`commit`：`app.dirty` 在提交前一直为假、历史只多一条、视图坐标与提交后重建一致；Esc 版本：历史不变。
 3. P-swap：预览期间触发 `app.autosave()` → 保存的项目里是已提交结构；缩略图未更新；点击原子、框选、右键菜单 "Delete atom" 都不改变选区或结构（E8）；
    取消后截图与预览前**逐像素相同**、控制台没有 WebGL 警告（E7）。
 4. N / Shift+N：对标准取向 slab 与 c 倾斜 CONTCAR，相机方向与 `surfaceNormal` 一致、`camera.up` 为 +y；沿 [1 0 0] 侧视时顶面在上。
 5. 导出：有选区与命名高亮时导出 PNG 四次（两个勾选项的组合），像素差只出现在对应的光环处；悬停光环不出现（E4）。
 6. U1：打开底层在 z = 0 的 pbc T T T POSCAR，`viewer.model.n` 等于 pbc T T F 时的值；单层石墨烯 T T T POSCAR 画在 z = 0；截图无多余顶层。
-7. 嵌入页：父页面调用 `command surface.cleave {layers: '4'}` 得到 `invalid-params` 文案（用一个测试用的同 id 命令桩）；会话期间 `crystallume:screenshot` 返回守卫文案。
+7. 嵌入页：父页面调用 `command surface.cleave {layers: '4'}` 得到 `invalid-params` 文案（用一个测试用的同 id 命令桩）；会话期间 `facet:screenshot` 返回守卫文案。
 8. 10k 原子 slab：连续 50 次 `editActive`（交替固定与移动）后 `history.bytes ≤ 64 MiB`，每次 ≤ 60 ms（软件 GL 上放宽到 2 倍）。
 9. **指针接缝**（新，E16）：页面里注册一个记录回调顺序的测试工具（`import('/js/render/tools/index.js')` 后 `tools.register`），用真实的 `pointerdown/move/up/cancel` 与触摸事件核对：
    按下-移动-松开 = `down → begin → move… → up`；不移动 = 点击（选区改变、双击选中分子、Shift 加选）；工具激活时右键拖动仍旋转、R+拖动缩放框有效；
@@ -1889,7 +1889,7 @@ crystallume.screenshot(opts)        // 会话期间抛 'Apply or cancel the prev
 | R2 | 预览期间被其他代码改动已提交结构 | 任何写历史的操作先取消会话（A-D2）；会话 `_assertLive()` 检查结构身份；P-swap 输入锁（A-D1） |
 | R3 | P-pos 越过晶胞面时提交后跳到对面 | 与现有包裹显示一致，文档说明；测量引用相对存储坐标，不受影响 |
 | R4 | 第二根手指落下时 OrbitControls 没见过第一根手指 | 取消工具拖动后，这次手势剩下的部分按单指旋转处理，抬起后恢复正常；写进 §3.13.4 表格 |
-| R5 | 脚本直接改 props 不递增 `rev` | 文档要求调用 `crystallume.edit.touch()`；`structureDigest` 仍兜住坐标变化 |
+| R5 | 脚本直接改 props 不递增 `rev` | 文档要求调用 `facet.edit.touch()`；`structureDigest` 仍兜住坐标变化 |
 | R6 | `rebuild: 'appearance'` 被误用于改了坐标的编辑 | 摘要核对常开（§3.2），退回 `'full'` + 警告 |
 | R7 | 测量引用在编辑后指向另一副本 | v2 引用相对存储坐标：连续移动不受影响；整数格矢包裹的编辑传 `imageShift`；改晶格基的编辑丢弃像非零的测量 |
 | R8 | U1 切口使跨边界的 slab 有原子画在晶胞轮廓之外 | 窗口取移动原子最少的一侧，主体总在轮廓内；少数原子（如弛豫到 −0.02 Å）出界如实反映存储坐标，不移动轮廓 |
@@ -1935,9 +1935,9 @@ F0-D 的依赖按 §10.1：未合入时用列出的临时实现，并在 F0-D �
 | **T4b 拾取与射线** | §3.12.1–3.12.2、§3.11.5 | `pick/pickAtomHit/ray/pointOnPlane/pointOnLine/worldPerPixel`、`pickIn`、深度遮挡规则、叠加层事件（hover/click/dblclick/context） | T4a | `render/viewer.js`（264-268、323-352、1372-1392） | M | 第 2 批 |
 | **T5 显示：掩码、U1 切口、按组包裹、测量引用** | §3.8、§3.9、§3.12.3 | `buildDisplayModel({visible, cuts})`、切口缓存、`model.home/homeIndex/cuts/wrapRule/refs`、`storedImage/refOf/homeOffsets`、按组包裹（B10）、`estimateDisplayCount` 缓存、`drawnCopies`、`setVisibility/remapIndexed`、状态栏 "hidden" 药丸与 `view.showAll`、`sel.all/sel.invert` 的可见规则与删除确认；`core/measure.js`、测量迁移、Float64 数值、画线查找、`_remapMeasurements` v2、结构面板测量行；`atomInfo` 与卡片的存储坐标 | F0-D 的 `core/vacuum.js`（未合入时把 `vacgap.mjs` 的四个函数临时放在 `display.js` 内） | `render/display.js`（70-265）、`render/viewer.js`（593-670、1003-1046、1394-1407、1546-1552）、`core/measure.js`（新）、`app.js`（99-102、232-253、575-588、764-800）、`ui/panels/structure.js`（148-160）、`ui/selectioncard.js`（108、169-226）、`ui/shell.js`（593-605）、`ui/panels/appearance.js`（383、449） | L | 第 1 批 |
 | **T6 工具注册表与指针钩子** | §3.13 | `render/tools/{index,select,measure}.js`、`setTool`、视图接缝（延迟认领、`_cancelTool`、keydown、输入锁）、`selects` 替换、提示栏/HUD/工具栏/快捷键对话框鼠标行 | T4b（`pick`） | `render/tools/`（新）、`render/viewer.js`（256-512）、`app.js`（721-762）、`ui/shell.js`（468-481、507-516、627-651、1049-1078、1204-1212）、`ui/selectioncard.js:169` | L | 第 3 批 |
-| **T7a 晶格函数与表面法向** | §3.14.2–3.14.4 | `core/lattice.js` 的追加函数（含 `centeredCellHint`、`ariaIndices`）、`core/lattice.py` 扩展、`surfaceNormal`/`surface_normal`（追加到 `core/vacuum.js`/`analysis/vacuum.py`）、`directions.json`、`gaps.json` 的法向部分 | F0-D T1/T2（`lattice.js`、`vacuum.js` 建立后） | `web/js/core/lattice.js`、`web/js/core/vacuum.js`、`crystallume/core/lattice.py`、`crystallume/analysis/vacuum.py`、`crystallume/analysis/__init__.py`、`crystallume/core/__init__.py` | M | 第 1 批（F0-D 合入后） |
-| **T7b 沿任意方向观察** | §3.14.1 | `viewAlong`（侧视 up 规则、来源标签）、方向标签（`textLayer`）、`view.normal/normalBelow/along` 命令与对话框、视图菜单、`reducedMotion`、`crystallume.view` 扩展 | T7a、T4a（`textLayer`） | `render/viewer.js`（1167-1214）、`main.js`、`ui/shell.js`（764-775）、`api/public.js` | M | 第 2 批 |
-| **T8 参数 schema 与输入控件** | §3.15、§5.6 | `core/params.js`、`crystallume/core/params.py`（含 `parse_cli_value`）、`ui/inputs.js`（含 `size: 2`、`presets` 函数、`area`、`warn`、滚轮屏蔽、`badInput`、粘贴）、`paramForm` 新类型与 `valid`、`defaultParams` 迁移、CLI、REST 插件参数规范化、全局无效样式、金标 `coerce.json` | T7a（`isHexagonalCell`、`hklToHkil`、`centeredCellHint`） | `web/js/core/params.js`（新）、`web/js/ui/inputs.js`（新）、`web/js/ui/paramform.js`、`web/js/core/analyses.js`（43-55）、`crystallume/core/params.py`（新）、`crystallume/cli.py`（73-107）、`crystallume/server/routes/build.py`（126-147）、`crystallume/server/routes/analysis.py`（139-）、`css/app.css`（212-216、660-663）、`docs/PLUGINS.md`（97-108） | L | 第 1 批（T7a 的晶格函数可先以桩开发） |
+| **T7a 晶格函数与表面法向** | §3.14.2–3.14.4 | `core/lattice.js` 的追加函数（含 `centeredCellHint`、`ariaIndices`）、`core/lattice.py` 扩展、`surfaceNormal`/`surface_normal`（追加到 `core/vacuum.js`/`analysis/vacuum.py`）、`directions.json`、`gaps.json` 的法向部分 | F0-D T1/T2（`lattice.js`、`vacuum.js` 建立后） | `web/js/core/lattice.js`、`web/js/core/vacuum.js`、`facet/core/lattice.py`、`facet/analysis/vacuum.py`、`facet/analysis/__init__.py`、`facet/core/__init__.py` | M | 第 1 批（F0-D 合入后） |
+| **T7b 沿任意方向观察** | §3.14.1 | `viewAlong`（侧视 up 规则、来源标签）、方向标签（`textLayer`）、`view.normal/normalBelow/along` 命令与对话框、视图菜单、`reducedMotion`、`facet.view` 扩展 | T7a、T4a（`textLayer`） | `render/viewer.js`（1167-1214）、`main.js`、`ui/shell.js`（764-775）、`api/public.js` | M | 第 2 批 |
+| **T8 参数 schema 与输入控件** | §3.15、§5.6 | `core/params.js`、`facet/core/params.py`（含 `parse_cli_value`）、`ui/inputs.js`（含 `size: 2`、`presets` 函数、`area`、`warn`、滚轮屏蔽、`badInput`、粘贴）、`paramForm` 新类型与 `valid`、`defaultParams` 迁移、CLI、REST 插件参数规范化、全局无效样式、金标 `coerce.json` | T7a（`isHexagonalCell`、`hklToHkil`、`centeredCellHint`） | `web/js/core/params.js`（新）、`web/js/ui/inputs.js`（新）、`web/js/ui/paramform.js`、`web/js/core/analyses.js`（43-55）、`facet/core/params.py`（新）、`facet/cli.py`（73-107）、`facet/server/routes/build.py`（126-147）、`facet/server/routes/analysis.py`（139-）、`css/app.css`（212-216、660-663）、`docs/PLUGINS.md`（97-108） | L | 第 1 批（T7a 的晶格函数可先以桩开发） |
 | **T9 命令扩展** | §3.16、§5.8 | `params/aliases/ms/estimate/edits`、`LIMITS`、`register` 包装函数里的校验、大结构确认、`ui/rank.js` 与别名显示、`CATEGORY_ORDER`、§5.8 的 F0-A 命令与"打开分区"回退实现 | T8（`validateParams`）、T10（`openSection`） | `core/commands.js`、`ui/rank.js`（新）、`ui/shell.js`（73-103、1120-1183）、`main.js`、`api/public.js`（reference） | M | 第 2 批 |
 | **T10 面板外壳** | §3.17、§5.2–5.4 | `ui/sections.js`（单独重绘、`openSection`）、`ui/panels/surface.js`、Structure 面板插槽、`shell.openLeft(id, {section, focus, tab})`、`registerSelectionAction` 与选区卡片 More 菜单、右键菜单插入点、`registerAtomInfo`、图标 `surface/move/target/lock/unlock/normal/matrix/more`、rail 第 5 个面板与 Shift+5、导览文案 | — | `ui/sections.js`（新）、`ui/panels/surface.js`（新）、`ui/atominfo.js`（新）、`ui/panels/structure.js`（70-189）、`ui/selectioncard.js`（150-226）、`ui/shell.js`（355-405、807-834、1306）、`ui/icons.js`、`main.js`（4-8、133）、`css/app.css` | L | 第 1 批 |
 | **T11 文档与 API 表** | 全部 | `docs/PLUGINS.md` §4（JS API）、事件表、废弃的 `undoStack`；`docs/SCHEMA.md`（测量格式）；`EVENTS`；README 键位（与 M7 协调） | T1–T10 | `docs/PLUGINS.md`、`docs/SCHEMA.md`、`api/public.js`、`README.md` | M | 最后 |
@@ -1978,7 +1978,7 @@ M1–M6 的 v1 规格各自写了对 F0-A 的需求。下表逐条给出结论�
 | M2：`millerInput`、`imatrixInput({size: 2, max, maxDet, presets: fn})`、`numberInput({unit, required})`、`seg`、`toggle` | 采纳 | `seg`、`toggle` 已在 `ui/dom.js:56, 65` |
 | M2：`core/params` 的 `miller` 类型 `max = 12` | 改（M2） | 默认硬上限 30、超过 12 软提示（D12）；M2 若要硬上限 12 就在自己的 schema 里写 `max: 12` |
 | M2：命令 `register({…, category: 'Surface', params, aliases, ms, estimate, edits})`、大结构确认（30 000 / 上限） | 采纳 | §3.16 |
-| M2：`isHexagonalCell`、`hklToHkil`/`hkilToHkl`、`millerNormal`、`formatIndices`、`surfaceNormal`（Python 同名） | 采纳 | Python 的 `surface_normal` 在 `crystallume.analysis`（不在 `core.lattice`，避免 core 依赖 analysis） |
+| M2：`isHexagonalCell`、`hklToHkil`/`hkilToHkl`、`millerNormal`、`formatIndices`、`surfaceNormal`（Python 同名） | 采纳 | Python 的 `surface_normal` 在 `facet.analysis`（不在 `core.lattice`，避免 core 依赖 analysis） |
 | M2：F0-A 的 `surfaceNormal` "首先读 `info.surface.normal`"（M2.md:759），旋转操作同步更新它（M2 R8） | 拒绝 | 笛卡尔法向会过期（D3、E3）；v2 只把 `info.surface.axis` 当经过校验的提示。M2 照常写 `axis`；`normal` 可保留为说明性字段，F0-A 不读 |
 | M3：`editActive(label, fn, {rebuild: 'props'})`，返回撤销条目 | 改名（M3） | `'props'` 即本规格的 `'appearance'`；返回 `{entry, value, map}` |
 | M3：`fn` 修改深拷贝 | 拒绝 | 原位修改 + 事前快照已能完全回滚；深拷贝每步多一次克隆（10k 原子约 1 ms），并让持有 `app.structure` 引用的面板失效；`structureKey` 已含 `rev` |
@@ -2035,11 +2035,11 @@ F0-A 与 F0-D 同在第 0 波。F0-D v2（`specs/F0-D.md`）与本次修订同�
 | `core/lattice.js`、`core/lattice.py` | F0-D T7 建立（`wrapFractional` 与对 `util.js` 的重新导出），F0-A 只追加 | 同 | 采用；合并顺序 F0-D → F0-A T7a → M1 | F0-D → F0-A → M1 |
 | `core/vacuum.js`、`analysis/vacuum.py` | F0-D 建立 | F0-A T7a 追加 `surfaceNormal`/`surface_normal` | 采用 | F0-D → F0-A |
 | toast | §10.1 第 3、4 条：编辑与导入的 toast 只显示本步新增的备注（`newWarnings(before, after)`）；悬停与聚焦时暂停计时；`timeout: 0` 的 toast 可用键盘关闭 | §3.2、§3.4 | 采用 | F0-A |
-| `crystallume.edit` 命名空间 | F0-D 注册 `sortBySpecies(order?)`、`clearNotes()`（`setPbc`、`detectSlab` 撤回） | F0-A 建立命名空间 | 采用 | F0-A / F0-D |
+| `facet.edit` 命名空间 | F0-D 注册 `sortBySpecies(order?)`、`clearNotes()`（`setPbc`、`detectSlab` 撤回） | F0-A 建立命名空间 | 采用 | F0-A / F0-D |
 | "Property" 配色 | 请排除 `tags`/`adsorbate_id` | B14 | 采用 | F0-A |
 | 撤销快照 | §10.1 第 8 条：改用 `toJSON({precision: 8, copy: false})`（`app.js:575`） | 撤销快照改为二进制（§3.1），不再经过 `toJSON` | 不需要（§12） | — |
 | C7、C8、props | `invalidateSymmetryInfo`、`addWarning`、`clone()` 不共享 props/info（C2-I2） | F0-A 在删除/替换原子时调用 `invalidateSymmetryInfo`；P-swap 的预览结构由各模块 `clone()` 后修改 | 采用 | F0-D 实现 |
-| 测试桥 | `tests/js_bridge.py`、`js` fixture、`crystallume/web/js/package.json` | F0-A 的 JS 测试都经它运行；未合入前直接 `node --test` | 采用 | F0-D |
+| 测试桥 | `tests/js_bridge.py`、`js` fixture、`facet/web/js/package.json` | F0-A 的 JS 测试都经它运行；未合入前直接 `node --test` | 采用 | F0-D |
 
 **临时实现与删除**（R12）：F0-D 合入前，F0-A 在 `app.js` 里用私有的 `bumpRev(s)`、`keepFrame(s)`、`setPositions(s, …)`，在 `render/display.js` 里内联 `vacgap.mjs` 的
 `axisGaps/gapCut/unwrapAlongGap`；`editActive` 没有追踪器时按 §3.2 的回退规则。F0-D 合入的同一个合并请求里删除这些临时代码（写进 F0-D 的合并清单）。
@@ -2169,7 +2169,7 @@ v1 原文存档于 `specs/F0-A.v1.md`。每条审查意见都先对照源码或�
 | E30 `display.gapCut` 与 `estimateDisplayCount` | 调试开关改为视图属性；计数用切口缓存 |
 | E31 选区与隐藏原子、Measure 单原子、Fix/Free 顺序 | 同 D16；Measure 为 1–4 个原子；Fix/Free 35/36；桌面 7 个、窄屏 5 个 |
 | E33 开放问题、报告 07、行号 | ⚑ Q1–Q5 改为已定案（U6）；报告 07 已存在并列入依据；行号改正（`structureKey` 103-107、`defaultParams` 43-55、`rankCommands` 73-101、`overlayDark` 933、`shown[j]` 190、`parse_params` 94-107） |
-| E34 API 细节 | `preview` 事件只含可序列化字段；缩略图单独规则；`drawnCopies(points, model, opts)` 一个签名；内部 `tools.register` 为必须、公共 `crystallume.registerTool` 留在可选 C4；`commit()` 统一返回 `{entry, structureEntry}` |
+| E34 API 细节 | `preview` 事件只含可序列化字段；缩略图单独规则；`drawnCopies(points, model, opts)` 一个签名；内部 `tools.register` 为必须、公共 `facet.registerTool` 留在可选 C4；`commit()` 统一返回 `{entry, structureEntry}` |
 | E 缺失内容 1–8 | 1 → §10.0；2 → §3.14.2（不再读 `normal`，所有权问题随之消失）与 §10.2；3 → §3.9 与 §3.8.2（P-pos 中冻结切口；滞后见 §12）；4 → §3.1；5 → §3.6.3；6 → §9 与 §10.1；7 → §3.7.2；8 → mod+Enter 与 keydown 接缝（§3.13.3） |
 
 **与同期 v2 规格的对齐**（F0-D v2、M4 v2 在本次修订期间定稿，按它们的定稿文本核对）
@@ -2179,7 +2179,7 @@ v1 原文存档于 `specs/F0-A.v1.md`。每条审查意见都先对照源码或�
 | F0-D v2 K13 | 修改计数名为 `rev`，`touch()` 递增 | 采用：本规格 v2 初稿按 E1 改成的 `version` 全部改回 `rev` |
 | F0-D v2 §3.13 | `find_vacuum_gap`/`find_vacuum_gaps`（字段 `{axis, start, end, width, center, height}`，`end` 在 [0, 1)，并列容差 1e-5 Å）、`vacuum_gap_hint` | 采用；§3.8.2 的 `VacuumGap` 字段、并列容差（改用 `positionTolerance`）、`findVacuumGaps` 的默认值随之改 |
 | F0-D v2 §3.13.2–3.13.4 | `find_surface_gap`、`gap_cut(gap)`（中点映射到 (−0.5, 0.5]）、`unwrap_along_gap(f, gap)`、`make_contiguous` 的切口 | 不采用其规则：它们照搬了本规格 v1 的切口，正是 D2 指出的问题；§10.1 写明 F0-D 需改的四处，金标由 F0-A 提供 |
-| F0-D v2 §10.1 第 3、4、7 条 | toast 只显示本步新增的备注、悬停暂停、键盘关闭；`crystallume.edit` 里 `sortBySpecies`、`clearNotes` | 采用（§3.2、§3.4、§6.2） |
+| F0-D v2 §10.1 第 3、4、7 条 | toast 只显示本步新增的备注、悬停暂停、键盘关闭；`facet.edit` 里 `sortBySpecies`、`clearNotes` | 采用（§3.2、§3.4、§6.2） |
 | F0-D v2 §10.1 第 1、8 条 | `editActive` 在克隆上运行 `fn`；撤销快照用 `toJSON({copy: false})` | 未采用（§12） |
 | M4 v2 A-CR1–A-CR4 | 测量键改写、`homeOffsets`、P-pos `commit(positions, {keepFrame})`、`up()` 返回 false 走点击 | A-CR2 采纳；A-CR3 采纳（选项名 `singleFrame`）；A-CR1、A-CR4 以测量引用 v2 与延迟认领代替（效果相同，§10.0）。v2 初稿把 `commit({positions})` 列为拒绝，按 A-CR3 改为采纳 |
 | M4 v2 的接口清单 | 按 F0-A v1 的名字（`banner`、`selectFallback`、`surfaceNormal → {normal, axis, source}`） | §10.0 写明三处由 M4 改名 |

@@ -2,14 +2,14 @@
 // run on a Viewer prototype instance holding only what these methods use (the constructor needs WebGL).
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import * as THREE from '../../crystallume/web/vendor/three/three.module.js';
-import { Viewer } from '../../crystallume/web/js/render/viewer.js';
-import { Overlays, cellOutlineLayer, HALO_ORDER_BASE } from '../../crystallume/web/js/render/overlays.js';
+import * as THREE from '../../facet/web/vendor/three/three.module.js';
+import { Viewer } from '../../facet/web/js/render/viewer.js';
+import { Overlays, cellOutlineLayer, HALO_ORDER_BASE } from '../../facet/web/js/render/overlays.js';
 import { fake2d } from './fake2d.mjs';
-import { colorSchemes } from '../../crystallume/web/js/render/colors.js';
-import { makeScene } from '../../crystallume/web/js/render/settings.js';
-import { buildAtoms, buildBonds, buildLines, buildPolyhedra, atomRadius, segmentsFor } from '../../crystallume/web/js/render/styles.js';
-import { Structure } from '../../crystallume/web/js/core/structure.js';
+import { colorSchemes } from '../../facet/web/js/render/colors.js';
+import { makeScene } from '../../facet/web/js/render/settings.js';
+import { buildAtoms, buildBonds, buildLines, buildPolyhedra, atomRadius, segmentsFor } from '../../facet/web/js/render/styles.js';
+import { Structure } from '../../facet/web/js/core/structure.js';
 
 /**
  * A viewer without a renderer: 3 structure atoms drawn as 5 (atom 0 three times, as periodic images are),

@@ -1,6 +1,6 @@
 """F0-D POSCAR: ops of the shared cases ``tests/data/surface/f0d/poscar.json``.
 
-They test ``crystallume/io/poscar.py``; the JS halves, for ``web/js/io/poscar.js``, are in
+They test ``facet/io/poscar.py``; the JS halves, for ``web/js/io/poscar.js``, are in
 ``tests/js/ops/f0d_poscar.mjs``.  Reading cases also use the ``read`` op of ``tests/ops/f0d.py`` with
 ``args.format = "poscar"``.  Written files are compared through the canonical form of acceptance scenario S14
 (:func:`poscar_canonical`), because the two writers print numbers differently (Python 16 decimals, JS 10):
@@ -35,9 +35,9 @@ from typing import Any, Sequence
 
 import numpy as np
 
-from crystallume.core.constraints import FLAG_RE
-from crystallume.core.structure import Structure, get_warnings
-from crystallume.io.poscar import read_poscar, write_poscar
+from facet.core.constraints import FLAG_RE
+from facet.core.structure import Structure, get_warnings
+from facet.io.poscar import read_poscar, write_poscar
 
 from ..cases import CaseInput, op
 

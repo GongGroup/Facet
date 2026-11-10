@@ -8,9 +8,9 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import * as params from '../../crystallume/web/js/core/params.js';
-import { formatIndices } from '../../crystallume/web/js/core/lattice.js';
-import * as analysesModule from '../../crystallume/web/js/core/analyses.js';
+import * as params from '../../facet/web/js/core/params.js';
+import { formatIndices } from '../../facet/web/js/core/lattice.js';
+import * as analysesModule from '../../facet/web/js/core/analyses.js';
 import { repoPath } from './helpers.mjs';
 
 const { ParamError, parseIndices, coerceParam, validateParams, defaultParams } = params;
@@ -49,7 +49,7 @@ test('exports and the error class', () => {
 
 test('the golden file has cases for every op and runs in both languages', () => {
   const doc = JSON.parse(readFileSync(repoPath('tests/data/surface/coerce.json'), 'utf8'));
-  assert.equal(doc.schema, 'crystallume.cases/1');
+  assert.equal(doc.schema, 'facet.cases/1');
   assert.ok(doc.cases.length >= 50);
   assert.deepEqual([...new Set(doc.cases.map((c) => c.op))].sort(), ['coerceParam', 'coerceText', 'defaultParams', 'parseIndices', 'validateParams']);
   for (const c of doc.cases) {

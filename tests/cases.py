@@ -1,8 +1,8 @@
-"""Shared cross-language test cases (``crystallume.cases/1``): loader, op and recipe registries, runner, comparator.
+"""Shared cross-language test cases (``facet.cases/1``): loader, op and recipe registries, runner, comparator.
 
 A case file is a JSON document anywhere under ``tests/data`` (for example ``tests/data/surface/f0d/poscar.json``)::
 
-    {"schema": "crystallume.cases/1",
+    {"schema": "facet.cases/1",
      "cases": [{"id": "poscar-read-dot-true", "op": "read", "args": {"format": "poscar"},
                 "input": {"text": "..."}, "expect": {"structure": {...}, "warnings": {"equals": []}},
                 "tol": {"positions": 1e-6}}]}
@@ -32,8 +32,8 @@ from typing import Any, Callable
 
 import numpy as np
 
-from crystallume import Structure
-from crystallume.io import parse_text
+from facet import Structure
+from facet.io import parse_text
 
 __all__ = [
     "SCHEMA",
@@ -53,7 +53,7 @@ __all__ = [
     "snake_args",
 ]
 
-SCHEMA = "crystallume.cases/1"
+SCHEMA = "facet.cases/1"
 REPO = Path(__file__).resolve().parents[1]
 DATA = REPO / "tests" / "data"
 
@@ -82,7 +82,7 @@ RECIPES: dict[str, RecipeFunc] = {}
 
 
 class CaseFileError(ValueError):
-    """A ``crystallume.cases/1`` file (or a case in it) is malformed."""
+    """A ``facet.cases/1`` file (or a case in it) is malformed."""
 
 
 # ------------------------------------------------------------------ registries
@@ -162,9 +162,9 @@ def _no_constants(token: str) -> Any:
 
 
 def load_cases(root: Path | str = DATA) -> list[dict[str, Any]]:
-    """Every case of every ``crystallume.cases/1`` file under *root*, recursively, files in path order.
+    """Every case of every ``facet.cases/1`` file under *root*, recursively, files in path order.
 
-    Other JSON files are ignored.  A ``crystallume.cases/<n>`` file of another version, invalid JSON in a case file,
+    Other JSON files are ignored.  A ``facet.cases/<n>`` file of another version, invalid JSON in a case file,
     a malformed case or an id used twice raises :class:`CaseFileError`.  Each returned case also has ``_file``
     (its file, relative to *root*) and ``_root`` (*root*, absolute; ``input.file`` paths are relative to it).
     """
@@ -184,14 +184,14 @@ def load_cases(root: Path | str = DATA) -> list[dict[str, Any]]:
         try:
             doc = json.loads(text, parse_constant=_no_constants)
         except ValueError as exc:
-            if '"crystallume.cases/' in text:
+            if '"facet.cases/' in text:
                 raise CaseFileError(f"{rel}: not valid JSON ({exc})") from None
             continue  # some other (non-standard) JSON file
         if not _is_obj(doc):
             continue
         schema = doc.get("schema")
         if schema != SCHEMA:
-            if isinstance(schema, str) and schema.startswith("crystallume.cases/"):
+            if isinstance(schema, str) and schema.startswith("facet.cases/"):
                 raise CaseFileError(f"{rel}: unsupported schema {_q(schema)} (this loader reads {_q(SCHEMA)})")
             continue
         items = doc.get("cases")

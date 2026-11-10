@@ -1,5 +1,5 @@
 // Planar Delaunay triangulation (core/delaunay.js, M5 §3.3.2): properties, degenerate grids, errors.
-// tests/test_delaunay.py runs the same checks on the Python twin crystallume/core/delaunay.py. Both files hold the
+// tests/test_delaunay.py runs the same checks on the Python twin facet/core/delaunay.py. Both files hold the
 // same JSON constant PARITY_CASES (between the BEGIN and END PARITY_CASES lines): point sets with the exact triangle
 // lists, in order, that both languages must return, so that each language asserts the same result (the Python test
 // checks that the two copies agree). The direct comparison of the two languages belongs to the M5 parity tests.
@@ -7,9 +7,9 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { circumcenter, delaunay } from '../../crystallume/web/js/core/delaunay.js';
-import * as D from '../../crystallume/web/js/core/delaunay.js';
-import { SURFACE_DEFAULTS } from '../../crystallume/web/js/core/defaults.js';
+import { circumcenter, delaunay } from '../../facet/web/js/core/delaunay.js';
+import * as D from '../../facet/web/js/core/delaunay.js';
+import { SURFACE_DEFAULTS } from '../../facet/web/js/core/defaults.js';
 import { repoPath } from './helpers.mjs';
 
 /** `siteMergeRatio` of the site finder (M5 §3.3.3): triangles across an edge merge when their circumcentres are
@@ -424,7 +424,7 @@ describe('circumcenter', () => {
 
 test('the module imports nothing and exports delaunay and circumcenter only', () => {
   assert.deepEqual(Object.keys(D).sort(), ['circumcenter', 'delaunay']);
-  const source = readFileSync(repoPath('crystallume/web/js/core/delaunay.js'), 'utf8');
+  const source = readFileSync(repoPath('facet/web/js/core/delaunay.js'), 'utf8');
   assert.ok(!/^\s*import\b/m.test(source));
   assert.ok(!source.includes('Math.fround('));
 });

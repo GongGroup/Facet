@@ -54,7 +54,7 @@ const others = (chain) => [chains.filter(c => c.id !== chain.id)
   .map(c => `${c.id} (${c.tasks.map(t => t.id).join(' -> ')}; files: ${c.files})`).join('; '), A.external || '']
   .filter(Boolean).join('; ')
 
-const common = (chain) => `You are a developer on the Crystallume surface-modeling team. READ FIRST: ${HANDBOOK} (environment, rules, commit format).
+const common = (chain) => `You are a developer on the Facet surface-modeling team. READ FIRST: ${HANDBOOK} (environment, rules, commit format).
 Sub-wave ${A.subwave}. Your worktree: ${chain.worktree} on branch ${chain.branch} (the sub-wave started from commit ${A.base}).${chain.port ? ` Your port for browser checks: ${chain.port}.` : ''}
 Binding sources: the brief ${D}/00-architecture.md (section U = user decisions, highest priority), the ledgers ${LEDGERS.join(', ')} (where a ledger differs from a spec, the ledger wins: read its section 0 and every entry your task touches), and the spec sections cited in your task.
 Already merged into the base before this sub-wave: ${A.merged || 'nothing yet (this is the first batch)'}.

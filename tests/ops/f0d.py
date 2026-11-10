@@ -14,7 +14,7 @@ Recipe ``crystal`` (``prototype``, ``elements``, ``a``, ``c``, ``u``, ``repeat``
 ``u`` where the prototype has them) must be given, because the default tables of the two builders differ until
 F0-D T10; so do the atom orders of ``fluorite`` and ``mos2``, and ``hbn`` exists only in JS.
 
-Vacuum gaps (``crystallume.analysis.vacuum`` / ``web/js/core/vacuum.js``; results with the JS key names, arrays as lists):
+Vacuum gaps (``facet.analysis.vacuum`` / ``web/js/core/vacuum.js``; results with the JS key names, arrays as lists):
 
 - ``axisGaps`` (``axis``, ``frame``, ``exclude``), ``findVacuumGaps`` (``frame``, ``periodicOnly``), ``findVacuumGap``
   (``axis``, ``minWidth``, ``frame``, ``periodicOnly``), ``gapCut`` (``axis``, ``frame``, ``hint``, ``exclude``),
@@ -30,7 +30,7 @@ Vacuum gaps (``crystallume.analysis.vacuum`` / ``web/js/core/vacuum.js``; result
   axis, hint on ``info.surface.axis``), ``displayCuts``, ``normal``, ``surfaceGap``, ``vacuumAxis``, ``hint``
   (``vacuumGapHint``) and ``shifts`` (``contiguousShifts`` along the vacuum axis, or null).
 
-Constraint flags (``crystallume.core.constraints`` / ``web/js/core/constraints.js``; ``value`` holds the JS-shaped result):
+Constraint flags (``facet.core.constraints`` / ``web/js/core/constraints.js``; ``value`` holds the JS-shaped result):
 
 - ``transformMoveFlags`` (``flags``, ``oldVectors``, then ``newVectors`` or ``matrix``, ``tol``): ``{flags, tightened}``;
   ``matrix`` P gives the new vectors ``P @ oldVectors`` (a supercell), summed in the same order on both sides.
@@ -53,12 +53,12 @@ from typing import Any, Sequence
 
 import numpy as np
 
-from crystallume import Structure, build
-from crystallume.analysis import vacuum
-from crystallume.build.crystal import PROTOTYPES
-from crystallume.core import constraints
-from crystallume.core.lattice import wrap_fractional
-from crystallume.io import parse_text, to_text
+from facet import Structure, build
+from facet.analysis import vacuum
+from facet.build.crystal import PROTOTYPES
+from facet.core import constraints
+from facet.core.lattice import wrap_fractional
+from facet.io import parse_text, to_text
 
 from ..cases import CaseInput, op, recipe
 

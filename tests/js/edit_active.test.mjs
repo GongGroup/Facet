@@ -50,7 +50,7 @@ const toastsSince = (from = 0) => elements.slice(from).filter((el) => el.tag ===
   .map((el) => ({ el, text: el.children.find((c) => c.classes?.has('msg'))?.textContent, buttons: el.children.filter((c) => c.tag === 'button').map((b) => b.textContent) }));
 const press = (toastEl, label) => toastEl.children.find((c) => c.tag === 'button' && c.textContent === label).listeners.click.forEach((fn) => fn());
 
-const web = (rel) => new URL(`../../crystallume/web/js/${rel}`, import.meta.url);
+const web = (rel) => new URL(`../../facet/web/js/${rel}`, import.meta.url);
 const { App, resolveIndexMap } = await import(web('app.js'));
 const { Structure, addWarning } = await import(web('core/structure.js'));
 const { makeScene } = await import(web('render/settings.js'));
@@ -420,8 +420,8 @@ describe('editActive', () => {
 });
 
 // ------------------------------------------------------------------ edits made inside an edit's fn
-describe('edits inside an edit’s fn (crystallume.edit.run and edit.* members)', () => {
-  /** crystallume for `app`, with an edit.* member that sorts by species: one editActive per call, as members are (L-F0-53). */
+describe('edits inside an edit’s fn (facet.edit.run and edit.* members)', () => {
+  /** facet for `app`, with an edit.* member that sorts by species: one editActive per call, as members are (L-F0-53). */
   function apiWithSort(app, t) {
     app.storage = { list: () => [] };
     t.after(defineApi('edit.sortForTest', (order) => app.editActive('Sort atoms by species', (s) => { s.sortBySpecies(order); }, { toast: 'Sorted the atoms by species' }), { owner: 'test' }));
@@ -821,7 +821,7 @@ describe('addStructure', () => {
   });
 });
 
-// ------------------------------------------------------------------ notifyStructureChanged (crystallume.edit.touch)
+// ------------------------------------------------------------------ notifyStructureChanged (facet.edit.touch)
 describe('notifyStructureChanged', () => {
   test('redraws colours only when the geometry is what the view was built from, else in full; never an undo step', () => {
     const app = makeApp(), s = slab(), v = app.viewer;
@@ -857,7 +857,7 @@ describe('notifyStructureChanged', () => {
 
 // ------------------------------------------------------------------ with the real viewer's masks
 describe('with the viewer’s visibility masks', async () => {
-  const THREE = await import('../../crystallume/web/vendor/three/three.module.js');
+  const THREE = await import('../../facet/web/vendor/three/three.module.js');
   const { Viewer } = await import(web('render/viewer.js'));
   /** A viewer without a renderer: the real model, visibility and measurement code; stubs for drawing. */
   function bareViewer() {
@@ -893,7 +893,7 @@ describe('with the viewer’s visibility masks', async () => {
     assert.ok([...v.model.src].every((i) => i >= 2), 'the model was built with the remapped mask');
   });
 
-  test('edits inside crystallume.edit.run: the mask and the highlight stay on their atoms through a sort and a deletion', () => {
+  test('edits inside facet.edit.run: the mask and the highlight stay on their atoms through a sort and a deletion', () => {
     const v = bareViewer(), app = makeApp(v), s = mix();
     setup(app, s);
     app.storage = { list: () => [] };

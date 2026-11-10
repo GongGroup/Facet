@@ -15,13 +15,13 @@
 
 ## Environment
 - Python with the test dependencies: `DEVPY=/tmp/claude-0/-home-user-crystallume/f118e1c6-ea51-5594-ad44-3edbe2cba708/scratchpad/devenv/bin/python`.
-  Run from the worktree root so that your worktree's `crystallume` package is the one imported:
+  Run from the worktree root so that your worktree's `facet` package is the one imported:
   `cd <worktree> && $DEVPY -m pytest -q -p no:cacheprovider` (the whole suite takes about 8 s today).
-- Node: `/opt/node22/bin/node`. Web modules are ES modules; once `crystallume/web/js/package.json` (`{"type":"module"}`) exists,
+- Node: `/opt/node22/bin/node`. Web modules are ES modules; once `facet/web/js/package.json` (`{"type":"module"}`) exists,
   import them by absolute path. Run node tests by passing the files, e.g. `node --test tests/js/*.test.mjs` (a directory argument fails on Node 22/24).
 - Browser checks: start the app from your worktree on a port unique to your task:
-  `cd <worktree> && $DEVPY -m crystallume serve --port <port> --data <scratch dir> &` and stop it when done.
-  ALWAYS pass `--data` with a fresh folder under `scratchpad/data/<task-id>/`: the default `~/.crystallume` is shared,
+  `cd <worktree> && $DEVPY -m facet serve --port <port> --data <scratch dir> &` and stop it when done.
+  ALWAYS pass `--data` with a fresh folder under `scratchpad/data/<task-id>/`: the default `~/.facet` is shared,
   and the app's autosave would write test projects into it.
   Playwright and Chromium are preinstalled: `require('playwright')` works from any directory, `chromium.launch()` needs no options.
   Do not run `playwright install`. Screenshots you only look at yourself: `deviceScaleFactor: 1`; save under

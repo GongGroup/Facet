@@ -1,44 +1,47 @@
 # docker compose up -d
-# docker compose exec crystallume crystallume user create alice     # accounts (registration is off)
-# Upgrading from AtomScope: the service is now "crystallume"; run `docker compose up -d --remove-orphans` once
-# so the old "atomscope" container stops and frees the port. The project keeps its pre-rename name below, so the
-# data volume stays "atomscope_atomscope-data" even when this checkout's folder is renamed or freshly cloned as
-# "crystallume". If your old checkout folder was not called "atomscope", its project (and volume prefix) was that
+# docker compose exec facet facet user create alice     # accounts (registration is off)
+# The image comes from the registry when it can be pulled there, and is built from this checkout otherwise.
+# Upgrading from Crystallume or AtomScope: the service is now "facet"; run `docker compose up -d --remove-orphans`
+# once so the old "crystallume" or "atomscope" container stops and frees the port. The project keeps its first
+# name below, so the data volume stays "atomscope_atomscope-data" even when this checkout's folder is renamed or
+# freshly cloned. If your old checkout folder was not called "atomscope", its project (and volume prefix) was that
 # folder's name: put COMPOSE_PROJECT_NAME=<old folder name> in a .env file next to this one (or pass -p <old name>).
+# CRYSTALLUME_* and ATOMSCOPE_* settings from an older compose file still work; FACET_* wins when both are set.
 name: atomscope
 services:
-  crystallume:
+  facet:
+    image: ghcr.io/mastreina/facet:0.3.2
     build: .
-    image: crystallume:0.3.1
     restart: unless-stopped
     ports:
       - "8765:8765"
       # Local mode has no login: publish it on this machine only, e.g.
       # - "127.0.0.1:8765:8765"
     environment:
-      CRYSTALLUME_MODE: cloud                    # or "local" for a single-user server (then also set CRYSTALLUME_TOKEN)
-      CRYSTALLUME_ALLOW_REGISTRATION: "false"    # "true" lets anyone who reaches the server sign up (5 per hour per address)
-      # CRYSTALLUME_TOKEN: <long random string>  # local mode: require this token (sign in as "local")
-      # CRYSTALLUME_TOKEN_TTL_DAYS: "30"         # cloud sign-ins expire after this many idle days (0 = never)
-      # CRYSTALLUME_SECRET: change-me            # optional; otherwise generated into /data/secret.key
-      # CRYSTALLUME_CORS_ORIGINS: https://viewer.example.org
-      # CRYSTALLUME_ROOT_PATH: /crystallume      # when a reverse proxy serves the app under a sub-path
-      # CRYSTALLUME_FORWARDED_ALLOW_IPS: "172.28.0.0/16"   # behind a reverse-proxy container: trust X-Forwarded-For
+      FACET_MODE: cloud                    # or "local" for a single-user server (then also set FACET_TOKEN)
+      FACET_ALLOW_REGISTRATION: "false"    # "true" lets anyone who reaches the server sign up (5 per hour per address)
+      # FACET_TOKEN: <long random string>  # local mode: require this token (sign in as "local")
+      # FACET_TOKEN_TTL_DAYS: "30"         # cloud sign-ins expire after this many idle days (0 = never)
+      # FACET_SECRET: change-me            # optional; otherwise generated into /data/secret.key
+      # FACET_CORS_ORIGINS: https://viewer.example.org
+      # FACET_ROOT_PATH: /facet      # when a reverse proxy serves the app under a sub-path
+      # FACET_FORWARDED_ALLOW_IPS: "172.28.0.0/16"   # behind a reverse-proxy container: trust X-Forwarded-For
       #                                          # from the proxy's address or network (the subnet below), else rate
       #                                          # limits treat every user as the proxy. Never "*": any client could
       #                                          # then forge its address and dodge the sign-in limits.
-      # CRYSTALLUME_FRAME_ANCESTORS: "'self' https://wiki.example.org"   # allow embedding in other sites
-      CRYSTALLUME_MAX_PROJECT_MB: "50"
-      CRYSTALLUME_MAX_ATOMS: "200000"            # largest structure the builder endpoints create
+      # FACET_FRAME_ANCESTORS: "'self' https://wiki.example.org"   # allow embedding in other sites
+      FACET_MAX_PROJECT_MB: "50"
+      FACET_MAX_ATOMS: "200000"            # largest structure the builder endpoints create
     volumes:
       - atomscope-data:/data
-      - ./examples/plugins:/plugins:ro           # plugin directory (CRYSTALLUME_PLUGIN_DIRS=/plugins)
+      - ./examples/plugins:/plugins:ro           # plugin directory (FACET_PLUGIN_DIRS=/plugins)
 
 volumes:
-  # Named as before the rename from AtomScope; with the project name above, the volume is atomscope_atomscope-data.
+  # Named as before the renames (AtomScope, then Crystallume); with the project name above, the volume is
+  # atomscope_atomscope-data.
   atomscope-data:
 
-# With a proxy container on this network, give the network a fixed subnet for CRYSTALLUME_FORWARDED_ALLOW_IPS
+# With a proxy container on this network, give the network a fixed subnet for FACET_FORWARDED_ALLOW_IPS
 # (and publish the port only on 127.0.0.1, or not at all, so clients cannot bypass the proxy):
 # networks:
 #   default:

@@ -11,10 +11,10 @@ import { readFileSync } from 'node:fs';
 import {
   asIntMatrix, egcd, hermiteNormalForm, hermiteNormalForm2d, hnfMatrices2d, intAdjugate3, intDet3, isUnimodular,
   supercellLatticePoints,
-} from '../../crystallume/web/js/core/intmath.js';
-import { beginCellOp, cellOpResult, finishCellOp } from '../../crystallume/web/js/core/cellops.js';
-import { CARTESIAN_VECTOR_PROPS, EDIT_KINDS, Structure, markEdited } from '../../crystallume/web/js/core/structure.js';
-import { SURFACE_DEFAULTS } from '../../crystallume/web/js/core/defaults.js';
+} from '../../facet/web/js/core/intmath.js';
+import { beginCellOp, cellOpResult, finishCellOp } from '../../facet/web/js/core/cellops.js';
+import { CARTESIAN_VECTOR_PROPS, EDIT_KINDS, Structure, markEdited } from '../../facet/web/js/core/structure.js';
+import { SURFACE_DEFAULTS } from '../../facet/web/js/core/defaults.js';
 import { repoPath } from './helpers.mjs';
 
 const OVERFLOW = 'integer overflow in lattice arithmetic';
@@ -727,7 +727,7 @@ describe('cellops skeleton', () => {
   });
 
   test('cellops.js does not import core/structure.js (ledger L-M1-08)', () => {
-    const text = readFileSync(repoPath('crystallume/web/js/core/cellops.js'), 'utf8');
+    const text = readFileSync(repoPath('facet/web/js/core/cellops.js'), 'utf8');
     const specs = [...text.matchAll(/^\s*(?:import|export)\b[^'"\n]*?\bfrom\s+['"]([^'"\n]+)['"]/gm)].map((m) => m[1]);
     assert.ok(!specs.some((spec) => spec.includes('structure')), specs.join(', '));
     assert.ok(!text.includes('import('));

@@ -46,10 +46,10 @@ globalThis.setTimeout = (fn, ms, ...a) => { const t = realSetTimeout(fn, ms, ...
 const toastsSince = (from = 0) => elements.slice(from).filter((el) => el.tag === 'span' && el.classes.has('msg')).map((el) => el.textContent);
 const clickButton = (label, from = 0) => elements.slice(from).find((el) => el.tag === 'button' && el.textContent === label)?.listeners.click?.forEach((fn) => fn());
 
-const { App } = await import('../../crystallume/web/js/app.js');
-const { Structure } = await import('../../crystallume/web/js/core/structure.js');
-const { makeScene } = await import('../../crystallume/web/js/render/settings.js');
-const { BUDGET_NOTICE, INCONSISTENT, HistoryStore } = await import('../../crystallume/web/js/core/history.js');
+const { App } = await import('../../facet/web/js/app.js');
+const { Structure } = await import('../../facet/web/js/core/structure.js');
+const { makeScene } = await import('../../facet/web/js/render/settings.js');
+const { BUDGET_NOTICE, INCONSISTENT, HistoryStore } = await import('../../facet/web/js/core/history.js');
 
 // ------------------------------------------------------------------ fixtures
 function slab(nx = 2, L = 3, name = `Pt(111) p(${nx}×${nx}) ${L}L`) {

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Write the formal oxidation-state table crystallume/web/data/oxidation_states.json (M2 §3.9.1).
+"""Write the formal oxidation-state table facet/web/data/oxidation_states.json (M2 §3.9.1).
 
     python scripts/gen_oxidation_states.py                    # write the file
     python scripts/gen_oxidation_states.py --check            # exit 1 when the file is out of date
     python scripts/gen_oxidation_states.py --pymatgen [FILE]  # also compare the snapshot below with pymatgen
 
-The table has one copy, the JSON file, which both the Python package (crystallume.build.surface, through
-crystallume.core.webdata) and the web app (build/surface.js, through core/webdata.js) read; the cleave tool uses it
+The table has one copy, the JSON file, which both the Python package (facet.build.surface, through
+facet.core.webdata) and the web app (build/surface.js, through core/webdata.js) read; the cleave tool uses it
 to estimate formal charges (polarity, Tasker type, the default termination).  Run this script after changing a table
 below and commit both files: tests/test_oxidation_states.py fails while the JSON is out of date.  Nothing runs this
 script at run time.
@@ -19,7 +19,7 @@ Where the table comes from:
   (``pymatgen/core/periodic_table.json`` or ``.json.gz``), and reports any difference;
 * anions: the elements of ANION_ELEMENTS, each with its most negative common oxidation state;
 * cations: the manual preference order of M2 §3.9.1 (PREFERENCE, first = preferred), and for the metals of
-  crystallume.core.elements.METALS that it does not list, the positive common states in pymatgen's order.  Every
+  facet.core.elements.METALS that it does not list, the positive common states in pymatgen's order.  Every
   manual list must be the positive common states plus the states in ADDED minus the states in DROPPED, which say
   why: the script refuses a list that adds or drops a state without a reason.
 """
@@ -35,9 +35,9 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-TARGET = ROOT / "crystallume" / "web" / "data" / "oxidation_states.json"
+TARGET = ROOT / "facet" / "web" / "data" / "oxidation_states.json"
 
-SCHEMA = "crystallume.oxidation-states/1"
+SCHEMA = "facet.oxidation-states/1"
 SOURCE = ("common oxidation states (pymatgen Element.common_oxidation_states, MIT; frozen at development time) "
           "+ manual preference order")
 PYMATGEN_VERSION = "pymatgen-core 2026.10.31"
@@ -109,10 +109,10 @@ DROPPED: dict[str, dict[int, str]] = {
 
 
 def _elements() -> Any:
-    """The module ``crystallume.core.elements`` of this checkout (METALS and the atomic numbers)."""
+    """The module ``facet.core.elements`` of this checkout (METALS and the atomic numbers)."""
     if str(ROOT) not in sys.path:
         sys.path.insert(0, str(ROOT))
-    return importlib.import_module("crystallume.core.elements")
+    return importlib.import_module("facet.core.elements")
 
 
 def _positive(states: tuple[int, ...]) -> list[int]:

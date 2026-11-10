@@ -16,7 +16,7 @@ Wyckoff positions.  pbc T T T is the rule (user decision U2) and every file has 
 
 The expected values come from the construction (rows, spacings, which atoms were added as adsorbates) and from a
 plain re-implementation of M3 §3 as amended by the API ledgers: direction and period, the U1 cut through
-``crystallume.analysis.vacuum`` (``surface_normal(...)["cut"]``, the display's cut), single-linkage clustering,
+``facet.analysis.vacuum`` (``surface_normal(...)["cut"]``, the display's cut), single-linkage clustering,
 row statistics and warnings, stoichiometric units, the bond graph, the adsorbate guess and the closed-form
 exposure.  Every analytic value of M3 §7.1 (d-spacings, kappa* thresholds, atoms per row, adsorbate sets) is
 asserted here, and the script stops when a value lies so close to a threshold that rounding could flip it.
@@ -41,13 +41,13 @@ OUT = ROOT / "tests" / "data" / "surface" / "layers"
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from crystallume import Structure, build  # noqa: E402
-from crystallume.analysis.vacuum import display_cuts, surface_normal, unwrap_along_gap, vacuum_gap_hint  # noqa: E402
-from crystallume.core.defaults import SURFACE_DEFAULTS  # noqa: E402
-from crystallume.core.elements import covalent_radius  # noqa: E402
-from crystallume.core.lattice import wrap_fractional  # noqa: E402
+from facet import Structure, build  # noqa: E402
+from facet.analysis.vacuum import display_cuts, surface_normal, unwrap_along_gap, vacuum_gap_hint  # noqa: E402
+from facet.core.defaults import SURFACE_DEFAULTS  # noqa: E402
+from facet.core.elements import covalent_radius  # noqa: E402
+from facet.core.lattice import wrap_fractional  # noqa: E402
 
-SCHEMA = "crystallume.cases/1"
+SCHEMA = "facet.cases/1"
 
 # ------------------------------------------------------------------------------------------------ constants
 #: The M3 keys of SURFACE_DEFAULTS (M3 §3); M3-T1/T3a/T3b add them to core/defaults.py and core/defaults.js.
@@ -162,7 +162,7 @@ def make(symbols: Sequence[str], positions: Any, cell: Any, pbc: Sequence[bool],
          props: dict | None = None, info: dict | None = None) -> Structure:
     """A structure exactly as the tests will load it: coordinates rounded to DIGITS decimals."""
     doc: dict[str, Any] = {
-        "schema": "crystallume.structure/1", "name": name, "symbols": list(symbols),
+        "schema": "facet.structure/1", "name": name, "symbols": list(symbols),
         "positions": [[_r(x) for x in p] for p in np.asarray(positions, float).reshape(-1, 3)],
         "cell": None if cell is None else [[_r(x) for x in row] for row in np.asarray(cell, float)],
         "pbc": [bool(b) for b in pbc],
@@ -176,7 +176,7 @@ def make(symbols: Sequence[str], positions: Any, cell: Any, pbc: Sequence[bool],
 
 def to_doc(s: Structure) -> dict[str, Any]:
     doc: dict[str, Any] = {
-        "schema": "crystallume.structure/1", "name": s.name, "symbols": list(s.symbols),
+        "schema": "facet.structure/1", "name": s.name, "symbols": list(s.symbols),
         "positions": [[_r(x) for x in p] for p in s.positions],
         "cell": None if s.cell is None else [[_r(x) for x in row] for row in s.cell],
         "pbc": [bool(b) for b in s.pbc],
@@ -1242,7 +1242,7 @@ def py_layer_args(args: dict[str, Any]) -> dict[str, Any]:
 def load_input(inp: Structure | dict) -> Structure:
     if isinstance(inp, Structure):
         return inp
-    from crystallume.io import read
+    from facet.io import read
     return read(ROOT / "tests" / "data" / inp["file"])
 
 

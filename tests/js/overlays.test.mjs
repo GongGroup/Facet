@@ -1,16 +1,16 @@
-// Overlay layers (crystallume/web/js/render/overlays.js): the registry, export policies and the pure helpers
+// Overlay layers (facet/web/js/render/overlays.js): the registry, export policies and the pure helpers
 // the viewer uses for named highlights (F0-A §3.10, §3.11; ledger L-F0-37, L-F0-39).
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import * as THREE from '../../crystallume/web/vendor/three/three.module.js';
-import { LineSegments2 } from '../../crystallume/web/vendor/three/addons/lines/LineSegments2.js';
-import { LineSegmentsGeometry } from '../../crystallume/web/vendor/three/addons/lines/LineSegmentsGeometry.js';
-import { LineMaterial } from '../../crystallume/web/vendor/three/addons/lines/LineMaterial.js';
+import * as THREE from '../../facet/web/vendor/three/three.module.js';
+import { LineSegments2 } from '../../facet/web/vendor/three/addons/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from '../../facet/web/vendor/three/addons/lines/LineSegmentsGeometry.js';
+import { LineMaterial } from '../../facet/web/vendor/three/addons/lines/LineMaterial.js';
 import {
   Overlays, TIERS, EXPORT_POLICIES, haloExported, layerExported, isPlainColor, isColorSpec, resolveColor, normalizeHighlight,
   checkHighlightName, highlightIndexSet, haloOrder, remapIndices, unionBounds, pointsBounds, pickSpheres, cellEdges,
   triangulatePolygon, legendRows, haloMaterial, prepareObject, disposeObject, DEFAULT_HIGHLIGHT_COLOR, HALO_ORDER_BASE, LEGEND_FALLBACK_COLOR,
-} from '../../crystallume/web/js/render/overlays.js';
+} from '../../facet/web/js/render/overlays.js';
 import { fake2d, quietErrors } from './fake2d.mjs';
 
 /** What Overlays needs from a viewer: container, resolution, requestRender(), on('model'), halos. */

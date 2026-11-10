@@ -4,11 +4,11 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import * as xyz from '../../crystallume/web/js/io/xyz.js';
-import { parseStructure, exportStructure } from '../../crystallume/web/js/io/index.js';
-import { readCIF } from '../../crystallume/web/js/io/cif.js';
-import { readPDB } from '../../crystallume/web/js/io/pdb.js';
-import { Structure } from '../../crystallume/web/js/core/structure.js';
+import * as xyz from '../../facet/web/js/io/xyz.js';
+import { parseStructure, exportStructure } from '../../facet/web/js/io/index.js';
+import { readCIF } from '../../facet/web/js/io/cif.js';
+import { readPDB } from '../../facet/web/js/io/pdb.js';
+import { Structure } from '../../facet/web/js/core/structure.js';
 import { repoPath } from './helpers.mjs';
 
 const { readXYZ, writeXYZ, kvTokenize, convertValue, formatInfoValue, extxyzColumns } = xyz;

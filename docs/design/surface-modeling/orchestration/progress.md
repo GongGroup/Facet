@@ -12,7 +12,7 @@
 - Still to do: integrated plan for waves 1-5 (plan agent), copy design docs into repo docs/design/surface-modeling/, commit, push.
 
 ## Known pre-existing defects to fix in wave 0 (see ledger-F0 defect table)
-- Python minimum_image_vectors fails in skewed cells (crystallume/analysis/geometry.py:21-40), reproduced 0.50 A -> 2.73 A.
+- Python minimum_image_vectors fails in skewed cells (facet/analysis/geometry.py:21-40), reproduced 0.50 A -> 2.73 A.
 
 ## Implementation log
 - 12:21 Design docs committed and pushed: 1729d01 (docs/design/surface-modeling/).
@@ -86,3 +86,9 @@
   The user asked NOT to resume the chains and NOT to start the agent team for now: wait for their go-ahead.
   Progress page for the user: https://claude.ai/artifact/AVYSpBsdV7vPeLWZn1gx2d (29 of 141 tasks merged). Main: pytest 3788 passed,
   node 2139 passed, 0 failed.
+- 2026-11-10 10:50 The user asked to rename the software to Facet (package facet/, command facet, image ghcr.io/mastreina/facet,
+  version 0.3.2), to publish a Docker image from GitHub Actions and to shorten the README. Done on the main checkout; every path in
+  the design and orchestration files now says facet/ (the checkout folder and the repository are still called crystallume).
+  Crystallume and AtomScope names keep working (tests/test_former_names.py). The nine interrupted worktrees predate the rename:
+  to carry one over, run orchestration/rename_to_facet.py in it, `git mv crystallume facet`, commit, then rebase onto the main branch;
+  the six with uncommitted partial edits are cheaper to redo. Development chains are still paused at the user's request.

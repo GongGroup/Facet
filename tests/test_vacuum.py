@@ -1,4 +1,4 @@
-"""Vacuum gaps along the cell vectors (``crystallume.analysis.vacuum``), ``SURFACE_DEFAULTS`` and ``wrap_fractional``.
+"""Vacuum gaps along the cell vectors (``facet.analysis.vacuum``), ``SURFACE_DEFAULTS`` and ``wrap_fractional``.
 
 The shared cases ``tests/data/surface/f0d/vacuum.json`` and ``tests/data/surface/gaps.json`` run in both languages
 (``tests/test_cases.py``, ``tests/js/cases.test.mjs``).  The tests here cover the Python API and, through the Node
@@ -17,9 +17,9 @@ from collections.abc import Mapping
 import numpy as np
 import pytest
 
-from crystallume import Structure, analysis, build, read
-from crystallume.analysis import vacuum as V
-from crystallume.analysis.vacuum import (
+from facet import Structure, analysis, build, read
+from facet.analysis import vacuum as V
+from facet.analysis.vacuum import (
     axis_gaps,
     contiguous_shifts,
     display_cuts,
@@ -34,8 +34,8 @@ from crystallume.analysis.vacuum import (
     vacuum_axis,
     vacuum_gap_hint,
 )
-from crystallume.core.defaults import SURFACE_DEFAULTS, Defaults
-from crystallume.core.lattice import wrap_fractional
+from facet.core.defaults import SURFACE_DEFAULTS, Defaults
+from facet.core.lattice import wrap_fractional
 
 from .conftest import DATA
 

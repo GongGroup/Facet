@@ -1,1 +1,1 @@
-"""Crystallume test-suite."""
+"""Facet test-suite."""

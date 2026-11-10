@@ -3,9 +3,9 @@
 // web/js/io/poscar.js; written files are compared through the canonical form of acceptance scenario S14
 // (poscarCanonical, exported for tests/js/io_poscar.test.mjs).
 import { op } from '../cases.mjs';
-import { FLAG_RE } from '../../../crystallume/web/js/core/constraints.js';
-import { getWarnings } from '../../../crystallume/web/js/core/structure.js';
-import { readPOSCAR, writePOSCAR } from '../../../crystallume/web/js/io/poscar.js';
+import { FLAG_RE } from '../../../facet/web/js/core/constraints.js';
+import { getWarnings } from '../../../facet/web/js/core/structure.js';
+import { readPOSCAR, writePOSCAR } from '../../../facet/web/js/io/poscar.js';
 
 const LINES = /\r\n|\r|\n/;
 const NUMBER = /^[-+]?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eEdD][-+]?[0-9]+)?$/;

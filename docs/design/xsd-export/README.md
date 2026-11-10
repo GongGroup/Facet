@@ -14,8 +14,8 @@
 |---|---|
 | 网页 Export 菜单 | 结构文件一组里多一项 `Materials Studio XSD  .xsd`，排在 PDB 之后 |
 | 命令面板 | `Export Materials Studio XSD`，搜 `xsd`、`materials studio`、`save as` 都能找到 |
-| 命令行 | `crystallume convert CONTCAR slab.xsd`（按扩展名识别），`crystallume formats` 里列出 |
-| Python | `crystallume.io.write("slab.xsd", structure)`，`crystallume.io.to_text(structure, "xsd")` |
+| 命令行 | `facet convert CONTCAR slab.xsd`（按扩展名识别），`facet formats` 里列出 |
+| Python | `facet.io.write("slab.xsd", structure)`，`facet.io.to_text(structure, "xsd")` |
 | REST / 客户端 | 现有的格式列表与转换接口自动带上，不加新接口 |
 | 在 claude.ai artifact 里 | 查看器不允许直接保存 `.xsd`，文件会像 `.vasp` 一样装进一个 `.zip`（现有机制） |
 
@@ -46,7 +46,7 @@
 ```xml
 <?xml version="1.0" encoding="latin1"?>
 <!DOCTYPE XSD []>
-<XSD Version="6.0" WrittenBy="Crystallume">
+<XSD Version="6.0" WrittenBy="Facet">
 	<AtomisticTreeRoot ID="1" NumProperties="40" NumChildren="1">
 		<Property DefinedOn="ClassicalEnergyHolder" Name="AngleEnergy" Type="Double"/>
 		… 共 40 行属性定义，内容固定 …
@@ -163,11 +163,11 @@ Materials Studio 的这类文档要么三维周期，要么非周期。有晶胞
 
 | 文件 | 改动 |
 |---|---|
-| `crystallume/io/xsd.py`（新） | `write_xsd(structure) -> str` |
-| `crystallume/io/__init__.py` | 注册写出器（扩展名 `.xsd`，类型 `application/xml`）；`export_report` 加第 6 节的三条消息 |
-| `crystallume/io/capabilities.py` | 新取值 `atoms`，新的一行 |
-| `crystallume/web/js/io/xsd.js`（新） | `writeXSD(s)` |
-| `crystallume/web/js/io/index.js`、`io/capabilities.js` | 同上，JS 一侧 |
+| `facet/io/xsd.py`（新） | `write_xsd(structure) -> str` |
+| `facet/io/__init__.py` | 注册写出器（扩展名 `.xsd`，类型 `application/xml`）；`export_report` 加第 6 节的三条消息 |
+| `facet/io/capabilities.py` | 新取值 `atoms`，新的一行 |
+| `facet/web/js/io/xsd.js`（新） | `writeXSD(s)` |
+| `facet/web/js/io/index.js`、`io/capabilities.js` | 同上，JS 一侧 |
 | `README.md`、`docs/SCHEMA.md` | 格式列表、能力表 |
 
 Export 菜单、命令面板里的导出命令、命令行、REST 和客户端都从格式注册表生成，不用单独改；命令面板的搜索词取自格式的扩展名与描述，描述写成 `Materials Studio XSD (3D atomistic document; save as .xsd)`。不新增依赖。
@@ -204,7 +204,7 @@ Export 菜单、命令面板里的导出命令、命令行、REST 和客户端�
 - **D2 晶胞取向**。转到 Materials Studio 默认取向是为了让矢量与文件里声明的取向一致。另一种做法是像 ASE 那样原样写矢量。
 - **D3 不写键**。周期结构里跨晶胞边界的键在这个格式里要用镜像对象表示，写错会画出横穿晶胞的长键，所以先不写。
 
-另有两处默认决定：文件头写 `WrittenBy="Crystallume"`（如实标明来源；Materials Studio 若因此拒绝，改为不写这个属性）；原子显示方式统一写 `Ball and Stick`。
+另有两处默认决定：文件头写 `WrittenBy="Facet"`（如实标明来源；Materials Studio 若因此拒绝，改为不写这个属性）；原子显示方式统一写 `Ball and Stick`。
 
 ## 10. 工作量与后续
 

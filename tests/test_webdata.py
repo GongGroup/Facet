@@ -1,4 +1,4 @@
-"""The shared data module ``crystallume.core.webdata`` (M5 §4.2, ledger L-M2-06): ``crystallume/web/data/*.json``,
+"""The shared data module ``facet.core.webdata`` (M5 §4.2, ledger L-M2-06): ``facet/web/data/*.json``,
 one copy read by Python through importlib.resources and by the web app through ``web/js/core/webdata.js``.
 
 ``tests/js/webdata.test.mjs`` runs the same checks on the JavaScript twin (``loadWebData``, ``webData``,
@@ -19,11 +19,11 @@ from pathlib import Path
 
 import pytest
 
-from crystallume.core import webdata
-from crystallume.core.webdata import load_web_data
+from facet.core import webdata
+from facet.core.webdata import load_web_data
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGE = ROOT / "crystallume"
+PACKAGE = ROOT / "facet"
 DATA = PACKAGE / "web" / "data"
 JS_TESTS = Path(__file__).resolve().parent / "js" / "webdata.test.mjs"
 
@@ -101,10 +101,10 @@ def test_a_missing_file():
 
 
 def test_the_data_is_package_data():
-    """pyproject.toml ships crystallume/web/** with the package (setuptools expands the glob from the package)."""
+    """pyproject.toml ships facet/web/** with the package (setuptools expands the glob from the package)."""
     tomllib = pytest.importorskip("tomllib")
     config = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    globs = config["tool"]["setuptools"]["package-data"]["crystallume"]
+    globs = config["tool"]["setuptools"]["package-data"]["facet"]
     shipped = {p for g in globs for p in PACKAGE.glob(g) if p.is_file()}
     assert {DATA / name for name in PARITY_CASES["valid"]} <= shipped
 
@@ -121,14 +121,14 @@ def test_an_installed_package_reads_its_own_data(tmp_path: Path):
     """A copy of the package in a site directory (as pip installs it) finds the table next to itself, and the
     oxidation-state functions work from there."""
     site = tmp_path / "site-packages"
-    shutil.copytree(PACKAGE, site / "crystallume", ignore=shutil.ignore_patterns("__pycache__"))
+    shutil.copytree(PACKAGE, site / "facet", ignore=shutil.ignore_patterns("__pycache__"))
     got = _run(
         "import json, sys\n"
         "sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1])\n"
-        "import crystallume\n"
-        "from crystallume.core.webdata import load_web_data\n"
-        "from crystallume.build.surface import estimate_oxidation_states, load_oxidation_states\n"
-        "print(json.dumps({'file': crystallume.__file__, 'table': load_web_data('oxidation_states.json'),\n"
+        "import facet\n"
+        "from facet.core.webdata import load_web_data\n"
+        "from facet.build.surface import estimate_oxidation_states, load_oxidation_states\n"
+        "print(json.dumps({'file': facet.__file__, 'table': load_web_data('oxidation_states.json'),\n"
         "                  'loaded': load_oxidation_states(), 'SrTiO3': estimate_oxidation_states(['Sr', 'Ti', 'O', 'O', 'O'])}))\n",
         str(site), cwd=tmp_path)
     assert Path(got["file"]).is_relative_to(site)
@@ -147,10 +147,10 @@ def test_a_zipped_package_reads_its_data_through_importlib_resources(tmp_path: P
     got = _run(
         "import json, sys\n"
         "sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1])\n"
-        "import crystallume\n"
-        "from crystallume.core.webdata import load_web_data\n"
-        "from crystallume.build.surface import load_oxidation_states\n"
-        "print(json.dumps({'file': crystallume.__file__, 'table': load_web_data('oxidation_states.json'),\n"
+        "import facet\n"
+        "from facet.core.webdata import load_web_data\n"
+        "from facet.build.surface import load_oxidation_states\n"
+        "print(json.dumps({'file': facet.__file__, 'table': load_web_data('oxidation_states.json'),\n"
         "                  'loaded': load_oxidation_states()}))\n",
         str(archive), cwd=tmp_path)
     assert Path(got["file"]).is_relative_to(archive)

@@ -8,9 +8,9 @@ import io as stdio
 import numpy as np
 import pytest
 
-import crystallume as cl
-from crystallume import Structure, build
-from crystallume.io import FormatError, ParseError, detect_format, parse_text, to_text
+import facet as cl
+from facet import Structure, build
+from facet.io import FormatError, ParseError, detect_format, parse_text, to_text
 
 
 def _same_positions(a: Structure, b: Structure, atol: float = 1e-4) -> bool:
@@ -70,8 +70,8 @@ def test_extxyz_reader_external_style():
 
 # Extended XYZ (F0-D T5, §3.11).  The shared cases (both languages) are tests/data/surface/f0d/extxyz.json; these
 # tests cover what only Python shows (int and float types, numpy values) and the two languages against each other.
-from crystallume.core.constraints import lattice_to_cartesian_mask  # noqa: E402
-from crystallume.io import xyz as xyz_io  # noqa: E402
+from facet.core.constraints import lattice_to_cartesian_mask  # noqa: E402
+from facet.io import xyz as xyz_io  # noqa: E402
 
 _T, _F = True, False
 #: The 33 info keys of F0-D appendix A (``warnings`` is never written, ``nan`` cannot be).
@@ -81,7 +81,7 @@ _INFO33 = {
     "short": "T", "sg_text": "225", "version": "0.4", "flag": "false", "note": "1 2 3", "plain": "Pt(111) p(3×3)",
     "surface": {"miller": [1, 1, 1], "note": 'say "hi" \\ x'}, "labels": ["a", "b"], "one": [5], "empty": [],
     "nested": [[1, 2], [3, 4]], "mixed": [1, "a"], "bools": [True, False, True], "big": 12345678901234567890,
-    "crystallume_clip": "abc123", "spacegroup": "Fm-3m", "spacegroupNumber": 225, "comma": "a,b", "comma_num": "1,2",
+    "facet_clip": "abc123", "spacegroup": "Fm-3m", "spacegroupNumber": 225, "comma": "a,b", "comma_num": "1,2",
     "inf_text": "inf", "unicode_digits": "\u0661\u0662", "underscore_num": "1_000", "hexlike": "0x10", "dexp": 1500.0,
     "floats": [1.0, 2.5], "multiline": "line1\nline2"}
 
@@ -197,7 +197,7 @@ def test_extxyz_structures_cross_language(js):
                   props={"selective_dynamics": [[_F, _F, _F], [_T, _T, _F], [_F, _T, _F], [_T, _T, _T]],
                          "tags": [3, 2, 1, 0], "adsorbate_id": [0, 0, 0, 1], "forces": [[0, 0, 0.5]] * 4,
                          "labels": ["Pt1", "Pt2", "Pt3", "O1"], "initial_magmoms": [0.5, 0.5, 0.5, 0.0]},
-                  info={"energy": -12.25, "surface": {"miller": [1, 1, 1], "layers": 3}, "crystallume_clip": "c1"})
+                  info={"energy": -12.25, "surface": {"miller": [1, 1, 1], "layers": 3}, "facet_clip": "c1"})
     py_text = to_text(s, "extxyz")
     got = js("""
         const { readXYZ, writeXYZ } = await web('io/xyz.js');
@@ -217,7 +217,7 @@ def test_extxyz_structures_cross_language(js):
         assert props["adsorbate_id"] == [0, 0, 0, 1] and props["labels"] == ["Pt1", "Pt2", "Pt3", "O1"], label
         assert np.allclose(props["forces"], [[0, 0, 0.5]] * 4) and np.allclose(props["initial_magmoms"], [0.5] * 3 + [0])
         assert doc["info"]["energy"] == -12.25 and doc["info"]["surface"] == {"miller": [1, 1, 1], "layers": 3}
-        assert doc["info"]["crystallume_clip"] == "c1", label
+        assert doc["info"]["facet_clip"] == "c1", label
     assert py_text.splitlines()[1] == got["text"].splitlines()[1]   # the same comment line from both writers
 
 
@@ -321,8 +321,8 @@ def test_poscar_groups_species():
 
 
 # F0-D T4 (F0-D §3.10, §7.2 "POSCAR"); the shared cases are tests/data/surface/f0d/poscar.json.
-from crystallume.core.structure import get_warnings  # noqa: E402
-from crystallume.io.poscar import read_poscar, write_poscar  # noqa: E402
+from facet.core.structure import get_warnings  # noqa: E402
+from facet.io.poscar import read_poscar, write_poscar  # noqa: E402
 
 from .ops.f0d_poscar import poscar_canonical  # noqa: E402
 

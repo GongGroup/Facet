@@ -2,7 +2,7 @@
 // in tests/data/surface/coerce.json, with the same argument errors. coerceText reads the text the way the input
 // controls (ui/inputs.js) do: parseIndices, and text it cannot read goes to coerceParam, which gives the type's message.
 import { op } from '../cases.mjs';
-import { parseIndices, coerceParam, validateParams, defaultParams } from '../../../crystallume/web/js/core/params.js';
+import { parseIndices, coerceParam, validateParams, defaultParams } from '../../../facet/web/js/core/params.js';
 
 function take(args, name, allowed, required = []) {
   const unknown = Object.keys(args).filter((k) => !allowed.includes(k)).sort();

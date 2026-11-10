@@ -5,17 +5,17 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { Structure } from '../../crystallume/web/js/core/structure.js';
-import { inv3, cartToFrac } from '../../crystallume/web/js/core/util.js';
-import { findPeriodicNeighbors } from '../../crystallume/web/js/core/bonds.js';
-import { METALS, ANIONS } from '../../crystallume/web/js/core/elements.js';
-import { buildCrystal } from '../../crystallume/web/js/build/crystal.js';
-import { parseStructure } from '../../crystallume/web/js/io/index.js';
-import { makeScene } from '../../crystallume/web/js/render/settings.js';
+import { Structure } from '../../facet/web/js/core/structure.js';
+import { inv3, cartToFrac } from '../../facet/web/js/core/util.js';
+import { findPeriodicNeighbors } from '../../facet/web/js/core/bonds.js';
+import { METALS, ANIONS } from '../../facet/web/js/core/elements.js';
+import { buildCrystal } from '../../facet/web/js/build/crystal.js';
+import { parseStructure } from '../../facet/web/js/io/index.js';
+import { makeScene } from '../../facet/web/js/render/settings.js';
 import {
   buildDisplayModel, estimateDisplayCount, homeOffsets, storedImage, refOf, drawnCopies, smartBondFilter,
   smartPairDefault, disabledPairsFor, anionBondedMetals,
-} from '../../crystallume/web/js/render/display.js';
+} from '../../facet/web/js/render/display.js';
 import { repoPath } from './helpers.mjs';
 
 const DISPLAY = makeScene().display;

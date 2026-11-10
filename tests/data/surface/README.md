@@ -1,7 +1,7 @@
 # Shared test cases and fixtures
 
-Golden data that both implementations are tested against: the Python package (`crystallume/`) and the web
-modules (`crystallume/web/js/`). A case that passes in both languages is a parity check: the two sides compared
+Golden data that both implementations are tested against: the Python package (`facet/`) and the web
+modules (`facet/web/js/`). A case that passes in both languages is a parity check: the two sides compared
 their results with the same expectation.
 
 ```
@@ -15,7 +15,7 @@ tests/data/surface/
 
 Case files may live anywhere under `tests/data` (for example `tests/data/geometry/mic.json`): the loaders read every
 `*.json` file below `tests/data` recursively, in path order, and use the ones whose `schema` is
-`crystallume.cases/1`. Other JSON files are left alone; names starting with `.` are skipped.
+`facet.cases/1`. Other JSON files are left alone; names starting with `.` are skipped.
 
 ## Running
 
@@ -26,14 +26,14 @@ node --test tests/js/cases.test.mjs        # the JS side directly (pass files, n
 ```
 
 Node.js 22 or newer is needed for the JS side. Without it the JS tests are skipped; set
-`CRYSTALLUME_REQUIRE_NODE=1` to make that a failure (CI). `CRYSTALLUME_NODE` picks the `node` binary, or turns
+`FACET_REQUIRE_NODE=1` to make that a failure (CI). `FACET_NODE` picks the `node` binary, or turns
 the JS tests off with `0`/`off`.
 
-## The case format `crystallume.cases/1`
+## The case format `facet.cases/1`
 
 ```json
 {
-  "schema": "crystallume.cases/1",
+  "schema": "facet.cases/1",
   "description": "optional; other top-level keys are ignored",
   "cases": [
     {
@@ -58,14 +58,14 @@ the JS tests off with `0`/`off`.
 | `id` | Unique across all case files, no spaces. It names the test on both sides. |
 | `op` | The operation to run, registered by a module on both sides (see below). |
 | `args` | Arguments of the op, camelCase keys as in the JS API. Each Python op maps them to snake_case explicitly (`tests.cases.snake_args` does the mechanical conversion). |
-| `input` | Exactly one of `{"structure": <crystallume.structure/1>}`, `{"text": "..."}`, `{"file": "path relative to tests/data"}`, `{"recipe": {"name": "...", "args": {...}}}`. Optional. |
+| `input` | Exactly one of `{"structure": <facet.structure/1>}`, `{"text": "..."}`, `{"file": "path relative to tests/data"}`, `{"recipe": {"name": "...", "args": {...}}}`. Optional. |
 | `expect` | What the op must produce; see the comparators. Required, not empty. |
 | `tol` | Tolerances: `positions` and `cell` (Å, default 1e-6), `value` (default 1e-9, used for every other number), `props` and `info` (default: `value`), or the name of an op-specific `expect` key. |
 | `skip` | `{"py": "reason"}` and/or `{"js": "reason"}`: do not run on that side. A reason is required. |
 | `xfail` | Same shape: a known defect. The case must fail on that side; once it passes, the test fails until the marker is removed (strict). |
 | `note` | Free text. |
 
-The loaders reject unknown keys, malformed values, duplicate ids, other `crystallume.cases/<n>` versions and invalid
+The loaders reject unknown keys, malformed values, duplicate ids, other `facet.cases/<n>` versions and invalid
 JSON (NaN and Infinity included) in a case file, with the same message in both languages.
 
 **Inputs.** The op gets the resolved input (`CaseInput`): `inp.kind`, `inp.raw` (the input as written), `inp.text`

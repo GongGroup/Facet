@@ -1,7 +1,7 @@
 """F0-D export check: ops of the shared cases ``tests/data/surface/f0d/export.json``.
 
-They test ``crystallume/io/capabilities.py``, :func:`crystallume.io.export_report` and
-``crystallume/analysis/contacts.py``; the JS halves, for ``web/js/io/capabilities.js``, ``exportReport`` in
+They test ``facet/io/capabilities.py``, :func:`facet.io.export_report` and
+``facet/analysis/contacts.py``; the JS halves, for ``web/js/io/capabilities.js``, ``exportReport`` in
 ``web/js/io/index.js`` and ``web/js/core/contacts.js``, are in ``tests/js/ops/f0d_export.mjs``:
 
 - ``writerCapabilities``: no input; ``value`` = ``{"table", "keys", "optional", "overlapCheckMaxAtoms",
@@ -20,9 +20,9 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
-from crystallume.analysis.contacts import close_contacts
-from crystallume.io import export_report, register_writer, unregister_writer, writers
-from crystallume.io.capabilities import (
+from facet.analysis.contacts import close_contacts
+from facet.io import export_report, register_writer, unregister_writer, writers
+from facet.io.capabilities import (
     CAPABILITY_VALUES,
     OCCUPANCY_TOLERANCE,
     OPTIONAL_CAPABILITIES,

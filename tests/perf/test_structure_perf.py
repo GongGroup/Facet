@@ -1,6 +1,6 @@
 """Timing budget of the structure data core (F0-D §7.6, M7 §7.5), Python side.
 
-``_remap`` and ``repeat`` within 5 ms for 216 atoms and 80 ms for 10 000, times ``CRYSTALLUME_PERF_FACTOR``
+``_remap`` and ``repeat`` within 5 ms for 216 atoms and 80 ms for 10 000, times ``FACET_PERF_FACTOR``
 (default 2).  ``_remap`` is measured as a permutation and as the ``extend`` of a structure whose ``poscar_species``
 column lacks the new element (the default of each new atom once scanned that column, O(n·m)), and the ``from_dict``
 padding of that column gets the same budget.  Marked ``slow``, so the default run leaves it out:
@@ -15,11 +15,11 @@ import time
 import numpy as np
 import pytest
 
-from crystallume import Structure, build
+from facet import Structure, build
 
 pytestmark = pytest.mark.slow
 
-FACTOR = float(os.environ.get("CRYSTALLUME_PERF_FACTOR") or 2)
+FACTOR = float(os.environ.get("FACET_PERF_FACTOR") or 2)
 BUDGET_MS = {216: 5.0, 10000: 80.0}
 
 

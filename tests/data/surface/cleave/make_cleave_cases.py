@@ -21,8 +21,8 @@ Where the expectations come from (see README.md):
   and the K8 labels) and refuses to write a case whose quoted value it does not reproduce;
 * names, warnings and errors are the texts of M2 §3.13 and §3.20 and of the ledgers, verbatim.
 
-Only numpy and this checkout's ``crystallume`` (to check the analytic bulks against the builders the ``bulk`` recipe
-calls and the covalent radii against ``crystallume/core/elements.py``) are needed.
+Only numpy and this checkout's ``facet`` (to check the analytic bulks against the builders the ``bulk`` recipe
+calls and the covalent radii against ``facet/core/elements.py``) are needed.
 """
 
 from __future__ import annotations
@@ -42,10 +42,10 @@ import numpy as np
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[3]
 DATA = REPO / "tests" / "data"
-SCHEMA = "crystallume.cases/1"
+SCHEMA = "facet.cases/1"
 
 # =============================================================================================== element data
-#: Cordero (2008) covalent radii (Å) of the elements used here, as in crystallume/core/elements.py (checked below).
+#: Cordero (2008) covalent radii (Å) of the elements used here, as in facet/core/elements.py (checked below).
 COV = {"H": 0.31, "C": 0.76, "O": 0.66, "Na": 1.66, "Al": 1.21, "Si": 1.11, "Cl": 1.02, "Ti": 1.60, "Fe": 1.32,
        "Co": 1.26, "Cu": 1.32, "Zn": 1.22, "Ga": 1.22, "As": 1.19, "Sr": 1.95, "Ru": 1.46, "Ag": 1.45, "La": 2.07,
        "Ce": 2.04, "Pt": 1.36, "Mo": 1.54, "S": 1.05, "Cr": 1.39}
@@ -2043,9 +2043,9 @@ E12D = ("a vacuum of 0 Å is only possible when cleaving (the slab then repeats 
 
 def structure_doc(name: str, symbols: list[str], cart: np.ndarray, cell: np.ndarray, pbc=(True, True, True),
                   props: dict | None = None, info: dict | None = None, exact: bool = False) -> dict:
-    """A ``crystallume.structure/1`` input (10 decimals, or every digit with *exact*)."""
+    """A ``facet.structure/1`` input (10 decimals, or every digit with *exact*)."""
     num = (lambda x: float(x) + 0.0) if exact else r10      # noqa: E731
-    return {"schema": "crystallume.structure/1", "name": name, "symbols": list(symbols),
+    return {"schema": "facet.structure/1", "name": name, "symbols": list(symbols),
             "positions": [[num(x) for x in r] for r in cart], "cell": [[num(x) for x in r] for r in cell],
             "pbc": list(pbc), "props": props or {}, "info": info or {}}
 
@@ -2448,7 +2448,7 @@ def load_case(cid: str, inp: dict, crys: Crystal, note: str, *, name: str | None
 
 def recipe_cases() -> list[dict]:
     """The ``bulk`` recipe in both languages against the analytic crystals (op ``load``, registered by F0-D)."""
-    from crystallume import build   # the builders the recipe calls: the analytic crystals must be what they build
+    from facet import build   # the builders the recipe calls: the analytic crystals must be what they build
 
     out = []
     table = [("fcc", ["Pt"], 3.92, None, {}), ("bcc", ["Fe"], 2.866, None, {}), ("hcp", ["Ru"], 2.71, 4.28, {}),
@@ -2581,8 +2581,8 @@ def all_files(*, keep_state: bool = True) -> dict[str, str]:
 
 
 def check_radii() -> None:
-    """The radii and electronegativities used here are the repository's (crystallume/core/elements.py)."""
-    from crystallume.core.elements import covalent_radius
+    """The radii and electronegativities used here are the repository's (facet/core/elements.py)."""
+    from facet.core.elements import covalent_radius
     for e, r in COV.items():
         assert abs(covalent_radius(e) - r) < 1e-12, (e, covalent_radius(e), r)
 

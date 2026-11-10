@@ -1,7 +1,7 @@
 """The node:test files in ``tests/js`` (``*.test.mjs``), run from pytest so that one ``pytest`` covers both languages,
 and the tests of the bridge itself (``tests/js_bridge.py``).
 
-Without Node.js >= 22 the JS tests are skipped; ``CRYSTALLUME_REQUIRE_NODE=1`` makes that a failure.  The JS files
+Without Node.js >= 22 the JS tests are skipped; ``FACET_REQUIRE_NODE=1`` makes that a failure.  The JS files
 also run on their own: ``node --test tests/js/*.test.mjs`` (pass the files, not the directory).
 """
 
@@ -121,7 +121,7 @@ def test_bridge_talks_utf8_whatever_the_locale(js, monkeypatch: pytest.MonkeyPat
 def test_run_js_imports_repository_modules(js):
     """``repo(rel)`` imports any module of the checkout (here the JS case helpers)."""
     got = js("const h = await repo('tests/js/helpers.mjs'); return [h.SCHEMA, h.REPO, h.WEB_JS];")
-    assert got[0] == "crystallume.cases/1"
+    assert got[0] == "facet.cases/1"
     assert Path(got[1]) == REPO and Path(got[2]) == WEB_JS
 
 
@@ -136,7 +136,7 @@ def test_run_js_reports_errors(js):
 
 
 def test_web_modules_load_as_es_modules():
-    """crystallume/web/js/package.json makes Node treat the web .js files as ES modules (no syntax sniffing)."""
+    """facet/web/js/package.json makes Node treat the web .js files as ES modules (no syntax sniffing)."""
     assert json.loads((WEB_JS / "package.json").read_text(encoding="utf-8")) == {"type": "module"}
 
 
@@ -160,39 +160,39 @@ def fake_node(tmp_path: Path):
     return make
 
 
-def test_find_node_follows_crystallume_node(monkeypatch: pytest.MonkeyPatch, fake_node, tmp_path: Path):
+def test_find_node_follows_facet_node(monkeypatch: pytest.MonkeyPatch, fake_node, tmp_path: Path):
     for off in ("0", "off", "False", "no"):
-        monkeypatch.setenv("CRYSTALLUME_NODE", off)
-        with pytest.raises(NodeUnavailable, match="disabled by CRYSTALLUME_NODE"):
+        monkeypatch.setenv("FACET_NODE", off)
+        with pytest.raises(NodeUnavailable, match="disabled by FACET_NODE"):
             find_node()
-    monkeypatch.setenv("CRYSTALLUME_NODE", str(tmp_path / "no-such-node"))
+    monkeypatch.setenv("FACET_NODE", str(tmp_path / "no-such-node"))
     with pytest.raises(NodeUnavailable, match="node not found"):
         find_node()
-    monkeypatch.setenv("CRYSTALLUME_NODE", fake_node("v20.18.1"))
+    monkeypatch.setenv("FACET_NODE", fake_node("v20.18.1"))
     with pytest.raises(NodeUnavailable, match=f"older than v{MIN_NODE_MAJOR}"):
         find_node()
-    monkeypatch.setenv("CRYSTALLUME_NODE", fake_node("not a version"))
+    monkeypatch.setenv("FACET_NODE", fake_node("not a version"))
     with pytest.raises(NodeUnavailable, match="unexpected"):
         find_node()
     node = fake_node("v24.1.0")
-    monkeypatch.setenv("CRYSTALLUME_NODE", node)
+    monkeypatch.setenv("FACET_NODE", node)
     assert find_node() == (node, (24, 1, 0))
-    monkeypatch.delenv("CRYSTALLUME_NODE")
+    monkeypatch.delenv("FACET_NODE")
     monkeypatch.setenv("PATH", str(tmp_path / "empty"))
     with pytest.raises(NodeUnavailable, match="not found on PATH"):
         find_node()
 
 
 def test_missing_node_skips_or_fails(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("CRYSTALLUME_NODE", "off")
-    monkeypatch.delenv("CRYSTALLUME_REQUIRE_NODE", raising=False)
+    monkeypatch.setenv("FACET_NODE", "off")
+    monkeypatch.delenv("FACET_REQUIRE_NODE", raising=False)
     with pytest.raises(pytest.skip.Exception, match=f"JS parity tests need Node.js >= {MIN_NODE_MAJOR}: disabled"):
         require_node()
     for on in ("1", "true", "YES"):
-        monkeypatch.setenv("CRYSTALLUME_REQUIRE_NODE", on)
-        with pytest.raises(pytest.fail.Exception, match="CRYSTALLUME_REQUIRE_NODE is set"):
+        monkeypatch.setenv("FACET_REQUIRE_NODE", on)
+        with pytest.raises(pytest.fail.Exception, match="FACET_REQUIRE_NODE is set"):
             require_node()
-    monkeypatch.setenv("CRYSTALLUME_REQUIRE_NODE", "0")
+    monkeypatch.setenv("FACET_REQUIRE_NODE", "0")
     with pytest.raises(pytest.skip.Exception):
         require_node()
 

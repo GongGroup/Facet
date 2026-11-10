@@ -6,12 +6,12 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import * as THREE from '../../crystallume/web/vendor/three/three.module.js';
-import { micVector, reduceBasis, dihedralFromVectors, signedAngle } from '../../crystallume/web/js/core/geometry.js';
-import { findPeriodicNeighbors } from '../../crystallume/web/js/core/bonds.js';
-import { ELEMENTS, element, covalentRadius, bondiRadius } from '../../crystallume/web/js/core/elements.js';
-import { measureValue } from '../../crystallume/web/js/render/viewer.js';
-import { geometryValue } from '../../crystallume/web/js/ui/selectioncard.js';
+import * as THREE from '../../facet/web/vendor/three/three.module.js';
+import { micVector, reduceBasis, dihedralFromVectors, signedAngle } from '../../facet/web/js/core/geometry.js';
+import { findPeriodicNeighbors } from '../../facet/web/js/core/bonds.js';
+import { ELEMENTS, element, covalentRadius, bondiRadius } from '../../facet/web/js/core/elements.js';
+import { measureValue } from '../../facet/web/js/render/viewer.js';
+import { geometryValue } from '../../facet/web/js/ui/selectioncard.js';
 import { repoPath } from './helpers.mjs';
 
 const A_PT = 3.92;
@@ -314,7 +314,7 @@ describe('dihedral angles (IUPAC, as Python get_dihedral)', () => {
 });
 
 describe('element radii', () => {
-  const data = JSON.parse(readFileSync(repoPath('crystallume/data/elements.json'), 'utf8')).elements;
+  const data = JSON.parse(readFileSync(repoPath('facet/data/elements.json'), 'utf8')).elements;
 
   test('covalent and Bondi radii are those of elements.json, element by element', () => {
     assert.equal(data.length, 103);

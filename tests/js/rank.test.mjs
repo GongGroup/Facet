@@ -1,10 +1,10 @@
-// Command palette ranking (crystallume/web/js/ui/rank.js; F0-A §3.16, ledger L-F0-52): without aliases it orders
+// Command palette ranking (facet/web/js/ui/rank.js; F0-A §3.16, ledger L-F0-52): without aliases it orders
 // exactly like the rankCommands that ui/shell.js had before (copied below as the reference); aliases (Materials
 // Studio names) score 5 points below the same kind of title match, and the result names the alias that matched.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const web = (rel) => new URL(`../../crystallume/web/js/${rel}`, import.meta.url);
+const web = (rel) => new URL(`../../facet/web/js/${rel}`, import.meta.url);
 const { rankCommands, CATEGORY_ORDER, ALIAS_PENALTY, byCategory, categoryRank, aliasesOf } = await import(web('ui/rank.js'));
 const shell = await import(web('ui/shell.js'));
 

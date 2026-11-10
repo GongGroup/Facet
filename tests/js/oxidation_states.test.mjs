@@ -1,5 +1,5 @@
 // Formal oxidation states of the cleave tool (build/surface.js segment M2-T2, M2 §3.9.1, ledger L-M2-06): the shared
-// table crystallume/web/data/oxidation_states.json, loadOxidationStates, estimateOxidationStates and formalCharges,
+// table facet/web/data/oxidation_states.json, loadOxidationStates, estimateOxidationStates and formalCharges,
 // and the element data they rest on (core/elements.js METALS, ANIONS, PAULING). tests/test_oxidation_states.py runs
 // the same cases on the Python twins; both files hold the same JSON constant PARITY_CASES (between the BEGIN and END
 // PARITY_CASES lines): compositions with the charges, their source and the notes, or the error, that both languages
@@ -9,14 +9,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { estimateOxidationStates, formalCharges, loadOxidationStates } from '../../crystallume/web/js/build/surface.js';
-import { setWebData, webData } from '../../crystallume/web/js/core/webdata.js';
-import { ANIONS, METALS, PAULING } from '../../crystallume/web/js/core/elements.js';
+import { estimateOxidationStates, formalCharges, loadOxidationStates } from '../../facet/web/js/build/surface.js';
+import { setWebData, webData } from '../../facet/web/js/core/webdata.js';
+import { ANIONS, METALS, PAULING } from '../../facet/web/js/core/elements.js';
 import { repoPath } from './helpers.mjs';
 
 const NOT_LOADED = 'oxidation states are not loaded yet; call await loadOxidationStates() first';
 const FILE = 'oxidation_states.json';
-const TABLE = JSON.parse(readFileSync(repoPath(`crystallume/web/data/${FILE}`), 'utf8'));
+const TABLE = JSON.parse(readFileSync(repoPath(`facet/web/data/${FILE}`), 'utf8'));
 
 // BEGIN PARITY_CASES (JSON: the same constant as in tests/test_oxidation_states.py)
 const PARITY_CASES = {
@@ -117,16 +117,16 @@ const PARITY_CASES = {
     {"id": "given charges as a list", "symbols": {"Sr": 1, "Ti": 1, "O": 3}, "given": [2, 4, -2], "kind": "type", "error": "charges must be a mapping of element symbols to charges"}
   ],
   "tables": [
-    {"id": "another schema", "table": {"schema": "crystallume.oxidation-states/2", "anions": {}, "cations": {}}, "error": "oxidation_states.json is not a crystallume.oxidation-states/1 table"},
-    {"id": "a list", "table": [], "error": "oxidation_states.json is not a crystallume.oxidation-states/1 table"},
-    {"id": "no cations", "table": {"schema": "crystallume.oxidation-states/1", "anions": {"O": -2}}, "error": "oxidation_states.json needs the objects anions and cations"},
-    {"id": "cations as a list", "table": {"schema": "crystallume.oxidation-states/1", "anions": {"O": -2}, "cations": []}, "error": "oxidation_states.json needs the objects anions and cations"},
-    {"id": "a positive anion charge", "table": {"schema": "crystallume.oxidation-states/1", "anions": {"O": 2}, "cations": {}}, "error": "oxidation_states.json: anions.O must be a negative whole number"},
-    {"id": "a fractional anion charge", "table": {"schema": "crystallume.oxidation-states/1", "anions": {"O": -1.5}, "cations": {}}, "error": "oxidation_states.json: anions.O must be a negative whole number"},
-    {"id": "no valences", "table": {"schema": "crystallume.oxidation-states/1", "anions": {"O": -2}, "cations": {"Fe": []}}, "error": "oxidation_states.json: cations.Fe must be a list of distinct positive whole numbers"},
-    {"id": "a repeated valence", "table": {"schema": "crystallume.oxidation-states/1", "anions": {"O": -2}, "cations": {"Fe": [3, 3]}}, "error": "oxidation_states.json: cations.Fe must be a list of distinct positive whole numbers"},
-    {"id": "a negative valence", "table": {"schema": "crystallume.oxidation-states/1", "anions": {"O": -2}, "cations": {"Fe": [3, -2]}}, "error": "oxidation_states.json: cations.Fe must be a list of distinct positive whole numbers"},
-    {"id": "a valence that is not a list", "table": {"schema": "crystallume.oxidation-states/1", "anions": {"O": -2}, "cations": {"Fe": 3}}, "error": "oxidation_states.json: cations.Fe must be a list of distinct positive whole numbers"}
+    {"id": "another schema", "table": {"schema": "facet.oxidation-states/2", "anions": {}, "cations": {}}, "error": "oxidation_states.json is not a facet.oxidation-states/1 table"},
+    {"id": "a list", "table": [], "error": "oxidation_states.json is not a facet.oxidation-states/1 table"},
+    {"id": "no cations", "table": {"schema": "facet.oxidation-states/1", "anions": {"O": -2}}, "error": "oxidation_states.json needs the objects anions and cations"},
+    {"id": "cations as a list", "table": {"schema": "facet.oxidation-states/1", "anions": {"O": -2}, "cations": []}, "error": "oxidation_states.json needs the objects anions and cations"},
+    {"id": "a positive anion charge", "table": {"schema": "facet.oxidation-states/1", "anions": {"O": 2}, "cations": {}}, "error": "oxidation_states.json: anions.O must be a negative whole number"},
+    {"id": "a fractional anion charge", "table": {"schema": "facet.oxidation-states/1", "anions": {"O": -1.5}, "cations": {}}, "error": "oxidation_states.json: anions.O must be a negative whole number"},
+    {"id": "no valences", "table": {"schema": "facet.oxidation-states/1", "anions": {"O": -2}, "cations": {"Fe": []}}, "error": "oxidation_states.json: cations.Fe must be a list of distinct positive whole numbers"},
+    {"id": "a repeated valence", "table": {"schema": "facet.oxidation-states/1", "anions": {"O": -2}, "cations": {"Fe": [3, 3]}}, "error": "oxidation_states.json: cations.Fe must be a list of distinct positive whole numbers"},
+    {"id": "a negative valence", "table": {"schema": "facet.oxidation-states/1", "anions": {"O": -2}, "cations": {"Fe": [3, -2]}}, "error": "oxidation_states.json: cations.Fe must be a list of distinct positive whole numbers"},
+    {"id": "a valence that is not a list", "table": {"schema": "facet.oxidation-states/1", "anions": {"O": -2}, "cations": {"Fe": 3}}, "error": "oxidation_states.json: cations.Fe must be a list of distinct positive whole numbers"}
   ]
 };
 // END PARITY_CASES
@@ -148,12 +148,12 @@ test('before the table is loaded the estimate throws instead of answering unknow
   assert.throws(() => estimateOxidationStates('SrTiO3'), { name: 'TypeError' });
 });
 
-test('loadOxidationStates reads crystallume/web/data/oxidation_states.json', async () => {
+test('loadOxidationStates reads facet/web/data/oxidation_states.json', async () => {
   const table = await loadOxidationStates();
   assert.deepEqual(table, TABLE);
   assert.equal(webData(FILE), table);
   assert.equal(await loadOxidationStates(), table, 'loaded once');
-  assert.equal(table.schema, 'crystallume.oxidation-states/1');
+  assert.equal(table.schema, 'facet.oxidation-states/1');
   for (const e of METALS) assert.ok(Object.hasOwn(table.cations, e), `${e} has cation valences`);
 });
 
@@ -209,10 +209,10 @@ test('twenty cations take no time (reachable sums instead of 3.5 million combina
   assert.ok(performance.now() - t0 < 500);
 });
 
-test('METALS, ANIONS and the Pauling electronegativities of every element (crystallume/data/elements.json)', () => {
+test('METALS, ANIONS and the Pauling electronegativities of every element (facet/data/elements.json)', () => {
   assert.equal(METALS.size, 72);
   assert.deepEqual([...ANIONS].sort(), ['As', 'Br', 'C', 'Cl', 'F', 'H', 'I', 'N', 'O', 'P', 'S', 'Se', 'Te']);
-  const records = JSON.parse(readFileSync(repoPath('crystallume/data/elements.json'), 'utf8')).elements;
+  const records = JSON.parse(readFileSync(repoPath('facet/data/elements.json'), 'utf8')).elements;
   for (const r of records) assert.equal(Object.hasOwn(PAULING, r.symbol) ? PAULING[r.symbol] : null, r.electronegativity, r.symbol);
   assert.deepEqual(Object.keys(PAULING).filter((s) => !records.some((r) => r.symbol === s)), []);
   assert.deepEqual(records.filter((r) => !Object.hasOwn(PAULING, r.symbol)).map((r) => r.symbol), ['He', 'Ne', 'Ar']);

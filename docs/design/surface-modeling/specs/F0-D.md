@@ -6,10 +6,10 @@
 
 - v1 原文保存在 `specs/F0-D.v1.md`。v2 的逐条修改见文末"修订记录"，未采纳的意见见"未采纳的意见"。
 - **v2 最大的变化**：按用户决定 U1–U4 删除了导入时识别 slab 的整条链（改 pbc、移动原子、toast、偏好开关、`detect_slab`），
-  改为只读的真空间隙原语；Crystallume 生成的 slab 一律 `pbc = [T, T, T]`；按消费方（F0-A、M1–M6）的期望定稿了全部接口（§10.0）。
+  改为只读的真空间隙原语；Facet 生成的 slab 一律 `pbc = [T, T, T]`；按消费方（F0-A、M1–M6）的期望定稿了全部接口（§10.0）。
 - 原型：v1 在 `scratchpad/proto/f0d/`，v2 在 `scratchpad/proto/f0d/v2/`（附录 A）。
 
-文中 `structure.py` = `crystallume/core/structure.py`，`structure.js` = `crystallume/web/js/core/structure.js`，行号指当前 HEAD。
+文中 `structure.py` = `facet/core/structure.py`，`structure.js` = `facet/web/js/core/structure.js`，行号指当前 HEAD。
 标记：**[V]** 本人运行验证，**[S]** 读源码确认，**[决定]** 本规格的决定（含理由），**[U]** 按用户决定修改。
 
 ---
@@ -43,13 +43,13 @@
 | K3 | 部分约束在基变换下"只收紧不放松"：`g_j = (b_j ∈ S)`，`S = span{a_k : f_k}`；不精确时警告 | 永不让固定方向变得可动；面内变换下 `[T,T,F]`、`[F,F,T]` 精确（两份审查独立复核） | 不变 |
 | K4 | extxyz 只写 ASE `move_mask`（U5/D5）；能写宽度 1 就写宽度 1；不得不写宽度 3 时给出导出警告（ASE 的 VASP 写出器忽略 `FixCartesian`，所有原子会被放开）；全部可动时省略 | 领域 F4 实测 ASE 3.29 静默丢约束 | **改** |
 | K5 | **[U]** 导入不做任何 slab 识别：不改 pbc、不移动原子、不弹提示；只提供只读的 `find_vacuum_gap` / `find_surface_gap` / `unwrap_along_gap`；`make_contiguous` 只供显式编辑调用 | U1 | **改**（原"导入检测"删除） |
-| K6 | **[U]** Crystallume 生成的 slab 一律 `pbc = [T, T, T]`；导入的文件保留文件里的 pbc；`set_pbc` 只改 pbc、无副作用 | U2 | **改**（原"断开复原"删除） |
+| K6 | **[U]** Facet 生成的 slab 一律 `pbc = [T, T, T]`；导入的文件保留文件里的 pbc；`set_pbc` 只改 pbc、无副作用 | U2 | **改**（原"断开复原"删除） |
 | K7 | `info.warnings` = 结构的持久备注（唯一键，去重）；读取器与编辑照常 `add_warning`；toast 只显示本步新增的备注（差集）；extxyz 不写 `warnings`；旧 `info.warning` 整条迁入 | 工程 #7、领域 F16：v1 会把一次性的警告在每次打开文件时重新弹出 | **改** |
 | K8 | 三个失效函数（空间群、计算结果、构建参数）+ 统一入口 `mark_edited(s, kind)`，一张表规定每种编辑清除什么 | 领域 F3/F17、工程 #6：编辑后陈旧的 DFT 能量会被写进导出文件，ASE 当成新结构的能量 | **改** |
 | K9 | 导出检查分两级：**警告**（影响计算或丢失数据）与**说明**（不影响计算）；POSCAR 的原子顺序提示降为说明；新增左手晶胞、原子重叠、`FixCartesian` 三项检查 | 领域 F6/F13；K9 原则本身不变 | **改** |
 | K10 | 现有方法的轨迹语义两种语言对齐到 Python：`wrap`、`repeat` 处理所有帧；C11"只作用于当前帧并丢弃其余帧"在**界面命令**层执行（`keep_frame`/`keepFrame`） | 保持 Python API 兼容；P1 | 补 `keepFrame` |
 | K11 | 二面角统一 IUPAC 符号（改 JS），核心函数两种语言都返回 [0, 360)，界面显示 (−180°, 180°] | Python/ASE 现行约定 | 升为"必须"（U5/D7） |
-| K12 | 测试桥：`tests/js_bridge.py` + `js` fixture + `tests/js/*.test.mjs`（由 Python 列出文件逐个传给 `node --test`）+ 公共用例外壳 `crystallume.cases/1`（所有模块共用）；**Node ≥ 22** | 工程 #9：`node --test 目录` 在 Node 22/24 上失败，Node 20 已停止维护 | **改** |
+| K12 | 测试桥：`tests/js_bridge.py` + `js` fixture + `tests/js/*.test.mjs`（由 Python 列出文件逐个传给 `node --test`）+ 公共用例外壳 `facet.cases/1`（所有模块共用）；**Node ≥ 22** | 工程 #9：`node --test 目录` 在 Node 22/24 上失败，Node 20 已停止维护 | **改** |
 | K13 | JS 修改计数名为 `rev`，`touch()` 递增并返回 `this` | F0-A A4 与 M1 已按此写（工程 #2 建议用 `version`，未采纳，见文末） | 新 |
 | K14 | 生成器的原子顺序推荐 `canonical_order`：先按元素分块（首次出现顺序），块内按层从下到上；POSCAR 物种行重复元素时用 `props.poscar_species` 保留各块 | 内存顺序 = POSCAR 顺序，CONTCAR 序号与界面一致；重复块（赝氢、反铁磁分块）往返不丢（领域 F6/F7） | 新 |
 | K15 | extxyz info 的写法与 ASE 互通：`stress`/`virial` 写 9 个数，一维数值/布尔列表写空格分隔，读回会变类型的字符串写成 `_JSON "…"`，只有嵌套、字典、字符串列表等才用 `_JSON`；数字解析只认 ASCII | 领域 F5、工程 #5/#12/#13：v1 写法让 ASE 打不开文件；原型 33 个键 × 4 个方向 0 处不一致，ASE 3.29 读得回 | 新 |
@@ -108,18 +108,18 @@ v2 原型（`proto/f0d/v2/`，本次）：
    部分占位的 CIF 导出 POSCAR 时，重叠原子与"占位丢失"各有一条警告。
 6. **石墨烯 / MoS2 单层**：内置二维原型保持 `pbc = [T, T, F]`，从 POSCAR 导入的单层保持文件的 T T T（U2）；改真空用 M2 的工具
    （`find_vacuum_gap(..., periodic_only=False)` 也能量出 TTF 结构 c 方向的间隙）；导出 POSCAR 时给出说明"c 不是周期方向，按 15.0 Å 的间隙写成周期"。
-7. **ASE 工作流**：Crystallume 写出的 extxyz 被 `ase.io.read` 读成 `FixAtoms`/`FixCartesian`、`tags`、`info["surface"]`；ASE 写出的 extxyz
+7. **ASE 工作流**：Facet 写出的 extxyz 被 `ase.io.read` 读成 `FixAtoms`/`FixCartesian`、`tags`、`info["surface"]`；ASE 写出的 extxyz
    （含 `move_mask`、`tags`、`_JSON`、`stress`）两种语言读回同样的 props/info，再写出后 ASE 仍能读回（K15）。有部分约束时，导出警告提醒
-   "经 ASE 写 POSCAR 会丢约束，请从 Crystallume 导出 POSCAR"（K4）。
+   "经 ASE 写 POSCAR 会丢约束，请从 Facet 导出 POSCAR"（K4）。
 8. **Python 脚本**：`s = cl.read("CONTCAR")`；`s.append("O", p)` 后 SD 不再丢失；`with s.track_changes() as t: ...` 之后 `t.src` 就是新旧原子的对应关系；
    `cl.write("x.cif", s)` 发出 `ExportWarning`。
 9. **服务器/插件**：插件写出器签名不变（`func(structure) -> str`），可声明能力表；`/io/export` 响应新增 `warnings`、`notes`；
-   CLI 在 stderr 打印 `crystallume: warning: …` / `crystallume: note: …`。
+   CLI 在 stderr 打印 `facet: warning: …` / `facet: note: …`。
 10. **大体系**：Pt(111) p(6×6) 6 层（216 原子）与 1 万原子 slab：本模块所有操作在预算内（§7.6）。
 
 ### 1.2 与 Materials Studio 对照
 
-| 方面 | Materials Studio | Crystallume（F0-D 之后） | 差异及理由 |
+| 方面 | Materials Studio | Facet（F0-D 之后） | 差异及理由 |
 |---|---|---|---|
 | 约束存储 | Modify › Constraints：逐原子"Fix Cartesian position"或"Fix fractional position"，可分 X/Y/Z 或 A/B/C | `props.selective_dynamics`，True = 沿 a/b/c 可动（VASP 语义） | 只存晶格系一种（与 VASP、pymatgen 一致）；笛卡尔约束只在 extxyz 交换时换算（K4） |
 | 晶胞变化后的约束 | 分数约束随晶胞基变化（MS 的具体行为未核实） | K3：精确时保持，否则收紧并写备注 | 明确、可测试；永不放松 |
@@ -151,7 +151,7 @@ v2 原型（`proto/f0d/v2/`，本次）：
 | M-13 | extxyz 两种语言（D5） | ASE 词法；ASCII 数值转换；`move_mask` 读写（宽度规则）；旧 `selective_dynamics:L:3` 读取；`charge`→`charges`；`tags`；与 ASE 互通的 info 写法（K15）；JS 读写器补齐所有列与 info；多帧结果只写第 1 帧 | §3.11 |
 | M-14 | 导出检查 | 能力表（含插件声明与校验）；`export_report` → 警告与说明；左手晶胞、原子重叠、FixCartesian 提醒；`ExportResponse.warnings/notes`；网页 toast 与 Export notes；CLI stderr；Python `write()` 发 `ExportWarning`；JS `exportStructure` 的同步契约 | §3.12 |
 | M-15 | 真空间隙原语（U1） | `find_vacuum_gap`、`find_vacuum_gaps`、`find_surface_gap`、`gap_cut`、`unwrap_along_gap`、`make_contiguous`（仅显式编辑）、`vacuum_gap_hint`；CLI `info` 的中性一行 | 阈值 5.0 Å |
-| M-16 | 跨语言测试桥与公共用例格式 | §7.1 的文件布局、fixture、标记、环境变量；`crystallume.cases/1` 外壳与递归加载器，供所有模块使用 | Node ≥ 22 |
+| M-16 | 跨语言测试桥与公共用例格式 | §7.1 的文件布局、fixture、标记、环境变量；`facet.cases/1` 外壳与递归加载器，供所有模块使用 | Node ≥ 22 |
 | M-17 | 二面角符号统一（D7，原 S-3） | JS 改为 IUPAC；新 `core/geometry.js` 一处实现，查看器与选区卡片共用 | (−180°, 180°] 显示 |
 | M-18 | JS 修改计数（原 S-4） | `rev` 与 `touch()`，所有修改方法递增；供 F0-A 的 `structureKey` | 0 |
 | M-19 | 默认参数表与元素数据对齐（D7，原 S-7） | 逐项取更准确的晶格常数；按化合物的纤锌矿 `u` 与 MX2 厚度；JS 移植参考表；Bk–Lr 共价半径；未知元素回退值；`bondiRadius` | §3.15 |
@@ -172,7 +172,7 @@ v2 原型（`proto/f0d/v2/`，本次）：
 
 | # | 功能 | 说明 |
 |---|---|---|
-| O-1 | `/io/convert` 响应头 `X-Crystallume-Warnings` | URL 编码的 JSON 列表 |
+| O-1 | `/io/convert` 响应头 `X-Facet-Warnings` | URL 编码的 JSON 列表 |
 | O-2 | JS POSCAR 写出无晶胞结构时装箱 | 与 Python 完全相同的规则（每侧 10 Å，§3.12.2 W3）；现在抛错，文案清楚 |
 | O-3 | extxyz 写出选项 `constraints="fix-partial"` | 把部分约束收紧为完全固定，从而写宽度 1（ASE 读成 FixAtoms，经 ASE 写 POSCAR 不丢）；只收紧（K3）；默认 `exact` |
 | O-4 | POSCAR 写出选项 `order="keep"` | 按内存顺序写连续的同元素块（元素名可重复，ASE `sort=False` 的写法）；提醒 VASP MLFF 不接受重复名 |
@@ -367,7 +367,7 @@ _remap(src, ...):
 模块级新增（§6.1 列全）：`PROP_DEFAULTS`、`PROP_SYMBOL_DEFAULT`、`PROP_SHAPED_ZERO`、`RESULT_PROPS`、`RESULT_INFO`、`SYMMETRY_INFO_KEYS`、
 `BUILD_INFO_KEYS`、`CARTESIAN_VECTOR_PROPS`、`copy_value`、`poscar_order`、`canonical_order`、`invert_source_map`、`compose_source_maps`、
 `add_warning`、`get_warnings`、`new_warnings`、`normalize_warnings`、`invalidate_symmetry_info`、`invalidate_results`、`invalidate_build_info`、
-`mark_edited`、`rotate_vector_props`、`concat_structures`、`ChangeTracker`；加入 `__all__`，并在 `crystallume/core/__init__.py` 再导出其中常用的
+`mark_edited`、`rotate_vector_props`、`concat_structures`、`ChangeTracker`；加入 `__all__`，并在 `facet/core/__init__.py` 再导出其中常用的
 （`PROP_DEFAULTS`、`mark_edited`、`invalidate_symmetry_info`、`add_warning`、`get_warnings`、`poscar_order`、`concat_structures`）。
 
 #### 3.5.2 JS `Structure`（`structure.js`）
@@ -420,7 +420,7 @@ concat_structures(parts, *, cell=None, pbc=None, defaults=None, renumber_adsorba
     不能拆分）。在 `from_dict`/`fromJSON` 中调用，0.3.1 网页保存的项目在两边都会被迁移。
 - **显示规则**：
   - toast 只显示**本步新增**的备注：F0-A 的 `editActive`、`addStructure` 与导入流程取 `new_warnings(之前, 之后)`（新结构的"之前"为空）；
-    Crystallume JSON 文件自带的备注是存档内容，打开时不弹出（§5.1）。
+    Facet JSON 文件自带的备注是存档内容，打开时不弹出（§5.1）。
   - 全部备注在结构面板 Summary 下以 `Notes (3)` 折叠列表显示，带 `Clear notes` 按钮（一步撤销，§5.2）。
   - CLI `info` 照旧逐条打印 `Warning     : …`；REST `/io/parse` 的 `warnings` 照旧为解析结果的全部备注（`server/routes/io.py:48-49`）。
 - **继承规则**：保持原子身份的派生（`copy`/`clone`、`repeat`、`select`、`get_frame`、`concat_structures` 取 `parts[0]`）深拷贝备注；
@@ -468,7 +468,7 @@ CARTESIAN_VECTOR_PROPS = ("velocities", "momenta", "initial_magmoms")           
 
 - 对角超胞也删除逐原子 `forces`（工程 #6 建议保留；未采纳，理由见文末：与 ASE 一致、规则只有一条）。
 - 改约束、tags、`adsorbate_id`、labels 等属性不调用 `mark_edited`。
-- **今天**：没有任何代码清除这些键——在 CIF 体相上删一个原子后，结构面板（`ui/panels/structure.js:112`）与 `crystallume info`（`cli.py:264`）
+- **今天**：没有任何代码清除这些键——在 CIF 体相上删一个原子后，结构面板（`ui/panels/structure.js:112`）与 `facet info`（`cli.py:264`）
   仍显示原空间群；extxyz 照样写出旧能量。
 - 本模块中的调用点见 §3.5；后续模块的调用要求见 §10（M1：`"cell"`、`"rotate"`；M2：新 slab 从新的 info 开始，改真空 `"cell"`；M4：`"positions"`、
   `"atoms"`；M5：`"atoms"`；M6：`concat_structures` 已调用）。
@@ -486,7 +486,7 @@ CARTESIAN_VECTOR_PROPS = ("velocities", "momenta", "initial_magmoms")           
 | 内容 | 归属 | 名字 |
 |---|---|---|
 | 读取标志、只读查询 | F0-D（第 0 波，导出检查要用） | `Structure.get_move_mask()`、`Structure.constraint_summary()`（M3 §3.10.2 的定义与返回字段） |
-| 基变换与换算（纯函数） | F0-D `crystallume/core/constraints.py`、`web/js/core/constraints.js` | `transform_move_flags`、`lattice_to_cartesian_mask`、`cartesian_to_lattice_flags`、`apply_basis_change`、`next_adsorbate_id`、`FLAG_RE`、`FLAG_TOL` |
+| 基变换与换算（纯函数） | F0-D `facet/core/constraints.py`、`web/js/core/constraints.js` | `transform_move_flags`、`lattice_to_cartesian_mask`、`cartesian_to_lattice_flags`、`apply_basis_change`、`next_adsorbate_id`、`FLAG_RE`、`FLAG_TOL` |
 | 编辑与界面标签 | M3（第 2 波） | `Structure.fix/free/fix_layers/fixed_indices`、`axis_labels(cell)`（逐轴规则，六方 slab 得 `['a','y','z']`）、`cartesian_to_flags(cell, fixed_xyz)`（**True = 固定**，用 `cartesian_to_lattice_flags` 实现，不精确时返回 `None`，保证界面标签与文件换算用同一判据） |
 
 v1 的 `has_constraints`、`move_flags`、`set_move_flags`、`clear_constraints`、`constraint_counts`、`constraint_axis_names` 全部删除（由上表的函数覆盖）。
@@ -690,7 +690,7 @@ parts ← 按 [ \t,]+ 切分（只认 ASCII 空格、制表符与逗号），去
 
 ```text
 mm  ← 弹出列 move_mask（若有；ASE 语义：True = 可动，笛卡尔）
-old ← 弹出列 selective_dynamics（若有；Crystallume ≤ 0.3.1 写的 L:3，晶格系）
+old ← 弹出列 selective_dynamics（若有；Facet ≤ 0.3.1 写的 L:3，晶格系）
 mm 存在：
     宽度 1 → 每原子 [b, b, b]
     宽度 3 → cartesian_to_lattice_flags(mm, cell)；收紧 > 0 → 备注
@@ -754,7 +754,7 @@ escape(s) ← s 为空，或含空白、引号、=、{}、[]、\ 时：'"' + s.r
 - 注释行顺序：`Lattice`（有晶胞时）`Properties` `pbc` `name` 其余 info。无晶胞时扩展格式也写 `Properties` 与 `pbc="F F F"`（JS 今天只写名字，`io/xyz.js:105-106`）。
 - 读取：所有非保留键经 `convert_value` 进 info；`name` → 结构名；剩余文字 → `info.comment`（Python 现行为，JS 补上）。文件里的 `warnings` 键当普通键读入
   （我们从不写它；外来文件若有，作为备注在导入时显示一次）。
-- M4 的剪贴板键 `crystallume_clip=<id>` 按普通字符串往返（用例见 §7.3）。
+- M4 的剪贴板键 `facet_clip=<id>` 按普通字符串往返（用例见 §7.3）。
 
 #### 3.11.7 多帧（S-5）
 
@@ -764,11 +764,11 @@ escape(s) ← s 为空，或含空白、引号、=、{}、[]、\ 时：'"' + s.r
 
 ### 3.12 导出检查
 
-#### 3.12.1 能力表（两种语言内容相同，Python `crystallume/io/capabilities.py`，JS `crystallume/web/js/io/capabilities.js`）
+#### 3.12.1 能力表（两种语言内容相同，Python `facet/io/capabilities.py`，JS `facet/web/js/io/capabilities.js`）
 
 | 写出器 id | `label` | `frames` | `cell` | `constraints` | `occupancy` | `order` | `pbc` | `overlap` | `handedness` |
 |---|---|---|---|---|---|---|---|---|---|
-| `json` | Crystallume JSON | `all` | `true` | `lattice` | `true` | `keep` | `stored` | `false` | `false` |
+| `json` | Facet JSON | `all` | `true` | `lattice` | `true` | `keep` | `stored` | `false` | `false` |
 | `extxyz` | Extended XYZ | `all` | `true` | `cartesian` | `true` | `keep` | `stored` | `true` | `false` |
 | `xyz` | plain XYZ | `all` | `false` | `none` | `false` | `keep` | `none` | `false` | `false` |
 | `poscar` | POSCAR | `one` | `required` | `lattice` | `false` | `species` | `periodic` | `true` | `true` |
@@ -797,11 +797,11 @@ W2  cell == false 且 有晶胞                 → "plain XYZ does not store th
 W3  cell == "required" 且 无晶胞（Python；JS 仅在 O-2 后）
                                             → "{F} needs a unit cell: the atoms were placed in a box with 10 Å of vacuum on each side (20 Å between periodic images)"
 W4  c.fixed + c.partial > 0 且 constraints == "none"
-                                            → "{m} atom(s) are fixed or partly fixed (selective dynamics), but {F} cannot store constraints; use POSCAR, Extended XYZ or Crystallume JSON to keep them"
+                                            → "{m} atom(s) are fixed or partly fixed (selective dynamics), but {F} cannot store constraints; use POSCAR, Extended XYZ or Facet JSON to keep them"
 W5  constraints == "cartesian" 且 lattice_to_cartesian_mask 收紧 t > 0
                                             → "Extended XYZ stores constraints along x, y and z (ASE move_mask): the partial constraints of {t} atom(s) are along cell vectors that are not x, y or z and were tightened; POSCAR keeps them exactly"
 W6  constraints == "cartesian" 且 写出的 move_mask 宽度为 3
-                                            → "Extended XYZ stores these constraints as ASE FixCartesian masks because {p} atom(s) are only partly fixed; ASE's VASP writer ignores FixCartesian and would write every atom as free, so export POSCAR from Crystallume for VASP"
+                                            → "Extended XYZ stores these constraints as ASE FixCartesian masks because {p} atom(s) are only partly fixed; ASE's VASP writer ignores FixCartesian and would write every atom as free, so export POSCAR from Facet for VASP"
 W7  occupancy == false 且 |occupancy − 1| > 1e-6 的个数 q > 0
                                             → "{q} site(s) are partially occupied, but {F} cannot store occupancy; they are written as full atoms"
 W8  extxyz：extxyz_columns 的每个 skipped  → "property '{key}' was not written: {reason}"
@@ -824,7 +824,7 @@ N2  format == poscar 且 某轴 pbc 为 F 且有晶胞
 
 #### 3.12.3 `close_contacts(structure, cutoff=None, *, pbc=None, limit=None)`（新，S-3）
 
-Python `crystallume/analysis/contacts.py`，JS `web/js/core/contacts.js`（新文件，不改现有的成键代码：`findPeriodicNeighbors` 与 `neighbor_arrays`
+Python `facet/analysis/contacts.py`，JS `web/js/core/contacts.js`（新文件，不改现有的成键代码：`findPeriodicNeighbors` 与 `neighbor_arrays`
 会丢掉小于 0.4/0.1 Å 的原子对，正好漏掉重叠）。
 
 ```text
@@ -841,18 +841,18 @@ cutoff ← cutoff ?? SURFACE_DEFAULTS.overlap_distance（0.5 Å）；pbc ← pbc
 | 通道 | 行为 |
 |---|---|
 | Python `to_text(s, fmt)` | 不变，不发警告（纯函数，服务器与 CLI 自己取报告） |
-| Python `write(dest, s, format)`（`io/__init__.py:410`） | 写完后对每条**警告** `warnings.warn(msg, ExportWarning, stacklevel=2)`；说明不发；`ExportWarning(UserWarning)` 定义在 `crystallume.io` 并导出 |
+| Python `write(dest, s, format)`（`io/__init__.py:410`） | 写完后对每条**警告** `warnings.warn(msg, ExportWarning, stacklevel=2)`；说明不发；`ExportWarning(UserWarning)` 定义在 `facet.io` 并导出 |
 | REST `POST /io/export` | `ExportResponse.warnings: list[str] = []`、`notes: list[str] = []`（附加字段，`server/models.py:135-138`） |
 | 客户端 | `export_structure(...)` 不变；新增 `export_structure_with_warnings(structure, format) -> ExportResult`（`text`、`filename`、`mimetype`、`warnings`、`notes`；工程 #23：不让返回类型随参数变化） |
-| CLI | `convert` 与 `build … -o`（`_write_or_print`，`cli.py:131-150`）写文件后逐条 `crystallume: warning: …` / `crystallume: note: …` 到 stderr；内部用 `warnings.catch_warnings()` 屏蔽 `ExportWarning` 以免重复；退出码不变 |
+| CLI | `convert` 与 `build … -o`（`_write_or_print`，`cli.py:131-150`）写文件后逐条 `facet: warning: …` / `facet: note: …` 到 stderr；内部用 `warnings.catch_warnings()` 屏蔽 `ExportWarning` 以免重复；退出码不变 |
 | JS `exportStructure(s, id)` | 返回 `{text, filename, mime, warnings, notes}`，契约见 §3.12.5 |
 | 网页 `app.exportStructureFile` | 见 §5.3 |
-| 公共 JS API | `crystallume.exportText(format, s)` 不变；新增 `crystallume.exportReport(format, s = app.structure) → {warnings, notes}`（同步，所有格式） |
+| 公共 JS API | `facet.exportText(format, s)` 不变；新增 `facet.exportReport(format, s = app.structure) → {warnings, notes}`（同步，所有格式） |
 
 #### 3.12.5 JS `exportStructure` 的同步契约与服务器格式（工程 #11）
 
 - `exportStructure` **保持同步**（`io/index.js:96-102`）。`warnings`、`notes` 总是普通数组，由本地 `exportReport` 算出；`text` 对本地格式是字符串，
-  对服务器格式照旧是 Promise（今天即如此）。因此 `crystallume.exportText(...)`（`api/public.js:303`）与嵌入页白名单里的 `exportText`（`api/embed.js:21`）行为不变。
+  对服务器格式照旧是 Promise（今天即如此）。因此 `facet.exportText(...)`（`api/public.js:303`）与嵌入页白名单里的 `exportText`（`api/embed.js:21`）行为不变。
 - `installServerFormats`（`api/extensions.js:176-195`）把 `GET /formats` 中写出器的 `capabilities` 抄进注册项，于是服务器格式的警告也在本地同步算出，
   且与服务器响应里的 `warnings` 由同一张表决定（P1）。插件契约 `write(structure) → string | Promise<string>` 不变。
 - `app.exportStructureFile` 已经 `await out.text`（`app.js:1320-1321`），警告直接读 `out.warnings`。单元测试用假 store 覆盖服务器格式。
@@ -861,7 +861,7 @@ cutoff ← cutoff ?? SURFACE_DEFAULTS.overlap_distance（0.5 Å）；pbc ← pbc
 
 U1：导入时的 slab 识别"要做，但要无感"——只提供内部的真空间隙检测，供（1）显示、（2）层分析与吸附位点判断上下表面、（3）slab 工具使用；
 不改 pbc、不改结构、不改导出；slab 与非 slab 不做任何其他区分。本节的函数**全部只读**，只有 §3.13.4 的 `make_contiguous` 修改坐标，且只供显式编辑调用。
-Python 在新文件 `crystallume/analysis/vacuum.py`（加入 `analysis.__all__`），JS 在新文件 `web/js/core/vacuum.js`。
+Python 在新文件 `facet/analysis/vacuum.py`（加入 `analysis.__all__`），JS 在新文件 `web/js/core/vacuum.js`。
 
 #### 3.13.1 `find_vacuum_gap`
 
@@ -947,7 +947,7 @@ ASE 的名字、做输入校验，并在 JS 中 `touch()`（直接给 `pbc` 赋�
 
 ### 3.14 命名基础（C9，S-1）
 
-`crystallume/core/naming.py` 与 `crystallume/web/js/core/naming.js`：
+`facet/core/naming.py` 与 `facet/web/js/core/naming.js`：
 
 ```text
 TIMES = "×"
@@ -971,7 +971,7 @@ add_repeat_suffix(name, reps):
 
 - 事实 [V，两份审查独立复核]：JS `measureValue`（`render/viewer.js:1949-1961`）与 `geometryValue`（`ui/selectioncard.js:54-64`）用
   `atan2((n1 × b̂2)·n2, n1·n2)`，恰为 IUPAC 符号的相反数；Python `dihedral_from_vectors`（`analysis/geometry.py:52-65`）为 IUPAC，[0, 360)，与 ASE 一致。
-- 新 `crystallume/web/js/core/geometry.js` 导出 `dihedralFromVectors(b0, b1, b2)`（公式与 Python 逐项相同，返回 [0, 360)）与 `signedAngle(deg)`（映射到 (−180, 180]）；
+- 新 `facet/web/js/core/geometry.js` 导出 `dihedralFromVectors(b0, b1, b2)`（公式与 Python 逐项相同，返回 [0, 360)）与 `signedAngle(deg)`（映射到 (−180, 180]）；
   查看器与选区卡片都显示 `signedAngle(dihedralFromVectors(...))`。M4 的"设定二面角"用同一函数（不再另写 `dihedralDeg`）。
 - 影响：网页上显示的二面角符号翻转（这是更正）。
 
@@ -999,7 +999,7 @@ add_repeat_suffix(name, reps):
 
 #### 3.15.3 元素数据（M-19、K16）
 
-- 共价半径：H–Cm 两边相同；Bk–Lr 7 个值不同 → JS 表改用 `crystallume/data/elements.json` 的值 [V]。
+- 共价半径：H–Cm 两边相同；Bk–Lr 7 个值不同 → JS 表改用 `facet/data/elements.json` 的值 [V]。
 - 未知元素/`X` 的共价半径：Python 1.5 Å、JS 0.5 Å → 两边 0.5 Å（Python `covalent_radius` 的回退值）。
 - **Bondi 半径**（M6 层间距默认值要用，工程 #2）：`elements.json` 增加 `bondiRadius`（Bondi 1964；Mantina 等 2009 补充的主族元素；没有的为 null），
   Python `bondi_radius(symbol) -> float | None`，JS `element(sym).rbondi`（`core/elements.js` 的数据表增加一列，`-` 表示 null），测试逐元素核对。
@@ -1010,7 +1010,7 @@ add_repeat_suffix(name, reps):
 ### 3.16 容差与常量（C10，S-2）
 
 ```python
-# crystallume/core/defaults.py（新）
+# facet/core/defaults.py（新）
 SURFACE_DEFAULTS = Defaults(           # 只读：同时支持 SURFACE_DEFAULTS.vacuum_gap_min 与 SURFACE_DEFAULTS["vacuum_gap_min"]
     vacuum_gap_min=5.0,                # Å：U1 真空间隙；M3 find_layers 共用
     flag_tolerance=1e-6,               # 相对：约束基变换 in_span
@@ -1021,7 +1021,7 @@ SURFACE_DEFAULTS = Defaults(           # 只读：同时支持 SURFACE_DEFAULTS.
 ```
 
 ```js
-// crystallume/web/js/core/defaults.js（新）
+// facet/web/js/core/defaults.js（新）
 export const SURFACE_DEFAULTS = Object.freeze({ vacuumGapMin: 5.0, flagTolerance: 1e-6, positionTolerance: 1e-5, overlapDistance: 0.5 /* … */ });
 ```
 
@@ -1100,7 +1100,7 @@ export const SURFACE_DEFAULTS = Object.freeze({ vacuumGapMin: 5.0, flagTolerance
 - 打开任何文件都**不做** slab 检测，pbc 与坐标与文件一致（U1）。
 - toast（`role="status"`，已有 aria-live）照旧 `Loaded CONTCAR — 36 atoms`；只附上**读取器本次写入**的备注（`getWarnings(structure.info)`，`app.js:901-902`
   今天读 `info.warning`）：一条时放在括号里，多条时 `Loaded CONTCAR — 36 atoms (selective dynamics: 4 line(s) had … ; +2 more)`，按钮 `Details` 打开对话框
-  `Notes for CONTCAR`，逐条列出。Crystallume JSON 文件自带的备注是存档内容，不弹出。
+  `Notes for CONTCAR`，逐条列出。Facet JSON 文件自带的备注是存档内容，不弹出。
 - 粘贴导入（`ui/shell.js:992`、`:1012`）今天不显示读取备注，改为同样的规则（工程 #7）。
 
 ### 5.2 结构面板（`ui/panels/structure.js`）
@@ -1157,7 +1157,7 @@ export const SURFACE_DEFAULTS = Object.freeze({ vacuumGapMin: 5.0, flagTolerance
 ### 6.1 Python
 
 ```python
-# crystallume/core/structure.py
+# facet/core/structure.py
 PROP_DEFAULTS: Mapping; PROP_SYMBOL_DEFAULT: tuple; PROP_SHAPED_ZERO: tuple; RESULT_PROPS: tuple; RESULT_INFO: tuple
 SYMMETRY_INFO_KEYS: tuple; BUILD_INFO_KEYS: tuple; CARTESIAN_VECTOR_PROPS: tuple; EDIT_KINDS: tuple
 def copy_value(v): ...
@@ -1199,7 +1199,7 @@ class Structure:
     def extend(self, other, *, renumber_adsorbates=True) -> Structure   # 变化
     # 变化：__init__, copy, from_dict, get_frame, delete, select, append, repeat, center, wrap（§3.5.1）
 
-# crystallume/core/constraints.py（§3.8.2）
+# facet/core/constraints.py（§3.8.2）
 MOVE_FLAGS_KEY = "selective_dynamics"; FLAG_RE; FLAG_TOL = SURFACE_DEFAULTS.flag_tolerance
 def transform_move_flags(flags, old_vectors, new_vectors, tol=FLAG_TOL) -> tuple[list[list[bool]], int]
 def lattice_to_cartesian_mask(flags, cell, tol=FLAG_TOL) -> tuple[list[list[bool]], int]
@@ -1207,12 +1207,12 @@ def cartesian_to_lattice_flags(mask, cell, tol=FLAG_TOL) -> tuple[list[list[bool
 def apply_basis_change(structure, old_vectors, new_vectors) -> int       # 原位；收紧数 > 0 时写备注
 def next_adsorbate_id(structure) -> int
 
-# crystallume/core/defaults.py: SURFACE_DEFAULTS（只读，属性与下标两种访问）
-# crystallume/core/naming.py: TIMES, format_repeat(reps), add_repeat_suffix(name, reps)
-# crystallume/core/lattice.py: wrap_fractional(frac, pbc=(True, True, True), eps=1e-12) -> ndarray   （M1 继续扩展此文件）
-# crystallume/core/elements.py: bondi_radius(symbol) -> float | None；covalent_radius 未知元素回退 0.5
+# facet/core/defaults.py: SURFACE_DEFAULTS（只读，属性与下标两种访问）
+# facet/core/naming.py: TIMES, format_repeat(reps), add_repeat_suffix(name, reps)
+# facet/core/lattice.py: wrap_fractional(frac, pbc=(True, True, True), eps=1e-12) -> ndarray   （M1 继续扩展此文件）
+# facet/core/elements.py: bondi_radius(symbol) -> float | None；covalent_radius 未知元素回退 0.5
 
-# crystallume/analysis/vacuum.py（新，加入 analysis.__all__）
+# facet/analysis/vacuum.py（新，加入 analysis.__all__）
 def find_vacuum_gap(structure, axis=None, *, min_width=None, frame=None, periodic_only=True) -> dict | None
 def find_vacuum_gaps(structure, *, frame=None, periodic_only=True) -> list[dict | None]
 def find_surface_gap(structure, *, frame=None) -> dict | None
@@ -1221,10 +1221,10 @@ def unwrap_along_gap(frac, gap)                        # float 或 ndarray
 def make_contiguous(structure, axis, *, gap=None, frame=None) -> int
 def vacuum_gap_hint(structure) -> str
 
-# crystallume/analysis/contacts.py（新）
+# facet/analysis/contacts.py（新）
 def close_contacts(structure, cutoff=None, *, pbc=None, limit=None) -> list[tuple[int, int, float]]
 
-# crystallume/io/__init__.py
+# facet/io/__init__.py
 class ExportWarning(UserWarning)
 def export_report(structure, format: str, *, frame: int | None = None) -> dict    # {"warnings": [...], "notes": [...]}
 def export_warnings(structure, format: str, *, frame: int | None = None) -> list[str]
@@ -1232,10 +1232,10 @@ def export_notes(structure, format: str, *, frame: int | None = None) -> list[st
 def register_writer(name, func, extensions=(), description="", *, mimetype="text/plain", source="builtin", capabilities=None)
 def write(dest, structure, format=None) -> None                                   # + ExportWarning
 # parse_text / read：签名不变（v1 的 detect_slab 删除）
-# crystallume/io/capabilities.py: WRITER_CAPABILITIES, validate_capabilities(name, caps)
-# crystallume/io/xyz.py: kv_tokenize(line), convert_value(raw), format_info_value(key, value), extxyz_columns(structure)
+# facet/io/capabilities.py: WRITER_CAPABILITIES, validate_capabilities(name, caps)
+# facet/io/xyz.py: kv_tokenize(line), convert_value(raw), format_info_value(key, value), extxyz_columns(structure)
 #   write_extxyz(structure, *, constraints="exact")          （O-3："fix-partial"）
-# crystallume/io/poscar.py: read_poscar（块标签、XDATCAR 帧），write_poscar(structure, *, order="species")   （O-4："keep"）
+# facet/io/poscar.py: read_poscar（块标签、XDATCAR 帧），write_poscar(structure, *, order="species")   （O-4："keep"）
 ```
 
 ### 6.2 JavaScript
@@ -1271,8 +1271,8 @@ class Structure {
 // io/xyz.js — kvTokenize, convertValue, formatInfoValue, extxyzColumns
 ```
 
-公共 API（`api/public.js`）：`crystallume.exportReport(format, s = app.structure)`、`crystallume.analysis.vacuumGap(s = app.structure, axis = null)`，
-以及 F0-A 的 `crystallume.edit` 命名空间下：`sortBySpecies(order?)`、`clearNotes()`（都可撤销）。
+公共 API（`api/public.js`）：`facet.exportReport(format, s = app.structure)`、`facet.analysis.vacuumGap(s = app.structure, axis = null)`，
+以及 F0-A 的 `facet.edit` 命名空间下：`sortBySpecies(order?)`、`clearNotes()`（都可撤销）。
 
 ### 6.3 REST（全部为附加改动）
 
@@ -1284,16 +1284,16 @@ class Structure {
 
 `/io/parse` 不变（v1 的 `detectSlab` 删除）。
 
-### 6.4 客户端（`crystallume/client.py`）
+### 6.4 客户端（`facet/client.py`）
 
 - `export_structure(structure, format) -> str` 不变（`client.py:238`）。
 - `export_structure_with_warnings(structure, format) -> ExportResult`（新数据类：`text`、`filename`、`mimetype`、`warnings`、`notes`），同一路由。
 - （O-6）`vacuum_gap(structure, axis=None, min_width=None) -> dict`，`ROUTE_METHODS` 增加 `("POST", "/api/v1/analysis/vacuum"): "vacuum_gap"`。
 
-### 6.5 CLI（`crystallume/cli.py`）
+### 6.5 CLI（`facet/cli.py`）
 
-- `crystallume convert IN OUT`、`crystallume build … -o FILE`：写出后在 stderr 打印 `crystallume: warning: …` 与 `crystallume: note: …`。
-- `crystallume info FILE`：有间隙时新增中性的一行 `Vacuum gap  : 15.00 Å along c`（`find_vacuum_gap` 的结果，任何结构都一样，U1）；`--json` 输出增加
+- `facet convert IN OUT`、`facet build … -o FILE`：写出后在 stderr 打印 `facet: warning: …` 与 `facet: note: …`。
+- `facet info FILE`：有间隙时新增中性的一行 `Vacuum gap  : 15.00 Å along c`（`find_vacuum_gap` 的结果，任何结构都一样，U1）；`--json` 输出增加
   `vacuumGap`（对象或 `null`）。
 
 ---
@@ -1303,7 +1303,7 @@ class Structure {
 ### 7.1 跨语言测试桥：最终布局（采纳 `scratchpad/python-api/parity/` 原型，04 报告 §6）
 
 ```
-crystallume/web/js/package.json      {"type": "module"}            （使 .js 不依赖 Node 的语法探测；对浏览器与 build_artifact.py 无影响）
+facet/web/js/package.json      {"type": "module"}            （使 .js 不依赖 Node 的语法探测；对浏览器与 build_artifact.py 无影响）
 tests/
   js_bridge.py        find_node() / run_js(source, payload, timeout=30) / run_node_tests(paths) / JSError / NodeUnavailable / WEB_JS
   conftest.py         + session fixture `js`；+ pytest_collection_modifyitems：用到 `js` fixture 的测试自动加 `js` 标记
@@ -1324,25 +1324,25 @@ tests/
 ```
 
 - `js_bridge.py` 相对原型的改动：`REPO = Path(__file__).resolve().parents[1]`；`MIN_NODE_MAJOR = 22`（Node 20 已于 2026-04-30 停止维护，工程 #9）；
-  `CRYSTALLUME_NODE`（路径，或 `0`/`off`/`false`/`no` 关闭）保留；`run_node_tests` 只接受显式文件列表（`node --test 目录` 在 Node 22/24 上失败 [V]；
+  `FACET_NODE`（路径，或 `0`/`off`/`false`/`no` 关闭）保留；`run_node_tests` 只接受显式文件列表（`node --test 目录` 在 Node 22/24 上失败 [V]；
   传入非测试文件会被算作一个测试）。
 - 桥本身的测试：一个故意失败的样例文件交给 `run_node_tests` 必须报失败（防止桥吞掉失败）。
-- `js` fixture：Node 不可用时 `pytest.skip("JS parity tests need Node.js >= 22: <原因>")`；`CRYSTALLUME_REQUIRE_NODE` ∈ {1, true, yes} 时 `pytest.fail`。
+- `js` fixture：Node 不可用时 `pytest.skip("JS parity tests need Node.js >= 22: <原因>")`；`FACET_REQUIRE_NODE` ∈ {1, true, yes} 时 `pytest.fail`。
 - `pyproject.toml`：在现有 `testpaths`、`addopts = "-q"`、`filterwarnings` 三项上**追加**（不要整段替换）：`addopts = "-q -m 'not slow'"`，以及
 
   ```toml
   markers = [
-      "js: needs Node.js >= 22 (skipped when it is missing; CRYSTALLUME_REQUIRE_NODE=1 makes that a failure)",
+      "js: needs Node.js >= 22 (skipped when it is missing; FACET_REQUIRE_NODE=1 makes that a failure)",
       "slow: end-to-end browser tests (run with: pytest -m slow)",
   ]
   ```
 - 已知缺陷用 `xfail(strict=True)` 记录（原型做法）；本模块修好后删除标记。
 
-**公共用例外壳 `crystallume.cases/1`**（所有模块共用，M1–M6 只注册自己的 op，不再各写加载与比较代码；M7 汇总时核对；工程 #26）：
+**公共用例外壳 `facet.cases/1`**（所有模块共用，M1–M6 只注册自己的 op，不再各写加载与比较代码；M7 汇总时核对；工程 #26）：
 
 ```json
 {
-  "schema": "crystallume.cases/1",
+  "schema": "facet.cases/1",
   "cases": [
     {
       "id": "poscar-read-dot-true",
@@ -1360,7 +1360,7 @@ tests/
 }
 ```
 
-- `input`：`{"structure": <crystallume.structure/1>}`、`{"text": …}` 或 `{"file": "相对 tests/data 的路径"}`。`args`：camelCase 键；Python 分派函数显式映射为 snake_case。
+- `input`：`{"structure": <facet.structure/1>}`、`{"text": …}` 或 `{"file": "相对 tests/data 的路径"}`。`args`：camelCase 键；Python 分派函数显式映射为 snake_case。
 - `expect` 的内容由各 op 自定，公共比较器有：`structure`（只比较给出的键：`symbols` 精确、`positions`/`cell` 在 tol 内、`pbc` 精确、`props`/`info` 只比较列出的键、
   `nFrames`、`name`）、`value`（任意 JSON，数值按值比较，`1 == 1.0`，在 `tol.value` 内）、`sourceMap`、`warnings`（`equals`/`contains`/`count`）、
   `text`（`contains` 列表）、`error`（错误信息子串）。
@@ -1415,7 +1415,7 @@ tests/
 - `move_mask`：全部 T/F 型 → `L:1`；有部分约束 → `L:3` 且导出警告 W6；全部可动 → 不写；六方 `[F,T,F]` → W5；ASE 样例 `FixAtoms`、`FixCartesian` 读成预期的晶格系标志；
   `crystallume031_sd.extxyz`（旧 `selective_dynamics:L:3`）照常读；两列都有 → `move_mask` 优先并写备注；`charge` 列读成 `charges`。
 - JS 读取器保留 `forces:R:3`、`label:S:1`、`fixed:L:1`、`tags:I:1` 列与 info（`energy`、`config_type`），与 Python 相同；名字不取自 `config_type`。
-- `crystallume_clip=<id>` 往返（M4 剪贴板，工程 #2）；多帧：结果类列只在第 1 帧出现，并有 W9。
+- `facet_clip=<id>` 往返（M4 剪贴板，工程 #2）；多帧：结果类列只在第 1 帧出现，并有 W9。
 
 **导出检查**：§3.12.2 每条规则一个正例一个反例（含 W10 左手晶胞、W11 两对重叠、N1、N2）；`register_writer` 不带能力 → 空结果，带非法能力 → `ValueError`；
 JS 服务器格式（假 store）的 `exportStructure` 同步返回 `warnings`，`text` 为 Promise；`write()` 发出 `ExportWarning`（`pytest.warns`），说明不发。
@@ -1438,7 +1438,7 @@ JS `rev`：每个修改方法递增一次，直接赋值不递增（F0-A 的 `st
 | `edits.json` | §3.7 的每种 `kind`；`concat`、`extend`（重编号、标志换算） |
 | `constraints.json` | 基变换验证表与边界用例 |
 | `poscar.json` | 词法表、Cartesian SD、重复块、XDATCAR、U1 验收 |
-| `extxyz.json` | 词法、值转换边界、info 往返、ASE 样例、`move_mask`、`crystallume_clip` |
+| `extxyz.json` | 词法、值转换边界、info 往返、ASE 样例、`move_mask`、`facet_clip` |
 | `vacuum.json` | 场景、平移、并列、负零、`find_surface_gap`、`make_contiguous` |
 | `export.json` | 能力表与 W1–W11、N1–N2 |
 
@@ -1447,11 +1447,11 @@ JS `rev`：每个修改方法递增一次，直接赋值不递增（F0-A 的 `st
 - `tests/test_server.py`：`/io/export` 的 `warnings`/`notes`（CIF + 固定原子 → 1 条警告；POSCAR、已分组 → 0 条；交错元素的 POSCAR → 1 条说明）；
   `/formats` 含 `capabilities`；（O-6）`/analysis/vacuum` 成功、422（`minWidth` 越界）、云模式未登录 401。
 - `tests/test_client.py`：`export_structure_with_warnings` 返回 `ExportResult`；（O-6）`ROUTE_METHODS` 增加 `vacuum_gap`。
-- `tests/test_cli.py`：`convert x.vasp x.cif` 的 stderr 含 `crystallume: warning:`；`info` 对 slab 打印 `Vacuum gap` 行、对体相不打印；导入不改变 pbc。
+- `tests/test_cli.py`：`convert x.vasp x.cif` 的 stderr 含 `facet: warning:`；`info` 对 slab 打印 `Vacuum gap` 行、对体相不打印；导入不改变 pbc。
 
 ### 7.5 端到端（Playwright，标记 `slow`，可选运行；截图交审查）
 
-1. 打开 `contcar_pt111.vasp`：没有额外提示；`crystallume.structure.pbc` 为 `[true,true,true]`；画出的原子数等于 F0-A 切口规则的结果（底层画在底部）；截图。
+1. 打开 `contcar_pt111.vasp`：没有额外提示；`facet.structure.pbc` 为 `[true,true,true]`；画出的原子数等于 F0-A 切口规则的结果（底层画在底部）；截图。
 2. 不做编辑导出 POSCAR：文本含 `Selective dynamics` 且 18 行带 `F F F`，坐标与原文件一致；导出 CIF：toast 含 `cannot store constraints`，toast 不自动消失。
 3. 交错元素后导出 POSCAR：toast 只有 `Notes` 按钮；对话框里 `Sort atoms by species` 一步撤销，Ctrl+Z 恢复原顺序，选区跟随原子。
 4. 删一个原子后 Structure 面板的 `Notes` 出现"calculated results … were removed"（用带 `energy` 的 extxyz 打开时）；`Clear notes` 一步撤销。
@@ -1486,7 +1486,7 @@ JS `rev`：每个修改方法递增一次，直接赋值不递增（F0-A 的 `st
 | R1 | 真空间隙检测在少数体相上误报（插层、扩层的层状材料或带平面空腔的框架） | 阈值 5 Å（单原子原胞最大 4.34 Å）；U1 下误报只影响显示切口与工具的上下表面，从不改结构或导出 |
 | R2 | 带高吸附物、小真空的 slab 没有 ≥ 5 Å 的间隙 | `find_surface_gap` 用 `info.surface.axis` 兜底；工具给出带实测值的说明（`vacuum_gap_hint`） |
 | R3 | 行为变化影响现有用户或插件（§4.5） | CHANGELOG 列出；版本进 0.4；大多是缺陷修复 |
-| R4 | extxyz 笛卡尔语义无法表达少数部分约束；经 ASE 写 POSCAR 会丢 FixCartesian | W5、W6 导出警告并指向 POSCAR；常见 `[T,T,F]`/`[F,F,T]` 在标准取向下精确；O-3 可收紧为宽度 1；`docs/PLUGINS.md` 写一张"约束在 Crystallume → extxyz/POSCAR → ASE → VASP 之间如何传递、在哪一步丢失"的表（只写已核实的 ASE 3.29 行为） |
+| R4 | extxyz 笛卡尔语义无法表达少数部分约束；经 ASE 写 POSCAR 会丢 FixCartesian | W5、W6 导出警告并指向 POSCAR；常见 `[T,T,F]`/`[F,F,T]` 在标准取向下精确；O-3 可收紧为宽度 1；`docs/PLUGINS.md` 写一张"约束在 Facet → extxyz/POSCAR → ASE → VASP 之间如何传递、在哪一步丢失"的表（只写已核实的 ASE 3.29 行为） |
 | R5 | 大结构深拷贝开销 | `copy_value` 快路径；服务器上限 20 万原子时 Python `repeat` 约 0.6 s，可接受 |
 | R6 | 构建器忘记声明谱系或调用 `mark_edited` | `editActive` 在拿不到映射时开发版抛错；§7.2 的表逐项测试；§10 写明每个模块的调用要求；extxyz 写出器对含 `None` 的列给出 W8 |
 | R7 | 两份常量表漂移 | §7.2 的逐键相等测试 |
@@ -1526,17 +1526,17 @@ JS `rev`：每个修改方法递增一次，直接赋值不递增（F0-A 的 `st
 
 | 任务 | 输入 | 输出 | 涉及文件（归本任务） | 依赖 | 规模 | 并行 |
 |---|---|---|---|---|---|---|
-| **T0 测试桥与公共用例外壳** | 原型 `scratchpad/python-api/parity/` | §7.1 的基础设施（桥、fixture、标记、递归加载器与比较器、空的 OPS 表、`package.json`、共用 CONTCAR 夹具、桥自测） | `tests/js_bridge.py`、`tests/conftest.py`、`tests/cases.py`、`tests/test_cases.py`、`tests/test_js_unit.py`、`tests/js/helpers.mjs`、`tests/js/cases.mjs`、`tests/js/cases.test.mjs`、`tests/data/surface/README.md`、`tests/data/surface/contcar_pt111.vasp`、`pyproject.toml`、`crystallume/web/js/package.json` | 无 | S | 第 1 批最先做 |
-| **T7 晶格包裹与真空间隙（两语言）** | §3.13、§3.16 | `wrap_fractional`、`core/lattice.js`（新建并重新导出 `util.js`）、`analysis/vacuum.py`、`core/vacuum.js`、`SURFACE_DEFAULTS` 文件、`vacuum.json` 用例 | `crystallume/core/lattice.py`（只加 `wrap_fractional`）、新 `crystallume/core/defaults.py`、新 `crystallume/analysis/vacuum.py`、`crystallume/analysis/__init__.py`、新 `web/js/core/lattice.js`、新 `web/js/core/defaults.js`、新 `web/js/core/vacuum.js`、`tests/test_vacuum.py`、`tests/js/vacuum.test.mjs`、`tests/data/surface/f0d/vacuum.json` | T0 | S | 第 1 批（只读结构的 `positions`/`cell`/`pbc`/帧，不依赖 T1/T2） |
-| **T3 约束核心（两语言）** | §3.8–3.9 | `core/constraints.py`/`.js` 全部函数 + 用例 | 新 `crystallume/core/constraints.py`、新 `web/js/core/constraints.js`、`tests/test_constraints_core.py`、`tests/js/constraints-core.test.mjs`、`tests/data/surface/f0d/constraints.json` | T0、T7（`SURFACE_DEFAULTS`） | S | 第 1 批（对普通列表编程，`apply_basis_change` 只用 props 接口） |
-| **T1 Python 数据核心** | §3.1–3.7、§3.14 | `_remap`、源映射与会话、默认值与规范化器、方法改造与新原语、备注、失效表与 `mark_edited`、`concat_structures`、`poscar_order`/`canonical_order`、命名 | `crystallume/core/structure.py`、`crystallume/core/__init__.py`、新 `crystallume/core/naming.py`、`tests/test_structure.py`、`tests/data/surface/f0d/{props,sourcemap,edits}.json` | T0、T3、T7 | M | 第 2 批，与 T2 并行 |
-| **T2 JS 数据核心** | 同上 | `structure.js` 改造（含 `rev`/`touch`、`setPositions`、`keepFrame`、`extend`、会话）、`naming.js` | `crystallume/web/js/core/structure.js`、新 `web/js/core/naming.js`、`tests/js/structure.test.mjs` | T0、T3、T7 | M | 第 2 批，与 T1 并行 |
-| **T4 POSCAR（两语言）** | §3.10 | 容错读取、Cartesian SD、SD 写出、重复块、XDATCAR（JS 修、Python 新）、（O-5）速度块、用例 | `crystallume/io/poscar.py`、`web/js/io/poscar.js`、`tests/test_io.py` 的 POSCAR 部分、`tests/js/io.test.mjs` 的 POSCAR 部分、`tests/data/surface/f0d/poscar.json` | T1、T2 | M | 第 3 批，与 T5 并行 |
-| **T5 extxyz 与读取器小改（两语言）** | §3.11、S-6、S-7 | 词法、值转换、全列读取（JS）、`move_mask`、`charge` 映射、info 写法、多帧结果、ASE 样例；JS CIF/PDB 的 props 名；读取器文案统一 | `crystallume/io/xyz.py`、`web/js/io/xyz.js`、`web/js/io/cif.js`、`web/js/io/pdb.js`、`tests/test_io.py` 的 extxyz 部分、`tests/js/io.test.mjs` 的 extxyz 部分、`tests/data/surface/f0d/extxyz.json`、`tests/data/surface/ase329_*.extxyz`、`crystallume031_sd.extxyz` | T1、T2、T3 | M | 第 3 批，与 T4 并行（`test_io.py`、`io.test.mjs` 按段落归属，T4 先合） |
-| **T6 导出检查与通道（库与服务器）** | §3.12 | 能力表与校验、`export_report`、`close_contacts`（两语言）、`ExportWarning`、REST/客户端/CLI（含 `info` 的 `Vacuum gap` 行）、JS `exportStructure` 契约与服务器格式 | `crystallume/io/__init__.py`、新 `crystallume/io/capabilities.py`、新 `crystallume/analysis/contacts.py`、`crystallume/server/models.py`、`crystallume/server/routes/io.py`、（O-6）`crystallume/server/routes/analysis.py`、`crystallume/client.py`、`crystallume/cli.py`、`web/js/io/index.js`、新 `web/js/io/capabilities.js`、新 `web/js/core/contacts.js`、`web/js/api/extensions.js`、`tests/test_export.py`、`tests/js/export.test.mjs`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/data/surface/f0d/export.json` | T3、T4、T5、T7 | M | 第 4 批 |
+| **T0 测试桥与公共用例外壳** | 原型 `scratchpad/python-api/parity/` | §7.1 的基础设施（桥、fixture、标记、递归加载器与比较器、空的 OPS 表、`package.json`、共用 CONTCAR 夹具、桥自测） | `tests/js_bridge.py`、`tests/conftest.py`、`tests/cases.py`、`tests/test_cases.py`、`tests/test_js_unit.py`、`tests/js/helpers.mjs`、`tests/js/cases.mjs`、`tests/js/cases.test.mjs`、`tests/data/surface/README.md`、`tests/data/surface/contcar_pt111.vasp`、`pyproject.toml`、`facet/web/js/package.json` | 无 | S | 第 1 批最先做 |
+| **T7 晶格包裹与真空间隙（两语言）** | §3.13、§3.16 | `wrap_fractional`、`core/lattice.js`（新建并重新导出 `util.js`）、`analysis/vacuum.py`、`core/vacuum.js`、`SURFACE_DEFAULTS` 文件、`vacuum.json` 用例 | `facet/core/lattice.py`（只加 `wrap_fractional`）、新 `facet/core/defaults.py`、新 `facet/analysis/vacuum.py`、`facet/analysis/__init__.py`、新 `web/js/core/lattice.js`、新 `web/js/core/defaults.js`、新 `web/js/core/vacuum.js`、`tests/test_vacuum.py`、`tests/js/vacuum.test.mjs`、`tests/data/surface/f0d/vacuum.json` | T0 | S | 第 1 批（只读结构的 `positions`/`cell`/`pbc`/帧，不依赖 T1/T2） |
+| **T3 约束核心（两语言）** | §3.8–3.9 | `core/constraints.py`/`.js` 全部函数 + 用例 | 新 `facet/core/constraints.py`、新 `web/js/core/constraints.js`、`tests/test_constraints_core.py`、`tests/js/constraints-core.test.mjs`、`tests/data/surface/f0d/constraints.json` | T0、T7（`SURFACE_DEFAULTS`） | S | 第 1 批（对普通列表编程，`apply_basis_change` 只用 props 接口） |
+| **T1 Python 数据核心** | §3.1–3.7、§3.14 | `_remap`、源映射与会话、默认值与规范化器、方法改造与新原语、备注、失效表与 `mark_edited`、`concat_structures`、`poscar_order`/`canonical_order`、命名 | `facet/core/structure.py`、`facet/core/__init__.py`、新 `facet/core/naming.py`、`tests/test_structure.py`、`tests/data/surface/f0d/{props,sourcemap,edits}.json` | T0、T3、T7 | M | 第 2 批，与 T2 并行 |
+| **T2 JS 数据核心** | 同上 | `structure.js` 改造（含 `rev`/`touch`、`setPositions`、`keepFrame`、`extend`、会话）、`naming.js` | `facet/web/js/core/structure.js`、新 `web/js/core/naming.js`、`tests/js/structure.test.mjs` | T0、T3、T7 | M | 第 2 批，与 T1 并行 |
+| **T4 POSCAR（两语言）** | §3.10 | 容错读取、Cartesian SD、SD 写出、重复块、XDATCAR（JS 修、Python 新）、（O-5）速度块、用例 | `facet/io/poscar.py`、`web/js/io/poscar.js`、`tests/test_io.py` 的 POSCAR 部分、`tests/js/io.test.mjs` 的 POSCAR 部分、`tests/data/surface/f0d/poscar.json` | T1、T2 | M | 第 3 批，与 T5 并行 |
+| **T5 extxyz 与读取器小改（两语言）** | §3.11、S-6、S-7 | 词法、值转换、全列读取（JS）、`move_mask`、`charge` 映射、info 写法、多帧结果、ASE 样例；JS CIF/PDB 的 props 名；读取器文案统一 | `facet/io/xyz.py`、`web/js/io/xyz.js`、`web/js/io/cif.js`、`web/js/io/pdb.js`、`tests/test_io.py` 的 extxyz 部分、`tests/js/io.test.mjs` 的 extxyz 部分、`tests/data/surface/f0d/extxyz.json`、`tests/data/surface/ase329_*.extxyz`、`crystallume031_sd.extxyz` | T1、T2、T3 | M | 第 3 批，与 T4 并行（`test_io.py`、`io.test.mjs` 按段落归属，T4 先合） |
+| **T6 导出检查与通道（库与服务器）** | §3.12 | 能力表与校验、`export_report`、`close_contacts`（两语言）、`ExportWarning`、REST/客户端/CLI（含 `info` 的 `Vacuum gap` 行）、JS `exportStructure` 契约与服务器格式 | `facet/io/__init__.py`、新 `facet/io/capabilities.py`、新 `facet/analysis/contacts.py`、`facet/server/models.py`、`facet/server/routes/io.py`、（O-6）`facet/server/routes/analysis.py`、`facet/client.py`、`facet/cli.py`、`web/js/io/index.js`、新 `web/js/io/capabilities.js`、新 `web/js/core/contacts.js`、`web/js/api/extensions.js`、`tests/test_export.py`、`tests/js/export.test.mjs`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/data/surface/f0d/export.json` | T3、T4、T5、T7 | M | 第 4 批 |
 | **T8 网页集成** | §5 | 导入 toast 用本步备注（含粘贴）、Notes 列表与 `Clear notes`、导出 toast 与 Export notes 对话框、3 个命令、公共 API | `web/js/app.js`（只改 `importFiles`/`importText`/`exportStructureFile` 三段）、`web/js/main.js`、`web/js/ui/panels/structure.js`、`web/js/ui/shell.js`（只改粘贴的两处 toast）、`web/js/api/public.js` | T2、T6；F0-A T1（`app.js` 的撤销存储改造先合） | S | 第 5 批 |
-| **T9 二面角与元素数据** | §3.15.1、§3.15.3 | `core/geometry.js`、查看器与选区卡片改用、JS 共价半径 7 个值、`bondiRadius` 两种语言、Python 回退值、测试 | 新 `web/js/core/geometry.js`、`web/js/render/viewer.js`（只改 `measureValue`，1949-1961）、`web/js/ui/selectioncard.js`、`web/js/core/elements.js`、`crystallume/data/elements.json`、`crystallume/core/elements.py`、`tests/test_js_parity.py` 的对应测试 | T0 | S | 任意批次（`viewer.js` 与 F0-A 的改动在不同行段，按"F0-A 先合"处理） |
-| **T10 默认参数表对齐** | §3.15.2 | 生成脚本、`web/js/build/reference.js`、JS 构建器与 Build 面板、Python `hbn`、按化合物的 `u` 与厚度、MoS2 参数与原子顺序、严格的逐原型对比测试 | 新 `scripts/gen_reference_data.py`、`crystallume/build/crystal.py`、`web/js/build/crystal.js`、新 `web/js/build/reference.js`、`web/js/ui/panels/build.js`、`tests/test_build.py` | T0 | M | 任意批次 |
+| **T9 二面角与元素数据** | §3.15.1、§3.15.3 | `core/geometry.js`、查看器与选区卡片改用、JS 共价半径 7 个值、`bondiRadius` 两种语言、Python 回退值、测试 | 新 `web/js/core/geometry.js`、`web/js/render/viewer.js`（只改 `measureValue`，1949-1961）、`web/js/ui/selectioncard.js`、`web/js/core/elements.js`、`facet/data/elements.json`、`facet/core/elements.py`、`tests/test_js_parity.py` 的对应测试 | T0 | S | 任意批次（`viewer.js` 与 F0-A 的改动在不同行段，按"F0-A 先合"处理） |
+| **T10 默认参数表对齐** | §3.15.2 | 生成脚本、`web/js/build/reference.js`、JS 构建器与 Build 面板、Python `hbn`、按化合物的 `u` 与厚度、MoS2 参数与原子顺序、严格的逐原型对比测试 | 新 `scripts/gen_reference_data.py`、`facet/build/crystal.py`、`web/js/build/crystal.js`、新 `web/js/build/reference.js`、`web/js/ui/panels/build.js`、`tests/test_build.py` | T0 | M | 任意批次 |
 | **T11 文档** | 全部 | `docs/SCHEMA.md`（props 表、`info.warnings` 语义、能力表含 pbc 一栏、`supercellMatrix`）、`docs/PLUGINS.md`（写出器能力、`exportReport`、新方法、REST/客户端/CLI、约束传递表、ASE `_JSON` 反斜杠问题）、`docs/DEPLOY.md`（REST 表）、`README.md`（网页支持 SD）、CHANGELOG 的行为变化 | `docs/*`、`README.md` | T1–T8 | S | 最后 |
 
 ### 9.2 批次与关键路径
@@ -1549,39 +1549,39 @@ JS `rev`：每个修改方法递增一次，直接赋值不递增（F0-A 的 `st
 - 关键路径：T0 → T7 → T1/T2 → T5 → T6 → T8（约 5–6 个工作日）。
 - 与 F0-A 的文件交界：`core/lattice.js` 与 `core/lattice.py` 由本模块 T7 建立，F0-A T7 只**追加**；`app.js` 的撤销快照（575 行附近）归 F0-A T1，本模块只提供
   `toJSON({copy: false})`；`viewer.js` 与 `ui/panels/structure.js` 两边改不同行段，合并顺序"F0-A 先合"。
-- 每个任务的完成标准：本任务的单元测试与用例（Python 与 JS 两侧）通过，`pytest` 全量通过，`CRYSTALLUME_REQUIRE_NODE=1 pytest` 通过。
+- 每个任务的完成标准：本任务的单元测试与用例（Python 与 JS 两侧）通过，`pytest` 全量通过，`FACET_REQUIRE_NODE=1 pytest` 通过。
 
 ### 9.3 按文件的改动索引
 
 | 文件 | 改动（见节） | 任务 |
 |---|---|---|
-| `crystallume/core/structure.py` | §3.1–3.7、§3.10.3（`poscar_order`、`canonical_order`） | T1 |
-| `crystallume/core/__init__.py` | 再导出（§3.5.1 末） | T1 |
-| `crystallume/core/lattice.py` | `wrap_fractional` | T7 |
-| `crystallume/core/defaults.py`（新） | §3.16 | T7 |
-| `crystallume/core/naming.py`（新） | §3.14 | T1 |
-| `crystallume/core/constraints.py`（新） | §3.8–3.9 | T3 |
-| `crystallume/core/elements.py`、`crystallume/data/elements.json` | 回退值 0.5、`bondi_radius`（§3.15.3） | T9 |
-| `crystallume/analysis/vacuum.py`（新）、`analysis/__init__.py` | §3.13 | T7 |
-| `crystallume/analysis/contacts.py`（新） | §3.12.3 | T6 |
-| `crystallume/io/__init__.py` | `ExportWarning`、`export_report`、`register_writer(capabilities=)`、`WriterSpec.capabilities`、`formats()`、`write()` 发警告、POSCAR 读取器的文件名加 `xdatcar`（T4 的测试直接调用 `read_poscar`/`parse_text(..., "poscar")`，不依赖它） | T6 |
-| `crystallume/io/capabilities.py`（新） | §3.12.1 | T6 |
-| `crystallume/io/poscar.py` | §3.10 | T4 |
-| `crystallume/io/xyz.py` | §3.11 | T5 |
-| `crystallume/server/models.py`、`server/routes/io.py`、`server/routes/analysis.py` | §6.3 | T6 |
-| `crystallume/client.py`、`crystallume/cli.py` | §6.4、§6.5 | T6 |
-| `crystallume/build/crystal.py`、`web/js/build/crystal.js`、`web/js/build/reference.js`（新）、`web/js/ui/panels/build.js`、`scripts/gen_reference_data.py`（新） | §3.15.2 | T10 |
-| `crystallume/web/js/package.json`（新） | `{"type": "module"}` | T0 |
-| `crystallume/web/js/core/structure.js` | §3.5.2 全部 | T2 |
-| `crystallume/web/js/core/naming.js`（新） | §3.14 | T2 |
-| `crystallume/web/js/core/defaults.js`、`lattice.js`、`vacuum.js`（新） | §3.16、§3.13 | T7 |
-| `crystallume/web/js/core/constraints.js`（新） | §3.8 | T3 |
-| `crystallume/web/js/core/contacts.js`（新） | §3.12.3 | T6 |
-| `crystallume/web/js/core/geometry.js`（新）、`core/elements.js`、`render/viewer.js`、`ui/selectioncard.js` | §3.15.1、§3.15.3 | T9 |
-| `crystallume/web/js/io/poscar.js` | §3.10 | T4 |
-| `crystallume/web/js/io/xyz.js`、`io/cif.js`、`io/pdb.js` | §3.11、S-6、S-7 | T5 |
-| `crystallume/web/js/io/index.js`、`io/capabilities.js`（新）、`api/extensions.js` | §3.12 | T6 |
-| `crystallume/web/js/app.js`、`main.js`、`ui/panels/structure.js`、`ui/shell.js`、`api/public.js` | §5、§6.2 | T8 |
+| `facet/core/structure.py` | §3.1–3.7、§3.10.3（`poscar_order`、`canonical_order`） | T1 |
+| `facet/core/__init__.py` | 再导出（§3.5.1 末） | T1 |
+| `facet/core/lattice.py` | `wrap_fractional` | T7 |
+| `facet/core/defaults.py`（新） | §3.16 | T7 |
+| `facet/core/naming.py`（新） | §3.14 | T1 |
+| `facet/core/constraints.py`（新） | §3.8–3.9 | T3 |
+| `facet/core/elements.py`、`facet/data/elements.json` | 回退值 0.5、`bondi_radius`（§3.15.3） | T9 |
+| `facet/analysis/vacuum.py`（新）、`analysis/__init__.py` | §3.13 | T7 |
+| `facet/analysis/contacts.py`（新） | §3.12.3 | T6 |
+| `facet/io/__init__.py` | `ExportWarning`、`export_report`、`register_writer(capabilities=)`、`WriterSpec.capabilities`、`formats()`、`write()` 发警告、POSCAR 读取器的文件名加 `xdatcar`（T4 的测试直接调用 `read_poscar`/`parse_text(..., "poscar")`，不依赖它） | T6 |
+| `facet/io/capabilities.py`（新） | §3.12.1 | T6 |
+| `facet/io/poscar.py` | §3.10 | T4 |
+| `facet/io/xyz.py` | §3.11 | T5 |
+| `facet/server/models.py`、`server/routes/io.py`、`server/routes/analysis.py` | §6.3 | T6 |
+| `facet/client.py`、`facet/cli.py` | §6.4、§6.5 | T6 |
+| `facet/build/crystal.py`、`web/js/build/crystal.js`、`web/js/build/reference.js`（新）、`web/js/ui/panels/build.js`、`scripts/gen_reference_data.py`（新） | §3.15.2 | T10 |
+| `facet/web/js/package.json`（新） | `{"type": "module"}` | T0 |
+| `facet/web/js/core/structure.js` | §3.5.2 全部 | T2 |
+| `facet/web/js/core/naming.js`（新） | §3.14 | T2 |
+| `facet/web/js/core/defaults.js`、`lattice.js`、`vacuum.js`（新） | §3.16、§3.13 | T7 |
+| `facet/web/js/core/constraints.js`（新） | §3.8 | T3 |
+| `facet/web/js/core/contacts.js`（新） | §3.12.3 | T6 |
+| `facet/web/js/core/geometry.js`（新）、`core/elements.js`、`render/viewer.js`、`ui/selectioncard.js` | §3.15.1、§3.15.3 | T9 |
+| `facet/web/js/io/poscar.js` | §3.10 | T4 |
+| `facet/web/js/io/xyz.js`、`io/cif.js`、`io/pdb.js` | §3.11、S-6、S-7 | T5 |
+| `facet/web/js/io/index.js`、`io/capabilities.js`（新）、`api/extensions.js` | §3.12 | T6 |
+| `facet/web/js/app.js`、`main.js`、`ui/panels/structure.js`、`ui/shell.js`、`api/public.js` | §5、§6.2 | T8 |
 | `tests/…` | §7.1 布局 | T0 起各任务（见 9.1 的文件列） |
 | `docs/SCHEMA.md`、`docs/PLUGINS.md`、`docs/DEPLOY.md`、`README.md` | §4、§6 | T11 |
 
@@ -1608,7 +1608,7 @@ JS `rev`：每个修改方法递增一次，直接赋值不递增（F0-A 的 `st
 | 半径 | M6：`bondi_radius`、两种语言一致的 `vdw_radius` | `bondi_radius`（两种语言，K16）；`vdw_radius` 不供算法使用 | M6：层间距用 `bondi_radius`，不用 `vdw_radius` |
 | 超胞矩阵 | M1 K4：`repeat` 维护 `info.supercellMatrix`；"Make supercell real"改用 M1 的 `cell.bakeRepeat` | `repeat` 两种语言都维护 `supercellMatrix`（§3.5）；按钮归 M1 | — |
 | Wrap 按钮 | M1：`Wrap atoms into cell` 按 C11 丢帧 | 归 M1；核心 `wrap()` 处理所有帧（K10） | — |
-| extxyz 剪贴板 | M4：带 `crystallume_clip=<id>` 的 extxyz，JS 读取器与 Python 对等 | 普通字符串键往返，有用例（§7.2） | — |
+| extxyz 剪贴板 | M4：带 `facet_clip=<id>` 的 extxyz，JS 读取器与 Python 对等 | 普通字符串键往返，有用例（§7.2） | — |
 | 二面角 | M4：JS 改 IUPAC 或用 M4 的 `dihedralDeg` | `core/geometry.js` 的 `dihedralFromVectors`、`signedAngle` | M4：不再另写 `dihedralDeg` |
 | 派生信息失效 | M1/M4/M5/M6：`invalidate_symmetry_info(info)`；M2：清除空间群 | `mark_edited(s, kind)` 统一入口（§3.7 的表），仍导出 `invalidate_symmetry_info` | 各模块按 §3.7 的表调用 `mark_edited` |
 | `METALS` | M4：若放在 `core/elements.py` 由 F0-D 加 | 不放进 F0-D（不是数据地基的需要） | M4：在自己的 `analysis/fragments.py` 定义 |
@@ -1629,7 +1629,7 @@ JS `rev`：每个修改方法递增一次，直接赋值不递增（F0-A 的 `st
 4. **toast 改造**：悬停与聚焦时暂停计时；`timeout: 0` 的 toast 可用键盘关闭；Undo 只撤销自己那一步（F0-A 已有此项）。
 5. **`structureKey`**：用 `structure.rev`（本模块保证所有修改方法递增它）。
 6. **"Property" 配色**（`render/colors.js:205`）：现在默认取第一个数值 prop，切面后会变成 `tags`；请改为显式选择或排除 `adsorbate_id`（建议，非必须）。
-7. **`crystallume.edit` 命名空间**：本模块注册 `sortBySpecies(order?)`、`clearNotes()`（v1 的 `setPbc`、`detectSlab` 撤回）。
+7. **`facet.edit` 命名空间**：本模块注册 `sortBySpecies(order?)`、`clearNotes()`（v1 的 `setPbc`、`detectSlab` 撤回）。
 8. **文件交界**：`core/lattice.js`/`.py` 由本模块 T7 建立（含 `wrapFractional` 与对 `util.js` 的重新导出），F0-A T7 只追加；`SURFACE_DEFAULTS` 的 JS 键用 camelCase；
    撤销快照改用 `toJSON({precision: 8, copy: false})`（`app.js:575`）由 F0-A T1 采用。
 
@@ -1667,7 +1667,7 @@ JS `rev`：每个修改方法递增一次，直接赋值不递增（F0-A 的 `st
 - 添加原子用 `append`/`addAtom`（默认值自动补齐）；粘贴、合并用 `extend`（标志按来源晶胞换算、`adsorbate_id` 重新编号）或 `concat_structures`；
   部分原子的移动用 `set_positions`/`setPositions`（已调用 `mark_edited("positions")`）。
 - 约束换算用 `transform_move_flags`/`apply_basis_change`（不另起 `convert_constraints`）；二面角读写用 `core/geometry.js` 与 Python `get_dihedral` 的 IUPAC 约定。
-- 剪贴板 extxyz 的 `crystallume_clip` 键按普通字符串往返；`METALS` 由 M4 自己定义。
+- 剪贴板 extxyz 的 `facet_clip` 键按普通字符串往返；`METALS` 由 M4 自己定义。
 
 ### 10.6 M5（吸附物）
 
@@ -1688,7 +1688,7 @@ JS `rev`：每个修改方法递增一次，直接赋值不递增（F0-A 的 `st
 ### 10.8 M7（API、文档与测试总纲）
 
 - 汇总本模块的 REST/客户端/CLI 名称（`/io/export` 的 `warnings`/`notes`、`export_structure_with_warnings`、`Vacuum gap` 行，可选的 `/analysis/vacuum` 与 `vacuum_gap`）；
-  在 CI 中设置 `CRYSTALLUME_REQUIRE_NODE=1`；确认 `crystallume.cases/1` 与 `tests/data/surface/` 的递归加载作为所有模块的统一格式，CONTCAR 夹具只留 `contcar_pt111.vasp`。
+  在 CI 中设置 `FACET_REQUIRE_NODE=1`；确认 `facet.cases/1` 与 `tests/data/surface/` 的递归加载作为所有模块的统一格式，CONTCAR 夹具只留 `contcar_pt111.vasp`。
 - `docs/PLUGINS.md` 收录约束传递表（R4）与 ASE `_JSON` 反斜杠问题（R8）。
 
 ---
@@ -1759,7 +1759,7 @@ v2（本版）相对 v1 的修改，逐条对应审查意见。"按用户决定 
 |---|---|---|---|
 | 领域 F1 / 工程 #1 | blocker | **[U] 按用户决定 U1–U4 修改**：删除导入检测整条链（`detect_slab`、`vacuum_axes`、`SLAB_DETECT_FORMATS`、偏好与命令、`Treat as slab`/`Keep periodic`、`detect_slab` 参数、REST `detectSlab`、CLI `--detect-slab`、`kind` 分类、文案表、R1/R2 旧版、相关测试）；只保留只读的 `find_vacuum_gap`（与 F0-A、M2 对齐的签名与字段）+ `find_vacuum_gaps`（诊断）+ `find_surface_gap`；新增共用切口 `gap_cut`/`unwrap_along_gap`；`make_contiguous` 改为只供显式编辑、原位、所有帧同一组平移；`set_pbc` 无副作用；结构面板不加周期按钮与真空提示；CLI `info` 只留中性的 `Vacuum gap` 行；新增 U1 验收用例（CONTCAR 读入直接导出 POSCAR 不变）；T7 缩为 S | K5、§2.4、§3.13、§5.1–5.2、§6.5、§7.2、§7.5、§9 |
 | 领域 F2 / 工程 #1-5 | blocker | **[U] 按用户决定 U2 修改**：生成的 slab 与界面 `pbc = [T, T, T]`；导入保留文件的 pbc；用户故事 5、6、MS 对照表、测试期望改写；通知 M2、M6 | K6、§1、§10.3、§10.7 |
-| 工程 #2 | blocker | 新增 §10.0 消费方接口对照表并逐项定稿：真空间隙、`make_contiguous`、`rev`/`touch()`、`keepFrame`、`setPositions`（封装帧别名）、remap 签名、约束分工（F0-D 实现 `get_move_mask`/`constraint_summary` 与纯函数，M3 实现编辑与 `axis_labels`/`cartesian_to_flags`，删 `constraint_axis_names` 等）、常量对象双访问、默认表扩展规则、`concat_structures`、Bondi 半径、`supercellMatrix`、按钮归属、`crystallume_clip`、二面角函数、`METALS` | §3.5、§3.8.2、§3.15.3、§3.16、§10.0 |
+| 工程 #2 | blocker | 新增 §10.0 消费方接口对照表并逐项定稿：真空间隙、`make_contiguous`、`rev`/`touch()`、`keepFrame`、`setPositions`（封装帧别名）、remap 签名、约束分工（F0-D 实现 `get_move_mask`/`constraint_summary` 与纯函数，M3 实现编辑与 `axis_labels`/`cartesian_to_flags`，删 `constraint_axis_names` 等）、常量对象双访问、默认表扩展规则、`concat_structures`、Bondi 半径、`supercellMatrix`、按钮归属、`facet_clip`、二面角函数、`METALS` | §3.5、§3.8.2、§3.15.3、§3.16、§10.0 |
 | 工程 #3 | major | 源映射改为累计语义 + 跟随派生结构的追踪会话（`stop(result)`），比审查建议更进一步，覆盖"派生后再改父结构"；`compose_source_maps` 校验衔接；`editActive` 拿不到映射时要求 `indexMap`；原型两语言 6 种写法正确 | K2、§3.4、§10.1 |
 | 工程 #4 | major | 间隙并列规则写死：宽度差 ≤ 1e-5 Å 为并列，轴内取 start 最小，跨轴 c、b、a；阈值比较带容差；400 个并列晶胞 0 处不一致 | §3.13.1 |
 | 领域 F5 / 工程 #5 | major | info 写法改为与 ASE 互通：`stress`/`virial` 写 9 个数（含 Voigt 展开），一维数值/布尔列表空格分隔，只有嵌套、字典等用 `_JSON`；ASE 3.29 读回两种语言的输出 | K15、§3.11.6 |
@@ -1797,7 +1797,7 @@ v2（本版）相对 v1 的修改，逐条对应审查意见。"按用户决定 
 | 工程 #23 | minor | 客户端新增 `export_structure_with_warnings`，`export_structure` 不变 | §6.4 |
 | 工程 #24 | minor | 注册写出器时校验能力表 | §3.12.1 |
 | 工程 #25 | minor | 改正 ASE 反斜杠问题的描述（静默损坏，不是解码错误） | §0.3、附录 B、R8 |
-| 工程 #26 | minor | `crystallume.cases/1` 定为所有模块的公共外壳，递归加载；CONTCAR 夹具只留 `contcar_pt111.vasp` | §7.1、§10.8 |
+| 工程 #26 | minor | `facet.cases/1` 定为所有模块的公共外壳，递归加载；CONTCAR 夹具只留 `contcar_pt111.vasp` | §7.1、§10.8 |
 | 工程 #27 | minor | `sortBySpecies(order)` 参数校验（两种语言与命令） | §3.5.1、§5.4 |
 | 工程 #28 | minor | 补 `toJSON({copy})`、`exportReport`、多帧 20 万原子·帧的预算 | §7.6 |
 | 工程"缺失"第 7 条 | — | 能力表加 `pbc` 一栏并写进 SCHEMA（不报警告，POSCAR 另有说明 N2） | §3.12.1 |
@@ -1816,9 +1816,9 @@ v2（本版）相对 v1 的修改，逐条对应审查意见。"按用户决定 
 | 工程"缺失"第 9 条 | 构建器写的 `info.prototype/a/c/u` 在改晶胞后保留为来源信息 | 采用领域 F17：改晶格后删除（它们会以 `a=3.92` 的形式写进 extxyz，被当作当前晶格参数）；来源由保留的 `info.source` 记录。对角超胞不删。 |
 | 工程 #1-4 / 领域 F1-5 的"或整个删掉 `set_pbc`" | `set_pbc` 若没有消费方可删除 | 保留为无副作用的设置函数：它是 ASE 的名字、做输入校验，并在 JS 中递增 `rev`（直接赋值 `pbc` 不会）；没有界面入口。 |
 | 领域 F16（部分） | 载入说明不写入 `info`，或另存 `info.loadNotes` | 不另设键：载入说明作为持久备注保留（对派生的同原子结构仍然成立），用"toast 只显示本步新增的备注"与"extxyz 不写 `warnings`"解决重复弹出；少一个键、少一套继承规则。 |
-| 工程 #7（部分） | 读入文件里自带的 `warnings` 键只进备注、不 toast | 对 Crystallume JSON 照此处理；对 extxyz，我们从不写 `warnings`，外来文件若带此键就当普通键读入并在导入时显示一次——为此给读取器加"来源标记"不值得。 |
+| 工程 #7（部分） | 读入文件里自带的 `warnings` 键只进备注、不 toast | 对 Facet JSON 照此处理；对 extxyz，我们从不写 `warnings`，外来文件若带此键就当普通键读入并在导入时显示一次——为此给读取器加"来源标记"不值得。 |
 | 领域 F11（部分） | 所有数值型键的新原子默认值都取同形状的 0 | 只对已知的输入量（`PROP_SHAPED_ZERO`）这样做；未知键保持 `None`：现有测试依赖它（`tests/test_structure.py:107-117`），而且对未知含义的数据填 0 等于编造数值。 |
-| 领域 F4 第 3 条（部分） | 写出选项 `constraints="fix-partial"` | 采纳为可选（O-3）而不是必须：主要问题（静默丢约束）已由 W6 警告解决，需要走 ASE→VASP 的用户应直接从 Crystallume 导出 POSCAR。 |
+| 领域 F4 第 3 条（部分） | 写出选项 `constraints="fix-partial"` | 采纳为可选（O-3）而不是必须：主要问题（静默丢约束）已由 W6 警告解决，需要走 ASE→VASP 的用户应直接从 Facet 导出 POSCAR。 |
 | 领域 F6 第 4 条（部分） | 写出选项 `order="species" \| "keep"` | 采纳为可选（O-4）：生成器按 `canonical_order` 排列后，内存顺序与 POSCAR 一致，`keep` 很少需要；且重复元素名与 VASP MLFF 冲突。 |
 | 领域 F13（部分） | 原子重叠检查作为必须 | 列为"应该"（S-3）：它依赖新的邻近搜索函数并有性能成本，不影响其他模块的接口；规则与预算已写定。 |
 | 领域 F19（部分） | Python 补上 XDATCAR 支持（与 JS 同为必须） | JS 的错误坐标是数据缺陷，列为必须；Python 的 XDATCAR 是新增读取能力，列为"应该"（S-4）。 |

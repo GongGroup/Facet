@@ -20,9 +20,9 @@ from typing import Any
 import numpy as np
 import pytest
 
-from crystallume import Structure
-from crystallume.analysis.vacuum import display_cuts, unwrap_along_gap
-from crystallume.io import read
+from facet import Structure
+from facet.analysis.vacuum import display_cuts, unwrap_along_gap
+from facet.io import read
 
 from . import ops  # noqa: F401  (registers every op and recipe)
 from .cases import DATA, OPS, load_cases

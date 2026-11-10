@@ -1,5 +1,5 @@
-"""Exact integer lattice arithmetic (``crystallume.core.intmath``, M1 §3.2) and the skeleton of
-``crystallume.core.cellops`` (``CellOpResult`` and the two hooks of plan.md P-05).
+"""Exact integer lattice arithmetic (``facet.core.intmath``, M1 §3.2) and the skeleton of
+``facet.core.cellops`` (``CellOpResult`` and the two hooks of plan.md P-05).
 
 ``tests/js/intmath.test.mjs`` runs the same checks on the JavaScript twins ``web/js/core/intmath.js`` and
 ``web/js/core/cellops.js``.  Both files hold the same JSON constant ``PARITY_CASES`` (between the BEGIN and END
@@ -26,10 +26,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from crystallume.core import cellops, intmath
-from crystallume.core.cellops import CellOpResult, begin_cell_op, finish_cell_op
-from crystallume.core.defaults import SURFACE_DEFAULTS
-from crystallume.core.intmath import (
+from facet.core import cellops, intmath
+from facet.core.cellops import CellOpResult, begin_cell_op, finish_cell_op
+from facet.core.defaults import SURFACE_DEFAULTS
+from facet.core.intmath import (
     as_int_matrix,
     egcd,
     hermite_normal_form,
@@ -40,15 +40,15 @@ from crystallume.core.intmath import (
     is_unimodular,
     supercell_lattice_points,
 )
-from crystallume.core.structure import CARTESIAN_VECTOR_PROPS, EDIT_KINDS, Structure, mark_edited
+from facet.core.structure import CARTESIAN_VECTOR_PROPS, EDIT_KINDS, Structure, mark_edited
 
 ROOT = Path(__file__).resolve().parents[1]
 JS_TESTS = Path(__file__).resolve().parent / "js" / "intmath.test.mjs"
 SOURCES = {
-    "intmath.py": ROOT / "crystallume" / "core" / "intmath.py",
-    "intmath.js": ROOT / "crystallume" / "web" / "js" / "core" / "intmath.js",
-    "cellops.py": ROOT / "crystallume" / "core" / "cellops.py",
-    "cellops.js": ROOT / "crystallume" / "web" / "js" / "core" / "cellops.js",
+    "intmath.py": ROOT / "facet" / "core" / "intmath.py",
+    "intmath.js": ROOT / "facet" / "web" / "js" / "core" / "intmath.js",
+    "cellops.py": ROOT / "facet" / "core" / "cellops.py",
+    "cellops.js": ROOT / "facet" / "web" / "js" / "core" / "cellops.js",
 }
 #: The seven matrices of M1 §3.2 (the v1 prototype's set): a diagonal, √3, c(2×2)-like, the det-16 Materials
 #: Studio BN core-hole cell, a shear whose bounding box holds 38 cells, det 7 and a general det-81 matrix.

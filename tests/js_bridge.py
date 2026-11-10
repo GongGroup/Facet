@@ -1,4 +1,4 @@
-"""Run Crystallume's browser ES modules (``crystallume/web/js``) under Node.js from Python tests.
+"""Run Facet's browser ES modules (``facet/web/js``) under Node.js from Python tests.
 
 The cross-language test bridge.  Python tests send parameters to Node, run the web module there and compare
 the result with the Python implementation (:func:`run_js`); the pure-JS unit tests in ``tests/js/*.test.mjs``
@@ -10,9 +10,9 @@ run under ``node --test`` from pytest (:func:`run_node_tests`), so one ``pytest`
 
 In tests use the ``js`` fixture (``tests/conftest.py``), which is :func:`run_js` after :func:`require_node`.
 
-Node discovery: ``$CRYSTALLUME_NODE`` (a path, or ``0``/``off``/``false``/``no`` to disable), then ``node`` on
+Node discovery: ``$FACET_NODE`` (a path, or ``0``/``off``/``false``/``no`` to disable), then ``node`` on
 ``PATH``; Node.js 22 or newer is required.  Without it the JS tests are skipped, unless
-``$CRYSTALLUME_REQUIRE_NODE`` is ``1``/``true``/``yes`` (CI), which turns the skip into a failure.
+``$FACET_REQUIRE_NODE`` is ``1``/``true``/``yes`` (CI), which turns the skip into a failure.
 """
 
 from __future__ import annotations
@@ -43,10 +43,10 @@ __all__ = [
 ]
 
 REPO = Path(__file__).resolve().parents[1]
-WEB_JS = REPO / "crystallume" / "web" / "js"
+WEB_JS = REPO / "facet" / "web" / "js"
 
 #: Node 20 is end-of-life (2026-04-30); 22 runs ``node --test`` with explicit file lists and the web modules
-#: as ES modules (``crystallume/web/js/package.json`` declares ``"type": "module"``).
+#: as ES modules (``facet/web/js/package.json`` declares ``"type": "module"``).
 MIN_NODE_MAJOR = 22
 
 _OFF = ("0", "off", "false", "no")
@@ -56,7 +56,7 @@ _ON = ("1", "true", "yes")
 _FLOAT_KEY = "$float"
 
 # The driver: reads {"source", "input"} from stdin, runs ``source`` as the body of an async
-# function(input, web, repo) and prints the JSON result on stdout.  web(rel) imports crystallume/web/js/<rel>,
+# function(input, web, repo) and prints the JSON result on stdout.  web(rel) imports facet/web/js/<rel>,
 # repo(rel) any module of the checkout (e.g. 'tests/js/helpers.mjs').  console.log/info/debug go to stderr so
 # that stdout carries only the result; typed arrays become arrays, Map/Set objects/arrays, NaN and infinities
 # the $float objects above.
@@ -78,8 +78,8 @@ const replace = (k, v) => {
 const done = (stream, text, code) => stream.write(text, () => process.exit(code));
 const env = process.env;
 const load = (base, rel) => import(pathToFileURL(`${base}/${rel}`).href);
-const web = (rel) => load(env.CRYSTALLUME_WEB_JS, rel);
-const repo = (rel) => load(env.CRYSTALLUME_REPO, rel);
+const web = (rel) => load(env.FACET_WEB_JS, rel);
+const repo = (rel) => load(env.FACET_REPO, rel);
 try {
   const req = JSON.parse(readFileSync(0, 'utf8'), revive);
   const AsyncFunction = (async () => {}).constructor;
@@ -92,7 +92,7 @@ try {
 
 
 class NodeUnavailable(RuntimeError):
-    """No usable Node.js; tests skip (or fail when ``$CRYSTALLUME_REQUIRE_NODE`` is set)."""
+    """No usable Node.js; tests skip (or fail when ``$FACET_REQUIRE_NODE`` is set)."""
 
 
 class JSError(RuntimeError):
@@ -106,18 +106,18 @@ class JSError(RuntimeError):
 def find_node() -> tuple[str, tuple[int, int, int]]:
     """Path and version of a usable ``node``; raises :class:`NodeUnavailable` with the reason.
 
-    The lookup is cached for the current ``$CRYSTALLUME_NODE`` and ``$PATH``.
+    The lookup is cached for the current ``$FACET_NODE`` and ``$PATH``.
     """
-    return _find_node(os.environ.get("CRYSTALLUME_NODE", "").strip(), os.environ.get("PATH", ""))
+    return _find_node(os.environ.get("FACET_NODE", "").strip(), os.environ.get("PATH", ""))
 
 
 @lru_cache(maxsize=8)
 def _find_node(env: str, path: str) -> tuple[str, tuple[int, int, int]]:
     if env.lower() in _OFF:
-        raise NodeUnavailable(f"disabled by CRYSTALLUME_NODE={env}")
+        raise NodeUnavailable(f"disabled by FACET_NODE={env}")
     node = shutil.which(env, path=path) if env else shutil.which("node", path=path)
     if not node:
-        raise NodeUnavailable(f"node not found (CRYSTALLUME_NODE={env})" if env else "node not found on PATH")
+        raise NodeUnavailable(f"node not found (FACET_NODE={env})" if env else "node not found on PATH")
     try:
         out = subprocess.run([node, "--version"], capture_output=True, text=True, timeout=20)
     except (OSError, subprocess.SubprocessError) as exc:
@@ -135,8 +135,8 @@ def _find_node(env: str, path: str) -> tuple[str, tuple[int, int, int]]:
 
 
 def node_required() -> bool:
-    """``True`` when ``$CRYSTALLUME_REQUIRE_NODE`` is ``1``, ``true`` or ``yes`` (missing Node fails the tests)."""
-    return os.environ.get("CRYSTALLUME_REQUIRE_NODE", "").strip().lower() in _ON
+    """``True`` when ``$FACET_REQUIRE_NODE`` is ``1``, ``true`` or ``yes`` (missing Node fails the tests)."""
+    return os.environ.get("FACET_REQUIRE_NODE", "").strip().lower() in _ON
 
 
 def require_node() -> tuple[str, tuple[int, int, int]]:
@@ -147,13 +147,13 @@ def require_node() -> tuple[str, tuple[int, int, int]]:
         return find_node()
     except NodeUnavailable as exc:
         if node_required():
-            pytest.fail(f"CRYSTALLUME_REQUIRE_NODE is set but the JS tests cannot run: {exc}", pytrace=False)
+            pytest.fail(f"FACET_REQUIRE_NODE is set but the JS tests cannot run: {exc}", pytrace=False)
         pytest.skip(f"JS parity tests need Node.js >= {MIN_NODE_MAJOR}: {exc}")
     raise AssertionError("unreachable")  # pragma: no cover
 
 
 def _env() -> dict[str, str]:
-    return {**os.environ, "CRYSTALLUME_WEB_JS": str(WEB_JS), "CRYSTALLUME_REPO": str(REPO), "NODE_NO_WARNINGS": "1"}
+    return {**os.environ, "FACET_WEB_JS": str(WEB_JS), "FACET_REPO": str(REPO), "NODE_NO_WARNINGS": "1"}
 
 
 def _encode(obj: Any) -> Any:
@@ -183,7 +183,7 @@ def run_js(source: str, payload: Any = None, timeout: float = 30.0) -> Any:
     """Run *source*, the body of ``async function(input, web, repo)``, under Node and return its JSON result.
 
     ``input`` is *payload* (JSON-encoded: lists, dicts, numbers, strings, numpy arrays); ``await web(rel)``
-    imports ``crystallume/web/js/<rel>``, ``await repo(rel)`` any module of the checkout.  Typed arrays come back
+    imports ``facet/web/js/<rel>``, ``await repo(rel)`` any module of the checkout.  Typed arrays come back
     as lists.  Raises :class:`JSError` when the code throws or Node times out, :class:`NodeUnavailable` without Node.
     """
     node, _ = find_node()

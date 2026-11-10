@@ -2,9 +2,9 @@
 // category legends, app.registerColorExtra's values, the "Property" scheme's default property, overlay legend rows.
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { colorSchemes, computeColors, defaultPropertyName, PROPERTY_SKIP, colorExtrasFrom, offeredSchemes, srgbToLinear, hexToRgb } from '../../crystallume/web/js/render/colors.js';
-import { drawLegends } from '../../crystallume/web/js/render/legend.js';
-import { scenePathValues, makeScene } from '../../crystallume/web/js/render/settings.js';
+import { colorSchemes, computeColors, defaultPropertyName, PROPERTY_SKIP, colorExtrasFrom, offeredSchemes, srgbToLinear, hexToRgb } from '../../facet/web/js/render/colors.js';
+import { drawLegends } from '../../facet/web/js/render/legend.js';
+import { scenePathValues, makeScene } from '../../facet/web/js/render/settings.js';
 import { fake2d, quietErrors } from './fake2d.mjs';
 
 const model = (symbols) => ({

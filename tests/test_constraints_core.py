@@ -1,4 +1,4 @@
-"""Constraint flags core (``crystallume.core.constraints``): storage, the change-of-basis rule, axis names, adsorbate ids.
+"""Constraint flags core (``facet.core.constraints``): storage, the change-of-basis rule, axis names, adsorbate ids.
 
 The shared cases ``tests/data/surface/f0d/constraints.json`` run in both languages (``tests/test_cases.py``,
 ``tests/js/cases.test.mjs``).  The tests here cover the Python API in detail, check the rule against an independent
@@ -14,9 +14,9 @@ import math
 import numpy as np
 import pytest
 
-from crystallume import Structure
-from crystallume.core import constraints as C
-from crystallume.core.constraints import (
+from facet import Structure
+from facet.core import constraints as C
+from facet.core.constraints import (
     FLAG_RE,
     FLAG_TOL,
     MOVE_FLAGS_KEY,
@@ -32,7 +32,7 @@ from crystallume.core.constraints import (
     set_move_flags,
     transform_move_flags,
 )
-from crystallume.core.defaults import SURFACE_DEFAULTS
+from facet.core.defaults import SURFACE_DEFAULTS
 
 T, F = True, False
 NOTE = ("selective dynamics: the partial constraints of {n} atom(s) do not follow the new cell vectors and were "

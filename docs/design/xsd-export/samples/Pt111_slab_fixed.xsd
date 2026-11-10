@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="latin1"?>
 <!DOCTYPE XSD []>
-<XSD Version="6.0" WrittenBy="Crystallume">
+<XSD Version="6.0" WrittenBy="Facet">
 	<AtomisticTreeRoot ID="1" NumProperties="40" NumChildren="1">
 		<Property DefinedOn="ClassicalEnergyHolder" Name="AngleEnergy" Type="Double"/>
 		<Property DefinedOn="ClassicalEnergyHolder" Name="BendBendEnergy" Type="Double"/>

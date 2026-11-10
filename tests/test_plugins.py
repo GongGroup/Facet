@@ -6,10 +6,10 @@ import textwrap
 
 from fastapi.testclient import TestClient
 
-from crystallume import io as cl_io
-from crystallume.config import Settings
-from crystallume.plugins import PluginManager
-from crystallume.server import create_app
+from facet import io as cl_io
+from facet.config import Settings
+from facet.plugins import PluginManager
+from facet.server import create_app
 
 from .conftest import EXAMPLE_PLUGINS
 
@@ -125,7 +125,7 @@ def test_frontend_urls_are_relative_and_look_alias(tmp_path):
 
 
 def test_load_plugins_helper():
-    import crystallume as cl
+    import facet as cl
 
     mgr = cl.load_plugins([EXAMPLE_PLUGINS], entry_points=False)
     s = mgr.builders["hello-chain"].func(n=3)
@@ -137,7 +137,7 @@ def test_load_plugins_helper():
 def test_plugin_template_names():
     import pytest
 
-    from crystallume.plugins import plugin_template
+    from facet.plugins import plugin_template
 
     files = plugin_template("my_plugin")
     assert set(files) == {"plugin.py", "static/my_plugin.js"}
@@ -146,21 +146,21 @@ def test_plugin_template_names():
 
 
 def test_former_package_name_imports():
-    """Plugins and scripts written for AtomScope import ``atomscope``: it is the crystallume package."""
+    """Plugins and scripts written for AtomScope import ``atomscope``: it is the facet package."""
     import importlib
     import warnings
 
-    import crystallume
-    import crystallume.core.structure
+    import facet
+    import facet.core.structure
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", DeprecationWarning)
         atomscope = importlib.import_module("atomscope")
         legacy_structure = importlib.import_module("atomscope.core.structure")
-    assert atomscope is crystallume and legacy_structure is crystallume.core.structure
-    assert crystallume.core.structure.__spec__.name == "crystallume.core.structure"
+    assert atomscope is facet and legacy_structure is facet.core.structure
+    assert facet.core.structure.__spec__.name == "facet.core.structure"
     from atomscope import PluginContext, Structure  # noqa: F401  (the old plugin template's import)
-    assert Structure is crystallume.Structure
+    assert Structure is facet.Structure
 
 
 def test_entry_point_in_both_groups_loads_once(tmp_path, monkeypatch):
@@ -172,7 +172,7 @@ def test_entry_point_in_both_groups_loads_once(tmp_path, monkeypatch):
     dist = site / "dualplug-0.1.dist-info"
     dist.mkdir()
     (dist / "METADATA").write_text("Metadata-Version: 2.1\nName: dualplug\nVersion: 0.1\n")
-    (dist / "entry_points.txt").write_text("[crystallume.plugins]\ndualplug = dualplug\n\n"
+    (dist / "entry_points.txt").write_text("[facet.plugins]\ndualplug = dualplug\n\n"
                                            "[atomscope.plugins]\ndualplug = dualplug\n")
     monkeypatch.syspath_prepend(str(site))
     try:

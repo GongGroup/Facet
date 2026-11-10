@@ -2,11 +2,11 @@
 // tests/data/surface/f0d/export.json, with the same arguments, results and argument errors. They test
 // web/js/io/capabilities.js, exportReport in web/js/io/index.js and web/js/core/contacts.js.
 import { op } from '../cases.mjs';
-import { closeContacts } from '../../../crystallume/web/js/core/contacts.js';
-import { exportReport, formats } from '../../../crystallume/web/js/io/index.js';
+import { closeContacts } from '../../../facet/web/js/core/contacts.js';
+import { exportReport, formats } from '../../../facet/web/js/io/index.js';
 import {
   CAPABILITY_VALUES, OCCUPANCY_TOLERANCE, OPTIONAL_CAPABILITIES, OVERLAP_CHECK_MAX_ATOMS, WRITER_CAPABILITIES, validateCapabilities,
-} from '../../../crystallume/web/js/io/capabilities.js';
+} from '../../../facet/web/js/io/capabilities.js';
 
 function take(args, name, allowed, required = []) {
   const unknown = Object.keys(args).filter((k) => !allowed.includes(k)).sort();

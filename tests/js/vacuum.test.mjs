@@ -6,16 +6,16 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { Structure } from '../../crystallume/web/js/core/structure.js';
-import * as util from '../../crystallume/web/js/core/util.js';
-import * as lattice from '../../crystallume/web/js/core/lattice.js';
-import { SURFACE_DEFAULTS } from '../../crystallume/web/js/core/defaults.js';
+import { Structure } from '../../facet/web/js/core/structure.js';
+import * as util from '../../facet/web/js/core/util.js';
+import * as lattice from '../../facet/web/js/core/lattice.js';
+import { SURFACE_DEFAULTS } from '../../facet/web/js/core/defaults.js';
 import {
   axisGaps, contiguousShifts, displayCuts, findSurfaceGap, findVacuumGap, findVacuumGaps, gapCut, makeContiguous,
   requireGap, surfaceNormal, unwrapAlongGap, vacuumAxis, vacuumGapHint,
-} from '../../crystallume/web/js/core/vacuum.js';
-import * as vacuum from '../../crystallume/web/js/core/vacuum.js';
-import { parseStructure } from '../../crystallume/web/js/io/index.js';
+} from '../../facet/web/js/core/vacuum.js';
+import * as vacuum from '../../facet/web/js/core/vacuum.js';
+import { parseStructure } from '../../facet/web/js/io/index.js';
 import { repoPath } from './helpers.mjs';
 
 const close = (a, b, tol = 1e-9) => Math.abs(a - b) <= tol;

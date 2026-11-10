@@ -3,13 +3,13 @@
 // WebGL, these methods do not).
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import * as THREE from '../../crystallume/web/vendor/three/three.module.js';
-import { Viewer } from '../../crystallume/web/js/render/viewer.js';
-import { Overlays, markerLayer, pickSpheres, PICK_SLACK } from '../../crystallume/web/js/render/overlays.js';
-import { makeScene } from '../../crystallume/web/js/render/settings.js';
-import { buildDisplayModel } from '../../crystallume/web/js/render/display.js';
-import { Structure } from '../../crystallume/web/js/core/structure.js';
-import { EVENTS } from '../../crystallume/web/js/api/public.js';
+import * as THREE from '../../facet/web/vendor/three/three.module.js';
+import { Viewer } from '../../facet/web/js/render/viewer.js';
+import { Overlays, markerLayer, pickSpheres, PICK_SLACK } from '../../facet/web/js/render/overlays.js';
+import { makeScene } from '../../facet/web/js/render/settings.js';
+import { buildDisplayModel } from '../../facet/web/js/render/display.js';
+import { Structure } from '../../facet/web/js/core/structure.js';
+import { EVENTS } from '../../facet/web/js/api/public.js';
 import { quietErrors } from './fake2d.mjs';
 
 /** The canvas: 400 × 300 CSS px at (30, 20) on the page. */

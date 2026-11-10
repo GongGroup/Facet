@@ -13,15 +13,15 @@ from typing import Any
 import numpy as np
 import pytest
 
-from crystallume import build
-from crystallume.analysis import distance_matrix
-from crystallume.build.crystal import _FALLBACK_PARAMS, _REF_A, _REF_AB, PROTOTYPES, reference_parameters
-from crystallume.cli import build_parser, main
-from crystallume.io import read
+from facet import build
+from facet.analysis import distance_matrix
+from facet.build.crystal import _FALLBACK_PARAMS, _REF_A, _REF_AB, PROTOTYPES, reference_parameters
+from facet.cli import build_parser, main
+from facet.io import read
 
 REPO = Path(__file__).resolve().parents[1]
 GENERATOR = REPO / "scripts" / "gen_reference_data.py"
-REFERENCE_JS = REPO / "crystallume" / "web" / "js" / "build" / "reference.js"
+REFERENCE_JS = REPO / "facet" / "web" / "js" / "build" / "reference.js"
 
 
 @pytest.mark.parametrize(
@@ -141,7 +141,7 @@ def test_reference_js_is_generated_from_the_python_tables():
     assert REFERENCE_JS.read_text(encoding="utf-8") == render(), "run: python scripts/gen_reference_data.py"
     check = subprocess.run([sys.executable, str(GENERATOR), "--check"], capture_output=True, text=True, timeout=120)
     assert check.returncode == 0, check.stderr
-    assert check.stdout.strip() == "crystallume/web/js/build/reference.js is up to date"
+    assert check.stdout.strip() == "facet/web/js/build/reference.js is up to date"
 
 
 @pytest.mark.parametrize("prototype", list(PROTOTYPES))
@@ -269,7 +269,7 @@ def test_cli_build_crystal_vacuum_note(tmp_path: Path, capsys: pytest.CaptureFix
         warnings.simplefilter("always")
         assert main(["build", "crystal", "graphene", "C", "--vacuum", "7.5", "-o", str(out)]) == 0
     assert not [w for w in caught if "vacuum" in str(w.message)]
-    note = "crystallume: note: --vacuum adds vacuum on each side; use 'crystallume edit vacuum IN --vacuum V' for the total gap"
+    note = "facet: note: --vacuum adds vacuum on each side; use 'facet edit vacuum IN --vacuum V' for the total gap"
     assert note in capsys.readouterr().err.splitlines()
     assert read(out).cell[2, 2] == pytest.approx(15.0)
     assert main(["build", "crystal", "hbn", "-o", str(out)]) == 0

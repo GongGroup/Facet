@@ -1,6 +1,6 @@
 {
-  "schema": "crystallume.cases/1",
-  "description": "F0-A T8 parameter schema (crystallume/core/params.py, web/js/core/params.js): parseIndices (JSON, brackets, ';' rows, U+2212 and the bars formatIndices writes, fractions, finite numbers), text through a type (parse_cli_value on the Python side, the controls' parse on the JS side), coerceParam on JSON values (every message of F0-A §3.15 at least once), validateParams (defaults, required, strict unknown keys, soft warnings) and defaultParams. Includes the 25 inputs of parse2.py and the 13 of params_proto.py. Expected values are written by hand from the specification (analytic). Ops: tests/ops/f0a_params.py and tests/js/ops/f0a_params.mjs.",
+  "schema": "facet.cases/1",
+  "description": "F0-A T8 parameter schema (facet/core/params.py, web/js/core/params.js): parseIndices (JSON, brackets, ';' rows, U+2212 and the bars formatIndices writes, fractions, finite numbers), text through a type (parse_cli_value on the Python side, the controls' parse on the JS side), coerceParam on JSON values (every message of F0-A §3.15 at least once), validateParams (defaults, required, strict unknown keys, soft warnings) and defaultParams. Includes the 25 inputs of parse2.py and the 13 of params_proto.py. Expected values are written by hand from the specification (analytic). Ops: tests/ops/f0a_params.py and tests/js/ops/f0a_params.mjs.",
   "cases": [
     {"id": "f0a-params-parse-brackets-no-comma", "op": "parseIndices", "args": {"text": "[1 1 0]"}, "expect": {"value": [1, 1, 0]}, "note": "starts with [ but has no comma: not JSON; the brackets are dropped"},
     {"id": "f0a-params-parse-braces", "op": "parseIndices", "args": {"text": "{1 1 1}"}, "expect": {"value": [1, 1, 1]}},

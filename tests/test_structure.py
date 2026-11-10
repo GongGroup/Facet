@@ -1,6 +1,6 @@
 """Tests for the Structure model and lattice helpers.
 
-The data core of F0-D T1 (``crystallume.core.structure`` and ``core.naming``) has its shared cases in
+The data core of F0-D T1 (``facet.core.structure`` and ``core.naming``) has its shared cases in
 ``tests/data/surface/f0d/props.json``, ``sourcemap.json`` and ``edits.json`` (both languages, ``tests/test_cases.py``);
 the tests here cover the Python API in detail: the props invariants and defaults, ``_remap`` and the methods built on
 it, source maps and tracking sessions, notes, ``mark_edited``, the atom order and the repeat suffix.
@@ -16,11 +16,11 @@ import pickle
 import numpy as np
 import pytest
 
-from crystallume import Structure, build
-from crystallume.core import structure as st
-from crystallume.core.lattice import cart_to_frac, cell_to_cellpar, cellpar_to_cell, frac_to_cart
-from crystallume.core.naming import TIMES, add_repeat_suffix, format_repeat
-from crystallume.core.structure import (
+from facet import Structure, build
+from facet.core import structure as st
+from facet.core.lattice import cart_to_frac, cell_to_cellpar, cellpar_to_cell, frac_to_cart
+from facet.core.naming import TIMES, add_repeat_suffix, format_repeat
+from facet.core.structure import (
     BUILD_INFO_KEYS,
     EDIT_KINDS,
     PROP_DEFAULTS,
@@ -41,7 +41,7 @@ from crystallume.core.structure import (
     normalize_warnings,
     poscar_order,
 )
-from crystallume.io import parse_text, to_text
+from facet.io import parse_text, to_text
 
 T, F = True, False
 
@@ -51,7 +51,7 @@ def test_to_dict_from_dict_roundtrip():
                   props={"charges": [1.0, -1.0]}, info={"source": "test"}, name="NaCl",
                   frames=[{"positions": [[0.1, 0, 0], [2.9, 2.82, 2.82]]}])
     d = s.to_dict()
-    assert d["schema"] == "crystallume.structure/1"
+    assert d["schema"] == "facet.structure/1"
     assert set(d) == {"schema", "name", "symbols", "positions", "cell", "pbc", "frames", "props", "info"}
     assert d["positions"][1][0] == 2.82  # rounded to 6 decimals
     assert d["pbc"] == [True, True, True]
@@ -172,42 +172,42 @@ def test_lattice_roundtrip():
 
 def test_former_name_documents_still_load():
     """Files written while the package was called AtomScope keep opening."""
-    from crystallume import Structure
-    from crystallume.project import normalize_project
+    from facet import Structure
+    from facet.project import normalize_project
 
     s = Structure.from_dict({"schema": "atomscope.structure/1", "symbols": ["H"], "positions": [[0, 0, 0]]})
     assert len(s) == 1
     doc = normalize_project({"schema": "atomscope.project/1", "name": "old", "structures": []})
-    assert doc["schema"] == "crystallume.project/1"
+    assert doc["schema"] == "facet.project/1"
 
 
 def test_former_name_environment_variables(tmp_path):
-    from crystallume.config import Settings
+    from facet.config import Settings
 
-    s = Settings.from_env({"ATOMSCOPE_PORT": "9123", "CRYSTALLUME_MODE": "local", "ATOMSCOPE_DATA_DIR": str(tmp_path)})
+    s = Settings.from_env({"ATOMSCOPE_PORT": "9123", "FACET_MODE": "local", "ATOMSCOPE_DATA_DIR": str(tmp_path)})
     assert s.port == 9123 and s.data_dir == tmp_path
-    s2 = Settings.from_env({"ATOMSCOPE_PORT": "9123", "CRYSTALLUME_PORT": "9200"})
+    s2 = Settings.from_env({"ATOMSCOPE_PORT": "9123", "FACET_PORT": "9200"})
     assert s2.port == 9200
 
 
 def test_former_name_cloud_database(tmp_path):
     """A data directory from before the rename keeps using its atomscope.db."""
-    from crystallume.config import Settings
-    from crystallume.storage.sqlite import SQLiteStore
+    from facet.config import Settings
+    from facet.storage.sqlite import SQLiteStore
 
     s = Settings(mode="cloud", data_dir=tmp_path)
-    assert s.db_path == tmp_path / "crystallume.db"   # nothing there yet: the new name
+    assert s.db_path == tmp_path / "facet.db"   # nothing there yet: the new name
     old = SQLiteStore(tmp_path / "atomscope.db", secret="x" * 32)
     old.create_user("alice", "correct horse battery")
     old.close()
     assert s.db_path == tmp_path / "atomscope.db"
-    # also when an earlier start already created an empty crystallume.db next to it
-    SQLiteStore(tmp_path / "crystallume.db", secret="x" * 32).close()
+    # also when an earlier start already created an empty facet.db next to it
+    SQLiteStore(tmp_path / "facet.db", secret="x" * 32).close()
     assert s.db_path == tmp_path / "atomscope.db"
-    new = SQLiteStore(tmp_path / "crystallume.db", secret="x" * 32)
+    new = SQLiteStore(tmp_path / "facet.db", secret="x" * 32)
     new.create_user("bob", "correct horse battery")
     new.close()
-    assert s.db_path == tmp_path / "crystallume.db"   # a crystallume.db that holds data wins
+    assert s.db_path == tmp_path / "facet.db"   # a facet.db that holds data wins
 
 
 # ------------------------------------------------------------------------------------------- props and remap
@@ -971,7 +971,7 @@ def test_repeat_suffix():
 
 
 def test_core_reexports():
-    import crystallume.core as core
+    import facet.core as core
 
     for name in ("PROP_DEFAULTS", "mark_edited", "invalidate_symmetry_info", "add_warning", "get_warnings",
                  "poscar_order", "concat_structures"):

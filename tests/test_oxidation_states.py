@@ -1,8 +1,8 @@
 """Formal oxidation states of the cleave tool (M2 §3.9.1, ledger L-M2-06): the shared table
-``crystallume/web/data/oxidation_states.json`` (written by ``scripts/gen_oxidation_states.py``),
-``load_oxidation_states`` and ``estimate_oxidation_states`` in ``crystallume.build.surface`` (segment M2-T2), and the
+``facet/web/data/oxidation_states.json`` (written by ``scripts/gen_oxidation_states.py``),
+``load_oxidation_states`` and ``estimate_oxidation_states`` in ``facet.build.surface`` (segment M2-T2), and the
 element data they rest on: ``METALS``, ``ANIONS`` and the Pauling electronegativities of
-``crystallume.core.elements``.
+``facet.core.elements``.
 
 ``tests/js/oxidation_states.test.mjs`` runs the same cases on the JavaScript twins (``web/js/build/surface.js``,
 ``web/js/core/elements.js``).  Both files hold the same JSON constant ``PARITY_CASES`` (between the BEGIN and END
@@ -30,16 +30,16 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from crystallume.build.surface import _check_oxidation_table, _formal_charges, _neutral_valences
-from crystallume.build.surface import estimate_oxidation_states, load_oxidation_states
-from crystallume.core.elements import ANIONS, METALS, electronegativity, elements
-from crystallume.project import display_formula
+from facet.build.surface import _check_oxidation_table, _formal_charges, _neutral_valences
+from facet.build.surface import estimate_oxidation_states, load_oxidation_states
+from facet.core.elements import ANIONS, METALS, electronegativity, elements
+from facet.project import display_formula
 
-#: The module itself (``crystallume.build`` will also export a function ``surface``, M7 §3.1 rule 13).
-surface = importlib.import_module("crystallume.build.surface")
+#: The module itself (``facet.build`` will also export a function ``surface``, M7 §3.1 rule 13).
+surface = importlib.import_module("facet.build.surface")
 
 ROOT = Path(__file__).resolve().parents[1]
-TABLE = ROOT / "crystallume" / "web" / "data" / "oxidation_states.json"
+TABLE = ROOT / "facet" / "web" / "data" / "oxidation_states.json"
 GENERATOR = ROOT / "scripts" / "gen_oxidation_states.py"
 JS_TESTS = Path(__file__).resolve().parent / "js" / "oxidation_states.test.mjs"
 
@@ -160,16 +160,16 @@ PARITY_CASES = {
     {"id": "given charges as a list", "symbols": {"Sr": 1, "Ti": 1, "O": 3}, "given": [2, 4, -2], "kind": "type", "error": "charges must be a mapping of element symbols to charges"}
   ],
   "tables": [
-    {"id": "another schema", "table": {"schema": "crystallume.oxidation-states/2", "anions": {}, "cations": {}}, "error": "oxidation_states.json is not a crystallume.oxidation-states/1 table"},
-    {"id": "a list", "table": [], "error": "oxidation_states.json is not a crystallume.oxidation-states/1 table"},
-    {"id": "no cations", "table": {"schema": "crystallume.oxidation-states/1", "anions": {"O": -2}}, "error": "oxidation_states.json needs the objects anions and cations"},
-    {"id": "cations as a list", "table": {"schema": "crystallume.oxidation-states/1", "anions": {"O": -2}, "cations": []}, "error": "oxidation_states.json needs the objects anions and cations"},
-    {"id": "a positive anion charge", "table": {"schema": "crystallume.oxidation-states/1", "anions": {"O": 2}, "cations": {}}, "error": "oxidation_states.json: anions.O must be a negative whole number"},
-    {"id": "a fractional anion charge", "table": {"schema": "crystallume.oxidation-states/1", "anions": {"O": -1.5}, "cations": {}}, "error": "oxidation_states.json: anions.O must be a negative whole number"},
-    {"id": "no valences", "table": {"schema": "crystallume.oxidation-states/1", "anions": {"O": -2}, "cations": {"Fe": []}}, "error": "oxidation_states.json: cations.Fe must be a list of distinct positive whole numbers"},
-    {"id": "a repeated valence", "table": {"schema": "crystallume.oxidation-states/1", "anions": {"O": -2}, "cations": {"Fe": [3, 3]}}, "error": "oxidation_states.json: cations.Fe must be a list of distinct positive whole numbers"},
-    {"id": "a negative valence", "table": {"schema": "crystallume.oxidation-states/1", "anions": {"O": -2}, "cations": {"Fe": [3, -2]}}, "error": "oxidation_states.json: cations.Fe must be a list of distinct positive whole numbers"},
-    {"id": "a valence that is not a list", "table": {"schema": "crystallume.oxidation-states/1", "anions": {"O": -2}, "cations": {"Fe": 3}}, "error": "oxidation_states.json: cations.Fe must be a list of distinct positive whole numbers"}
+    {"id": "another schema", "table": {"schema": "facet.oxidation-states/2", "anions": {}, "cations": {}}, "error": "oxidation_states.json is not a facet.oxidation-states/1 table"},
+    {"id": "a list", "table": [], "error": "oxidation_states.json is not a facet.oxidation-states/1 table"},
+    {"id": "no cations", "table": {"schema": "facet.oxidation-states/1", "anions": {"O": -2}}, "error": "oxidation_states.json needs the objects anions and cations"},
+    {"id": "cations as a list", "table": {"schema": "facet.oxidation-states/1", "anions": {"O": -2}, "cations": []}, "error": "oxidation_states.json needs the objects anions and cations"},
+    {"id": "a positive anion charge", "table": {"schema": "facet.oxidation-states/1", "anions": {"O": 2}, "cations": {}}, "error": "oxidation_states.json: anions.O must be a negative whole number"},
+    {"id": "a fractional anion charge", "table": {"schema": "facet.oxidation-states/1", "anions": {"O": -1.5}, "cations": {}}, "error": "oxidation_states.json: anions.O must be a negative whole number"},
+    {"id": "no valences", "table": {"schema": "facet.oxidation-states/1", "anions": {"O": -2}, "cations": {"Fe": []}}, "error": "oxidation_states.json: cations.Fe must be a list of distinct positive whole numbers"},
+    {"id": "a repeated valence", "table": {"schema": "facet.oxidation-states/1", "anions": {"O": -2}, "cations": {"Fe": [3, 3]}}, "error": "oxidation_states.json: cations.Fe must be a list of distinct positive whole numbers"},
+    {"id": "a negative valence", "table": {"schema": "facet.oxidation-states/1", "anions": {"O": -2}, "cations": {"Fe": [3, -2]}}, "error": "oxidation_states.json: cations.Fe must be a list of distinct positive whole numbers"},
+    {"id": "a valence that is not a list", "table": {"schema": "facet.oxidation-states/1", "anions": {"O": -2}, "cations": {"Fe": 3}}, "error": "oxidation_states.json: cations.Fe must be a list of distinct positive whole numbers"}
   ]
 }
 # END PARITY_CASES
@@ -209,7 +209,7 @@ def test_the_table_follows_m2():
     """M2 §3.9.1: the schema, the source, the anion charges and the cation valences in their preference order."""
     t = _table()
     assert list(t) == ["schema", "source", "anions", "cations"]
-    assert t["schema"] == "crystallume.oxidation-states/1"
+    assert t["schema"] == "facet.oxidation-states/1"
     assert t["source"] == ("common oxidation states (pymatgen Element.common_oxidation_states, MIT; frozen at "
                            "development time) + manual preference order")
     assert t["anions"] == SPEC_ANIONS
@@ -227,21 +227,21 @@ def test_the_table_covers_every_metal():
 
 
 def test_the_table_is_what_the_generator_writes():
-    """crystallume/web/data/oxidation_states.json is the output of scripts/gen_oxidation_states.py (no pymatgen)."""
+    """facet/web/data/oxidation_states.json is the output of scripts/gen_oxidation_states.py (no pymatgen)."""
     render = runpy.run_path(str(GENERATOR), run_name="gen_oxidation_states")["render"]
     assert TABLE.read_text(encoding="utf-8") == render(), "run: python scripts/gen_oxidation_states.py"
 
 
 def test_the_table_is_stored_once():
     """One copy of the JSON in the sources, and no module of the package carries the table in another form."""
-    copies = sorted(p.relative_to(ROOT).as_posix() for top in ("crystallume", "tests", "scripts", "docs", "examples")
+    copies = sorted(p.relative_to(ROOT).as_posix() for top in ("facet", "tests", "scripts", "docs", "examples")
                     for p in (ROOT / top).rglob("oxidation_states*.json"))
-    assert copies == ["crystallume/web/data/oxidation_states.json"]
+    assert copies == ["facet/web/data/oxidation_states.json"]
     osmium = re.compile(r"""["']?Os["']?\s*:\s*[\[(]\s*4\s*,\s*8\s*[\])]""")   # the valences of Os, unique to the table
-    holders = sorted(p.relative_to(ROOT).as_posix() for p in (ROOT / "crystallume").rglob("*")
+    holders = sorted(p.relative_to(ROOT).as_posix() for p in (ROOT / "facet").rglob("*")
                      if p.is_file() and p.suffix in (".py", ".js", ".mjs", ".json", ".html")
                      and osmium.search(p.read_text(encoding="utf-8", errors="replace")))
-    assert holders == ["crystallume/web/data/oxidation_states.json"]
+    assert holders == ["facet/web/data/oxidation_states.json"]
 
 
 def test_load_oxidation_states_returns_a_copy_of_the_table():
@@ -261,7 +261,7 @@ def test_malformed_tables(case):
 
 
 def test_a_malformed_table_stops_the_estimate(monkeypatch: pytest.MonkeyPatch):
-    bad = {"schema": "crystallume.oxidation-states/1", "anions": {"O": -2}, "cations": {"Fe": [3, 3]}}
+    bad = {"schema": "facet.oxidation-states/1", "anions": {"O": -2}, "cations": {"Fe": [3, 3]}}
     surface._oxidation_table.cache_clear()
     monkeypatch.setattr(surface, "load_web_data", lambda name: bad)
     try:

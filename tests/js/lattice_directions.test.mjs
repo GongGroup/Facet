@@ -8,9 +8,9 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import * as lattice from '../../crystallume/web/js/core/lattice.js';
-import * as vacuum from '../../crystallume/web/js/core/vacuum.js';
-import { cellFromParams } from '../../crystallume/web/js/core/util.js';
+import * as lattice from '../../facet/web/js/core/lattice.js';
+import * as vacuum from '../../facet/web/js/core/vacuum.js';
+import { cellFromParams } from '../../facet/web/js/core/util.js';
 import { repoPath } from './helpers.mjs';
 
 const {
@@ -94,7 +94,7 @@ describe('exports', () => {
 
   test('the golden file runs in both languages, item by item', () => {
     const doc = JSON.parse(readFileSync(repoPath('tests/data/surface/directions.json'), 'utf8'));
-    assert.equal(doc.schema, 'crystallume.cases/1');
+    assert.equal(doc.schema, 'facet.cases/1');
     const ops = new Set(['reciprocalCell', 'millerNormal', 'latticeDirection', 'isHexagonalCell', 'hklToHkil', 'hkilToHkl',
       'uvwToUvtw', 'uvtwToUvw', 'centeredCellHint', 'primitiveMiller']);
     for (const c of doc.cases) {

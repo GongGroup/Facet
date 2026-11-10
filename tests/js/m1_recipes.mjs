@@ -11,8 +11,8 @@
 // adds amp·(2u − 1) with amp = σ·√3 and u = x / 2**32 from XorShift32(seed) (Marsaglia's xorshift32 started from
 // mix32(seed), MurmurHash3's fmix32). Node only: structureDigest uses node:crypto.
 import { createHash } from 'node:crypto';
-import { Structure } from '../../crystallume/web/js/core/structure.js';
-import { ELEMENTS } from '../../crystallume/web/js/core/elements.js';
+import { Structure } from '../../facet/web/js/core/structure.js';
+import { ELEMENTS } from '../../facet/web/js/core/elements.js';
 
 /** The most atoms one recipe builds (same as MAX_ATOMS in Python). */
 export const MAX_ATOMS = 200000;

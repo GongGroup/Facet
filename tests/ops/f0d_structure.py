@@ -1,8 +1,8 @@
 """F0-D data core: ops of the shared cases ``tests/data/surface/f0d/props.json``, ``sourcemap.json`` and ``edits.json``.
 
-They test ``crystallume/core/structure.py`` and ``core/naming.py`` (the JS halves, for ``web/js/core/structure.js``
+They test ``facet/core/structure.py`` and ``core/naming.py`` (the JS halves, for ``web/js/core/structure.js``
 and ``core/naming.js``, are in ``tests/js/ops/f0d_structure.mjs``).  Structure documents in ``args`` (``other``,
-``parts``, a ``new`` step's ``structure``) are ``crystallume.structure/1`` objects read with
+``parts``, a ``new`` step's ``structure``) are ``facet.structure/1`` objects read with
 ``Structure.from_dict`` / ``Structure.fromJSON``.  Every op that edits works on a copy of the input and returns it as
 ``structure``, together with:
 
@@ -59,9 +59,9 @@ from typing import Any, Sequence
 
 import numpy as np
 
-from crystallume.core import naming
-from crystallume.core import structure as st
-from crystallume.core.structure import Structure
+from facet.core import naming
+from facet.core import structure as st
+from facet.core.structure import Structure
 
 from ..cases import CaseInput, op
 

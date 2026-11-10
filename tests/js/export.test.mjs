@@ -6,12 +6,12 @@
 import { test, describe, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { Structure } from '../../crystallume/web/js/core/structure.js';
-import { closeContacts } from '../../crystallume/web/js/core/contacts.js';
-import { exportReport, exportStructure, formats, parseStructure } from '../../crystallume/web/js/io/index.js';
-import { CAPABILITY_VALUES, OPTIONAL_CAPABILITIES, WRITER_CAPABILITIES, validateCapabilities } from '../../crystallume/web/js/io/capabilities.js';
-import { writePOSCAR } from '../../crystallume/web/js/io/poscar.js';
-import { installExtensions } from '../../crystallume/web/js/api/extensions.js';
+import { Structure } from '../../facet/web/js/core/structure.js';
+import { closeContacts } from '../../facet/web/js/core/contacts.js';
+import { exportReport, exportStructure, formats, parseStructure } from '../../facet/web/js/io/index.js';
+import { CAPABILITY_VALUES, OPTIONAL_CAPABILITIES, WRITER_CAPABILITIES, validateCapabilities } from '../../facet/web/js/io/capabilities.js';
+import { writePOSCAR } from '../../facet/web/js/io/poscar.js';
+import { installExtensions } from '../../facet/web/js/api/extensions.js';
 import { repoPath } from './helpers.mjs';
 
 const T = true, F = false;
@@ -56,7 +56,7 @@ describe('capabilities', () => {
       offs.push(formats.register({ id: 'jsfmt', write: () => 'x\n', capabilities: { ...MYFMT } }));
       assert.deepEqual(formats.get('jsfmt').capabilities, MYFMT);
       const warned = warnsDuring(() => offs.push(formats.register({ id: 'jsbad', write: () => 'x\n', capabilities: { ...MYFMT, constraints: 'yes' } })));
-      assert.deepEqual(warned, ["Crystallume: writer 'jsbad': capabilities.constraints must be one of lattice, cartesian, none; the export check of this format is off"]);
+      assert.deepEqual(warned, ["Facet: writer 'jsbad': capabilities.constraints must be one of lattice, cartesian, none; the export check of this format is off"]);
       assert.equal(formats.get('jsbad').capabilities, null);
       offs.push(formats.register({ id: 'jsnone', write: () => 'x\n' }));
       assert.equal(formats.get('jsnone').capabilities, null);
@@ -100,7 +100,7 @@ describe('capabilities', () => {
       assert.deepEqual(formats.get('jsledger').capabilities, ledger);
       assert.deepEqual(exportReport(s, 'jsledger'), { warnings: ['My format holds one frame: wrote frame 1 of 2'], notes: [] });
       offs.push(formats.register({ id: 'jsnovel', write: () => 'x\n', capabilities: { ...ledger, velocities: false } }));
-      assert.deepEqual(exportReport(s, 'jsnovel').notes, ['the atoms have velocities, but My format cannot store them; use POSCAR, Extended XYZ or Crystallume JSON to keep them']);
+      assert.deepEqual(exportReport(s, 'jsnovel').notes, ['the atoms have velocities, but My format cannot store them; use POSCAR, Extended XYZ or Facet JSON to keep them']);
       offs.push(formats.register({ id: 'jsvel', write: () => 'x\n', capabilities: { ...ledger, velocities: true } }));
       assert.deepEqual(exportReport(s, 'jsvel').notes, []);
     } finally { offs.forEach((off) => off()); }
@@ -200,7 +200,7 @@ describe('exportReport rules', () => {
     const s = parseStructure(CONTCAR, 'contcar_pt111.vasp');
     const before = JSON.stringify(s.toJSON({ precision: 17 }));
     assert.deepEqual(exportReport(s, 'poscar'), { warnings: [], notes: [] });   // acceptance S14-4
-    assert.deepEqual(exportReport(s, 'cif').warnings, ['18 atom(s) are fixed or partly fixed (selective dynamics), but CIF cannot store constraints; use POSCAR, Extended XYZ or Crystallume JSON to keep them']);
+    assert.deepEqual(exportReport(s, 'cif').warnings, ['18 atom(s) are fixed or partly fixed (selective dynamics), but CIF cannot store constraints; use POSCAR, Extended XYZ or Facet JSON to keep them']);
     for (const id of ['xyz', 'extxyz', 'pdb', 'json']) exportReport(s, id);
     assert.equal(JSON.stringify(s.toJSON({ precision: 17 })), before);
     assert.deepEqual(s.pbc, [true, true, true]);   // reading changes no pbc (design decision U1)
@@ -252,7 +252,7 @@ describe('exportStructure', () => {
       const orig = console.warn;
       console.warn = (...a) => warned.push(a.join(' '));
       try { await installExtensions(app, api, null); } finally { console.warn = orig; }
-      assert.deepEqual(warned, ["Crystallume: writer 'srvbad': capabilities.frames must be one of all, one; the export check of this format is off"]);
+      assert.deepEqual(warned, ["Facet: writer 'srvbad': capabilities.frames must be one of all, one; the export check of this format is off"]);
       assert.deepEqual(formats.get('srvfmt').capabilities, caps);
       assert.equal(formats.get('srvfmt').server, true);
       const s = trajectory(2);
@@ -261,7 +261,7 @@ describe('exportStructure', () => {
       assert.ok(out.text instanceof Promise);
       assert.ok(Array.isArray(out.warnings) && Array.isArray(out.notes));
       assert.deepEqual(out.warnings, ['Server format holds one frame: wrote frame 1 of 2',
-        '1 atom(s) are fixed or partly fixed (selective dynamics), but Server format cannot store constraints; use POSCAR, Extended XYZ or Crystallume JSON to keep them']);
+        '1 atom(s) are fixed or partly fixed (selective dynamics), but Server format cannot store constraints; use POSCAR, Extended XYZ or Facet JSON to keep them']);
       assert.equal(await out.text, 'TEXT srvfmt');
       assert.equal(calls.length, 1);
       assert.equal(calls[0][0], '/io/export');

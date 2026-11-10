@@ -3,7 +3,7 @@
 
     python scripts/build_artifact.py [--out dist/artifact] [--fragment] [--plugin DIR ...]
 
-Copies crystallume/web (HTML, CSS, JS, vendored three.js) into OUT. With --fragment the
+Copies facet/web (HTML, CSS, JS, vendored three.js) into OUT. With --fragment the
 entry page is written without <!doctype>/<html>/<head>/<body> wrappers, for hosts that
 inject their own document skeleton (e.g. claude.ai artifacts). The bundle has no build
 step and no server dependency: open it from any static host (GitHub Pages, S3, nginx).
@@ -11,7 +11,7 @@ step and no server dependency: open it from any static host (GitHub Pages, S3, n
 --plugin DIR (repeatable) adds a plugin's frontend: its static folder is copied to
 OUT/plugins/<name>/ and listed in OUT/plugins.json, which the app reads at start-up.
 Only the JavaScript part runs in a static bundle; Python readers, builders and analyses
-need the server (crystallume serve --plugins ...).
+need the server (facet serve --plugins ...).
 """
 from __future__ import annotations
 
@@ -23,13 +23,13 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-WEB = ROOT / "crystallume" / "web"
+WEB = ROOT / "facet" / "web"
 
 
 def plugin_frontend(directory: Path) -> tuple[str, Path, list[str]]:
     """(name, static dir, module paths relative to it) of the plugin in *directory*.
 
-    The plugin is loaded with Crystallume's plugin manager when possible (exact name and
+    The plugin is loaded with Facet's plugin manager when possible (exact name and
     declared frontend modules); otherwise its folder name and static/*.js are used.
     """
     directory = directory.resolve()
@@ -38,9 +38,9 @@ def plugin_frontend(directory: Path) -> tuple[str, Path, list[str]]:
         sys.path.insert(0, str(ROOT))
         import logging
 
-        from crystallume.plugins import PluginManager
+        from facet.plugins import PluginManager
 
-        logging.getLogger("crystallume.plugins").setLevel(logging.CRITICAL)
+        logging.getLogger("facet.plugins").setLevel(logging.CRITICAL)
         rec = PluginManager([], use_entry_points=False).load_file(entry, root=directory, default_name=directory.name)
         if rec.status == "loaded" and rec.static_dir is not None:
             prefix = f"plugins/{rec.slug}/"
@@ -48,7 +48,7 @@ def plugin_frontend(directory: Path) -> tuple[str, Path, list[str]]:
             return rec.name, rec.static_dir, mods
         if rec.status == "error":
             print(f"warning: {directory.name}: plugin did not load ({rec.error}); copying static/*.js", file=sys.stderr)
-    except Exception as exc:  # pragma: no cover - crystallume not importable here
+    except Exception as exc:  # pragma: no cover - facet not importable here
         print(f"warning: {directory.name}: {exc}; copying static/*.js", file=sys.stderr)
     static = directory / "static"
     if not static.is_dir():

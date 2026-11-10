@@ -1,11 +1,11 @@
 // F0-D (data and file I/O): JS halves of the ops and recipes in tests/ops/f0d.py (see its docstring), with the
 // same argument errors.
 import { op, recipe } from '../cases.mjs';
-import { exportStructure, parseStructure } from '../../../crystallume/web/js/io/index.js';
-import { buildCrystal, prototypes } from '../../../crystallume/web/js/build/crystal.js';
-import * as vacuum from '../../../crystallume/web/js/core/vacuum.js';
-import { wrapFractional } from '../../../crystallume/web/js/core/lattice.js';
-import * as constraints from '../../../crystallume/web/js/core/constraints.js';
+import { exportStructure, parseStructure } from '../../../facet/web/js/io/index.js';
+import { buildCrystal, prototypes } from '../../../facet/web/js/build/crystal.js';
+import * as vacuum from '../../../facet/web/js/core/vacuum.js';
+import { wrapFractional } from '../../../facet/web/js/core/lattice.js';
+import * as constraints from '../../../facet/web/js/core/constraints.js';
 
 function take(args, name, allowed, required = []) {
   const unknown = Object.keys(args).filter((k) => !allowed.includes(k)).sort();

@@ -1,7 +1,7 @@
 // F0-A T7a (lattice directions): JS halves of the ops in tests/ops/f0a_lattice.py (see its docstring), for the shared
 // cases in tests/data/surface/directions.json, with the same argument errors.
 import { op } from '../cases.mjs';
-import * as lattice from '../../../crystallume/web/js/core/lattice.js';
+import * as lattice from '../../../facet/web/js/core/lattice.js';
 
 function take(args, name, allowed, required = []) {
   const unknown = Object.keys(args).filter((k) => !allowed.includes(k)).sort();

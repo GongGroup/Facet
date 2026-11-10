@@ -1,6 +1,6 @@
 // Shared helpers for the node:test files in tests/js (Node.js >= 22, no npm packages).
 //
-// loadCases() and compare() are the JS half of the shared case shell `crystallume.cases/1`: the same loader rules,
+// loadCases() and compare() are the JS half of the shared case shell `facet.cases/1`: the same loader rules,
 // error messages and comparison semantics as tests/cases.py (tests/test_cases.py checks the two against each other
 // through the bridge). The format is documented in tests/data/surface/README.md.
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
@@ -14,13 +14,13 @@ export const REPO = fileURLToPath(new URL('../../', import.meta.url));
 /** Absolute path of `rel` (a posix path relative to the repository root). */
 export function repoPath(rel = '') { return path.join(REPO, ...String(rel).split('/')); }
 
-export const WEB_JS = repoPath('crystallume/web/js');
+export const WEB_JS = repoPath('facet/web/js');
 export const DATA = repoPath('tests/data');
 
 /** Import a web module, e.g. `await web('core/structure.js')` (static imports work as well). */
 export const web = (rel) => import(pathToFileURL(path.join(WEB_JS, ...rel.split('/'))).href);
 
-export const SCHEMA = 'crystallume.cases/1';
+export const SCHEMA = 'facet.cases/1';
 /** Tolerances used when a case's `tol` does not give one (same as DEFAULT_TOL in tests/cases.py). */
 export const DEFAULT_TOL = Object.freeze({ positions: 1e-6, cell: 1e-6, value: 1e-9 });
 
@@ -33,7 +33,7 @@ const TOL_KEYS = ['cell', 'info', 'positions', 'props', 'value'];
 const LANGS = ['js', 'py'];
 const MAX_PROBLEMS = 20;
 
-/** A `crystallume.cases/1` file (or a case in it) is malformed. */
+/** A `facet.cases/1` file (or a case in it) is malformed. */
 export class CaseFileError extends Error {
   constructor(message) { super(message); this.name = 'CaseFileError'; }
 }
@@ -62,8 +62,8 @@ function jsonFiles(root) {
 }
 
 /**
- * Every case of every `crystallume.cases/1` file under `root` (default tests/data), recursively, files in path
- * order; other JSON files are ignored. Throws CaseFileError for another `crystallume.cases/<n>` version, invalid JSON
+ * Every case of every `facet.cases/1` file under `root` (default tests/data), recursively, files in path
+ * order; other JSON files are ignored. Throws CaseFileError for another `facet.cases/<n>` version, invalid JSON
  * in a case file, a malformed case or an id used twice. Each case also gets `_file` (relative to root) and `_root`.
  */
 export function loadCases(root = DATA) {
@@ -75,13 +75,13 @@ export function loadCases(root = DATA) {
     const text = readFileSync(file, 'utf8');
     let doc;
     try { doc = JSON.parse(text); } catch (err) {
-      if (text.includes('"crystallume.cases/')) throw new CaseFileError(`${rel}: not valid JSON (${err.message})`);
+      if (text.includes('"facet.cases/')) throw new CaseFileError(`${rel}: not valid JSON (${err.message})`);
       continue;
     }
     if (!isObj(doc)) continue;
     const schema = doc.schema;
     if (schema !== SCHEMA) {
-      if (typeof schema === 'string' && schema.startsWith('crystallume.cases/')) {
+      if (typeof schema === 'string' && schema.startsWith('facet.cases/')) {
         throw new CaseFileError(`${rel}: unsupported schema ${q(schema)} (this loader reads ${q(SCHEMA)})`);
       }
       continue;

@@ -85,52 +85,52 @@
 
 | 文件 | 位置 | 段名 | 建立者 |
 |---|---|---|---|
-| `crystallume/core/defaults.py`、`crystallume/web/js/core/defaults.js` | `SURFACE_DEFAULTS` 源码表内、F0 键之后 | `M1`、`M2`、`M3`、`M4`、`M5-adsorbates`、`M5-sites`、`M6` | W1-S0 |
-| `crystallume/core/structure.py`、`crystallume/web/js/core/structure.js` | `class Structure` 体的末尾（方法区） | `M1-T3a`、`M1-T3b`、`M1-T4`、`M2`、`M3`、`M4-geometry`、`M4-placement` | W1-S0 |
-| `crystallume/core/naming.py`、`crystallume/web/js/core/naming.js` | 文件末尾 | `M1`、`M2`、`M6` | W1-S0 |
-| `crystallume/core/lattice.py`、`crystallume/web/js/core/lattice.js` | 文件末尾 | `M1`、`M2` | W1-S0 |
-| `crystallume/build/__init__.py` | 导入区之后与 `__all__` 列表末尾各一对（同名） | `M1`、`M2`、`M5-T1`、`M5-T5`、`M5-T6`、`M5-T7`、`M6` | W1-S0 |
-| `crystallume/analysis/__init__.py` | 导入区之后与 `__all__` 列表末尾各一对（同名） | `M1`、`M3`、`M4`、`M5-sites`、`M5-topbottom`、`M6` | W1-S0 |
-| `crystallume/web/js/main.js` | 面板 import 之后（含 F0-A 的 `ui/panels/surface.js`），每段只放模块入口的 `import` 行 | `M1-sections`、`M1-commands`、`M2-cleave`、`M2-slab`、`M3-commands`、`M3-layers`、`M3-constraints`、`M3-atomselection`、`M4-move`、`M4-commands`、`M4-transform`、`M4-clipboard`、`M4-place`、`M5-adsorbates`、`M5-sitepick`、`M6-interface` | W1-S0 |
-| `crystallume/web/css/app.css` | 文件末尾（各段自带自己的 media 查询） | `M1`、`M2-cleave`、`M2-slab`、`M3-markers`、`M3-layers`、`M3-constraints`、`M3-atomselection`、`M4-move`、`M4-transform`、`M4-place`、`M4-card`、`M5-markers`、`M5-panel`、`M6` | W1-S0 |
-| `crystallume/web/js/ui/icons.js` | 图标表内 | `M3`、`M4`、`M5` | W1-S0 |
-| `crystallume/web/js/app.js` | `class App` 体的末尾 | `M2`、`M3`、`M4` | W1-S0 |
-| `crystallume/core/intmath.py`、`crystallume/web/js/core/intmath.js` | 新文件，末尾 | `M2` | M1-T1 |
-| `crystallume/core/cellops.py`、`crystallume/web/js/core/cellops.js` | 新文件骨架 | `M1-T3a`、`M1-T3b`、`M1-T10` | M1-T1 |
-| `crystallume/build/surface.py` | 新文件骨架 | `M2-T2`、`M2-T3`、`M2-T3b`、`M2-T4`、`M2-T5` | M2-T2 |
-| `crystallume/web/js/build/surface.js` | 新文件骨架 | `M2-T2`、`M2-T6a`、`M2-T3b`、`M2-T6b`、`M2-T5` | M2-T2 |
-| `crystallume/core/infohandlers.py`、`crystallume/web/js/core/infohandlers.js` | 新文件 | `M1`、`M5` | M1-T10 |
-| `crystallume/web/js/ui/panels/transform.js` | 新文件骨架（每段自带 import 小块） | `M4-T7a`、`M4-T7b` | M4-T6a |
-| `crystallume/analysis/sites.py`、`crystallume/web/js/core/sites.js` | 新文件骨架 | `M5-T3`、`M5-T4`、`M5-T11` | M5-T3 |
-| `crystallume/build/adsorbate.py`、`crystallume/web/js/build/adsorbates.js` | 新文件骨架 | `M5-T1`、`M5-T5`、`M5-T6`、`M5-T7` | M5-T1 |
-| `crystallume/web/js/ui/panels/surface-interface.js` | 新文件骨架 | `M6-T7b`、`M6-T7c` | M6-T7a |
+| `facet/core/defaults.py`、`facet/web/js/core/defaults.js` | `SURFACE_DEFAULTS` 源码表内、F0 键之后 | `M1`、`M2`、`M3`、`M4`、`M5-adsorbates`、`M5-sites`、`M6` | W1-S0 |
+| `facet/core/structure.py`、`facet/web/js/core/structure.js` | `class Structure` 体的末尾（方法区） | `M1-T3a`、`M1-T3b`、`M1-T4`、`M2`、`M3`、`M4-geometry`、`M4-placement` | W1-S0 |
+| `facet/core/naming.py`、`facet/web/js/core/naming.js` | 文件末尾 | `M1`、`M2`、`M6` | W1-S0 |
+| `facet/core/lattice.py`、`facet/web/js/core/lattice.js` | 文件末尾 | `M1`、`M2` | W1-S0 |
+| `facet/build/__init__.py` | 导入区之后与 `__all__` 列表末尾各一对（同名） | `M1`、`M2`、`M5-T1`、`M5-T5`、`M5-T6`、`M5-T7`、`M6` | W1-S0 |
+| `facet/analysis/__init__.py` | 导入区之后与 `__all__` 列表末尾各一对（同名） | `M1`、`M3`、`M4`、`M5-sites`、`M5-topbottom`、`M6` | W1-S0 |
+| `facet/web/js/main.js` | 面板 import 之后（含 F0-A 的 `ui/panels/surface.js`），每段只放模块入口的 `import` 行 | `M1-sections`、`M1-commands`、`M2-cleave`、`M2-slab`、`M3-commands`、`M3-layers`、`M3-constraints`、`M3-atomselection`、`M4-move`、`M4-commands`、`M4-transform`、`M4-clipboard`、`M4-place`、`M5-adsorbates`、`M5-sitepick`、`M6-interface` | W1-S0 |
+| `facet/web/css/app.css` | 文件末尾（各段自带自己的 media 查询） | `M1`、`M2-cleave`、`M2-slab`、`M3-markers`、`M3-layers`、`M3-constraints`、`M3-atomselection`、`M4-move`、`M4-transform`、`M4-place`、`M4-card`、`M5-markers`、`M5-panel`、`M6` | W1-S0 |
+| `facet/web/js/ui/icons.js` | 图标表内 | `M3`、`M4`、`M5` | W1-S0 |
+| `facet/web/js/app.js` | `class App` 体的末尾 | `M2`、`M3`、`M4` | W1-S0 |
+| `facet/core/intmath.py`、`facet/web/js/core/intmath.js` | 新文件，末尾 | `M2` | M1-T1 |
+| `facet/core/cellops.py`、`facet/web/js/core/cellops.js` | 新文件骨架 | `M1-T3a`、`M1-T3b`、`M1-T10` | M1-T1 |
+| `facet/build/surface.py` | 新文件骨架 | `M2-T2`、`M2-T3`、`M2-T3b`、`M2-T4`、`M2-T5` | M2-T2 |
+| `facet/web/js/build/surface.js` | 新文件骨架 | `M2-T2`、`M2-T6a`、`M2-T3b`、`M2-T6b`、`M2-T5` | M2-T2 |
+| `facet/core/infohandlers.py`、`facet/web/js/core/infohandlers.js` | 新文件 | `M1`、`M5` | M1-T10 |
+| `facet/web/js/ui/panels/transform.js` | 新文件骨架（每段自带 import 小块） | `M4-T7a`、`M4-T7b` | M4-T6a |
+| `facet/analysis/sites.py`、`facet/web/js/core/sites.js` | 新文件骨架 | `M5-T3`、`M5-T4`、`M5-T11` | M5-T3 |
+| `facet/build/adsorbate.py`、`facet/web/js/build/adsorbates.js` | 新文件骨架 | `M5-T1`、`M5-T5`、`M5-T6`、`M5-T7` | M5-T1 |
+| `facet/web/js/ui/panels/surface-interface.js` | 新文件骨架 | `M6-T7b`、`M6-T7c` | M6-T7a |
 
 **命名行段表**：
 
 | 记法 | 范围 | 使用者 |
 |---|---|---|
-| `crystallume/web/js/app.js#beginStructureEdit` | `beginStructureEdit` 方法体（P-04，条件性） | M2-T9（W1.6） |
-| `crystallume/web/js/main.js#edit.applyPreview` | `edit.applyPreview` 命令的 `run`（P-04，条件性） | M2-T9（W1.6） |
-| `crystallume/web/js/ui/panels/structure.js#tools-row` | 摘要之后的 Tools 行与摘要提示行（HEAD `structure.js:172-185` 一带） | M1-T7c（W1.6） |
-| `crystallume/web/js/app.js#select` | `select` 方法（只在第 0 波未支持 intersect 模式时改） | M3-T6（W2.3） |
-| `crystallume/web/js/app.js#PATH_LABELS` | `PATH_LABELS` 数组（HEAD `app.js:70-79`） | M3-T7（W2.3） |
-| `crystallume/web/js/app.js#entry-serialization` | 项目条目的序列化/反序列化函数（只在不保留 `entry.layers` 时改） | M3-T6（W2.3） |
-| `crystallume/web/js/render/viewer.js#HIGHLIGHT_COLORS` | `HIGHLIGHT_COLORS` 常量（只在仍有红色 `fixed` 时改） | M3-T7（W2.3） |
-| `crystallume/web/js/app.js#_onAtomDblClick` | `_onAtomDblClick` 方法体（HEAD `app.js:754-765`） | M4-T7c（W2.4） |
-| `crystallume/web/js/ui/selectioncard.js#value-rows` | 距离/角度/二面角数值行（不是动作区） | M4-T7c（W2.4） |
-| `crystallume/web/js/ui/panels/structure.js#measurements-row` | Measurements 列表的行渲染 | M4-T7c（W2.4） |
-| `crystallume/web/js/ui/shell.js#paste-listener` | 粘贴监听（HEAD `shell.js:976-984`） | M4-T6b（W2.4） |
-| `crystallume/web/js/ui/paramform.js#elementInput` | `elementInput`（HEAD `paramform.js:13-19`） | M4-T7b（W2.4） |
-| `crystallume/core/structure.py#PROP_DEFAULTS`、`crystallume/web/js/core/structure.js#PROP_DEFAULTS` | 两份 `PROP_DEFAULTS` 源码表 | M6-T0（W4.1） |
-| `crystallume/web/js/ui/panels/projects.js#context-menu` | 项目列表条目的右键菜单构造 | M6-T7c（W4.4） |
-| `crystallume/web/js/ui/shell.js#help-tour` | 帮助、快捷键对话框（Mouse 行）、提示栏与导览的文案 | 每波的文档链 |
-| `crystallume/web/js/app.js#VERSION` | `export const VERSION` 一行 | M7-T7（W5.2） |
-| `crystallume/web/js/app.js#segments` | `class App` 末尾由 W1-S0 放的三对段落标记（只删标记行） | M7-T7（W5.2） |
+| `facet/web/js/app.js#beginStructureEdit` | `beginStructureEdit` 方法体（P-04，条件性） | M2-T9（W1.6） |
+| `facet/web/js/main.js#edit.applyPreview` | `edit.applyPreview` 命令的 `run`（P-04，条件性） | M2-T9（W1.6） |
+| `facet/web/js/ui/panels/structure.js#tools-row` | 摘要之后的 Tools 行与摘要提示行（HEAD `structure.js:172-185` 一带） | M1-T7c（W1.6） |
+| `facet/web/js/app.js#select` | `select` 方法（只在第 0 波未支持 intersect 模式时改） | M3-T6（W2.3） |
+| `facet/web/js/app.js#PATH_LABELS` | `PATH_LABELS` 数组（HEAD `app.js:70-79`） | M3-T7（W2.3） |
+| `facet/web/js/app.js#entry-serialization` | 项目条目的序列化/反序列化函数（只在不保留 `entry.layers` 时改） | M3-T6（W2.3） |
+| `facet/web/js/render/viewer.js#HIGHLIGHT_COLORS` | `HIGHLIGHT_COLORS` 常量（只在仍有红色 `fixed` 时改） | M3-T7（W2.3） |
+| `facet/web/js/app.js#_onAtomDblClick` | `_onAtomDblClick` 方法体（HEAD `app.js:754-765`） | M4-T7c（W2.4） |
+| `facet/web/js/ui/selectioncard.js#value-rows` | 距离/角度/二面角数值行（不是动作区） | M4-T7c（W2.4） |
+| `facet/web/js/ui/panels/structure.js#measurements-row` | Measurements 列表的行渲染 | M4-T7c（W2.4） |
+| `facet/web/js/ui/shell.js#paste-listener` | 粘贴监听（HEAD `shell.js:976-984`） | M4-T6b（W2.4） |
+| `facet/web/js/ui/paramform.js#elementInput` | `elementInput`（HEAD `paramform.js:13-19`） | M4-T7b（W2.4） |
+| `facet/core/structure.py#PROP_DEFAULTS`、`facet/web/js/core/structure.js#PROP_DEFAULTS` | 两份 `PROP_DEFAULTS` 源码表 | M6-T0（W4.1） |
+| `facet/web/js/ui/panels/projects.js#context-menu` | 项目列表条目的右键菜单构造 | M6-T7c（W4.4） |
+| `facet/web/js/ui/shell.js#help-tour` | 帮助、快捷键对话框（Mouse 行）、提示栏与导览的文案 | 每波的文档链 |
+| `facet/web/js/app.js#VERSION` | `export const VERSION` 一行 | M7-T7（W5.2） |
+| `facet/web/js/app.js#segments` | `class App` 末尾由 W1-S0 放的三对段落标记（只删标记行） | M7-T7（W5.2） |
 
 ### 2.3 测试放置
 
-- Python 测试放 `tests/test_*.py`；JS 单元测试放 `tests/js/*.test.mjs`，由第 0 波的 `tests/test_js_unit.py` 按文件名自动收集（不要改这个运行器）。没有 Node 时跳过，`CRYSTALLUME_REQUIRE_NODE=1` 时失败。
-- **共享用例**一律用 `crystallume.cases/1` 外壳（ledger-F0 L-F0-27），放在 `tests/data/<area>/…`。op 与配方放在各模块自己的 op 文件里；为了让同一模块的两条链并行，op 文件可以按任务拆成 `tests/ops/<模块>_<主题>.py` 与 `tests/js/ops/<模块>_<主题>.mjs`（两者都按文件名自动导入，P-02）。
+- Python 测试放 `tests/test_*.py`；JS 单元测试放 `tests/js/*.test.mjs`，由第 0 波的 `tests/test_js_unit.py` 按文件名自动收集（不要改这个运行器）。没有 Node 时跳过，`FACET_REQUIRE_NODE=1` 时失败。
+- **共享用例**一律用 `facet.cases/1` 外壳（ledger-F0 L-F0-27），放在 `tests/data/<area>/…`。op 与配方放在各模块自己的 op 文件里；为了让同一模块的两条链并行，op 文件可以按任务拆成 `tests/ops/<模块>_<主题>.py` 与 `tests/js/ops/<模块>_<主题>.mjs`（两者都按文件名自动导入，P-02）。
 - **先写期望**：金标先于实现写好，每个用例带 `skip` 理由（写明哪个任务注册 op）；两种语言的 op 都合入之后由指定的任务去掉 skip（P-03）。
 - **跨语言平价**放在每个模块自己的 `tests/test_m<N>_parity.py`，不改共用的 `tests/test_js_parity.py`（P-02）。比较 `info.surface` 时排除 `bulk.name`（负责人决定 L-11，W5.1 解除）与网页的 `bulk.entryId`。
 - **性能**：Python 性能测试标 `slow`（不新增标记）；JS 性能测试放 `tests/js/perf/*.perf.mjs`，由 `tests/test_js_perf.py`（`slow`，W1.7 建立）运行，不进默认收集（P-10）。
@@ -140,14 +140,14 @@
 
 ### 2.4 文件束
 
-- **API 文件束**（REST、客户端、CLI 及其测试；结构交错，不分段，每个子批次最多一条链拥有）：`crystallume/server/models.py`、`crystallume/server/routes/build.py`、`crystallume/server/routes/analysis.py`、`crystallume/server/auth.py`、`crystallume/server/deps.py`、`crystallume/client.py`、`crystallume/cli.py`、`crystallume/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py`。拥有它的链：W1.4 M3-T11a、W1.5 M1-T6、W1.6 M2-T8、W2.1 M3-T3b（只改其中四个文件）、W2.3 M4-T8a、W3.4 M5-T10a、W4.1 M6-T0（只改 `config.py`）、W4.3 M6-T6、W5.1 M7-T1。
-- **文档束**：`README.md`、`docs/PLUGINS.md`、`docs/SCHEMA.md`、`docs/DEPLOY.md`、`CHANGELOG.md`，外加命名行段 `crystallume/web/js/ui/shell.js#help-tour`（帮助、快捷键对话框 Mouse 行、提示栏与导览）。每波最后一个子批次的文档链拥有；各波把条目写进 `CHANGELOG.md` 的 Unreleased 一节（若第 0 波还没有建这个文件，就由 W1.7 的文档链建立），W5.2 的 M7-T7 整理成 0.4.0。
+- **API 文件束**（REST、客户端、CLI 及其测试；结构交错，不分段，每个子批次最多一条链拥有）：`facet/server/models.py`、`facet/server/routes/build.py`、`facet/server/routes/analysis.py`、`facet/server/auth.py`、`facet/server/deps.py`、`facet/client.py`、`facet/cli.py`、`facet/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py`。拥有它的链：W1.4 M3-T11a、W1.5 M1-T6、W1.6 M2-T8、W2.1 M3-T3b（只改其中四个文件）、W2.3 M4-T8a、W3.4 M5-T10a、W4.1 M6-T0（只改 `config.py`）、W4.3 M6-T6、W5.1 M7-T1。
+- **文档束**：`README.md`、`docs/PLUGINS.md`、`docs/SCHEMA.md`、`docs/DEPLOY.md`、`CHANGELOG.md`，外加命名行段 `facet/web/js/ui/shell.js#help-tour`（帮助、快捷键对话框 Mouse 行、提示栏与导览）。每波最后一个子批次的文档链拥有；各波把条目写进 `CHANGELOG.md` 的 Unreleased 一节（若第 0 波还没有建这个文件，就由 W1.7 的文档链建立），W5.2 的 M7-T7 整理成 0.4.0。
 - **e2e 共用文件**：`tests/e2e/harness.mjs`、`tests/test_e2e.py`。
 
 ### 2.5 界面检查与端口
 
 - 有界面工作的链在 `plan.json` 里有唯一的端口（8820 起，全计划不重复）；端口为 0 的链没有界面工作。
-- 启动：`cd <worktree> && $DEVPY -m crystallume serve --port <端口> &`，用完关掉；静态模式检查：`python3 -m http.server <端口> --directory crystallume/web`（P1：网页端全部在浏览器里算，静态版必须可用）。两种模式至少各打开一次。
+- 启动：`cd <worktree> && $DEVPY -m facet serve --port <端口> &`，用完关掉；静态模式检查：`python3 -m http.server <端口> --directory facet/web`（P1：网页端全部在浏览器里算，静态版必须可用）。两种模式至少各打开一次。
 - Chromium：`require('playwright')` 可直接用，以 root 运行加 `--no-sandbox`；不要运行 `playwright install`。自己看的截图用 `deviceScaleFactor: 1`，存 `scratchpad/shots/<链 id>/`；交审查的 e2e 截图存 `tests/e2e/out/`。
 - 每次界面检查都要确认：`document.body.dataset.ready === 'true'`、没有 `pageerror` 与 `console.error`、新控件有 `aria-label`、U1-b（没有 slab 模式或徽章）与 U4-a（真空框为空、无占位数字）成立。
 
@@ -157,7 +157,7 @@
 |---|---|---|
 | P-01 | 段落归属与 W1-S0 脚手架 | §2.2；W1.1 的第一条链在 10 组热点文件里放好全部段落，之后各波的并行链只在自己的段内改。W5.2 清理。 |
 | P-02 | 测试与 op 文件按模块或任务拆开 | L-F0-27 的细化：`tests/ops/<模块>_<主题>.py`；平价测试按模块分文件；避免并行链改同一个测试文件。 |
-| P-03 | 金标一律 `crystallume.cases/1`，先写期望后去 skip | 覆盖 M2 §7.2、M5 §7.1 写的自定义格式（L-F0-27 优先于规格）；M2-T7a、M3-T2a、M4-T9a、M6-T3a 先写，平价任务去 skip。 |
+| P-03 | 金标一律 `facet.cases/1`，先写期望后去 skip | 覆盖 M2 §7.2、M5 §7.1 写的自定义格式（L-F0-27 优先于规格）；M2-T7a、M3-T2a、M4-T9a、M6-T3a 先写，平价任务去 skip。 |
 | P-04 | 预览条与 mod+Enter 对"新增结构"会话的语义 | 规格与账本未覆盖的缺口（M6 §5.4 已指出：P-swap 会话的预览条按钮与 `edit.applyPreview` 调用无参 `commit()` 会替换活动结构，违背 P4）。默认做法：M2-T9 先核对第 0 波实现；若确有此问题，在 `beginStructureEdit` 加会话选项 `commitArgs`（预览条与 mod+Enter 调用 `ses.commit(ses.commitArgs)`），Cleave 与 Interface 会话传 `{ addAsNew: true, name }`。**需负责人确认。** |
 | P-05 | M1 的命名与 info 处理器钩子 | L-X-07 第 4 条要求 M1 的晶胞操作调用 M2 的命名函数，而它们原定在 W1.5 才交付。做法：M1-T1 在 `core/cellops.*` 放 `begin_cell_op`/`finish_cell_op` 桩，T3a/T3b/T4 只调用钩子，M1-T10（W1.4）填实（`apply_info_handlers` → `refresh_auto_name` → `rename_after_cell_change`）；`reference_mesh` 因要用 `normalize_surface_info`，从 M1-T4 移到 M1-T10。 |
 | P-06 | M2 命名核心提前为 M2-T4n（W1.3） | L-M2-07 的八个函数从 M2-T4/T6b 拆出，两种语言一次交付；M2-T4/T6b 只在 `naming.*#M2` 段内做必要修正。 |
@@ -187,7 +187,7 @@
 
 ### 2.8 每个子批次的通用出口检查
 
-每个子批次的 `exitChecks` 第一条都是：集成分支上全量 Python 测试（含 pytest 桥运行的 `tests/js/*.test.mjs`）通过、`CRYSTALLUME_REQUIRE_NODE=1` 下通过、`tests/test_segments.py` 通过、`git status` 干净。有界面改动的子批次另有一条：静态模式与 `crystallume serve` 下应用都能启动且控制台无错误。其余各条是本子批次特有的测试文件与 acceptance 检查项（编号见 `acceptance.md` §1、§2、§3.2）。
+每个子批次的 `exitChecks` 第一条都是：集成分支上全量 Python 测试（含 pytest 桥运行的 `tests/js/*.test.mjs`）通过、`FACET_REQUIRE_NODE=1` 下通过、`tests/test_segments.py` 通过、`git status` 干净。有界面改动的子批次另有一条：静态模式与 `facet serve` 下应用都能启动且控制台无错误。其余各条是本子批次特有的测试文件与 acceptance 检查项（编号见 `acceptance.md` §1、§2、§3.2）。
 
 ## 3. 第 1 波：M1 晶胞工具 + M3 层分析核心 + M2 切面与 slab
 
@@ -197,9 +197,9 @@
 
 | 链 | 端口 | 任务 | 独占的文件 |
 |---|---|---|---|
-| `w1-scaffold` | 8820 | W1-S0 共享文件的段落标记（脚手架，不改行为）、M1-T12 M1 对第 0 波接口的契约测试 | `crystallume/core/defaults.py`、`crystallume/web/js/core/defaults.js`、`crystallume/core/structure.py`、`crystallume/web/js/core/structure.js`、`crystallume/core/naming.py`、`crystallume/web/js/core/naming.js`、`crystallume/core/lattice.py`、`crystallume/web/js/core/lattice.js`、`crystallume/build/__init__.py`、`crystallume/analysis/__init__.py`、`crystallume/web/js/main.js`、`crystallume/web/css/app.css`、`crystallume/web/js/ui/icons.js`、`crystallume/web/js/app.js`、`tests/test_segments.py`、`tests/test_m1_contracts.py`、`tests/js/m1_contracts.test.mjs` |
-| `w1-m1-intmath` | — | M1-T1 整数运算（双语言）与 cellops 骨架 | `crystallume/core/intmath.py`、`crystallume/web/js/core/intmath.js`、`crystallume/core/cellops.py`、`crystallume/web/js/core/cellops.js`、`tests/test_intmath.py`、`tests/js/intmath.test.mjs` |
-| `w1-m2-data` | — | M2-T2 共用数据模块 webdata、氧化态与元素集合；build/surface 骨架 | `crystallume/core/webdata.py`、`crystallume/web/js/core/webdata.js`、`crystallume/web/data/oxidation_states.json`、`scripts/gen_oxidation_states.py`、`crystallume/build/surface.py`、`crystallume/web/js/build/surface.js`、`crystallume/core/elements.py`、`crystallume/web/js/core/elements.js`、`tests/test_webdata.py`、`tests/test_oxidation_states.py`、`tests/js/webdata.test.mjs`、`tests/js/oxidation_states.test.mjs` |
+| `w1-scaffold` | 8820 | W1-S0 共享文件的段落标记（脚手架，不改行为）、M1-T12 M1 对第 0 波接口的契约测试 | `facet/core/defaults.py`、`facet/web/js/core/defaults.js`、`facet/core/structure.py`、`facet/web/js/core/structure.js`、`facet/core/naming.py`、`facet/web/js/core/naming.js`、`facet/core/lattice.py`、`facet/web/js/core/lattice.js`、`facet/build/__init__.py`、`facet/analysis/__init__.py`、`facet/web/js/main.js`、`facet/web/css/app.css`、`facet/web/js/ui/icons.js`、`facet/web/js/app.js`、`tests/test_segments.py`、`tests/test_m1_contracts.py`、`tests/js/m1_contracts.test.mjs` |
+| `w1-m1-intmath` | — | M1-T1 整数运算（双语言）与 cellops 骨架 | `facet/core/intmath.py`、`facet/web/js/core/intmath.js`、`facet/core/cellops.py`、`facet/web/js/core/cellops.js`、`tests/test_intmath.py`、`tests/js/intmath.test.mjs` |
+| `w1-m2-data` | — | M2-T2 共用数据模块 webdata、氧化态与元素集合；build/surface 骨架 | `facet/core/webdata.py`、`facet/web/js/core/webdata.js`、`facet/web/data/oxidation_states.json`、`scripts/gen_oxidation_states.py`、`facet/build/surface.py`、`facet/web/js/build/surface.js`、`facet/core/elements.py`、`facet/web/js/core/elements.js`、`tests/test_webdata.py`、`tests/test_oxidation_states.py`、`tests/js/webdata.test.mjs`、`tests/js/oxidation_states.test.mjs` |
 | `w1-m2-golden` | — | M2-T7a 切面与 slab 的解析金标（只写期望） | `tests/data/surface/cleave/`、`tests/test_cleave_golden_shape.py`、`tests/ops/m2_recipes.py`、`tests/js/ops/m2_recipes.mjs` |
 | `w1-m3-golden` | — | M3-T2a 层分析的金标与生成脚本（只写期望） | `scripts/gen_layer_fixtures.py`、`tests/data/surface/layers/`、`tests/test_layers_golden_shape.py` |
 
@@ -207,13 +207,13 @@
 
 **出口检查**：
 
-- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`CRYSTALLUME_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
+- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`FACET_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
 - W1-S0：`tests/test_segments.py` 核对 plan.md §2.2 表中 10 组文件的段落标记（成对、各一次、顺序正确）；全量测试结果与合并前相同（脚手架不改行为）
 - M1-T12：`tests/test_m1_contracts.py` 与 `tests/js/m1_contracts.test.mjs` 通过；若有 `xfail(strict=True, reason="F0: …")`，差异已列进集成报告交负责人
 - M1-T1：`tests/test_intmath.py`、`tests/js/intmath.test.mjs` 通过（`hnf_matrices_2d(6)` 12 个矩阵与次序；对角矩阵的格点顺序与 F0-D `repeat` 相同）；`core/cellops.*` 骨架可导入、钩子桩存在
 - M2-T2：`tests/test_webdata.py`、`tests/test_oxidation_states.py`、对应 JS 测试通过；`METALS`/`ANIONS`/电负性两语言逐项相同（L-M2-06）；`oxidation_states.json` 仓库里只有一份
 - 金标：`tests/data/surface/cleave/` 与 `tests/data/surface/layers/` 被 `tests/test_cases.py` 与 `tests/js/cases.test.mjs` 读到，全部为带理由的 skip，不失败；外壳格式测试通过
-- 界面：应用在静态模式（`python3 -m http.server <端口> --directory crystallume/web`）与 `crystallume serve` 下都能启动，`document.body.dataset.ready === 'true'`，控制台无 `pageerror`/`console.error`；打开 CONTCAR 夹具没有任何提示（U1-a）
+- 界面：应用在静态模式（`python3 -m http.server <端口> --directory facet/web`）与 `facet serve` 下都能启动，`document.body.dataset.ready === 'true'`，控制台无 `pageerror`/`console.error`；打开 CONTCAR 夹具没有任何提示（U1-a）
 
 #### W1-S0 共享文件的段落标记（脚手架，不改行为）（链 `w1-scaffold`）
 
@@ -251,11 +251,11 @@
 
 【U 与负责人决定】U1（只加注释、不改任何行为，也不引入任何 slab 分类）；负责人决定：无直接相关项（L-06 的 aria-label 选择器不受影响）。
 
-【文件】（只插标记）`crystallume/core/defaults.py`、`crystallume/web/js/core/defaults.js`、`crystallume/core/structure.py`、`crystallume/web/js/core/structure.js`、`crystallume/core/naming.py`、`crystallume/web/js/core/naming.js`、`crystallume/core/lattice.py`、`crystallume/web/js/core/lattice.js`、`crystallume/build/__init__.py`、`crystallume/analysis/__init__.py`、`crystallume/web/js/main.js`、`crystallume/web/css/app.css`、`crystallume/web/js/ui/icons.js`、`crystallume/web/js/app.js`；新建 `tests/test_segments.py`。同链的 M1-T12 另占 `tests/test_m1_contracts.py`、`tests/js/m1_contracts.test.mjs`。
+【文件】（只插标记）`facet/core/defaults.py`、`facet/web/js/core/defaults.js`、`facet/core/structure.py`、`facet/web/js/core/structure.js`、`facet/core/naming.py`、`facet/web/js/core/naming.js`、`facet/core/lattice.py`、`facet/web/js/core/lattice.js`、`facet/build/__init__.py`、`facet/analysis/__init__.py`、`facet/web/js/main.js`、`facet/web/css/app.css`、`facet/web/js/ui/icons.js`、`facet/web/js/app.js`；新建 `tests/test_segments.py`。同链的 M1-T12 另占 `tests/test_m1_contracts.py`、`tests/js/m1_contracts.test.mjs`。
 
 【测试】`tests/test_segments.py`；全量 pytest 与 node 测试照常通过。
 
-【界面检查】（Chromium，本链端口）静态模式与 `crystallume serve` 下应用照常启动（`document.body.dataset.ready === 'true'`），控制台无错误；Surface 面板（Shift+5）、Structure 面板与改动前一样。
+【界面检查】（Chromium，本链端口）静态模式与 `facet serve` 下应用照常启动（`document.body.dataset.ready === 'true'`），控制台无错误；Surface 面板（Shift+5）、Structure 面板与改动前一样。
 
 【注意】某文件的结构若与预期不同（例如 `SURFACE_DEFAULTS` 不是字面量表、`class App` 不在 `app.js`），选最接近的等价位置，并在报告里写清每段的实际位置；不要顺手整理代码。
 
@@ -281,13 +281,13 @@
 
 【实现】
 
-- `crystallume/core/intmath.py`、`web/js/core/intmath.js`：`egcd`、`int_det3`、`int_adjugate3`、`is_unimodular`、`as_int_matrix(m, *, what="matrix", plane=(0, 1))`、`hermite_normal_form`、`hermite_normal_form_2d`、`supercell_lattice_points(P)`（陪集代表按新分数坐标整数键的字典序，(0,0,0) 在首；det < 0 时按 −P 枚举）、`hnf_matrices_2d(n)`（i 升序、j 升序）。文件末尾留空段 `M2`（M2-T1 用）。
+- `facet/core/intmath.py`、`web/js/core/intmath.js`：`egcd`、`int_det3`、`int_adjugate3`、`is_unimodular`、`as_int_matrix(m, *, what="matrix", plane=(0, 1))`、`hermite_normal_form`、`hermite_normal_form_2d`、`supercell_lattice_points(P)`（陪集代表按新分数坐标整数键的字典序，(0,0,0) 在首；det < 0 时按 −P 枚举）、`hnf_matrices_2d(n)`（i 升序、j 升序）。文件末尾留空段 `M2`（M2-T1 用）。
 
-- `crystallume/core/cellops.py`、`web/js/core/cellops.js` 骨架：模块文档字符串；Python `CellOpResult` dataclass（L-M1-08 的字段），JS 工厂 `cellOpResult(fields)`；段 `M1-T3a`、`M1-T3b`、`M1-T10`。在段 `M1-T10` 内放两个桩：`begin_cell_op(structure) -> dict`（返回 `{"name": structure.name}`）与 `finish_cell_op(structure, ctx, before) -> None`（只调用 `mark_edited(structure, ctx["mark"])`），JS 为 `beginCellOp`/`finishCellOp`；文档字符串写明 M1-T10 会把它们改为 `auto_name_state` → `apply_info_handlers(ctx)` → `refresh_auto_name`（返回 False 时 `rename_after_cell_change`）。
+- `facet/core/cellops.py`、`web/js/core/cellops.js` 骨架：模块文档字符串；Python `CellOpResult` dataclass（L-M1-08 的字段），JS 工厂 `cellOpResult(fields)`；段 `M1-T3a`、`M1-T3b`、`M1-T10`。在段 `M1-T10` 内放两个桩：`begin_cell_op(structure) -> dict`（返回 `{"name": structure.name}`）与 `finish_cell_op(structure, ctx, before) -> None`（只调用 `mark_edited(structure, ctx["mark"])`），JS 为 `beginCellOp`/`finishCellOp`；文档字符串写明 M1-T10 会把它们改为 `auto_name_state` → `apply_info_handlers(ctx)` → `refresh_auto_name`（返回 False 时 `rename_after_cell_change`）。
 
 【U 与负责人决定】U2/C1（`supercell_lattice_points` 决定超胞的原子顺序，对角矩阵必须与 `repeat` 相同）；负责人决定 L-12、L-19 只体现在钩子的文档字符串里（实现归 M1-T10）。
 
-【文件】`crystallume/core/intmath.py`、`crystallume/web/js/core/intmath.js`、`crystallume/core/cellops.py`、`crystallume/web/js/core/cellops.js`（新建骨架）、`tests/test_intmath.py`、`tests/js/intmath.test.mjs`。
+【文件】`facet/core/intmath.py`、`facet/web/js/core/intmath.js`、`facet/core/cellops.py`、`facet/web/js/core/cellops.js`（新建骨架）、`tests/test_intmath.py`、`tests/js/intmath.test.mjs`。
 
 【测试】M1 §7.1 "格点"与"HNF / egcd"两行全部用例：对角 (2,2,2)、(3,1,2)、(1,1,1) 与 F0-D `repeat` 的原子顺序相同；7 个矩阵（含 `[[1,0,0],[0,1,0],[37,0,1]]`、det 16 的 MS BN 矩阵）的个数、在胞内、互不同余；det < 0 与 −P 的点集相同；`hermite_normal_form_2d`；`hnf_matrices_2d(6)` 的 12 个矩阵与次序；负数输入；秩不足报错；JS 同一组用例加溢出保护。两语言读同一个 JSON 常量块，结果逐项相同。
 
@@ -301,9 +301,9 @@
 
 【实现】
 
-- `crystallume/core/webdata.py`：`load_web_data(name)`（`importlib.resources` 读 `crystallume/web/data/<name>`，包数据已含 `web/**/*`）；`web/js/core/webdata.js`：`loadWebData`、`webData`、`setWebData`（浏览器 `fetch(new URL('../../data/<name>', import.meta.url))`，Node 测试经 `setWebData` 注入用 `fs` 读到的 JSON）。
+- `facet/core/webdata.py`：`load_web_data(name)`（`importlib.resources` 读 `facet/web/data/<name>`，包数据已含 `web/**/*`）；`web/js/core/webdata.js`：`loadWebData`、`webData`、`setWebData`（浏览器 `fetch(new URL('../../data/<name>', import.meta.url))`，Node 测试经 `setWebData` 注入用 `fs` 读到的 JSON）。
 
-- `crystallume/web/data/oxidation_states.json`：按 M2 §3.9.1 开发期生成并冻结；生成脚本 `scripts/gen_oxidation_states.py`（运行时不依赖）。
+- `facet/web/data/oxidation_states.json`：按 M2 §3.9.1 开发期生成并冻结；生成脚本 `scripts/gen_oxidation_states.py`（运行时不依赖）。
 
 - `load_oxidation_states`、`estimate_oxidation_states(composition)`（JS 同名 camelCase；JS 表未加载时调用抛错，不静默返回 unknown，M2 §7.3）放在 `build/surface.py` 与 `web/js/build/surface.js` 的段 `M2-T2` 内。启动任务 `registerBootTask('oxidation-states', loadOxidationStates)` 由 M2-T9 注册，本任务不碰 `main.js`。
 
@@ -313,7 +313,7 @@
 
 【U 与负责人决定】U5（D1：Cleave 分区要等氧化态表加载后才可用，启动任务由 M2-T9 注册）；负责人决定：无直接相关项。
 
-【文件】`crystallume/core/webdata.py`、`crystallume/web/js/core/webdata.js`、`crystallume/web/data/oxidation_states.json`、`scripts/gen_oxidation_states.py`、`crystallume/build/surface.py`（新建骨架）、`crystallume/web/js/build/surface.js`（新建骨架）、`crystallume/core/elements.py`、`crystallume/web/js/core/elements.js`、`tests/test_webdata.py`、`tests/test_oxidation_states.py`、`tests/js/webdata.test.mjs`、`tests/js/oxidation_states.test.mjs`。
+【文件】`facet/core/webdata.py`、`facet/web/js/core/webdata.js`、`facet/web/data/oxidation_states.json`、`scripts/gen_oxidation_states.py`、`facet/build/surface.py`（新建骨架）、`facet/web/js/build/surface.js`（新建骨架）、`facet/core/elements.py`、`facet/web/js/core/elements.js`、`tests/test_webdata.py`、`tests/test_oxidation_states.py`、`tests/js/webdata.test.mjs`、`tests/js/oxidation_states.test.mjs`。
 
 【测试】M2 §7.1"氧化态"一行（SrTiO3、TiO2、ZnO、CeO2、Al2O3、NaCl、GaAs 精确；Fe3O4、Co3O4 平均并给 W11；TaON；CaCO3（C +4）；TiH2（H −1）；Pt、PtTi 为 0；§3.9.1 的 40 种化合物 Charge unknown 为 0；缺表元素 → None；JS 未加载时抛错）；`METALS`、`ANIONS`、电负性两语言逐项相同；`load_web_data` 在已安装包里能读到；同一 JSON 只存一份。
 
@@ -323,7 +323,7 @@
 
 【目标】先写切面与 slab 的解析金标与真实输入，供 W1.4–W1.6 的 Python 与 JS 实现各自对照。
 
-【依据】M2 §7.2（金标与真实输入清单）、§0.3（原型实测表）；acceptance §0.4（体相与显式晶格常数）、§0.5（容差代号）与 S1-1/S1-2、S2-1/S2-2、S3-1、S4-1/S4-2、S5-1/S5-2、S6-1/S6-2、S7-1/S7-2、S8-1–S8-3、S9-1–S9-4、S10-1–S10-3、S11-1–S11-4/S11-6、S12-1/S12-2/S12-4、S13-1 的解析期望；ledger-F0 L-F0-27（一律用 `crystallume.cases/1` 外壳与配方输入，覆盖 M2 §7.2 写的 `{input, op, params, expected}` 格式，plan.md P-03）；ledger-features L-X-01（`info.surface` 字段）、L-X-07（名字）；负责人决定 L-19（`Cu(100) (√2×√2)R45° 4L`）、L-13（已有结构 `set_vacuum(0)` → E12d）；U2、U4。
+【依据】M2 §7.2（金标与真实输入清单）、§0.3（原型实测表）；acceptance §0.4（体相与显式晶格常数）、§0.5（容差代号）与 S1-1/S1-2、S2-1/S2-2、S3-1、S4-1/S4-2、S5-1/S5-2、S6-1/S6-2、S7-1/S7-2、S8-1–S8-3、S9-1–S9-4、S10-1–S10-3、S11-1–S11-4/S11-6、S12-1/S12-2/S12-4、S13-1 的解析期望；ledger-F0 L-F0-27（一律用 `facet.cases/1` 外壳与配方输入，覆盖 M2 §7.2 写的 `{input, op, params, expected}` 格式，plan.md P-03）；ledger-features L-X-01（`info.surface` 字段）、L-X-07（名字）；负责人决定 L-19（`Cu(100) (√2×√2)R45° 4L`）、L-13（已有结构 `set_vacuum(0)` → E12d）；U2、U4。
 
 【实现】
 
@@ -349,7 +349,7 @@
 
 【依据】M3 §7.1 全表（案例与期望，解析值优先）、§3.3（U1：切口与显示同一个）；acceptance S14-3；ledger-F0 L-F0-27（外壳与配方）；ledger-F0 §6 M3 第 2 条；U1、U2。
 
-【实现】`scripts/gen_layer_fixtures.py`（开发期运行，测试不依赖它）按 M3 §7.1 解析构造 slab：fcc/hcp/bcc 低指数面按层坐标直接写出；氧化物用仓库现有体相原型加旋转与裁剪；以 pbc T T T 为主，每组另留一份 T T F 对照。输出 `tests/data/surface/layers/*.json`（`crystallume.cases/1`，ops `findLayers`、`findAdsorbates`、`bondGraph`、`surfaceAtoms`）。期望：`atomLayer`、层高（atol 1e-6）、`period`/`vacuum`/`coords`/`normalSource`、提示文案、吸附物及来源、κ* 与暴露原子。每个用例带 skip：`op findLayers is registered by M3-T1`、`op surfaceAtoms is registered by M3-T3b (wave 2)` 等。
+【实现】`scripts/gen_layer_fixtures.py`（开发期运行，测试不依赖它）按 M3 §7.1 解析构造 slab：fcc/hcp/bcc 低指数面按层坐标直接写出；氧化物用仓库现有体相原型加旋转与裁剪；以 pbc T T T 为主，每组另留一份 T T F 对照。输出 `tests/data/surface/layers/*.json`（`facet.cases/1`，ops `findLayers`、`findAdsorbates`、`bondGraph`、`surfaceAtoms`）。期望：`atomLayer`、层高（atol 1e-6）、`period`/`vacuum`/`coords`/`normalSource`、提示文案、吸附物及来源、κ* 与暴露原子。每个用例带 skip：`op findLayers is registered by M3-T1`、`op surfaceAtoms is registered by M3-T3b (wave 2)` 等。
 
 【U 与负责人决定】U1（切口与显示同一个）、U2（以 pbc T T T 为主）；负责人决定：无直接相关项。
 
@@ -365,16 +365,16 @@ M1-α 的晶格核心、M3 层分析与键图、M2 Miller 规范化与常量、M
 
 | 链 | 端口 | 任务 | 独占的文件 |
 |---|---|---|---|
-| `w1-m1-lattice` | — | M1-T2 浮点晶格运算、网格标签与命名辅助（双语言，M1-α 核心） | `crystallume/core/lattice.py#M1`、`crystallume/web/js/core/lattice.js#M1`、`crystallume/core/naming.py#M1`、`crystallume/web/js/core/naming.js#M1`、`crystallume/core/defaults.py#M1`、`crystallume/web/js/core/defaults.js#M1`、`tests/data/surface/m1_niggli_ase329.json`、`scripts/dev/make_niggli_reference.py`、`tests/test_lattice_tools.py`、`tests/js/lattice_tools.test.mjs`、`tests/test_naming_m1.py`、`tests/js/naming_m1.test.mjs` |
-| `w1-m3-layers` | — | M3-T1 层分析核心 find_layers（双语言）与 M3 的常量、M3-T3a 化学键图、吸附物识别与标记（双语言） | `crystallume/analysis/layers.py`、`crystallume/web/js/core/layers.js`、`crystallume/analysis/neighbors.py`、`crystallume/web/js/core/bondgraph.js`、`crystallume/analysis/__init__.py#M3`、`crystallume/core/structure.py#M3`、`crystallume/web/js/core/structure.js#M3`、`crystallume/core/defaults.py#M3`、`crystallume/web/js/core/defaults.js#M3`、`tests/data/surface/layers/`、`tests/ops/m3_layers.py`、`tests/js/ops/m3_layers.mjs`、`tests/test_layers.py`、`tests/js/layers.test.mjs`、`tests/test_bond_graph.py`、`tests/js/bondgraph.test.mjs`、`tests/test_adsorbates.py`、`tests/js/adsorbates_m3.test.mjs` |
-| `w1-m2-miller` | — | M2-T1 整数基、Miller 规范化与 M2 的常量（双语言） | `crystallume/core/intmath.py#M2`、`crystallume/web/js/core/intmath.js#M2`、`crystallume/core/defaults.py#M2`、`crystallume/web/js/core/defaults.js#M2`、`tests/test_plane_basis.py`、`tests/js/plane_basis.test.mjs`、`tests/test_surface_defaults_m2.py` |
+| `w1-m1-lattice` | — | M1-T2 浮点晶格运算、网格标签与命名辅助（双语言，M1-α 核心） | `facet/core/lattice.py#M1`、`facet/web/js/core/lattice.js#M1`、`facet/core/naming.py#M1`、`facet/web/js/core/naming.js#M1`、`facet/core/defaults.py#M1`、`facet/web/js/core/defaults.js#M1`、`tests/data/surface/m1_niggli_ase329.json`、`scripts/dev/make_niggli_reference.py`、`tests/test_lattice_tools.py`、`tests/js/lattice_tools.test.mjs`、`tests/test_naming_m1.py`、`tests/js/naming_m1.test.mjs` |
+| `w1-m3-layers` | — | M3-T1 层分析核心 find_layers（双语言）与 M3 的常量、M3-T3a 化学键图、吸附物识别与标记（双语言） | `facet/analysis/layers.py`、`facet/web/js/core/layers.js`、`facet/analysis/neighbors.py`、`facet/web/js/core/bondgraph.js`、`facet/analysis/__init__.py#M3`、`facet/core/structure.py#M3`、`facet/web/js/core/structure.js#M3`、`facet/core/defaults.py#M3`、`facet/web/js/core/defaults.js#M3`、`tests/data/surface/layers/`、`tests/ops/m3_layers.py`、`tests/js/ops/m3_layers.mjs`、`tests/test_layers.py`、`tests/js/layers.test.mjs`、`tests/test_bond_graph.py`、`tests/js/bondgraph.test.mjs`、`tests/test_adsorbates.py`、`tests/js/adsorbates_m3.test.mjs` |
+| `w1-m2-miller` | — | M2-T1 整数基、Miller 规范化与 M2 的常量（双语言） | `facet/core/intmath.py#M2`、`facet/web/js/core/intmath.js#M2`、`facet/core/defaults.py#M2`、`facet/web/js/core/defaults.js#M2`、`tests/test_plane_basis.py`、`tests/js/plane_basis.test.mjs`、`tests/test_surface_defaults_m2.py` |
 | `w1-m1-recipes` | — | M1-T5a M1 金标的配方构造器与生成器骨架 | `tests/m1_recipes.py`、`tests/js/m1_recipes.mjs`、`tests/ops/m1.py`、`tests/js/ops/m1.mjs`、`tests/data/surface/make_m1_cases.py`、`tests/data/surface/m1_recipes_check.json` |
 
 **合并顺序**：`w1-m1-lattice` → `w1-m3-layers` → `w1-m2-miller` → `w1-m1-recipes`
 
 **出口检查**：
 
-- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`CRYSTALLUME_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
+- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`FACET_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
 - M1-T2：`tests/test_lattice_tools.py`、`tests/js/lattice_tools.test.mjs`、`tests/test_naming_m1.py`、`tests/js/naming_m1.test.mjs` 通过；`gauss_reduce_2d(angle=None)` 满足 |u|² ≤ (1+τ)|v|²、|u·v| ≤ (½+τ)|u|²（L-M1-02）；`format_decimal(2.125, 2) == "2.13"`、`-0.004 → "0.00"`（两语言，附录 A-2）
 - M3-T1/T3a：`tests/test_layers.py`、`tests/test_bond_graph.py`、`tests/test_adsorbates.py` 与 JS 对应测试通过；`tests/data/surface/layers/` 中 findLayers、findAdsorbates、bondGraph 用例在两语言都运行通过（skip 已去掉）
 - 验收 S14-3：CONTCAR 夹具上 `find_layers` 为 4 层 × 9、底层平均高度 ≈ 0，切口与显示同一个（U1-d），Python 与 JS 相同
@@ -397,7 +397,7 @@ M1-α 的晶格核心、M3 层分析与键图、M2 Miller 规范化与常量、M
 
 【U 与负责人决定】U4（M1 的 `SURFACE_DEFAULTS` 段不得有任何真空间隙值）；负责人决定 L-19（名字里的网格标签只由矩阵算出）。
 
-【文件】`crystallume/core/lattice.py#M1`、`crystallume/web/js/core/lattice.js#M1`、`crystallume/core/naming.py#M1`、`crystallume/web/js/core/naming.js#M1`、`crystallume/core/defaults.py#M1`、`crystallume/web/js/core/defaults.js#M1`、`tests/data/surface/m1_niggli_ase329.json`、`scripts/dev/make_niggli_reference.py`、`tests/test_lattice_tools.py`、`tests/js/lattice_tools.test.mjs`、`tests/test_naming_m1.py`、`tests/js/naming_m1.test.mjs`。
+【文件】`facet/core/lattice.py#M1`、`facet/web/js/core/lattice.js#M1`、`facet/core/naming.py#M1`、`facet/web/js/core/naming.js#M1`、`facet/core/defaults.py#M1`、`facet/web/js/core/defaults.js#M1`、`tests/data/surface/m1_niggli_ase329.json`、`scripts/dev/make_niggli_reference.py`、`tests/test_lattice_tools.py`、`tests/js/lattice_tools.test.mjs`、`tests/test_naming_m1.py`、`tests/js/naming_m1.test.mjs`。
 
 【测试】M1 §7.1 的"Wood 标签"（20 例 + D8 的 12 例）、"网格与预设"（噪声 1e-5…1e-3 Å 下 √3 300/300；单轴 0.05…4 % 三者一致；√N 的解 N = 19、21、49）、"parse_mesh_spec"（§3.6.3 全部写法与失败文案，两语言同一张表）、"Gauss"（2000 个随机基；bcc(110)；60° → 120°；`angle=None`；平行输入报错）、"Niggli"（`m1_niggli_ase329.json` 的 210 个基到 1e-6；若该文件不存在，用 ASE 参考环境 `scratchpad/proto/m1/refvenv/bin/python` 生成并入库，脚本放 `scripts/dev/make_niggli_reference.py`）、"晶胞参数"中的校验 5 例、"惯用胞"（7 个度规用例、正交晶格 → None、`miller_basis_note` 的六方 R）、"常量"。命名：`format_sig3`（2、√3、2√3、3√3、1.5、1234.5 → "1235"）、`format_angle`（30、19.1、26.6、23.4、10.9）、附录 A-2 的 11 个数两语言相同；`rename_after_cell_change` 的 `Cu fcc` diag(2,2,2) → `Cu fcc 2×2×2`、`Ru hcp` `[[2,1,0],[-1,1,0],[0,0,2]]` → `Ru hcp (√3×√3)R30° ×2`、幺模总矩阵去掉标签。
 
@@ -409,11 +409,11 @@ M1-α 的晶格核心、M3 层分析与键图、M2 Miller 规范化与常量、M
 
 【依据】M3 §3.1–3.6（§3.6 化学计量单元分组 `group="units"`：L-M3-01 把 `group` 列在 `find_layers` 的签名里、提供方为 M3 T1，因此从 M3 §9 的 T5 移到这里）、§3.14（JS 缓存）、§3.16（层部分的报错文案）、§4；ledger-features L-M3-01（R-F07：`None`/`"auto"` 有表面时沿表面法向、否则沿 c 面法向且不报错；`"normal"` 没有表面时报错；`"a"/"b"/"c"` = 另两根矢量所张面的法向，与真空无关；`tolerance=None` → `info.surface.layerTolerance` → `SURFACE_DEFAULTS.layer_tolerance`；层号 0 = 最底层，`from_top` 0 = 顶层）、L-M3-02（`cluster_heights(heights, tolerance) -> ndarray` 纯函数，两语言）、L-M3-06（`select_layers` 的六种选择器，`middle` 的奇偶报错）、L-X-08 M3 行（全部键）、§10.3 第 2 条；ledger-F0 §6 M3 第 2、3 条与 V-F12 第 1、2 条（沿 slab 轴一律 `sn = surface_normal(s, require_gap=True)`、`unwrap_along_gap(f, sn["cut"])`，窗口 [cut.lo, cut.lo + 1)，与显示同一切口；没有间隙时报 `vacuum_gap_hint(s)`）；U1（不按 slab/非 slab 分支）、U2。
 
-【实现】新文件 `crystallume/analysis/layers.py` 与 `web/js/core/layers.js`：`resolve_direction`、`period_along`、高度与切口、线性单链聚类、层统计与提示、`group="units"`（按 `info.surface.bulk.reducedFormula` 或参与原子的约化组成动态规划分组；少于 2 个成比例的组退回原子面并给提示）、`Layers` 与 `to_dict()`、JS `layersToJSON` 与 `findLayersCached`（按 M3 §3.14 的失效规则：SD 不失效，`adsorbate_id`/`tags`/`info.surface.layerTolerance`/换帧/撤销后的新对象失效）、`select_layers`；`analysis/__init__.py` 段 `M3` 导出；defaults 段 `M3`。注册 op `findLayers`（Python `tests/ops/m3_layers.py`，JS `tests/js/ops/m3_layers.mjs`），并去掉 `tests/data/surface/layers/` 中 findLayers 用例的 skip。
+【实现】新文件 `facet/analysis/layers.py` 与 `web/js/core/layers.js`：`resolve_direction`、`period_along`、高度与切口、线性单链聚类、层统计与提示、`group="units"`（按 `info.surface.bulk.reducedFormula` 或参与原子的约化组成动态规划分组；少于 2 个成比例的组退回原子面并给提示）、`Layers` 与 `to_dict()`、JS `layersToJSON` 与 `findLayersCached`（按 M3 §3.14 的失效规则：SD 不失效，`adsorbate_id`/`tags`/`info.surface.layerTolerance`/换帧/撤销后的新对象失效）、`select_layers`；`analysis/__init__.py` 段 `M3` 导出；defaults 段 `M3`。注册 op `findLayers`（Python `tests/ops/m3_layers.py`，JS `tests/js/ops/m3_layers.mjs`），并去掉 `tests/data/surface/layers/` 中 findLayers 用例的 skip。
 
 【U 与负责人决定】U1（不按 slab/非 slab 分支；切口与显示同一个）、U2；负责人决定：无直接相关项。
 
-【文件】`crystallume/analysis/layers.py`、`crystallume/web/js/core/layers.js`、`crystallume/analysis/__init__.py#M3`、`crystallume/core/defaults.py#M3`、`crystallume/web/js/core/defaults.js#M3`、`tests/ops/m3_layers.py`、`tests/js/ops/m3_layers.mjs`、`tests/data/surface/layers/`（只改 skip）、`tests/test_layers.py`、`tests/js/layers.test.mjs`。
+【文件】`facet/analysis/layers.py`、`facet/web/js/core/layers.js`、`facet/analysis/__init__.py#M3`、`facet/core/defaults.py#M3`、`facet/web/js/core/defaults.js#M3`、`tests/ops/m3_layers.py`、`tests/js/ops/m3_layers.mjs`、`tests/data/surface/layers/`（只改 skip）、`tests/test_layers.py`、`tests/js/layers.test.mjs`。
 
 【测试】M3 §7.2 Python/JS 的方向解析各分支与报错、左手晶胞、`'z'` 与 `'c'` 在标准 slab 上相同、`'normal'` 等于 `surface_normal`；周期判定（d111、无理方向、`P < 2·tol`）；真空切口与 `display_cuts` 相同；环上并列（体相切在晶胞边界）；`indices` 子集与越界；统计与提示文案；平均高度按原子序号累加；`group = "units"` 的 M3 §3.6 原型结果（TiO2(110) [O, Ti2O2, O] × 3；去顶层桥氧后 2 个整单元 + 顶部 1 个不完整单元；CeO2(111) [O, Ce, O] × 3；刚玉 [Al, O3, Al] × 6；金属每面一个单元；MoS2 单层不分组）；`select_layers` 六种选择器；acceptance S14-3。
 
@@ -421,13 +421,13 @@ M1-α 的晶格核心、M3 层分析与键图、M2 Miller 规范化与常量、M
 
 【目标】双语言化学键图与吸附物识别、标记，供 M2 终止面分析（W1.4）与 M4/M5 复用。
 
-【依据】M3 §3.7、§3.8、§3.13；ledger-features L-M3-03（`bond_graph(structure, *, metal_pairs="all", indices=None)`、`coordination_numbers(s, metal_pairs=…)`、`periodic_components(graph, indices) -> list[(members, periodic)]` 导出）、L-M3-04（`find_adsorbates(structure, *, direction=None, tolerance=None, details=False)`、`promote_adsorbates`、`mark_adsorbates`、`unmark_adsorbates`、`tags_convention(s) -> "ase" | "oc20" | None`）、L-X-05（R-ADS；`promote_adsorbates` 是第 1 条的唯一实现）、R-F21（只有 M3 的标记入口，标记不写记录）、R-F25、§10.3 第 1、3、4 条；ledger-F0 L-F0-55（smart 规则与显示同一定义）、L-F0-14（`next_adsorbate_id`）；`METALS`/`ANIONS` 从 `crystallume/core/elements` 导入（M2-T2 已合入）。
+【依据】M3 §3.7、§3.8、§3.13；ledger-features L-M3-03（`bond_graph(structure, *, metal_pairs="all", indices=None)`、`coordination_numbers(s, metal_pairs=…)`、`periodic_components(graph, indices) -> list[(members, periodic)]` 导出）、L-M3-04（`find_adsorbates(structure, *, direction=None, tolerance=None, details=False)`、`promote_adsorbates`、`mark_adsorbates`、`unmark_adsorbates`、`tags_convention(s) -> "ase" | "oc20" | None`）、L-X-05（R-ADS；`promote_adsorbates` 是第 1 条的唯一实现）、R-F21（只有 M3 的标记入口，标记不写记录）、R-F25、§10.3 第 1、3、4 条；ledger-F0 L-F0-55（smart 规则与显示同一定义）、L-F0-14（`next_adsorbate_id`）；`METALS`/`ANIONS` 从 `facet/core/elements` 导入（M2-T2 已合入）。
 
 【实现】`analysis/neighbors.py` 追加 `bond_graph`（CSR、按像计数、smart、`indices` 子图、与显示设置无关）、`coordination_numbers`、`periodic_components`；新文件 `web/js/core/bondgraph.js`（同名 camelCase，不改 `core/bonds.js`）；`analysis/layers.py`/`core/layers.js` 追加吸附物识别（来源 `adsorbate_id`/`tags`/`tags-oc20`/`geometry`）与标记函数；需要的 Structure 薄方法放 `core/structure.py` 与 `web/js/core/structure.js` 的段 `M3`。注册 ops `findAdsorbates`、`bondGraph`（同上两个 op 文件），去掉对应用例的 skip。
 
 【U 与负责人决定】U1（吸附物识别只读，不改结构）；负责人决定：无直接相关项（R-ADS 由账本 L-X-05 规定）。
 
-【文件】`crystallume/analysis/neighbors.py`、`crystallume/web/js/core/bondgraph.js`、`crystallume/analysis/layers.py`、`crystallume/web/js/core/layers.js`、`crystallume/core/structure.py#M3`、`crystallume/web/js/core/structure.js#M3`、`tests/ops/m3_layers.py`、`tests/js/ops/m3_layers.mjs`、`tests/data/surface/layers/`（只改 skip）、`tests/test_bond_graph.py`、`tests/js/bondgraph.test.mjs`、`tests/test_adsorbates.py`、`tests/js/adsorbates_m3.test.mjs`。
+【文件】`facet/analysis/neighbors.py`、`facet/web/js/core/bondgraph.js`、`facet/analysis/layers.py`、`facet/web/js/core/layers.js`、`facet/core/structure.py#M3`、`facet/web/js/core/structure.js#M3`、`tests/ops/m3_layers.py`、`tests/js/ops/m3_layers.mjs`、`tests/data/surface/layers/`（只改 skip）、`tests/test_bond_graph.py`、`tests/js/bondgraph.test.mjs`、`tests/test_adsorbates.py`、`tests/js/adsorbates_m3.test.mjs`。
 
 【测试】M3 §7.2 的键图（判据边界 d 恰为阈值不成键、按像计数、smart、`indices` 子图、与显示设置无关）与吸附物（三种来源、OC20、tag 0 周期层、桥位 OH 回归、周期块丢弃、2-core、替位判别、自由分子、团簇不猜）各条；网页默认场景 `disabledPairs = ["Pt-Pt"]` 时 `cn` 与 Python 相同（M3 §7.1 末行）；`promote_adsorbates` 的编号顺序。
 
@@ -441,7 +441,7 @@ M1-α 的晶格核心、M3 层分析与键图、M2 Miller 规范化与常量、M
 
 【U 与负责人决定】U4（没有 `vacuum` 键；默认 4 层、居中）；负责人决定：无直接相关项。
 
-【文件】`crystallume/core/intmath.py#M2`、`crystallume/web/js/core/intmath.js#M2`、`crystallume/core/defaults.py#M2`、`crystallume/web/js/core/defaults.js#M2`、`tests/test_plane_basis.py`、`tests/js/plane_basis.test.mjs`、`tests/test_surface_defaults_m2.py`。
+【文件】`facet/core/intmath.py#M2`、`facet/web/js/core/intmath.js#M2`、`facet/core/defaults.py#M2`、`facet/web/js/core/defaults.js#M2`、`tests/test_plane_basis.py`、`tests/js/plane_basis.test.mjs`、`tests/test_surface_defaults_m2.py`。
 
 【测试】M2 §7.1"整数基"（(hkl) ∈ [−6, 6]³ 互质、handedness ±1）与"Miller 与惯用胞"中关于规范化的条（N1、四指数、上限、全 0）；`tests/test_surface_defaults_m2.py`：M2 键两语言逐键相等，两语言都没有 `vacuum`、`layers`、`position`、`offset`、`supercell_max_entry` 键（L-X-08 末条），`slab_layers == 4`。
 
@@ -467,16 +467,16 @@ M1 超胞族与原胞并行；M2 惯用胞提示与命名核心（提前给 M1 �
 
 | 链 | 端口 | 任务 | 独占的文件 |
 |---|---|---|---|
-| `w1-m1-supercell` | — | M1-T3a 超胞族的结构操作（双语言） | `crystallume/core/cellops.py#M1-T3a`、`crystallume/web/js/core/cellops.js#M1-T3a`、`crystallume/core/structure.py#M1-T3a`、`crystallume/web/js/core/structure.js#M1-T3a`、`crystallume/build/__init__.py#M1`、`tests/test_cellops.py`、`tests/js/cellops.test.mjs` |
-| `w1-m1-translations` | — | M1-T4 平移对称性与原胞（双语言） | `crystallume/analysis/translations.py`、`crystallume/web/js/core/translations.js`、`crystallume/analysis/__init__.py#M1`、`crystallume/core/structure.py#M1-T4`、`crystallume/web/js/core/structure.js#M1-T4`、`tests/test_translations.py`、`tests/js/translations.test.mjs` |
-| `w1-m2-naming` | — | M2-T1b 惯用胞提示 conventional_cell_hint（双语言）、M2-T4n 命名核心（双语言纯函数，从 M2-T4/T6b 提前拆出） | `crystallume/core/lattice.py#M2`、`crystallume/web/js/core/lattice.js#M2`、`crystallume/core/naming.py#M2`、`crystallume/web/js/core/naming.js#M2`、`tests/test_lattice_hint.py`、`tests/js/lattice_hint.test.mjs`、`tests/test_naming_surface.py`、`tests/js/naming_surface.test.mjs` |
-| `w1-m3-constraints` | — | M3-T4 约束封装 fix/free/fix_layers/fix_height 与 set_tags_from_layers（双语言）、M3-T2b M3 层分析的跨语言平价测试 | `crystallume/core/structure.py#M3`、`crystallume/web/js/core/structure.js#M3`、`crystallume/analysis/layers.py`、`crystallume/web/js/core/layers.js`、`tests/test_fix_free.py`、`tests/js/fix-free.test.mjs`、`tests/test_m3_parity.py` |
+| `w1-m1-supercell` | — | M1-T3a 超胞族的结构操作（双语言） | `facet/core/cellops.py#M1-T3a`、`facet/web/js/core/cellops.js#M1-T3a`、`facet/core/structure.py#M1-T3a`、`facet/web/js/core/structure.js#M1-T3a`、`facet/build/__init__.py#M1`、`tests/test_cellops.py`、`tests/js/cellops.test.mjs` |
+| `w1-m1-translations` | — | M1-T4 平移对称性与原胞（双语言） | `facet/analysis/translations.py`、`facet/web/js/core/translations.js`、`facet/analysis/__init__.py#M1`、`facet/core/structure.py#M1-T4`、`facet/web/js/core/structure.js#M1-T4`、`tests/test_translations.py`、`tests/js/translations.test.mjs` |
+| `w1-m2-naming` | — | M2-T1b 惯用胞提示 conventional_cell_hint（双语言）、M2-T4n 命名核心（双语言纯函数，从 M2-T4/T6b 提前拆出） | `facet/core/lattice.py#M2`、`facet/web/js/core/lattice.js#M2`、`facet/core/naming.py#M2`、`facet/web/js/core/naming.js#M2`、`tests/test_lattice_hint.py`、`tests/js/lattice_hint.test.mjs`、`tests/test_naming_surface.py`、`tests/js/naming_surface.test.mjs` |
+| `w1-m3-constraints` | — | M3-T4 约束封装 fix/free/fix_layers/fix_height 与 set_tags_from_layers（双语言）、M3-T2b M3 层分析的跨语言平价测试 | `facet/core/structure.py#M3`、`facet/web/js/core/structure.js#M3`、`facet/analysis/layers.py`、`facet/web/js/core/layers.js`、`tests/test_fix_free.py`、`tests/js/fix-free.test.mjs`、`tests/test_m3_parity.py` |
 
 **合并顺序**：`w1-m1-supercell` → `w1-m1-translations` → `w1-m2-naming` → `w1-m3-constraints`
 
 **出口检查**：
 
-- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`CRYSTALLUME_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
+- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`FACET_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
 - M1-T3a：`tests/test_cellops.py`、`tests/js/cellops.test.mjs` 通过；`make_supercell(diag, wrap=False)` 与 `repeat` 在无 `info.surface`、无 `adsorbate_id` 的单帧结构上逐项相同（R-F24）；面内矩阵精确保持 `[T,T,F]`/`[F,F,T]`（C3）
 - M1-T4：`tests/test_translations.py`、`tests/js/translations.test.mjs` 通过；1 万原子去顶层 2/5/25 原子的原胞搜索 < 0.5 s（Python）；`PrimitiveResult.matrix is None`（R-F02）
 - M2-T4n：`tests/test_naming_surface.py`、`tests/js/naming_surface.test.mjs` 通过：L-X-07 表的全部例子两语言逐字相同（`Cu(100) (√2×√2)R45° 4L`，L-19）；只有 `autoName` 一个哨兵（L-12）
@@ -493,7 +493,7 @@ M1 超胞族与原胞并行；M2 惯用胞提示与命名核心（提前给 M1 �
 
 【U 与负责人决定】U1（不分类）、U2（超胞保持 pbc）；负责人决定 L-19（`label` 只进读数与 toast）。
 
-【文件】`crystallume/core/cellops.py#M1-T3a`、`crystallume/web/js/core/cellops.js#M1-T3a`、`crystallume/core/structure.py#M1-T3a`、`crystallume/web/js/core/structure.js#M1-T3a`、`crystallume/build/__init__.py#M1`、`tests/test_cellops.py`、`tests/js/cellops.test.mjs`。
+【文件】`facet/core/cellops.py#M1-T3a`、`facet/web/js/core/cellops.js#M1-T3a`、`facet/core/structure.py#M1-T3a`、`facet/web/js/core/structure.js#M1-T3a`、`facet/build/__init__.py#M1`、`tests/test_cellops.py`、`tests/js/cellops.test.mjs`。
 
 【测试】M1 §7.1 的"make_supercell""包裹（K3）""约化"与"惯用胞"中的结构操作：与 `repeat` 逐项相同（wrap 真/假）；Pt(111) p(3×3) 配方（M1-T5a）36 原子、18 固定、tags 平铺、无备注；√3：12 原子、a′ = √3·2.7719、γ = 120°；`[T,T,F]`/`[F,F,T]` 精确、`[T,F,F]` 收紧并写备注；`adsorbate_id` 重编号；det 0、过大、非整数、混入非周期轴、无晶胞、多帧的文案；手性（右手 + det −1 → E-SC2，含 `negate one row, or swap two rows`；左手 + det −1 得右手；左手 + det +3 得左手并附 N-LH）；底层 z = −0.01 的 T T T slab 经 √3、3×3×1、60°→120° 后 z 集合不变且连续；`changed_axes` 的 6 个矩阵；`reduce_cell` 的 60° → 120°、c 倾斜 `3a − 2b` 被移除、TTT p(8×8) auto 保持 c、CONTCAR 不变。名字与 `info.surface` 的断言留给 M1-T10 与 M1-T5b。
 
@@ -503,11 +503,11 @@ M1 超胞族与原胞并行；M2 惯用胞提示与命名核心（提前给 M1 �
 
 【依据】M1 §3.12（3.12.1–3.12.4）、§3.17；ledger-features L-M1-12（`identity_classes`、`find_translations(structure, tolerance=None, axes=None, *, props=None)`、`TranslationGroup`、`primitive_cell(...)`；`PrimitiveResult` 带 `transform = {num, den}`（新 = T @ 旧）与整数 `supercell_matrix`（旧 = S @ 新），`matrix` 恒为 None，R-F02；`props=None` = `translation_identity_props`（不含 labels、adsorbate_id），`props=()` = 只看元素；`axes=None` = 真空轴以外的周期轴，`"all"` = 全部；容差范围 [1e-4 Å, 0.25 × 最小晶面间距)，否则 E-PC1）、L-M1-13（`Structure.get_primitive_cell`）、§10.1 第 2 条。
 
-【实现】新文件 `crystallume/analysis/translations.py`（`analysis/__init__.py` 段 `M1` 导出）与 `web/js/core/translations.js`（平铺分箱表、`findTranslationsAsync(s, opts, { signal, onProgress })`）；`primitive_cell` 生成结构时调用 `cellops.begin_cell_op`/`finish_cell_op`（M1-T1 的桩，T10 填实）；`Structure.get_primitive_cell` 放 `core/structure.py`、`web/js/core/structure.js` 的段 `M1-T4`。**`reference_mesh` 不在本任务**：它要用 M2 的 `normalize_surface_info`，移到 M1-T10（plan.md P-05）。
+【实现】新文件 `facet/analysis/translations.py`（`analysis/__init__.py` 段 `M1` 导出）与 `web/js/core/translations.js`（平铺分箱表、`findTranslationsAsync(s, opts, { signal, onProgress })`）；`primitive_cell` 生成结构时调用 `cellops.begin_cell_op`/`finish_cell_op`（M1-T1 的桩，T10 填实）；`Structure.get_primitive_cell` 放 `core/structure.py`、`web/js/core/structure.js` 的段 `M1-T4`。**`reference_mesh` 不在本任务**：它要用 M2 的 `normalize_surface_info`，移到 M1-T10（plan.md P-05）。
 
 【U 与负责人决定】U1（有真空间隙时原胞只在面内搜索，D20；不按 slab 分类）；负责人决定：无直接相关项。
 
-【文件】`crystallume/analysis/translations.py`、`crystallume/web/js/core/translations.js`、`crystallume/analysis/__init__.py#M1`、`crystallume/core/structure.py#M1-T4`、`crystallume/web/js/core/structure.js#M1-T4`、`tests/test_translations.py`、`tests/js/translations.test.mjs`。
+【文件】`facet/analysis/translations.py`、`facet/web/js/core/translations.js`、`facet/analysis/__init__.py#M1`、`facet/core/structure.py#M1-T4`、`facet/web/js/core/structure.js#M1-T4`、`tests/test_translations.py`、`tests/js/translations.test.mjs`。
 
 【测试】M1 §7.1"原胞"一行的全部用例：无标签带噪声的 4 种 slab、P1 CIF、唯一 labels、磁矩聚类与边界值、AFM、8 种体相、TTT p(8×8)、双 slab、CONTCAR 2×2、R 心刚玉；1 万原子去顶层 2/5/25 个原子（在序列末尾）< 0.5 s；σ = 0.02 Å 在 0.05 Å 下报 N-PC1、在 0.1 Å 下约化；`average=True` 降低误差；`orbit_of` 与 `image_shift`；`transform` 与 `supercell_matrix` 互逆；JS `findTranslationsAsync` 与同步版本相同、`AbortSignal` 可取消。
 
@@ -521,7 +521,7 @@ M1 超胞族与原胞并行；M2 惯用胞提示与命名核心（提前给 M1 �
 
 【U 与负责人决定】U1（惯用胞提示只是度量提示，不是分类）；负责人决定：无直接相关项。
 
-【文件】`crystallume/core/lattice.py#M2`、`crystallume/web/js/core/lattice.js#M2`、`tests/test_lattice_hint.py`、`tests/js/lattice_hint.test.mjs`。
+【文件】`facet/core/lattice.py#M2`、`facet/web/js/core/lattice.js#M2`、`tests/test_lattice_hint.py`、`tests/js/lattice_hint.test.mjs`。
 
 【测试】M2 §7.1"Miller 与惯用胞"中 `conventional_cell_hint` 的各条：fcc/bcc/体心四方/菱方/底心单斜原胞上的 kind 与 Q；6 种惯用胞返回 None；Pt、Fe 原胞上 (100)、(110)、(211) 两种基的换算（F0-A §3.14.4 的表）；MP 风格刚玉菱方原胞在 Conventional 基输入 (0 0 0 1) 的换算；与 F0-A、M1 在 fcc/bcc 上同一矩阵。
 
@@ -535,7 +535,7 @@ M1 超胞族与原胞并行；M2 惯用胞提示与命名核心（提前给 M1 �
 
 【U 与负责人决定】U1（`kind: "vacuum"` 只是来源记录）；负责人决定 L-12（只有 `autoName`）、L-19。
 
-【文件】`crystallume/core/naming.py#M2`、`crystallume/web/js/core/naming.js#M2`、`tests/test_naming_surface.py`、`tests/js/naming_surface.test.mjs`。
+【文件】`facet/core/naming.py#M2`、`facet/web/js/core/naming.js#M2`、`tests/test_naming_surface.py`、`tests/js/naming_surface.test.mjs`。
 
 【测试】用手写的 `info.surface` 字典（L-X-01 字段）覆盖 L-X-07 表的全部例子：`Pt(111) 4L`、`Pt(111) p(3×3) 4L`、`SrTiO3(001) TiO2-term 7L`、`SrTiO3(001) TiO2/SrO-term 8L`、`Cu(100) (√2×√2)R45° 4L`、`Ag(111) (1×√3)rect 4L`、`Ag(111) [2 1, -1 3] 4L`、`ZnO(10-10) ZnO-A-term 8L`、`TiO2(110) O·Ti2O2-term 9L`、`Pt(1 1 12) 4L`；`refresh_auto_name` 的四个分支（无块 → False；`before["auto"]` 为假 → 置 null；cleave → `surface_name`；其他 kind → 去掉旧后缀、`cell_change` 时 `rename_after_cell_change`、接新后缀，例 `CONTCAR + CO` 经 2×2×1 → `CONTCAR 2×2×1 + 4CO`）；`adsorbate_suffix` 的合并与计数（`2CO + O`）；v1 块读成 v2；两语言逐字相同。
 
@@ -549,7 +549,7 @@ M1 超胞族与原胞并行；M2 惯用胞提示与命名核心（提前给 M1 �
 
 【U 与负责人决定】U5/D7（约束读写的旧缺陷已在第 0 波修好，本任务按 C3）；负责人决定：无直接相关项。
 
-【文件】`crystallume/core/structure.py#M3`、`crystallume/web/js/core/structure.js#M3`、`crystallume/analysis/layers.py`、`crystallume/web/js/core/layers.js`、`tests/test_fix_free.py`、`tests/js/fix-free.test.mjs`。
+【文件】`facet/core/structure.py#M3`、`facet/web/js/core/structure.js#M3`、`facet/analysis/layers.py`、`facet/web/js/core/layers.js`、`tests/test_fix_free.py`、`tests/js/fix-free.test.mjs`。
 
 【测试】M3 §7.2"约束"一条全部（`fix`/`free` 语义、Free all 删键、部分 free 保留键、无变化返回 0、`fix_layers` 设定语义（目标层恰好固定 axes）与累加、`fix_height` 两种方式、全部固定的警告、中段元素检查、内层数组不共享）；`test_cleave_fix_equals_fix_layers` 的 M3 一半（在 M3 夹具上按构建层号固定与 `fix_layers(bottom=2)` 结果相同；M2 一半在 W1.6 补上）。文件名不用 `test_constraints.py`（归 F0-D）。
 
@@ -565,7 +565,7 @@ M1 超胞族与原胞并行；M2 惯用胞提示与命名核心（提前给 M1 �
 
 【文件】`tests/test_m3_parity.py`。
 
-【测试】即上；没有 Node 时跳过，`CRYSTALLUME_REQUIRE_NODE=1` 时失败。
+【测试】即上；没有 Node 时跳过，`FACET_REQUIRE_NODE=1` 时失败。
 
 ### W1.4
 
@@ -573,22 +573,22 @@ M1 连续形变与 info 处理器/自动名接线；M2 切面分析两语言并�
 
 | 链 | 端口 | 任务 | 独占的文件 |
 |---|---|---|---|
-| `w1-m1-deform` | — | M1-T3b 连续形变与刚性操作（双语言） | `crystallume/core/cellops.py#M1-T3b`、`crystallume/web/js/core/cellops.js#M1-T3b`、`crystallume/core/structure.py#M1-T3b`、`crystallume/web/js/core/structure.js#M1-T3b`、`tests/test_cellops_deform.py`、`tests/js/cellops_deform.test.mjs` |
-| `w1-m1-infohandlers` | — | M1-T10 info 处理器注册表、自动名接线与 reference_mesh | `crystallume/core/infohandlers.py`、`crystallume/web/js/core/infohandlers.js`、`crystallume/core/cellops.py#M1-T10`、`crystallume/web/js/core/cellops.js#M1-T10`、`tests/test_infohandlers.py`、`tests/js/infohandlers.test.mjs`、`tests/test_reference_mesh.py`、`tests/js/reference_mesh.test.mjs` |
-| `w1-m2-analysis-py` | — | M2-T3 Python 切面分析（终止面、分层、极性） | `crystallume/build/surface.py#M2-T3`、`tests/test_surface_analysis.py`、`tests/ops/m2_analysis.py` |
-| `w1-m2-analysis-js` | — | M2-T6a JS 切面分析（按规格独立实现，分块可取消） | `crystallume/web/js/build/surface.js#M2-T6a`、`tests/js/surface_analysis.test.mjs`、`tests/js/ops/m2_analysis.mjs` |
-| `w1-m3-api` | — | M3-T11a M3 的 REST、客户端与 CLI（layers、edit fix/free） | `crystallume/server/models.py`、`crystallume/server/routes/build.py`、`crystallume/server/routes/analysis.py`、`crystallume/server/auth.py`、`crystallume/server/deps.py`、`crystallume/client.py`、`crystallume/cli.py`、`crystallume/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py` |
+| `w1-m1-deform` | — | M1-T3b 连续形变与刚性操作（双语言） | `facet/core/cellops.py#M1-T3b`、`facet/web/js/core/cellops.js#M1-T3b`、`facet/core/structure.py#M1-T3b`、`facet/web/js/core/structure.js#M1-T3b`、`tests/test_cellops_deform.py`、`tests/js/cellops_deform.test.mjs` |
+| `w1-m1-infohandlers` | — | M1-T10 info 处理器注册表、自动名接线与 reference_mesh | `facet/core/infohandlers.py`、`facet/web/js/core/infohandlers.js`、`facet/core/cellops.py#M1-T10`、`facet/web/js/core/cellops.js#M1-T10`、`tests/test_infohandlers.py`、`tests/js/infohandlers.test.mjs`、`tests/test_reference_mesh.py`、`tests/js/reference_mesh.test.mjs` |
+| `w1-m2-analysis-py` | — | M2-T3 Python 切面分析（终止面、分层、极性） | `facet/build/surface.py#M2-T3`、`tests/test_surface_analysis.py`、`tests/ops/m2_analysis.py` |
+| `w1-m2-analysis-js` | — | M2-T6a JS 切面分析（按规格独立实现，分块可取消） | `facet/web/js/build/surface.js#M2-T6a`、`tests/js/surface_analysis.test.mjs`、`tests/js/ops/m2_analysis.mjs` |
+| `w1-m3-api` | — | M3-T11a M3 的 REST、客户端与 CLI（layers、edit fix/free） | `facet/server/models.py`、`facet/server/routes/build.py`、`facet/server/routes/analysis.py`、`facet/server/auth.py`、`facet/server/deps.py`、`facet/client.py`、`facet/cli.py`、`facet/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py` |
 
 **合并顺序**：`w1-m1-infohandlers` → `w1-m1-deform` → `w1-m2-analysis-py` → `w1-m2-analysis-js` → `w1-m3-api`
 
 **出口检查**：
 
-- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`CRYSTALLUME_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
+- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`FACET_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
 - M1-T10：`tests/test_infohandlers.py`、`tests/test_reference_mesh.py` 与 JS 对应测试通过；手写 kind cleave 块上 √3 超胞后名字为 `Pt(111) (√3×√3)R30° 4L`、再叠 p(3×3) 为 `(3√3×3√3)R30°`；`reference_mesh` 只在 kind cleave/interface 时信任 `info.supercellMatrix`（R-F17）
 - M1-T3b：`tests/test_cellops_deform.py`、`tests/js/cellops_deform.test.mjs` 通过（Keep the vacuum gap：c 21.79 → 30 高度不变；双轴 +2 %）
 - M2-T3/T6a：`tests/test_surface_analysis.py`、`tests/js/surface_analysis.test.mjs` 通过；`tests/data/surface/cleave/analysis/` 的期望在两语言各自的单元测试里成立
 - 验收（分析部分，Python 与 JS）：S1-1、S8-1/S8-2、S9-1、S10-1/S10-2、S11-1–S11-3、S12-1
-- M3-T11a：`/api/v1/analysis/layers` 在 `ROUTE_METHODS` 中并有客户端方法；`crystallume layers` 与 `crystallume edit fix/free` 的 `tests/test_cli.py` 用例通过；未知字段 → 422（`extra="forbid"`）
+- M3-T11a：`/api/v1/analysis/layers` 在 `ROUTE_METHODS` 中并有客户端方法；`facet layers` 与 `facet edit fix/free` 的 `tests/test_cli.py` 用例通过；未知字段 → 422（`extra="forbid"`）
 
 #### M1-T3b 连续形变与刚性操作（双语言）（链 `w1-m1-deform`）
 
@@ -600,7 +600,7 @@ M1 连续形变与 info 处理器/自动名接线；M2 切面分析两语言并�
 
 【U 与负责人决定】U1（Keep the vacuum gap 对任何有真空间隙的结构都可用）、U4（`keep_vacuum` 不是真空值）；负责人决定：无直接相关项。
 
-【文件】`crystallume/core/cellops.py#M1-T3b`、`crystallume/web/js/core/cellops.js#M1-T3b`、`crystallume/core/structure.py#M1-T3b`、`crystallume/web/js/core/structure.js#M1-T3b`、`tests/test_cellops_deform.py`、`tests/js/cellops_deform.test.mjs`。
+【文件】`facet/core/cellops.py#M1-T3b`、`facet/web/js/core/cellops.js#M1-T3b`、`facet/core/structure.py#M1-T3b`、`facet/web/js/core/structure.js#M1-T3b`、`tests/test_cellops_deform.py`、`tests/js/cellops_deform.test.mjs`。
 
 【测试】M1 §7.1 的"晶胞参数"（旋转过的 hcp；保持笛卡尔；左手保持；Keep the vacuum gap：c 21.79 → 30 高度不变、a 2.7719 → 2.80 面内分数与高度不变；VASP 包裹的 CONTCAR 保持笛卡尔改 c → 间隙 23.20 Å；联动规则 90° 不联动）、"set_cell"（手性翻转 + scale_atoms 报 E-SC7；纯旋转 → `"rotate"`；非整数关系删除 `supercellMatrix`）、"应变"（双轴 +2 %；各向同性 −1 %；单轴 c +3 %；张量体积比 = det F；εxy 语义；Keep：间隙 15.0000 不变、厚度 6.7896 → 6.9254；`keep_vacuum="auto"` 体相为假、slab 为真；`{"hkl": [1,1,1]}`；tensor 给 percent 报错）、"重定向"、"平移原点与包裹"各行。名字与 info 处理器的断言留给 M1-T5b（W1.5）。
 
@@ -610,11 +610,11 @@ M1 连续形变与 info 处理器/自动名接线；M2 切面分析两语言并�
 
 【依据】M1 §3.15、§3.4、§3.5.4、§3.6.4；ledger-features L-M1-14（注册表、`ctx` 字段含新增的 `lattice_points` 与 `id_map`；内置处理器只有 M1 的 `surface` 几何处理器与 M5 的 `surface.adsorbates`；静态注册；重复注册 → `register_info_handler: 'surface' is already registered`）、L-M1-07（`reference_mesh(structure, *, exclude=None, tolerance=None, max_atoms=None, frame=None)` 的四个来源 record/interface/translations/current，最后 `gauss_reduce_2d(angle="obtuse")`；来源 3 从不写进 `info.supercellMatrix`；JS 按（结构、`rev`）缓存，给了 `exclude` 时不缓存）、L-X-07 机制第 1、2、4 条（命名在 `apply_info_handlers` **之后**；返回 False 时 `rename_after_cell_change`）、R-F17、§10.1 第 3、6、7 条；负责人决定 L-12、L-19。依赖：M2-T4n（`auto_name_state`、`refresh_auto_name`、`normalize_surface_info`，W1.3 已合入）、M1-T4（`primitive_cell`，W1.3）。
 
-【实现】新文件 `crystallume/core/infohandlers.py`、`web/js/core/infohandlers.js`：注册表、`update_surface_geometry`、`surface` 处理器；文件内建段 `M1` 与 `M5`（M5-T6 在 W3.2 注册 `surface.adsorbates`）。`cellops.*` 段 `M1-T10`：把 `begin_cell_op` 改为返回 `auto_name_state(s)`；`finish_cell_op` 改为 `mark_edited` → `apply_info_handlers(ctx)` → `refresh_auto_name(s, before, cell_change=…)`，返回 False 时 `s.name = rename_after_cell_change(...)`；重新导出三个注册表函数；`reference_mesh`/`referenceMesh`。
+【实现】新文件 `facet/core/infohandlers.py`、`web/js/core/infohandlers.js`：注册表、`update_surface_geometry`、`surface` 处理器；文件内建段 `M1` 与 `M5`（M5-T6 在 W3.2 注册 `surface.adsorbates`）。`cellops.*` 段 `M1-T10`：把 `begin_cell_op` 改为返回 `auto_name_state(s)`；`finish_cell_op` 改为 `mark_edited` → `apply_info_handlers(ctx)` → `refresh_auto_name(s, before, cell_change=…)`，返回 False 时 `s.name = rename_after_cell_change(...)`；重新导出三个注册表函数；`reference_mesh`/`referenceMesh`。
 
 【U 与负责人决定】U1；负责人决定 L-12（只有 `autoName`）、L-19（预设标签不进名字）。
 
-【文件】`crystallume/core/infohandlers.py`、`crystallume/web/js/core/infohandlers.js`、`crystallume/core/cellops.py#M1-T10`、`crystallume/web/js/core/cellops.js#M1-T10`、`tests/test_infohandlers.py`、`tests/js/infohandlers.test.mjs`、`tests/test_reference_mesh.py`、`tests/js/reference_mesh.test.mjs`。
+【文件】`facet/core/infohandlers.py`、`facet/web/js/core/infohandlers.js`、`facet/core/cellops.py#M1-T10`、`facet/web/js/core/cellops.js#M1-T10`、`tests/test_infohandlers.py`、`tests/js/infohandlers.test.mjs`、`tests/test_reference_mesh.py`、`tests/js/reference_mesh.test.mjs`。
 
 【测试】M1 §7.1"info 处理器"（假处理器的调用顺序与 ctx 字段；`surface` 处理器的 `normal`/`axis` 在重定向、轮换、超胞、基变换下；没注册时不改未知字段）、"派生信息"（T3a/T4 操作的 `mark_edited` kind）、"reference_mesh"（`supercellMatrix` 来源只在 kind cleave/interface 时信任；无记录的 p(2×2) → K = 2I；p(3×3) + CO（adsorbate_id）→ K = 3I；> 5000 原子 → current）。命名：手写 kind cleave 块上 √3 → `Pt(111) (√3×√3)R30° 4L`、再 p(3×3) 累计 → `Pt(111) (3√3×3√3)R30° 4L`、p(3×3) 后求原胞 → `Pt(111) 4L`；`Cu fcc` diag(2,2,2) → `Cu fcc 2×2×2`；改过名的 `my slab` diag(2,2,1) → `my slab 2×2×1`。T3b 的操作在合入后由 M1-T5b 覆盖。
 
@@ -628,7 +628,7 @@ M1 连续形变与 info 处理器/自动名接线；M2 切面分析两语言并�
 
 【U 与负责人决定】U1（终止面分析不判断是不是 slab）；负责人决定：无直接相关项。
 
-【文件】`crystallume/build/surface.py#M2-T3`、`tests/test_surface_analysis.py`、`tests/ops/m2_analysis.py`。
+【文件】`facet/build/surface.py#M2-T3`、`tests/test_surface_analysis.py`、`tests/ops/m2_analysis.py`。
 
 【测试】M2 §7.1 的"原胞步骤"、"OUC 不变量"（随机 (hkl) ∈ [−3, 3]³ × {Pt, SrTiO3, TiO2, ZnO, CeO2, GaAs} 共 1740 例：面积 × 周期 = 原胞体积、法向在 +hkl 侧、γ ∈ [90°, 120°]、0 个 E7、τ_eff 下单链重新分层 = 2m 层）、"分层与合并"、"原子层与终止面"、"带噪声的体相"、"惯用胞 ≡ 原胞"、"手性"各行；在 `tests/test_surface_analysis.py` 里直接读 `tests/data/surface/cleave/analysis/` 的用例文件调用 Python 实现（不依赖 skip 状态），覆盖 acceptance S1-1、S8-1、S8-2、S9-1、S10-1、S10-2、S11-1–S11-3、S12-1 的分析部分。
 
@@ -642,7 +642,7 @@ M1 连续形变与 info 处理器/自动名接线；M2 切面分析两语言并�
 
 【U 与负责人决定】U1；负责人决定：无直接相关项（两语言分歧按简报原则裁决，U6）。
 
-【文件】`crystallume/web/js/build/surface.js#M2-T6a`、`tests/js/surface_analysis.test.mjs`、`tests/js/ops/m2_analysis.mjs`。
+【文件】`facet/web/js/build/surface.js#M2-T6a`、`tests/js/surface_analysis.test.mjs`、`tests/js/ops/m2_analysis.mjs`。
 
 【测试】在 `tests/js/surface_analysis.test.mjs` 里读 `tests/data/surface/cleave/analysis/` 的用例文件并对 JS 实现逐项断言；M2 §7.1 中可以在 JS 侧复现的各组（OUC 不变量抽样 200 例、分层与合并、终止面标签与断键数、带噪声体相的固定种子）；分块版本与同步版本结果相同、可取消。
 
@@ -650,15 +650,15 @@ M1 连续形变与 info 处理器/自动名接线；M2 切面分析两语言并�
 
 #### M3-T11a M3 的 REST、客户端与 CLI（layers、edit fix/free）（链 `w1-m3-api`）
 
-【目标】M3 的 Python 外部接口：REST `POST /api/v1/analysis/layers`、客户端 `layers`、CLI `crystallume layers` 与 `crystallume edit fix/free`，并建立 `crystallume edit` 子命令组与全仓库唯一的 `--atoms SPEC` 解析函数。
+【目标】M3 的 Python 外部接口：REST `POST /api/v1/analysis/layers`、客户端 `layers`、CLI `facet layers` 与 `facet edit fix/free`，并建立 `facet edit` 子命令组与全仓库唯一的 `--atoms SPEC` 解析函数。
 
-【依据】M3 §6.3–6.5、§7.3；ledger-features L-M3-10（**[改]** `--frame` → `--index N`，`--to` → `--format`，写结构的命令加 `--from`；`LayersRequest` `extra="forbid"`）、§0.3 的 CLI 与 REST 规则（警告 `crystallume: warning: …`、提示 `crystallume: note: …` 到 stderr；`ValueError` 退出码 1、参数错误 2；不用 `nargs="+"`）、R-F13、R-F14、§10.3 第 7 条；负责人决定 L-10（`--atoms` 的解析函数在 `cli.py` 里只有一个，M4 的 `edit delete` 复用）；04 报告 §2。
+【依据】M3 §6.3–6.5、§7.3；ledger-features L-M3-10（**[改]** `--frame` → `--index N`，`--to` → `--format`，写结构的命令加 `--from`；`LayersRequest` `extra="forbid"`）、§0.3 的 CLI 与 REST 规则（警告 `facet: warning: …`、提示 `facet: note: …` 到 stderr；`ValueError` 退出码 1、参数错误 2；不用 `nargs="+"`）、R-F13、R-F14、§10.3 第 7 条；负责人决定 L-10（`--atoms` 的解析函数在 `cli.py` 里只有一个，M4 的 `edit delete` 复用）；04 报告 §2。
 
 【实现】`server/models.py`（`LayersRequest`）、`server/routes/analysis.py`（路由；`skipAdsorbates` 或 `surface` 为真时 `_guard_work(s, 5.0, settings)`；原子数上限 400）、`client.py`（`layers(...)` 与文档字符串）、`cli.py`（只读命令 `layers`：表格到 stdout、`--json`、提示到 stderr；`edit` 组与 `fix`/`free`；`parse_atom_spec`）；`tests/test_client.py` 的 `ROUTE_METHODS` 加一条。
 
 【U 与负责人决定】U4 不涉及；负责人决定 L-10（`--atoms SPEC` 只有一个解析函数，M4 的 `edit delete` 复用）。
 
-【文件】API 文件束（plan.md §2.4，本批次只归本链）：`crystallume/server/models.py`、`crystallume/server/routes/build.py`、`crystallume/server/routes/analysis.py`、`crystallume/server/auth.py`、`crystallume/server/deps.py`、`crystallume/client.py`、`crystallume/cli.py`、`crystallume/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py`。
+【文件】API 文件束（plan.md §2.4，本批次只归本链）：`facet/server/models.py`、`facet/server/routes/build.py`、`facet/server/routes/analysis.py`、`facet/server/auth.py`、`facet/server/deps.py`、`facet/client.py`、`facet/cli.py`、`facet/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py`。
 
 【测试】M3 §7.3 全部：`/analysis/layers` 200（auto、`{"hkl"}`、`skipAdsorbates`、`group: units`、`surface`（暴露原子要到 W2.1 的 M3-T3b 才有：本任务先让 `surface: true` 与 CLI `layers --surface` 返回 400/退出码 1，文案 `surface atoms are not available yet`，并在报告中列出；M3-T3b 在 W2.1 把它们改成正式行为并补测试）、400（无晶胞用 `'c'`、体相用 `'normal'`、体相 + `surface`）、422（容差 0 或 −1、方向矢量长度 2、未知字段）、云模式未登录被拒、响应回显参数；原子数上限；`ROUTE_METHODS` 与一次真实调用；CLI：`layers` 表格、`--json`、提示到 stderr；`edit fix --bottom 2 -o POSCAR` 读回 SD；`--layers 1`；`--depth 3.5`；`edit free --all`；省略 `-o` 写 stdout；`--vector` 与 `--direction` 互斥（退出码 2）；多帧读最后一帧。
 
@@ -668,24 +668,24 @@ M2 slab 组装两语言、改真空工具；M1 网页第一部分（Lattice para
 
 | 链 | 端口 | 任务 | 独占的文件 |
 |---|---|---|---|
-| `w1-m1-cellui` | 8821 | M1-T7a 网页：Cell 插槽状态模型、Lattice parameters 与共享超胞编辑器 | `crystallume/web/js/ui/cellsections.js`、`crystallume/web/js/ui/cellsupercell.js`、`crystallume/web/js/commands/cell.js`、`crystallume/web/js/main.js#M1-sections`、`crystallume/web/css/app.css#M1`、`tests/js/cellui.test.mjs` |
-| `w1-m1-api` | — | M1-T6 M1 的 REST、客户端与 CLI（supercell、transform） | `crystallume/server/models.py`、`crystallume/server/routes/build.py`、`crystallume/server/routes/analysis.py`、`crystallume/server/auth.py`、`crystallume/server/deps.py`、`crystallume/client.py`、`crystallume/cli.py`、`crystallume/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py` |
+| `w1-m1-cellui` | 8821 | M1-T7a 网页：Cell 插槽状态模型、Lattice parameters 与共享超胞编辑器 | `facet/web/js/ui/cellsections.js`、`facet/web/js/ui/cellsupercell.js`、`facet/web/js/commands/cell.js`、`facet/web/js/main.js#M1-sections`、`facet/web/css/app.css#M1`、`tests/js/cellui.test.mjs` |
+| `w1-m1-api` | — | M1-T6 M1 的 REST、客户端与 CLI（supercell、transform） | `facet/server/models.py`、`facet/server/routes/build.py`、`facet/server/routes/analysis.py`、`facet/server/auth.py`、`facet/server/deps.py`、`facet/client.py`、`facet/cli.py`、`facet/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py` |
 | `w1-m1-golden` | — | M1-T5b M1 金标生成与跨语言平价 | `tests/data/surface/make_m1_cases.py`、`tests/data/surface/m1_cases.json`、`tests/ops/m1.py`、`tests/js/ops/m1.mjs`、`tests/test_m1_parity.py` |
-| `w1-m2-assembly-py` | — | M2-T4 Python slab 组装、固定、来源信息与命名 | `crystallume/build/surface.py#M2-T4`、`crystallume/build/__init__.py#M2`、`crystallume/core/naming.py#M2`、`tests/test_surface.py`、`tests/ops/m2_slab.py` |
-| `w1-m2-assembly-js` | — | M2-T6b JS slab 组装、命名与晶面多边形 | `crystallume/web/js/build/surface.js#M2-T6b`、`crystallume/web/js/core/naming.js#M2`、`tests/js/surface.test.mjs`、`tests/js/ops/m2_slab.mjs` |
-| `w1-m2-vacuum-tools` | — | M2-T5 已有结构的工具：set_vacuum、add_vacuum、center_slab、flip_slab、standardize_slab（双语言）、M2-T7c 启用切面分析金标与 terminations 的跨语言平价 | `crystallume/core/structure.py#M2`、`crystallume/web/js/core/structure.js#M2`、`crystallume/build/surface.py#M2-T5`、`crystallume/web/js/build/surface.js#M2-T5`、`tests/test_vacuum_tools.py`、`tests/js/vacuum_tools.test.mjs`、`tests/ops/m2_tools.py`、`tests/js/ops/m2_tools.mjs`、`tests/data/surface/cleave/tools/`、`tests/data/surface/cleave/analysis/`、`tests/test_m2_parity.py` |
+| `w1-m2-assembly-py` | — | M2-T4 Python slab 组装、固定、来源信息与命名 | `facet/build/surface.py#M2-T4`、`facet/build/__init__.py#M2`、`facet/core/naming.py#M2`、`tests/test_surface.py`、`tests/ops/m2_slab.py` |
+| `w1-m2-assembly-js` | — | M2-T6b JS slab 组装、命名与晶面多边形 | `facet/web/js/build/surface.js#M2-T6b`、`facet/web/js/core/naming.js#M2`、`tests/js/surface.test.mjs`、`tests/js/ops/m2_slab.mjs` |
+| `w1-m2-vacuum-tools` | — | M2-T5 已有结构的工具：set_vacuum、add_vacuum、center_slab、flip_slab、standardize_slab（双语言）、M2-T7c 启用切面分析金标与 terminations 的跨语言平价 | `facet/core/structure.py#M2`、`facet/web/js/core/structure.js#M2`、`facet/build/surface.py#M2-T5`、`facet/web/js/build/surface.js#M2-T5`、`tests/test_vacuum_tools.py`、`tests/js/vacuum_tools.test.mjs`、`tests/ops/m2_tools.py`、`tests/js/ops/m2_tools.mjs`、`tests/data/surface/cleave/tools/`、`tests/data/surface/cleave/analysis/`、`tests/test_m2_parity.py` |
 
 **合并顺序**：`w1-m2-assembly-py` → `w1-m2-assembly-js` → `w1-m2-vacuum-tools` → `w1-m1-golden` → `w1-m1-api` → `w1-m1-cellui`
 
 **出口检查**：
 
-- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`CRYSTALLUME_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
+- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`FACET_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
 - M2-T4/T6b：`tests/test_surface.py`、`tests/js/surface.test.mjs` 通过；`build.surface(pt, (1,1,1), layers=4)` 不给 `vacuum` → `TypeError`，`vacuum=None` → E12a（U4-c）
 - 验收（Python 与 JS 的单元测试）：C-2、C-5、C-6、C-7、C-8；S1-1–S1-4（含 CLI 前的 Python 部分）、S9-2–S9-4、S11-4、S11-6、S12-2、S12-4、S12-5、S2-2/S2-3（`Cu(100) (√2×√2)R45° 4L`）、S3-1/S3-2
 - M2-T5/T7c：`tests/test_vacuum_tools.py`、`tests/js/vacuum_tools.test.mjs` 通过；S13-1（石墨烯改真空 c = 20、pbc 仍 T T F、新建 `kind: "vacuum"` 块）、S14-1–S14-3；已有结构 `set_vacuum(0)` → E12d（L-13）；`tests/test_m2_parity.py`（terminations JSON 两语言逐项相同，含随机 hkl）通过，analysis 与 tools 金标已启用
 - M1-T5b：`tests/data/surface/m1_cases.json` 两语言通过；`tests/test_m1_parity.py` 通过
-- M1-T6：`/build/supercell`（扩展）、`/build/transform` 在 `ROUTE_METHODS` 中；`crystallume transform` 的 `tests/test_cli.py` 用例通过
-- 界面：应用在静态模式（`python3 -m http.server <端口> --directory crystallume/web`）与 `crystallume serve` 下都能启动，`document.body.dataset.ready === 'true'`，控制台无 `pageerror`/`console.error`；Structure 面板 Cell 插槽出现 Lattice parameters 与 Supercell 两个分区（默认折叠），超胞预览与 Create 可用、Undo 只撤销自己
+- M1-T6：`/build/supercell`（扩展）、`/build/transform` 在 `ROUTE_METHODS` 中；`facet transform` 的 `tests/test_cli.py` 用例通过
+- 界面：应用在静态模式（`python3 -m http.server <端口> --directory facet/web`）与 `facet serve` 下都能启动，`document.body.dataset.ready === 'true'`，控制台无 `pageerror`/`console.error`；Structure 面板 Cell 插槽出现 Lattice parameters 与 Supercell 两个分区（默认折叠），超胞预览与 Create 可用、Undo 只撤销自己
 
 #### M1-T7a 网页：Cell 插槽状态模型、Lattice parameters 与共享超胞编辑器（链 `w1-m1-cellui`）
 
@@ -697,23 +697,23 @@ M2 slab 组装两语言、改真空工具；M1 网页第一部分（Lattice para
 
 【U 与负责人决定】U1（badge 不放分类）、U5（Structure 面板 Cell 分区，D1）；负责人决定 L-16（共享编辑器供 Slab 分区内嵌）、L-19（toast 写法）。
 
-【文件】`crystallume/web/js/ui/cellsections.js`、`crystallume/web/js/ui/cellsupercell.js`、`crystallume/web/js/commands/cell.js`、`crystallume/web/js/main.js#M1-sections`、`crystallume/web/css/app.css#M1`、`tests/js/cellui.test.mjs`。
+【文件】`facet/web/js/ui/cellsections.js`、`facet/web/js/ui/cellsupercell.js`、`facet/web/js/commands/cell.js`、`facet/web/js/main.js#M1-sections`、`facet/web/css/app.css#M1`、`tests/js/cellui.test.mjs`。
 
 【测试】`tests/js/cellui.test.mjs`（纯逻辑：预设菜单项与 `applicable`/`why`、读数文案、`runSupercell` 的参数解析、toast 与撤销标签；不依赖 DOM）；状态模型的 M1 §5.0 第 6 条用 Playwright 在界面检查里做，并把脚本留在报告里供 W1.7 的 e2e 链复用。
 
-【界面检查】（Chromium，本链端口）Build 面板建 Pt fcc（a = 3.92）与一个 4 层 Pt(111) 夹具（`tests/m1_recipes.py` 的 `fcc111` 导出成 JSON 后用 `crystallume.load`）。Structure 面板 Cell 插槽有 Lattice parameters、Supercell 两个分区，默认折叠；Supercell → Matrix → 预设 `(√3×√3)R30°`：虚线晶胞出现，读数 `New cell: (√3×√3)R30° … · 4 → 12 atoms`；Preview 出现预览条 `Preview: …`、状态栏 `Preview · 12 atoms`、历史长度不变；`Create supercell` → 12 原子、toast `Made a (√3×√3)R30° supercell: 12 atoms` 的 Undo 恢复 4 原子；Lattice parameters 改 c（Keep the vacuum gap 开）slab 高度不变；γ = 190 → 内联错误、Apply 不可用；在矩阵里输入 → 选一个原子 → 切换显示样式 → 输入与预览仍在。截图存 `scratchpad/shots/w1-m1-cellui/`。
+【界面检查】（Chromium，本链端口）Build 面板建 Pt fcc（a = 3.92）与一个 4 层 Pt(111) 夹具（`tests/m1_recipes.py` 的 `fcc111` 导出成 JSON 后用 `facet.load`）。Structure 面板 Cell 插槽有 Lattice parameters、Supercell 两个分区，默认折叠；Supercell → Matrix → 预设 `(√3×√3)R30°`：虚线晶胞出现，读数 `New cell: (√3×√3)R30° … · 4 → 12 atoms`；Preview 出现预览条 `Preview: …`、状态栏 `Preview · 12 atoms`、历史长度不变；`Create supercell` → 12 原子、toast `Made a (√3×√3)R30° supercell: 12 atoms` 的 Undo 恢复 4 原子；Lattice parameters 改 c（Keep the vacuum gap 开）slab 高度不变；γ = 190 → 内联错误、Apply 不可用；在矩阵里输入 → 选一个原子 → 切换显示样式 → 输入与预览仍在。截图存 `scratchpad/shots/w1-m1-cellui/`。
 
 #### M1-T6 M1 的 REST、客户端与 CLI（supercell、transform）（链 `w1-m1-api`）
 
-【目标】M1 的外部接口：扩展 `POST /api/v1/build/supercell`、新增 `POST /api/v1/build/transform`、客户端 `supercell/transform/transform_detailed`、CLI `crystallume transform`。
+【目标】M1 的外部接口：扩展 `POST /api/v1/build/supercell`、新增 `POST /api/v1/build/transform`、客户端 `supercell/transform/transform_detailed`、CLI `facet transform`。
 
-【依据】M1 §6.3–6.5；ledger-features L-M1-17（**[改]** 单帧 `repeat` 走 `make_supercell(diag, wrap=False)`，多帧照旧 `repeat`；`/build/transform` 的操作名 `supercell`、`redefine`、`right-handed`、`lattice-parameters`、`set-cell`、`strain`、`strain-tensor`、`reduce`、`primitive`、`conventional`、`reorient`、`shift-origin`、`wrap`；新模型 `extra="forbid"`；CLI `crystallume transform INPUT [--from FMT] [--index N] [-o OUT] [--format FMT] [--plugins DIR] OPS...`，修饰选项作用于紧邻的前一个操作；表面超胞 `--surface-cell SPEC [--relative-to current]`）、L-M1-08（`repeat`、`matrix`、`preset`、`spec` 恰好一个）、§0.3 REST/CLI 规则、R-F13、R-F14、R-F24、§10.1 第 11 条；服务器原胞上限 `primitive_atoms_server`（M1 键）。
+【依据】M1 §6.3–6.5；ledger-features L-M1-17（**[改]** 单帧 `repeat` 走 `make_supercell(diag, wrap=False)`，多帧照旧 `repeat`；`/build/transform` 的操作名 `supercell`、`redefine`、`right-handed`、`lattice-parameters`、`set-cell`、`strain`、`strain-tensor`、`reduce`、`primitive`、`conventional`、`reorient`、`shift-origin`、`wrap`；新模型 `extra="forbid"`；CLI `facet transform INPUT [--from FMT] [--index N] [-o OUT] [--format FMT] [--plugins DIR] OPS...`，修饰选项作用于紧邻的前一个操作；表面超胞 `--surface-cell SPEC [--relative-to current]`）、L-M1-08（`repeat`、`matrix`、`preset`、`spec` 恰好一个）、§0.3 REST/CLI 规则、R-F13、R-F14、R-F24、§10.1 第 11 条；服务器原胞上限 `primitive_atoms_server`（M1 键）。
 
 【实现】`server/models.py`（按模式拆分的应变模型、响应模型）、`server/routes/build.py`、`client.py`、`cli.py`；`tests/test_client.py` 的 `ROUTE_METHODS`；`tests/test_hardening.py` 的估算 = 实际。
 
 【U 与负责人决定】U4（`keep_vacuum` 不是间隙值）；负责人决定 L-19（名字只由矩阵算出）。
 
-【文件】API 文件束（plan.md §2.4）：`crystallume/server/models.py`、`crystallume/server/routes/build.py`、`crystallume/server/routes/analysis.py`、`crystallume/server/auth.py`、`crystallume/server/deps.py`、`crystallume/client.py`、`crystallume/cli.py`、`crystallume/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py`。
+【文件】API 文件束（plan.md §2.4）：`facet/server/models.py`、`facet/server/routes/build.py`、`facet/server/routes/analysis.py`、`facet/server/auth.py`、`facet/server/deps.py`、`facet/client.py`、`facet/cli.py`、`facet/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py`。
 
 【测试】`tests/test_server.py`（每个操作至少一次 200；恰好一个参数的校验 422/400；多帧 `repeat` 与单帧路径；原胞上限）、`tests/test_client.py`、`tests/test_cli.py`（`transform` 的操作串与修饰选项、`--surface-cell 3x3`、`--index`、警告到 stderr、退出码）、`tests/test_hardening.py`（估算 = 实际原子数）。
 
@@ -723,7 +723,7 @@ M2 slab 组装两语言、改真空工具；M1 网页第一部分（Lattice para
 
 【依据】M1 §7.2（类别：`points`、`gauss`（≥ 500 个非退化基 × 三种 `angle`，生成器先剔除 |a × b| ≤ 1e-8·|a||b|）、`niggli`（≥ 180）、`wood`（≥ 100）、`presets`（≥ 75，含变形网格）、`parse_mesh_spec`、`reference_mesh`、`supercell`（6 种结构 × 矩阵，含 `src`、`shift`）、`reduce_cell`、`lattice_parameters`（含 Keep the vacuum gap）、`strain`、`reorient`、`rename_after_cell_change` 与 `supercell_label`、`identity_classes`、`check_cellpar`、`vacuum_axis`、`conventional_lattice`、`translations`（含 `orbit_of`、`transform`））；比较规则：整数矩阵、标签、`src`、群与生成元逐项相等，坐标与晶胞 1e-9 Å（面上原子允许差一个新晶格矢量，比较前包裹）；ledger-F0 L-F0-27；plan.md P-02、P-03。
 
-【实现】完成 `tests/data/surface/make_m1_cases.py`（开发期运行，产物入库）→ `tests/data/surface/m1_cases.json`（`crystallume.cases/1`）；在 `tests/ops/m1.py`、`tests/js/ops/m1.mjs` 注册对应 op（配方已由 M1-T5a 注册）；`tests/test_m1_parity.py`：一次 Node 调用批量执行并按上面的规则比较；期望由 Python 实现生成后与 `scratchpad/proto/m1v2/` 的原型交叉核对（核对结论写进报告）。补充 T3b 操作（`set_lattice_parameters`、`apply_strain`、`reorient`、`shift_origin`、`wrap_into_cell`）在 kind cleave 块与无块结构上的名字与 `info.surface.normal`/`axis`。
+【实现】完成 `tests/data/surface/make_m1_cases.py`（开发期运行，产物入库）→ `tests/data/surface/m1_cases.json`（`facet.cases/1`）；在 `tests/ops/m1.py`、`tests/js/ops/m1.mjs` 注册对应 op（配方已由 M1-T5a 注册）；`tests/test_m1_parity.py`：一次 Node 调用批量执行并按上面的规则比较；期望由 Python 实现生成后与 `scratchpad/proto/m1v2/` 的原型交叉核对（核对结论写进报告）。补充 T3b 操作（`set_lattice_parameters`、`apply_strain`、`reorient`、`shift_origin`、`wrap_into_cell`）在 kind cleave 块与无块结构上的名字与 `info.surface.normal`/`axis`。
 
 【U 与负责人决定】U2；负责人决定 L-12、L-19（命名类别的期望）。
 
@@ -737,11 +737,11 @@ M2 slab 组装两语言、改真空工具；M1 网页第一部分（Lattice para
 
 【依据】M2 §3.10–3.13、§3.16、§3.20、§4；ledger-features L-M2-02（**[改]** `supercell=` 接受 2×2 矩阵、对角简写或文本（M1 `surface_mesh_matrix`），删除 `wood` 参数与 M2 自己的预设表、50/2500 限额，R-F03、R-F04、R-F38；`fix_middle` 要求 L − N 为偶数，`fix_axes` 为字符串按 R-F09 的语法）、L-X-01（`info.surface` 字段表：`version: 2`、`kind: "cleave"`、`autoName`、`miller`、`layers`、`thickness`、`vacuum`、`stacking`、`termination.count`、`tasker`（顶层键，R-F35）、`period`、`layersPerPeriod`、`layerTolerance`、`normal`、`axis`、`asBuilt`…；浮点 `round_half_up(x, 6)`；保留不认识的键）、L-X-02（`info.supercellMatrix`）、L-X-07（`name = autoName = surface_name(s)`；给了 `name=` 时 `autoName = null`）、§1.5 R-F05（`vacuum` 仅限关键字、必填、总间隙；0 = 体相堆垛；上限 `max_vacuum`）、§10.2 第 4、5、6 条；负责人决定 L-08（输入胞的网格倍数提示 `Using the input cell: the surface cell has N times the area of the smallest one, <Wood>.`）、L-19；ledger-F0 §6 M2 第 8 条；依赖 M1 `cellops.make_supercell`（取 `src`）、`standard_frame`、`supercell_label`、`surface_mesh_matrix`，M2-T3、M2-T4n；U2、U4、C5、C9。
 
-【实现】`build/surface.py` 的段 `M2-T4`；`build/__init__.py` 段 `M2` 导出 `surface`、`surface_analysis`、`terminations`、`oriented_cell`、`estimate_surface_atoms`（`build.surface` 是函数；子模块经 `crystallume.build.surface` 的 sys.modules 仍可导入）；命名需要修正时只改 `core/naming.py` 的段 `M2`（JS 由 M2-T6b 同步）；L-08 的文案生成函数作为内部函数放在本段（JS 同名同义）。注册 Python op `surface` 于新文件 `tests/ops/m2_slab.py`（配方 `bulk` 已由 M2-T7a 注册，不重复注册）。
+【实现】`build/surface.py` 的段 `M2-T4`；`build/__init__.py` 段 `M2` 导出 `surface`、`surface_analysis`、`terminations`、`oriented_cell`、`estimate_surface_atoms`（`build.surface` 是函数；子模块经 `facet.build.surface` 的 sys.modules 仍可导入）；命名需要修正时只改 `core/naming.py` 的段 `M2`（JS 由 M2-T6b 同步）；L-08 的文案生成函数作为内部函数放在本段（JS 同名同义）。注册 Python op `surface` 于新文件 `tests/ops/m2_slab.py`（配方 `bulk` 已由 M2-T7a 注册，不重复注册）。
 
 【U 与负责人决定】U2（pbc T T T、标准取向）、U4（`vacuum` 仅限关键字、必填、总间隙；0 = 体相堆垛；默认 4 层、居中）；负责人决定 L-08、L-19。
 
-【文件】`crystallume/build/surface.py#M2-T4`、`crystallume/build/__init__.py#M2`、`crystallume/core/naming.py#M2`、`tests/test_surface.py`、`tests/ops/m2_slab.py`。
+【文件】`facet/build/surface.py#M2-T4`、`facet/build/__init__.py#M2`、`facet/core/naming.py#M2`、`tests/test_surface.py`、`tests/ops/m2_slab.py`。
 
 【测试】M2 §7.1 的"组装"（`pbc == [T,T,T]`、元素按体相顺序分块且块内层号不减、锚点 (0, 0)、a ∥ x、c ∥ z、底层高 V/2 或 offset、`find_layers(slab).from_top + 1 == tags`）、"真空必填（U4）"、"V = 0 与小真空"、"厚度"、"对称"、"化学计量与极性"、"固定"（默认 N：Pt 4 层 2、金红石 6 层 3、CeO2 9 层 3、SrTiO3 8 层 4；E14；W13）、"超胞"（c(2×2)、√3、√7、2√3、(1×√3)rect、(2×√3)rect；det ≤ 0、超范围、不相容；六方网格上的 `c(4×2)` 被拒）、"命名"、"props / info"、"估算"（每个金标 `estimate_surface_atoms(...) == len(surface(...))`）、"报错"（E1–E16 至少一次，逐字）；在测试里直接读 `tests/data/surface/cleave/slab/` 的用例并调用 Python 实现。
 
@@ -755,7 +755,7 @@ M2 slab 组装两语言、改真空工具；M1 网页第一部分（Lattice para
 
 【U 与负责人决定】U2、U4（JS 缺 `vacuum` → E12a）；负责人决定 L-08、L-19。
 
-【文件】`crystallume/web/js/build/surface.js#M2-T6b`、`crystallume/web/js/core/naming.js#M2`、`tests/js/surface.test.mjs`、`tests/js/ops/m2_slab.mjs`。
+【文件】`facet/web/js/build/surface.js#M2-T6b`、`facet/web/js/core/naming.js#M2`、`tests/js/surface.test.mjs`、`tests/js/ops/m2_slab.mjs`。
 
 【测试】`tests/js/surface.test.mjs`：读 `tests/data/surface/cleave/slab/` 的用例并对 JS 实现逐项断言；组装、真空必填、V = 0、固定、超胞、命名、报错各组的 JS 版；`planePolygons` 在 20 个平面上 ≤ 1 ms、多边形顶点数与面积的解析值；`estimateSurfaceAtoms == buildSurface(...).length`。
 
@@ -769,7 +769,7 @@ M2 slab 组装两语言、改真空工具；M1 网页第一部分（Lattice para
 
 【U 与负责人决定】U1（`kind: "vacuum"` 不是 slab 标记）、U2（改真空不改 pbc）、U4（总间隙、必填）；负责人决定 L-13（已有结构 `set_vacuum(0)` → E12d）。
 
-【文件】`crystallume/core/structure.py#M2`、`crystallume/web/js/core/structure.js#M2`、`crystallume/build/surface.py#M2-T5`、`crystallume/web/js/build/surface.js#M2-T5`、`tests/test_vacuum_tools.py`、`tests/js/vacuum_tools.test.mjs`、`tests/ops/m2_tools.py`、`tests/js/ops/m2_tools.mjs`、`tests/data/surface/cleave/tools/`。
+【文件】`facet/core/structure.py#M2`、`facet/web/js/core/structure.js#M2`、`facet/build/surface.py#M2-T5`、`facet/web/js/build/surface.js#M2-T5`、`tests/test_vacuum_tools.py`、`tests/js/vacuum_tools.test.mjs`、`tests/ops/m2_tools.py`、`tests/js/ops/m2_tools.mjs`、`tests/data/surface/cleave/tools/`。
 
 【测试】M2 §7.1 的"真空工具"（CONTCAR 夹具：间隙 15.000、SD 原样、pbc 仍 T T T；倾斜 c；真空沿 a 的置换；左手晶胞 + 顶位 H：H 仍在顶上、W18；石墨烯 T T F：pbc 仍 T T F；MoS2；漂浮 H2：W19、间隙从 H2 量起；体相 W14；bottom/keep/offset；`add_vacuum` 正负；`center_slab` 不改晶胞；`set_vacuum(0)` → E12d；多帧被丢弃；`imageShift` 与 `contiguous_shifts` 相同）、"翻转"、"M6 接口"各行；acceptance S13-1、S14-1–S14-3。
 
@@ -793,24 +793,24 @@ M2 的 Cleave/Slab 分区与 REST/CLI、slab 完整金标与平价；M1 的其�
 
 | 链 | 端口 | 任务 | 独占的文件 |
 |---|---|---|---|
-| `w1-m1-cellui2` | 8822 | M1-T7b 网页：Strain、Reduce/primitive/conventional、Orientation & origin 分区 | `crystallume/web/js/ui/cellsections.js`、`crystallume/web/js/commands/cell.js`、`crystallume/web/css/app.css#M1`、`tests/js/cellui2.test.mjs` |
-| `w1-m1-commands` | 8823 | M1-T7c 右键菜单、选区动作与 Tools 行迁移、M1-T8a M1 的 JS 公共 API（defineApi） | `crystallume/web/js/ui/cellmenus.js`、`crystallume/web/js/api/cellapi.js`、`crystallume/web/js/main.js#M1-commands`、`crystallume/web/js/ui/panels/structure.js#tools-row`、`tests/js/cellapi.test.mjs` |
-| `w1-m2-cleave-ui` | 8824 | M2-T9 Surface › Cleave 分区（终止面列表、层堆叠图、晶面叠加、预览与 Create） | `crystallume/web/js/ui/panels/surface-cleave.js`、`crystallume/web/js/main.js#M2-cleave`、`crystallume/web/css/app.css#M2-cleave`、`crystallume/web/js/app.js#M2`、`crystallume/web/js/app.js#beginStructureEdit`、`crystallume/web/js/main.js#edit.applyPreview`、`tests/js/cleave_ui.test.mjs` |
-| `w1-m2-slab-ui` | 8825 | M2-T10 Surface › Slab 分区（改真空、内嵌超胞编辑器、翻转、居中） | `crystallume/web/js/ui/panels/surface-slab.js`、`crystallume/web/js/main.js#M2-slab`、`crystallume/web/css/app.css#M2-slab`、`tests/js/slab_ui.test.mjs`、`tests/js/supercell_two_mounts.test.mjs` |
-| `w1-m2-api` | — | M2-T8 M2 的 REST、客户端与 CLI（build surface、terminations、edit vacuum/flip/center-slab） | `crystallume/server/models.py`、`crystallume/server/routes/build.py`、`crystallume/server/routes/analysis.py`、`crystallume/server/auth.py`、`crystallume/server/deps.py`、`crystallume/client.py`、`crystallume/cli.py`、`crystallume/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py` |
-| `w1-m2-parity` | — | M2-T7b-lite slab 完整原子列表金标并启用全部切面金标、M2-T7b M2 跨语言平价、命名两条路径、固定两条路径与性能测试、M2-T3b （应该）表面配位与暴露层（双语言） | `scripts/gen_surface_fixtures.py`、`tests/data/surface/cleave/`、`tests/test_m2_parity.py`、`tests/test_surface_perf.py`、`tests/test_cleave_naming_paths.py`、`tests/test_cleave_fix_equals_fix_layers.py`、`crystallume/build/surface.py#M2-T3b`、`crystallume/web/js/build/surface.js#M2-T3b`、`tests/test_surface_coordination.py`、`tests/js/surface_coordination.test.mjs` |
+| `w1-m1-cellui2` | 8822 | M1-T7b 网页：Strain、Reduce/primitive/conventional、Orientation & origin 分区 | `facet/web/js/ui/cellsections.js`、`facet/web/js/commands/cell.js`、`facet/web/css/app.css#M1`、`tests/js/cellui2.test.mjs` |
+| `w1-m1-commands` | 8823 | M1-T7c 右键菜单、选区动作与 Tools 行迁移、M1-T8a M1 的 JS 公共 API（defineApi） | `facet/web/js/ui/cellmenus.js`、`facet/web/js/api/cellapi.js`、`facet/web/js/main.js#M1-commands`、`facet/web/js/ui/panels/structure.js#tools-row`、`tests/js/cellapi.test.mjs` |
+| `w1-m2-cleave-ui` | 8824 | M2-T9 Surface › Cleave 分区（终止面列表、层堆叠图、晶面叠加、预览与 Create） | `facet/web/js/ui/panels/surface-cleave.js`、`facet/web/js/main.js#M2-cleave`、`facet/web/css/app.css#M2-cleave`、`facet/web/js/app.js#M2`、`facet/web/js/app.js#beginStructureEdit`、`facet/web/js/main.js#edit.applyPreview`、`tests/js/cleave_ui.test.mjs` |
+| `w1-m2-slab-ui` | 8825 | M2-T10 Surface › Slab 分区（改真空、内嵌超胞编辑器、翻转、居中） | `facet/web/js/ui/panels/surface-slab.js`、`facet/web/js/main.js#M2-slab`、`facet/web/css/app.css#M2-slab`、`tests/js/slab_ui.test.mjs`、`tests/js/supercell_two_mounts.test.mjs` |
+| `w1-m2-api` | — | M2-T8 M2 的 REST、客户端与 CLI（build surface、terminations、edit vacuum/flip/center-slab） | `facet/server/models.py`、`facet/server/routes/build.py`、`facet/server/routes/analysis.py`、`facet/server/auth.py`、`facet/server/deps.py`、`facet/client.py`、`facet/cli.py`、`facet/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py` |
+| `w1-m2-parity` | — | M2-T7b-lite slab 完整原子列表金标并启用全部切面金标、M2-T7b M2 跨语言平价、命名两条路径、固定两条路径与性能测试、M2-T3b （应该）表面配位与暴露层（双语言） | `scripts/gen_surface_fixtures.py`、`tests/data/surface/cleave/`、`tests/test_m2_parity.py`、`tests/test_surface_perf.py`、`tests/test_cleave_naming_paths.py`、`tests/test_cleave_fix_equals_fix_layers.py`、`facet/build/surface.py#M2-T3b`、`facet/web/js/build/surface.js#M2-T3b`、`tests/test_surface_coordination.py`、`tests/js/surface_coordination.test.mjs` |
 
 **合并顺序**：`w1-m2-parity` → `w1-m2-api` → `w1-m1-cellui2` → `w1-m1-commands` → `w1-m2-cleave-ui` → `w1-m2-slab-ui`
 
 **出口检查**：
 
-- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`CRYSTALLUME_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
+- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`FACET_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
 - M2 平价：`tests/test_m2_parity.py` 全部金标两语言逐项相同（P6：坐标 1e-6 同顺序、晶胞 1e-8、tags、SD、`info.surface` 排除 `bulk.name` 与 `bulk.entryId`、名字与 `warnings` 逐字）——验收 C-9；9 个完整原子列表用例通过；`tests/data/surface/cleave/` 不再有 skip
 - L-19：`tests/test_cleave_naming_paths.py` 通过（切面 `supercell="c(2×2)"` 与切面后 `make_supercell` 得到同一名字 `Cu(100) (√2×√2)R45° 4L`，两语言）；R-F09：`test_cleave_fix_equals_fix_layers` 两半都通过
 - M2-T8：`/build/surface`、`/build/vacuum`、`/analysis/terminations` 在 `ROUTE_METHODS` 中；REST 缺 `vacuum` → 422，CLI 省略 `--vacuum` → 退出码 2（U4-c）；acceptance S1 的 CLI 前两行（改用 `--surface-cell 3x3`，plan.md P-16）stderr 为 `wrote 36 atoms (Pt36) to slab.json`
 - 界面：Surface 面板 Cleave 分区真空框为空、Create slab 与 Preview › Slab 在填写前不可用（U4-a）；会话内记住用户填的值、刷新后为空且 `localStorage` 不含真空（U4-b）；Create 后项目结构数 +1、体相保留、Undo 只撤销 Create（C-1、C-3）；预览期间 `app.dirty` 与历史不变（C-4）
 - 界面：Slab 分区内嵌 `supercellEditor`（L-16），与 Structure › Cell › Supercell 得到同一名字、toast 与撤销标签（`tests/js/supercell_two_mounts.test.mjs`）；Cell 插槽 5 个分区齐全；命令面板能搜到 `Cleave Surface`、`Build Vacuum Slab`、`Supercell`、`Redefine Lattice`、`Lattice Parameters`（MD-7 的 M1/M2 部分）
-- 界面：应用在静态模式（`python3 -m http.server <端口> --directory crystallume/web`）与 `crystallume serve` 下都能启动，`document.body.dataset.ready === 'true'`，控制台无 `pageerror`/`console.error`
+- 界面：应用在静态模式（`python3 -m http.server <端口> --directory facet/web`）与 `facet serve` 下都能启动，`document.body.dataset.ready === 'true'`，控制台无 `pageerror`/`console.error`
 
 #### M1-T7b 网页：Strain、Reduce/primitive/conventional、Orientation & origin 分区（链 `w1-m1-cellui2`）
 
@@ -822,7 +822,7 @@ M2 的 Cleave/Slab 分区与 REST/CLI、slab 完整金标与平价；M1 的其�
 
 【U 与负责人决定】U1（Orientation 分区 badge 只放 `left-handed`；惯用胞说明不写 bulk）、U5；负责人决定：无直接相关项。
 
-【文件】`crystallume/web/js/ui/cellsections.js`、`crystallume/web/js/commands/cell.js`、`crystallume/web/css/app.css#M1`、`tests/js/cellui2.test.mjs`。
+【文件】`facet/web/js/ui/cellsections.js`、`facet/web/js/commands/cell.js`、`facet/web/css/app.css#M1`、`tests/js/cellui2.test.mjs`。
 
 【测试】`tests/js/cellui2.test.mjs`：读数文案（`Niggli-reduced cell: …`、`Found 36 lattice translations: …`、`This is a cubic F lattice; …`、`Already in the standard orientation.`）、命令参数校验（tensor 模式给 percent 报 `invalid-params`）。
 
@@ -838,7 +838,7 @@ M2 的 Cleave/Slab 分区与 REST/CLI、slab 完整金标与平价；M1 的其�
 
 【U 与负责人决定】U1（菜单不按 slab 分类）、U5（D1）；负责人决定：无直接相关项。
 
-【文件】`crystallume/web/js/ui/cellmenus.js`、`crystallume/web/js/ui/panels/structure.js#tools-row`、`crystallume/web/js/main.js#M1-commands`。
+【文件】`facet/web/js/ui/cellmenus.js`、`facet/web/js/ui/panels/structure.js#tools-row`、`facet/web/js/main.js#M1-commands`。
 
 【测试】`tests/js/cellapi.test.mjs` 中的菜单项注册断言（id、order、`when`）。
 
@@ -846,7 +846,7 @@ M2 的 Cleave/Slab 分区与 REST/CLI、slab 完整金标与平价；M1 的其�
 
 #### M1-T8a M1 的 JS 公共 API（defineApi）（链 `w1-m1-commands`）
 
-【目标】M1 的 `window.crystallume` 成员（从 M1-T8 拆出 API 部分，文档在 W1.7）。
+【目标】M1 的 `window.facet` 成员（从 M1-T8 拆出 API 部分，文档在 W1.7）。
 
 【依据】M1 §6.2；ledger-features L-M1-16（公共 API 清单：`edit.makeSupercell`、`edit.redefineLattice`、`edit.makeRightHanded`、`edit.setLatticeParameters`、`edit.setCell`、`edit.strain`、`edit.reduceCell`、`edit.primitiveCell`、`edit.conventionalCell`、`edit.reorient`、`edit.shiftOrigin`、`edit.wrap`；`build.makeSupercell(s, P, { wrap }) → Structure`（不加入项目，R-F36）；`analysis.translations`、`analysis.primitiveCell`、`analysis.referenceMesh`；`lattice.*` 追加 `gaussReduce2d` … `hermiteNormalForm2d`）、L-M1-08；ledger-F0 L-F0-53（`defineApi(path, fn, {owner: 'M1'})`，不改 `api/public.js`）、§6 M1 第 10 条。
 
@@ -854,11 +854,11 @@ M2 的 Cleave/Slab 分区与 REST/CLI、slab 完整金标与平价；M1 的其�
 
 【U 与负责人决定】U5（P6：功能处处可用，JS API 与命令同一条执行路径）；负责人决定 L-19。
 
-【文件】`crystallume/web/js/api/cellapi.js`、`tests/js/cellapi.test.mjs`。
+【文件】`facet/web/js/api/cellapi.js`、`tests/js/cellapi.test.mjs`。
 
 【测试】`tests/js/cellapi.test.mjs`：每个成员已注册、`owner` 为 M1；`build.makeSupercell` 返回新结构且不改输入；`lattice.*` 的函数与 `core/lattice.js` 同一引用。
 
-【界面检查】（同链端口）控制台 `crystallume.edit.makeSupercell({ preset: 'sqrt3' })` 可撤销；`crystallume.build.makeSupercell(crystallume.structure, [[2,0,0],[0,2,0],[0,0,1]])` 返回新结构、项目结构数不变；`crystallume.reference()` 里能看到这些成员。
+【界面检查】（同链端口）控制台 `facet.edit.makeSupercell({ preset: 'sqrt3' })` 可撤销；`facet.build.makeSupercell(facet.structure, [[2,0,0],[0,2,0],[0,0,1]])` 返回新结构、项目结构数不变；`facet.reference()` 里能看到这些成员。
 
 #### M2-T9 Surface › Cleave 分区（终止面列表、层堆叠图、晶面叠加、预览与 Create）（链 `w1-m2-cleave-ui`）
 
@@ -872,7 +872,7 @@ M2 的 Cleave/Slab 分区与 REST/CLI、slab 完整金标与平价；M1 的其�
 
 【U 与负责人决定】U1、U4（真空框为空、不预填、会话内只记用户填的值）、U5；负责人决定 L-08、L-19；P-04（需负责人确认）。
 
-【文件】`crystallume/web/js/ui/panels/surface-cleave.js`、`crystallume/web/js/main.js#M2-cleave`、`crystallume/web/css/app.css#M2-cleave`、`crystallume/web/js/app.js#M2`、`crystallume/web/js/app.js#beginStructureEdit`（条件性）、`crystallume/web/js/main.js#edit.applyPreview`（条件性）、`tests/js/cleave_ui.test.mjs`。
+【文件】`facet/web/js/ui/panels/surface-cleave.js`、`facet/web/js/main.js#M2-cleave`、`facet/web/css/app.css#M2-cleave`、`facet/web/js/app.js#M2`、`facet/web/js/app.js#beginStructureEdit`（条件性）、`facet/web/js/main.js#edit.applyPreview`（条件性）、`tests/js/cleave_ui.test.mjs`。
 
 【测试】`tests/js/cleave_ui.test.mjs`：纯逻辑（摘要三行的文案、L-08 文案、真空校验与 E12a/E12b/H5 的就地文案、命令参数校验：缺 `vacuum` → `{code: 'invalid-params'}` 且 message 含 `vacuum`、`spec` 与 `supercell` 同给报错）；P-04 修补时的会话测试。
 
@@ -888,7 +888,7 @@ M2 的 Cleave/Slab 分区与 REST/CLI、slab 完整金标与平价；M1 的其�
 
 【U 与负责人决定】U1、U2、U4、U5；负责人决定 L-13、L-16、L-19。
 
-【文件】`crystallume/web/js/ui/panels/surface-slab.js`、`crystallume/web/js/main.js#M2-slab`、`crystallume/web/css/app.css#M2-slab`、`tests/js/slab_ui.test.mjs`、`tests/js/supercell_two_mounts.test.mjs`。
+【文件】`facet/web/js/ui/panels/surface-slab.js`、`facet/web/js/main.js#M2-slab`、`facet/web/css/app.css#M2-slab`、`tests/js/slab_ui.test.mjs`、`tests/js/supercell_two_mounts.test.mjs`。
 
 【测试】`tests/js/slab_ui.test.mjs`（信息行文案：`No vacuum gap of 5 Å or more was found. …`、`the atoms cross the cell edge`、W19；toast 文案；命令参数校验缺 `vacuum` → `invalid-params`）；`tests/js/supercell_two_mounts.test.mjs`（L-M1-16 的 `test_supercell_two_mounts`：同一结构上 `owner: 'cell.supercell'` 与 `owner: 'surface.slab'` 两种挂载经同一执行函数得到相同名字、toast 与撤销标签）。
 
@@ -896,7 +896,7 @@ M2 的 Cleave/Slab 分区与 REST/CLI、slab 完整金标与平价；M1 的其�
 
 #### M2-T8 M2 的 REST、客户端与 CLI（build surface、terminations、edit vacuum/flip/center-slab）（链 `w1-m2-api`）
 
-【目标】M2 的外部接口：REST `/build/surface`、`/build/vacuum`、`/analysis/terminations`，客户端方法，CLI `crystallume build surface`、`crystallume terminations`、`crystallume edit vacuum|flip|center-slab`。
+【目标】M2 的外部接口：REST `/build/surface`、`/build/vacuum`、`/analysis/terminations`，客户端方法，CLI `facet build surface`、`facet terminations`、`facet edit vacuum|flip|center-slab`。
 
 【依据】M2 §6.3–6.5；ledger-features L-M2-09（**[改]** 三个新模型 `extra="forbid"`；`vacuum: float = Field(..., ge=0, le=1000)`；`supercell: list[Row2] | Row2 | str | None`（文本经 M1 语法）；`fixAxes: str`（R-F09 语法，非法 → 400）；客户端 `surface(self, structure, miller, *, vacuum, **kw)`、`set_vacuum(self, structure, vacuum, **kw)`、`terminations(self, structure, miller, **kw)`；CLI 选项按账本原文：`--vacuum` 必填（`required=True`）、`--surface-cell SPEC`，删除 `--supercell`、`--supercell-matrix`、`--wood`；只读的 `terminations` 用 `--format` 表示输入格式）、§0.3、R-F13、R-F14、§10.2 第 11 条；M2 §3.16（服务器构建前估算原子数，云模式公开限额 `max_cleave_bulk_atoms_public`）；U4-c。
 
@@ -904,9 +904,9 @@ M2 的 Cleave/Slab 分区与 REST/CLI、slab 完整金标与平价；M1 的其�
 
 【U 与负责人决定】U4-c（REST 缺 `vacuum` → 422，CLI 省略 `--vacuum` → 退出码 2）；负责人决定：无直接相关项（CLI 选项按账本 R-F13）。
 
-【文件】API 文件束（plan.md §2.4）：`crystallume/server/models.py`、`crystallume/server/routes/build.py`、`crystallume/server/routes/analysis.py`、`crystallume/server/auth.py`、`crystallume/server/deps.py`、`crystallume/client.py`、`crystallume/cli.py`、`crystallume/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py`。
+【文件】API 文件束（plan.md §2.4）：`facet/server/models.py`、`facet/server/routes/build.py`、`facet/server/routes/analysis.py`、`facet/server/auth.py`、`facet/server/deps.py`、`facet/client.py`、`facet/cli.py`、`facet/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py`。
 
-【测试】REST：200、缺 `vacuum` 422、`vacuum` > 1000 422、未知字段 422、科学错误 400（E12d、E9 等）、云模式公开限额；`tests/test_hardening.py` 估算 = 实际；客户端 `ROUTE_METHODS` 与真实调用；CLI：acceptance S1 的前两行（`crystallume build crystal fcc Pt --a 3.92 -o Pt.json`、`crystallume build surface Pt.json --hkl 1 1 1 --layers 4 --vacuum 15 --surface-cell 3x3 --fix-bottom 2 -o slab.json`，stderr `wrote 36 atoms (Pt36) to slab.json`）、省略 `--vacuum` 退出码 2、`terminations --json`、`edit vacuum` 读回 c 与 pbc。
+【测试】REST：200、缺 `vacuum` 422、`vacuum` > 1000 422、未知字段 422、科学错误 400（E12d、E9 等）、云模式公开限额；`tests/test_hardening.py` 估算 = 实际；客户端 `ROUTE_METHODS` 与真实调用；CLI：acceptance S1 的前两行（`facet build crystal fcc Pt --a 3.92 -o Pt.json`、`facet build surface Pt.json --hkl 1 1 1 --layers 4 --vacuum 15 --surface-cell 3x3 --fix-bottom 2 -o slab.json`，stderr `wrote 36 atoms (Pt36) to slab.json`）、省略 `--vacuum` 退出码 2、`terminations --json`、`edit vacuum` 读回 c 与 pbc。
 
 #### M2-T7b-lite slab 完整原子列表金标并启用全部切面金标（链 `w1-m2-parity`）
 
@@ -946,7 +946,7 @@ M2 的 Cleave/Slab 分区与 REST/CLI、slab 完整金标与平价；M1 的其�
 
 【U 与负责人决定】U1；负责人决定：无直接相关项。
 
-【文件】`crystallume/build/surface.py#M2-T3b`、`crystallume/web/js/build/surface.js#M2-T3b`、`tests/test_surface_coordination.py`、`tests/js/surface_coordination.test.mjs`。
+【文件】`facet/build/surface.py#M2-T3b`、`facet/web/js/build/surface.js#M2-T3b`、`tests/test_surface_coordination.py`、`tests/js/surface_coordination.test.mjs`。
 
 【测试】M2 §7.1"表面配位（应该）"：Pt(111)/(100)/(110)/(211)、金红石(110) 三个终止面、CeO2(111)、SrTiO3 的 CN 与 `exposedLayers`；预算每个终止面 Python ≤ 20 ms、JS ≤ 10 ms。
 
@@ -956,17 +956,17 @@ M2 的 Cleave/Slab 分区与 REST/CLI、slab 完整金标与平价；M1 的其�
 
 | 链 | 端口 | 任务 | 独占的文件 |
 |---|---|---|---|
-| `w1-docs` | 8826 | M1-T8b M1 文档、M2-T11 M2 文档、应用内帮助与导览、M3-T12a M3 核心（层分析、约束、REST/CLI）的文档 | `README.md`、`docs/PLUGINS.md`、`docs/SCHEMA.md`、`docs/DEPLOY.md`、`CHANGELOG.md`、`crystallume/web/js/ui/shell.js#help-tour` |
+| `w1-docs` | 8826 | M1-T8b M1 文档、M2-T11 M2 文档、应用内帮助与导览、M3-T12a M3 核心（层分析、约束、REST/CLI）的文档 | `README.md`、`docs/PLUGINS.md`、`docs/SCHEMA.md`、`docs/DEPLOY.md`、`CHANGELOG.md`、`facet/web/js/ui/shell.js#help-tour` |
 | `w1-e2e-cell` | 8827 | M1-T9 M1 的 Playwright 冒烟测试 | `tests/e2e/cell_tools.spec.mjs` |
 | `w1-e2e-surface` | 8828 | M2-T12 M2 的 Playwright 冒烟测试与第 1 波验收子集 | `tests/e2e/harness.mjs`、`tests/test_e2e.py`、`tests/e2e/surface.spec.mjs`、`tests/e2e/w1_acceptance.spec.mjs` |
-| `w1-perf` | — | M1-T11 M1 性能预算测试与 JS 性能测试的运行器 | `tests/test_translations_perf.py`、`tests/js/perf/translations.perf.mjs`、`tests/test_js_perf.py`、`crystallume/analysis/translations.py`、`crystallume/web/js/core/translations.js` |
+| `w1-perf` | — | M1-T11 M1 性能预算测试与 JS 性能测试的运行器 | `tests/test_translations_perf.py`、`tests/js/perf/translations.perf.mjs`、`tests/test_js_perf.py`、`facet/analysis/translations.py`、`facet/web/js/core/translations.js` |
 | `w1-xmodule` | — | W1-X1 第 1 波跨模块回归测试（M1 × M2 × M3） | `tests/test_w1_crossmodule.py`、`tests/js/w1_crossmodule.test.mjs` |
 
 **合并顺序**：`w1-xmodule` → `w1-perf` → `w1-e2e-surface` → `w1-e2e-cell` → `w1-docs`
 
 **出口检查**：
 
-- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`CRYSTALLUME_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
+- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`FACET_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
 - Playwright（`$DEVPY -m pytest -m slow tests/test_e2e.py`）：`tests/e2e/cell_tools.spec.mjs`（M1 §7.3 第 1–7 条）、`tests/e2e/surface.spec.mjs`（M2 §7.4 第 1–5 条）、`tests/e2e/w1_acceptance.spec.mjs`（E2E-1 第 1–7 步与切面后的导出断言、E2E-3 第 1–3、6–8 步、E2E-4 第 1–3 步按 L-16 改写）全部通过，无 `pageerror`/`console.error`；截图在 `tests/e2e/out/`
 - 跨模块：`tests/test_w1_crossmodule.py`、`tests/js/w1_crossmodule.test.mjs` 通过：S2-3、S3-2（两条路径同名）、S11-6、S12-4、S12-5、S13-1、S13-2、S14-3、C-6（全部切面金标 `find_layers(slab).from_top + 1 == tags`）
 - 性能：`pytest -m slow tests/test_translations_perf.py` 与 `tests/test_js_perf.py` 通过（M1 §7.4 预算，CI ×3）
@@ -979,7 +979,7 @@ M2 的 Cleave/Slab 分区与 REST/CLI、slab 完整金标与平价；M1 的其�
 
 【依据】M1 §6（Python、JS、REST、客户端、CLI）、§3.15、§4；ledger-features L-M1-01…17、L-X-02；简报 §5（文档清单）；plan.md P-14。
 
-【实现】`docs/PLUGINS.md`：M1 的 Python API（`make_supercell`、`set_cell` 与 ASE 的同名同义、`set_lattice_parameters`、`apply_strain`（百分数）、`reduce_cell`、`primitive_cell`、`reference_mesh` …）、JS `crystallume.edit.*`、`build.makeSupercell`、`analysis.*`、`lattice.*`、REST `/build/supercell` 与 `/build/transform`、客户端、CLI `crystallume transform`；`docs/SCHEMA.md`：`info.supercellMatrix` 与旧键 `info.supercell`（L-X-02）、info 处理器注册表的约定；`docs/DEPLOY.md`：REST 表两行；README：Structure 面板 Cell 分区一段。数字、乘号、根号按 C9 写。
+【实现】`docs/PLUGINS.md`：M1 的 Python API（`make_supercell`、`set_cell` 与 ASE 的同名同义、`set_lattice_parameters`、`apply_strain`（百分数）、`reduce_cell`、`primitive_cell`、`reference_mesh` …）、JS `facet.edit.*`、`build.makeSupercell`、`analysis.*`、`lattice.*`、REST `/build/supercell` 与 `/build/transform`、客户端、CLI `facet transform`；`docs/SCHEMA.md`：`info.supercellMatrix` 与旧键 `info.supercell`（L-X-02）、info 处理器注册表的约定；`docs/DEPLOY.md`：REST 表两行；README：Structure 面板 Cell 分区一段。数字、乘号、根号按 C9 写。
 
 【U 与负责人决定】U1（文档不写 slab 模式）、U4（真空是总间隙、无默认）；负责人决定 L-19。
 
@@ -997,7 +997,7 @@ M2 的 Cleave/Slab 分区与 REST/CLI、slab 完整金标与平价；M1 的其�
 
 【U 与负责人决定】U1、U4；负责人决定 L-02（二维原型的每侧真空）、L-13、L-16。
 
-【文件】`README.md`、`docs/PLUGINS.md`、`docs/SCHEMA.md`、`docs/DEPLOY.md`、`CHANGELOG.md`、`crystallume/web/js/ui/shell.js#help-tour`。
+【文件】`README.md`、`docs/PLUGINS.md`、`docs/SCHEMA.md`、`docs/DEPLOY.md`、`CHANGELOG.md`、`facet/web/js/ui/shell.js#help-tour`。
 
 【测试】文档例子逐个运行；导览与帮助在界面检查中查看。
 
@@ -1009,7 +1009,7 @@ M2 的 Cleave/Slab 分区与 REST/CLI、slab 完整金标与平价；M1 的其�
 
 【依据】M3 §6.1、§6.3–6.5、§3.12.3、§4；ledger-features L-M3-01…08、L-M3-10、L-X-05（R-ADS、`tags` 与 `adsorbate_id`）；C3、C4。
 
-【实现】`docs/PLUGINS.md`：`find_layers`（方向语义、容差来源、层号约定）、`bond_graph`、`find_adsorbates`、`promote_adsorbates`、`mark_adsorbates`、约束方法（`fix`、`free`、`fix_layers`、`fix_height`、`set_tags_from_layers`）、REST `/analysis/layers`、客户端 `layers`、CLI `crystallume layers`、`crystallume edit fix/free`（`--atoms SPEC` 写法 `0-35,40`）；`docs/SCHEMA.md`：约束规则（True = 可动，C3）、`axis_labels` 的 x/y/z 规则、`tags`/`adsorbate_id` 约定；`docs/DEPLOY.md`：REST 表一行。
+【实现】`docs/PLUGINS.md`：`find_layers`（方向语义、容差来源、层号约定）、`bond_graph`、`find_adsorbates`、`promote_adsorbates`、`mark_adsorbates`、约束方法（`fix`、`free`、`fix_layers`、`fix_height`、`set_tags_from_layers`）、REST `/analysis/layers`、客户端 `layers`、CLI `facet layers`、`facet edit fix/free`（`--atoms SPEC` 写法 `0-35,40`）；`docs/SCHEMA.md`：约束规则（True = 可动，C3）、`axis_labels` 的 x/y/z 规则、`tags`/`adsorbate_id` 约定；`docs/DEPLOY.md`：REST 表一行。
 
 【U 与负责人决定】U1；负责人决定 L-10（`--atoms SPEC` 的写法）。
 
@@ -1021,7 +1021,7 @@ M2 的 Cleave/Slab 分区与 REST/CLI、slab 完整金标与平价；M1 的其�
 
 【目标】M1 网页的端到端冒烟测试（Node 版 Playwright，由 pytest 包装，`slow`）。
 
-【依据】M1 §7.3 第 1–7 条；acceptance §3.2（运行方式：`tests/e2e/*.spec.mjs`、共用 `tests/e2e/harness.mjs`、`tests/test_e2e.py` 包装、静态版 `http.server`、`CRYSTALLUME_E2E_URL`、`chromium.launch({ headless: true, args: ['--no-sandbox', …] })`、视口 1280×800、收集 `pageerror` 与 `console.error`、等待 `document.body.dataset.ready === 'true'`、截图到 `tests/e2e/out/`）；负责人决定 L-06（Node 版 Playwright；各模块 §5 控件表里的 `aria-label` 是选择器的唯一来源）；L-16、L-19。
+【依据】M1 §7.3 第 1–7 条；acceptance §3.2（运行方式：`tests/e2e/*.spec.mjs`、共用 `tests/e2e/harness.mjs`、`tests/test_e2e.py` 包装、静态版 `http.server`、`FACET_E2E_URL`、`chromium.launch({ headless: true, args: ['--no-sandbox', …] })`、视口 1280×800、收集 `pageerror` 与 `console.error`、等待 `document.body.dataset.ready === 'true'`、截图到 `tests/e2e/out/`）；负责人决定 L-06（Node 版 Playwright；各模块 §5 控件表里的 `aria-label` 是选择器的唯一来源）；L-16、L-19。
 
 【实现】`tests/e2e/cell_tools.spec.mjs`：1）4 层 Pt(111) 夹具 → Supercell › Presets `(√3×√3)R30°` → 虚线晶胞 → Create → 12 原子、名字更新、toast 的 Undo 恢复 4 原子；2）状态模型（矩阵输入 → 选原子 → 切换显示样式 → 输入与预览仍在）；3）Lattice parameters 改 c（Keep 开）高度不变、γ = 190 报错且 Apply 不可用；4）Strain Biaxial +2 % → 导出 POSCAR 的 a +2 %、c 不变；5）CONTCAR 夹具 → Supercell 2×2×1 → 导出 POSCAR 的 SD 行正确、slab 仍一块；6）1 万原子 Primitive cell：进度条出现、主线程不冻结（期间 `page.mouse` 拖动视图有响应）、可取消；7）命令面板搜 `Redefine Lattice`、`Lattice Parameters`、`Conventional Cell` 命中别名。harness 与包装由 `w1-e2e-surface` 链维护，本链不改；需要 harness 新功能时在报告里写明。
 
@@ -1041,7 +1041,7 @@ M2 的 Cleave/Slab 分区与 REST/CLI、slab 完整金标与平价；M1 的其�
 
 【实现】
 
-- harness 与包装：若 W0 的 w0-a-t12 已建立 `tests/e2e/harness.mjs` 与 `tests/test_e2e.py`，确认包装会自动收集 `tests/e2e/*.spec.mjs`（逐个 `node tests/e2e/<name>.spec.mjs`、断言退出码 0；找不到 Node/Playwright/Chromium 时跳过，`CRYSTALLUME_REQUIRE_E2E=1` 时失败）；没有就按 acceptance §3.2 建立；只做必要的修改。
+- harness 与包装：若 W0 的 w0-a-t12 已建立 `tests/e2e/harness.mjs` 与 `tests/test_e2e.py`，确认包装会自动收集 `tests/e2e/*.spec.mjs`（逐个 `node tests/e2e/<name>.spec.mjs`、断言退出码 0；找不到 Node/Playwright/Chromium 时跳过，`FACET_REQUIRE_E2E=1` 时失败）；没有就按 acceptance §3.2 建立；只做必要的修改。
 
 - `tests/e2e/surface.spec.mjs`：M2 §7.4 第 1–5 条（Create 在填真空前不可用 → 15 → Create → POSCAR 含 `Selective dynamics`、36 原子、18 行 `F F F`、项目 2 个结构、Undo 只删 slab；SrTiO3 TiO2 对称 → `excess TiO2` → 名称 `SrTiO3(001) TiO2-term 7L`；CONTCAR 夹具 → 底层画在底部（截图）→ Slab 真空框为空、信息行有当前间隙 → 20 → Apply → c = 厚度 + 20、SD 不变、pbc T T T；MP 风格 Pt 原胞 POSCAR → 惯用胞提示 → Conventional cell → (1 0 0) → 方形网格；Planes 叠加层可见，Preview 切到 Slab 再切回后体相与相机恢复、无撤销条目）。
 
@@ -1065,7 +1065,7 @@ M2 的 Cleave/Slab 分区与 REST/CLI、slab 完整金标与平价；M1 的其�
 
 【U 与负责人决定】无直接相关的 U 项与负责人决定（只测性能）。
 
-【文件】`tests/test_translations_perf.py`、`tests/js/perf/translations.perf.mjs`、`tests/test_js_perf.py`、`crystallume/analysis/translations.py`、`crystallume/web/js/core/translations.js`。
+【文件】`tests/test_translations_perf.py`、`tests/js/perf/translations.perf.mjs`、`tests/test_js_perf.py`、`facet/analysis/translations.py`、`facet/web/js/core/translations.js`。
 
 【测试】`$DEVPY -m pytest -m slow tests/test_translations_perf.py tests/test_js_perf.py` 通过；实测数字写进报告。
 
@@ -1091,18 +1091,18 @@ M3 暴露原子；M4 几何核心、片段与编辑坐标系、移动工具的�
 
 | 链 | 端口 | 任务 | 独占的文件 |
 |---|---|---|---|
-| `w2-m3-surface-atoms` | — | M3-T3b 暴露原子 surface_atoms（双语言）并补全 layers 的 surface 选项 | `crystallume/analysis/layers.py`、`crystallume/web/js/core/layers.js`、`tests/test_surface_atoms.py`、`tests/js/surface_atoms.test.mjs`、`tests/ops/m3_surface.py`、`tests/js/ops/m3_surface.mjs`、`tests/data/surface/layers/`、`tests/test_m3_parity.py`、`crystallume/server/routes/analysis.py`、`crystallume/cli.py`、`tests/test_server.py`、`tests/test_cli.py` |
-| `w2-m4-geometry` | — | M4-T1 几何核心：平移、旋转、镜像、移到、质心（双语言）与 M4 的常量 | `crystallume/analysis/geometry.py`、`crystallume/web/js/core/geometry.js`、`crystallume/core/structure.py#M4-geometry`、`crystallume/web/js/core/structure.js#M4-geometry`、`crystallume/core/defaults.py#M4`、`crystallume/web/js/core/defaults.js#M4`、`tests/test_manipulate.py`、`tests/js/manipulate.test.mjs` |
-| `w2-m4-fragments` | — | M4-T2 编辑坐标系、基底与分子、moving_group、unwrap_group（双语言） | `crystallume/analysis/fragments.py`、`crystallume/web/js/core/fragments.js`、`crystallume/analysis/__init__.py#M4`、`tests/test_fragments.py`、`tests/js/fragments.test.mjs` |
-| `w2-m4-movemath` | — | M4-T5a 移动工具的交互数学（纯函数） | `crystallume/web/js/render/tools/movemath.js`、`tests/js/movemath.test.mjs` |
+| `w2-m3-surface-atoms` | — | M3-T3b 暴露原子 surface_atoms（双语言）并补全 layers 的 surface 选项 | `facet/analysis/layers.py`、`facet/web/js/core/layers.js`、`tests/test_surface_atoms.py`、`tests/js/surface_atoms.test.mjs`、`tests/ops/m3_surface.py`、`tests/js/ops/m3_surface.mjs`、`tests/data/surface/layers/`、`tests/test_m3_parity.py`、`facet/server/routes/analysis.py`、`facet/cli.py`、`tests/test_server.py`、`tests/test_cli.py` |
+| `w2-m4-geometry` | — | M4-T1 几何核心：平移、旋转、镜像、移到、质心（双语言）与 M4 的常量 | `facet/analysis/geometry.py`、`facet/web/js/core/geometry.js`、`facet/core/structure.py#M4-geometry`、`facet/web/js/core/structure.js#M4-geometry`、`facet/core/defaults.py#M4`、`facet/web/js/core/defaults.js#M4`、`tests/test_manipulate.py`、`tests/js/manipulate.test.mjs` |
+| `w2-m4-fragments` | — | M4-T2 编辑坐标系、基底与分子、moving_group、unwrap_group（双语言） | `facet/analysis/fragments.py`、`facet/web/js/core/fragments.js`、`facet/analysis/__init__.py#M4`、`tests/test_fragments.py`、`tests/js/fragments.test.mjs` |
+| `w2-m4-movemath` | — | M4-T5a 移动工具的交互数学（纯函数） | `facet/web/js/render/tools/movemath.js`、`tests/js/movemath.test.mjs` |
 | `w2-m4-fixtures` | — | M4-T9a M4 的测试夹具与 ASE 参考数据 | `scripts/dev/make_ase_reference.py`、`tests/data/manipulate/`、`tests/test_manipulate_golden_shape.py` |
 
 **合并顺序**：`w2-m3-surface-atoms` → `w2-m4-geometry` → `w2-m4-fragments` → `w2-m4-movemath` → `w2-m4-fixtures`
 
 **出口检查**：
 
-- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`CRYSTALLUME_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
-- M3-T3b：`tests/test_surface_atoms.py`、`tests/js/surface_atoms.test.mjs` 通过；`tests/data/surface/layers/` 的 surfaceAtoms 用例启用并两语言相同（`tests/test_m3_parity.py`）；κ* 与晶格常数无关（atol 1e-6）；`/analysis/layers` 的 `surface: true` 与 `crystallume layers --surface` 正式可用
+- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`FACET_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
+- M3-T3b：`tests/test_surface_atoms.py`、`tests/js/surface_atoms.test.mjs` 通过；`tests/data/surface/layers/` 的 surfaceAtoms 用例启用并两语言相同（`tests/test_m3_parity.py`）；κ* 与晶格常数无关（atol 1e-6）；`/analysis/layers` 的 `surface: true` 与 `facet layers --surface` 正式可用
 - M4-T1：`tests/test_manipulate.py`、`tests/js/manipulate.test.mjs` 通过（`rotate('x', 'y')` 把 (1,0,0) 变为 (0,1,0)；`rotate(90, 'z', 'COM', True)` 按 ASE 解释为 `rotate_cell=True`；部分原子平移清除 `info.spacegroup`，整体平移保留，C7）
 - M4-T2：`tests/test_fragments.py`、`tests/js/fragments.test.mjs` 通过；`edit_frame` 与显示同一切口（`display_cuts`，U1）；`bond_graph` 与显示设置无关（D1/E2）
 - M4-T5a：`tests/js/movemath.test.mjs` 通过（表面平面内拖动高度不变、侧对退回屏幕平面、六方逆变分量取整）
@@ -1110,7 +1110,7 @@ M3 暴露原子；M4 几何核心、片段与编辑坐标系、移动工具的�
 
 #### M3-T3b 暴露原子 surface_atoms（双语言）并补全 layers 的 surface 选项（链 `w2-m3-surface-atoms`）
 
-【目标】双语言暴露原子 `surface_atoms`（闭式判据、二维网格、`details`），并把 W1.4 暂时返回 400 的 REST `surface: true` 与 CLI `crystallume layers --surface` 改成正式行为。
+【目标】双语言暴露原子 `surface_atoms`（闭式判据、二维网格、`details`），并把 W1.4 暂时返回 400 的 REST `surface: true` 与 CLI `facet layers --surface` 改成正式行为。
 
 【依据】M3 §3.9、§3.16、§6.3（`surface` 与 `probe` 字段）、§6.5（`--surface`、`--probe K`）、§7.1（暴露度金属系列、Pt(211) 台阶边、TiO2/ZnO 位移等）；ledger-features L-M3-05（`surface_atoms(structure, side="top", *, probe=None, direction=None, tolerance=None, skip_adsorbates=True, details=False)`）、R-F06（*surface atoms* 只指暴露原子；M5 的叫 *site atoms*）、L-M3-10；ledger-F0 L-F0-17（没有间隙时报 `vacuum_gap_hint`）；M3 的 `surface_probe`、`surface_borderline` 键已在 W1.2 加入（L-X-08）。
 
@@ -1118,7 +1118,7 @@ M3 暴露原子；M4 几何核心、片段与编辑坐标系、移动工具的�
 
 【U 与负责人决定】U1（暴露原子用与显示同一切口；没有间隙时只给说明）；负责人决定：无直接相关项。
 
-【文件】`crystallume/analysis/layers.py`、`crystallume/web/js/core/layers.js`、`tests/test_surface_atoms.py`、`tests/js/surface_atoms.test.mjs`、`tests/ops/m3_surface.py`、`tests/js/ops/m3_surface.mjs`、`tests/data/surface/layers/`（只改 skip）、`tests/test_m3_parity.py`、`crystallume/server/routes/analysis.py`、`crystallume/cli.py`、`tests/test_server.py`、`tests/test_cli.py`（本批次只有本链改这四个 API 文件）。
+【文件】`facet/analysis/layers.py`、`facet/web/js/core/layers.js`、`tests/test_surface_atoms.py`、`tests/js/surface_atoms.test.mjs`、`tests/ops/m3_surface.py`、`tests/js/ops/m3_surface.mjs`、`tests/data/surface/layers/`（只改 skip）、`tests/test_m3_parity.py`、`facet/server/routes/analysis.py`、`facet/cli.py`、`tests/test_server.py`、`tests/test_cli.py`（本批次只有本链改这四个 API 文件）。
 
 【测试】M3 §7.2 暴露原子一条（闭式与逐原子模拟一致：随机 slab 上与暴力下落比较；`side='bottom'/'both'`；体相报错；1×1 Ru 的面内像；`details` 的 κ* 与 borderline）；§7.1 的暴露度金属系列（fcc(211)/(100)/(110)/(111) 取 Ni/Cu/Rh/Pd/Pt/Au/Ag；bcc(100)/(110)/(111) 取 Fe/Mo/W；κ* = 2/√3 − 1、√2 − 1、1、√3 − 1、2 等）；REST `surface: true` 200、体相 + `surface` 400；CLI `layers --surface`。
 
@@ -1132,7 +1132,7 @@ M3 暴露原子；M4 几何核心、片段与编辑坐标系、移动工具的�
 
 【U 与负责人决定】U1（表面法向来自真空间隙，不按 slab 分类）、U5/D7（二面角符号已在第 0 波修好）；负责人决定：无直接相关项。
 
-【文件】`crystallume/analysis/geometry.py`、`crystallume/web/js/core/geometry.js`、`crystallume/core/structure.py#M4-geometry`、`crystallume/web/js/core/structure.js#M4-geometry`、`crystallume/core/defaults.py#M4`、`crystallume/web/js/core/defaults.js#M4`、`tests/test_manipulate.py`、`tests/js/manipulate.test.mjs`。
+【文件】`facet/analysis/geometry.py`、`facet/web/js/core/geometry.js`、`facet/core/structure.py#M4-geometry`、`facet/web/js/core/structure.js#M4-geometry`、`facet/core/defaults.py#M4`、`facet/web/js/core/defaults.js#M4`、`tests/test_manipulate.py`、`tests/js/manipulate.test.mjs`。
 
 【测试】M4 §7.1 第 3、4 条（`translate` 的子集、`frac=True`、全帧与 C7；`rotate(90, 'z')` 与 `rotate('z', 90)`；`rotate('x', 'y')` 把 (1,0,0) 变为 (0,1,0)；反平行的确定性轴；`center` 各形式；`axis='a'`、`'normal'`；`rotate(90, 'z', 'COM', True)` 为 `rotate_cell=True`，晶胞与 `info.surface.normal` 一起旋转、约束不变；`indices` 与 `rotate_cell` 同给报错；多帧抛错；旋转全部原子而不转晶胞时删除 `info.surface.normal` 并警告）；M4 键两语言逐键相等。
 
@@ -1142,11 +1142,11 @@ M3 暴露原子；M4 几何核心、片段与编辑坐标系、移动工具的�
 
 【依据】M4 §3.2（编辑坐标系）、§3.3、§3.4–3.6、§3.7.1、§3.14；ledger-features L-M4-04（提供方 M4 T2–T4；**[改]** `fragments` 里不定义 `BondGraph`/`bond_graph`，用 M3 的 `bond_graph(metal_pairs="all")`（L-M3-03）；`METALS` 从 `core/elements` 导入；`edit_frame(s)`：`cuts = display_cuts(s)`，有切口的轴 `shift_i,k = −floor(f_i,k − cuts[k].lo)`、不取最小像，其余周期轴为 `mic_axes`；`substrate_mask` 以 M3 `find_adsorbates` 为第一来源；`moving_group` 基底优先，约束不决定移动哪一侧）、§10.4 第 3 条；ledger-F0 §6 M4 第 2 条（与显示逐字同一切口，U1）、L-F0-20（`mic_vector`）；plan.md P-08（`edit_frame` 从 M4 §9 的 T1 移到这里）。
 
-【实现】新文件 `crystallume/analysis/fragments.py` 与 `web/js/core/fragments.js`；若按 M4 §6.2 需要从 `crystallume.analysis` 导出，放 `analysis/__init__.py` 的段 `M4`。
+【实现】新文件 `facet/analysis/fragments.py` 与 `web/js/core/fragments.js`；若按 M4 §6.2 需要从 `facet.analysis` 导出，放 `analysis/__init__.py` 的段 `M4`。
 
 【U 与负责人决定】U1（编辑坐标系与显示同一切口）；负责人决定：无直接相关项。
 
-【文件】`crystallume/analysis/fragments.py`、`crystallume/web/js/core/fragments.js`、`crystallume/analysis/__init__.py#M4`、`tests/test_fragments.py`、`tests/js/fragments.test.mjs`。
+【文件】`facet/analysis/fragments.py`、`facet/web/js/core/fragments.js`、`facet/analysis/__init__.py#M4`、`tests/test_fragments.py`、`tests/js/fragments.test.mjs`。
 
 【测试】M4 §7.1 第 2 条（CONTCAR 底层 f = 0.99995 → 编辑坐标 −0.001 Å；跨 c 边界；盒中分子；体相）、第 8–11 条（`bond_graph` 与显示设置无关；`substrate_mask` 五种来源；`moving_group` 的 §3.6.5 表 21 个场景（读 `tests/data/manipulate/moving_group.json` 若 M4-T9a 已合入，否则在测试里内联同一表）；`unwrap_group` 恢复键长、SrTiO3 7L 与 Pt(111) p(6×6) 6L/10 Å、8L/15 Å 展开后 z 范围等于存储坐标、> 5000 原子快速路径与 BFS 结果相同）；M4 §7.2 第 9 条的纯逻辑部分（双击 O 选中 {C, O} 的 `moleculeOf`）。
 
@@ -1160,7 +1160,7 @@ M3 暴露原子；M4 几何核心、片段与编辑坐标系、移动工具的�
 
 【U 与负责人决定】U1（表面平面 = 有真空间隙时的表面）；负责人决定：无直接相关项。
 
-【文件】`crystallume/web/js/render/tools/movemath.js`、`tests/js/movemath.test.mjs`。
+【文件】`facet/web/js/render/tools/movemath.js`、`tests/js/movemath.test.mjs`。
 
 【测试】M4 §7.2 第 1、2 条全部：轴拖动 1.5 Å、偏离轴的指针、平面拖动、视线与法向成 30°/60° 时表面平面内拖动高度不变、侧对退回屏幕平面、环 30°、跨 ±180° 累加、平行时 null、六方 Lattice 框架的逆变分量取整与精细增量；命中优先级。
 
@@ -1168,9 +1168,9 @@ M3 暴露原子；M4 几何核心、片段与编辑坐标系、移动工具的�
 
 【目标】M4 的跨语言夹具与 ASE 参考数据（从 M4-T9 拆出的"夹具先行"部分）。
 
-【依据】M4 §7（所有夹具用 pbc T T T 的 slab，另含 pbc T T F 的石墨烯与无晶胞分子各一组）、§7.1 第 5 条（`set_distance` 与 ASE 一致的 8 个组合；参考值由 `scripts/dev/make_ase_reference.py` 生成并固化在 `tests/data/manipulate/ase_reference.json`，注明 ASE 3.29）、§3.6.5（`moving_group` 的 21 个场景）、§7.3（夹具字段）；ledger-F0 L-F0-27（`crystallume.cases/1`、配方）；P2（运行时不依赖 ASE）。
+【依据】M4 §7（所有夹具用 pbc T T T 的 slab，另含 pbc T T F 的石墨烯与无晶胞分子各一组）、§7.1 第 5 条（`set_distance` 与 ASE 一致的 8 个组合；参考值由 `scripts/dev/make_ase_reference.py` 生成并固化在 `tests/data/manipulate/ase_reference.json`，注明 ASE 3.29）、§3.6.5（`moving_group` 的 21 个场景）、§7.3（夹具字段）；ledger-F0 L-F0-27（`facet.cases/1`、配方）；P2（运行时不依赖 ASE）。
 
-【实现】`scripts/dev/make_ase_reference.py`（只在 ASE 参考环境 `scratchpad/proto/m1/refvenv/bin/python` 下运行，不进 CI、不进包）→ `tests/data/manipulate/ase_reference.json`；`tests/data/manipulate/moving_group.json`（21 个场景：C 为 `F F T`、整只 CO 冻结、Pt4/MgO 有无 tags、反序吸附原子、晶格内键、苯环 `ring` 等）；其余夹具 `tests/data/manipulate/*.json`（`crystallume.cases/1`；ops `editFrame`、`translate`、`rotate`、`setDistance`、`setAngle`、`setDihedral`、`movingGroup`、`unwrapGroup`、`sitePoint`、`addAtom`、`extend`、`bondGraph`、`parseElement`），全部带 skip：`op <name> is registered by M4-T9b (W2.3)`。
+【实现】`scripts/dev/make_ase_reference.py`（只在 ASE 参考环境 `scratchpad/proto/m1/refvenv/bin/python` 下运行，不进 CI、不进包）→ `tests/data/manipulate/ase_reference.json`；`tests/data/manipulate/moving_group.json`（21 个场景：C 为 `F F T`、整只 CO 冻结、Pt4/MgO 有无 tags、反序吸附原子、晶格内键、苯环 `ring` 等）；其余夹具 `tests/data/manipulate/*.json`（`facet.cases/1`；ops `editFrame`、`translate`、`rotate`、`setDistance`、`setAngle`、`setDihedral`、`movingGroup`、`unwrapGroup`、`sitePoint`、`addAtom`、`extend`、`bondGraph`、`parseElement`），全部带 skip：`op <name> is registered by M4-T9b (W2.3)`。
 
 【U 与负责人决定】U2（夹具 pbc T T T）；负责人决定：无直接相关项。
 
@@ -1184,33 +1184,33 @@ M3 选择与查询引擎；M4 设定几何、放置核心（含 add_atom/extend�
 
 | 链 | 端口 | 任务 | 独占的文件 |
 |---|---|---|---|
-| `w2-m3-selection` | — | M3-T5 几何选择与查询引擎（双语言） | `crystallume/analysis/selection.py`、`crystallume/web/js/core/selection.js`、`crystallume/analysis/__init__.py#M3`、`tests/test_selection.py`、`tests/js/selection.test.mjs`、`tests/ops/m3_selection.py`、`tests/js/ops/m3_selection.mjs`、`tests/data/surface/selection/`、`tests/test_m3_parity.py` |
-| `w2-m4-setgeometry` | — | M4-T3 设定距离、角度、二面角（双语言，ASE 语义 + GUI 语义） | `crystallume/core/structure.py#M4-geometry`、`crystallume/web/js/core/structure.js#M4-geometry`、`tests/test_set_geometry.py`、`tests/js/set_geometry.test.mjs` |
-| `w2-m4-placement` | — | M4-T4 放置核心：site_point、add_atom、extend 的放置参数（双语言） | `crystallume/analysis/placement.py`、`crystallume/web/js/core/placement.js`、`crystallume/core/structure.py#M4-placement`、`crystallume/web/js/core/structure.js#M4-placement`、`tests/test_placement.py`、`tests/js/placement.test.mjs` |
-| `w2-m4-movetool` | 8829 | M4-T5b 移动工具（手柄、HUD、表面平面拖动、吸附目标） | `crystallume/web/js/render/tools/move.js`、`crystallume/web/js/ui/icons.js#M4`、`crystallume/web/css/app.css#M4-move`、`crystallume/web/js/main.js#M4-move`、`tests/js/movetool.test.mjs` |
+| `w2-m3-selection` | — | M3-T5 几何选择与查询引擎（双语言） | `facet/analysis/selection.py`、`facet/web/js/core/selection.js`、`facet/analysis/__init__.py#M3`、`tests/test_selection.py`、`tests/js/selection.test.mjs`、`tests/ops/m3_selection.py`、`tests/js/ops/m3_selection.mjs`、`tests/data/surface/selection/`、`tests/test_m3_parity.py` |
+| `w2-m4-setgeometry` | — | M4-T3 设定距离、角度、二面角（双语言，ASE 语义 + GUI 语义） | `facet/core/structure.py#M4-geometry`、`facet/web/js/core/structure.js#M4-geometry`、`tests/test_set_geometry.py`、`tests/js/set_geometry.test.mjs` |
+| `w2-m4-placement` | — | M4-T4 放置核心：site_point、add_atom、extend 的放置参数（双语言） | `facet/analysis/placement.py`、`facet/web/js/core/placement.js`、`facet/core/structure.py#M4-placement`、`facet/web/js/core/structure.js#M4-placement`、`tests/test_placement.py`、`tests/js/placement.test.mjs` |
+| `w2-m4-movetool` | 8829 | M4-T5b 移动工具（手柄、HUD、表面平面拖动、吸附目标） | `facet/web/js/render/tools/move.js`、`facet/web/js/ui/icons.js#M4`、`facet/web/css/app.css#M4-move`、`facet/web/js/main.js#M4-move`、`tests/js/movetool.test.mjs` |
 
 **合并顺序**：`w2-m3-selection` → `w2-m4-setgeometry` → `w2-m4-placement` → `w2-m4-movetool`
 
 **出口检查**：
 
-- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`CRYSTALLUME_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
+- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`FACET_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
 - M3-T5：`tests/test_selection.py`、`tests/js/selection.test.mjs` 通过；`QUERY_PROPS` 与选择结果两语言相同（`tests/test_m3_parity.py`）；验收 S8-8（配位数查询：空位前 2、空位后 4，smart 规则不计 Ti–Ti）
 - M4-T3：`tests/test_set_geometry.py` 与 ASE 参考逐项一致（`fix`、`mask`、`indices`、`add`、`factor`、`mic` 的 8 个组合）；二面角符号符合 IUPAC（D7）
 - M4-T4：`tests/test_placement.py`、`tests/js/placement.test.mjs` 通过；`add_atom(adsorbate=True)` 先 promote 再写新 id（R-ADS，L-X-05）；默认键长读数 `(covalent radii)`（L-05 的 M5 一支在 W3.2 接上）
 - M4-T5b：`tests/js/movetool.test.mjs` 通过（工具契约：按在未选原子上不认领、按下不动即松开按点击处理、Esc 取消且不清选区）
-- 界面：应用在静态模式（`python3 -m http.server <端口> --directory crystallume/web`）与 `crystallume serve` 下都能启动，`document.body.dataset.ready === 'true'`，控制台无 `pageerror`/`console.error`；按 G 进入移动工具，拖动后撤销按钮显示 `Undo Move 2 atoms`
+- 界面：应用在静态模式（`python3 -m http.server <端口> --directory facet/web`）与 `facet serve` 下都能启动，`document.body.dataset.ready === 'true'`，控制台无 `pageerror`/`console.error`；按 G 进入移动工具，拖动后撤销按钮显示 `Undo Move 2 atoms`
 
 #### M3-T5 几何选择与查询引擎（双语言）（链 `w2-m3-selection`）
 
 【目标】双语言的几何选择函数与 Atom Selection 的查询引擎（查询 JSON、解析、求值与组合模式）。
 
-【依据】M3 §3.10、§3.11（3.11.1 查询 JSON：Python、JS、REST、`crystallume.selectWhere` 共用，写进 `docs/SCHEMA.md`；3.11.2 `combine_selection(current, matches, mode)` 的五种模式）、§3.16；ledger-features L-M3-06（`select_height`、`select_fractional`、`select_within`、`select_where`；`select_layers` 已在 W1.2）；ledger-F0 §6 M3 第 7 条（球形选择与 `distance` 查询用 F0-D T9 的 `mic_vector`）；`QUERY_PROPS` 两语言相同；`cn` 用 M3 `coordination_numbers(metal_pairs="smart")`；`surface` 用 M3-T3b 的 `surface_atoms`。注意：§3.6 的单元分组已在 W1.2 随 `find_layers` 交付（plan.md 对 M3 §9 的调整）。
+【依据】M3 §3.10、§3.11（3.11.1 查询 JSON：Python、JS、REST、`facet.selectWhere` 共用，写进 `docs/SCHEMA.md`；3.11.2 `combine_selection(current, matches, mode)` 的五种模式）、§3.16；ledger-features L-M3-06（`select_height`、`select_fractional`、`select_within`、`select_where`；`select_layers` 已在 W1.2）；ledger-F0 §6 M3 第 7 条（球形选择与 `distance` 查询用 F0-D T9 的 `mic_vector`）；`QUERY_PROPS` 两语言相同；`cn` 用 M3 `coordination_numbers(metal_pairs="smart")`；`surface` 用 M3-T3b 的 `surface_atoms`。注意：§3.6 的单元分组已在 W1.2 随 `find_layers` 交付（plan.md 对 M3 §9 的调整）。
 
-【实现】新文件 `crystallume/analysis/selection.py` 与 `web/js/core/selection.js`（`QUERY_PROPS`、`parse_query`、各属性与运算符、all/any、`version`、`layers`/`bonds` 字段、报错文案）；`analysis/__init__.py` 段 `M3` 导出；查询金标 `tests/data/surface/selection/*.json`（`crystallume.cases/1`，op `selectWhere`）与两语言 op 文件；在 `tests/test_m3_parity.py` 追加选择结果与 `QUERY_PROPS` 的比较。
+【实现】新文件 `facet/analysis/selection.py` 与 `web/js/core/selection.js`（`QUERY_PROPS`、`parse_query`、各属性与运算符、all/any、`version`、`layers`/`bonds` 字段、报错文案）；`analysis/__init__.py` 段 `M3` 导出；查询金标 `tests/data/surface/selection/*.json`（`facet.cases/1`，op `selectWhere`）与两语言 op 文件；在 `tests/test_m3_parity.py` 追加选择结果与 `QUERY_PROPS` 的比较。
 
 【U 与负责人决定】U1（`surface` 条件用暴露原子，不判断 slab）；负责人决定：无直接相关项。
 
-【文件】`crystallume/analysis/selection.py`、`crystallume/web/js/core/selection.js`、`crystallume/analysis/__init__.py#M3`、`tests/test_selection.py`、`tests/js/selection.test.mjs`、`tests/ops/m3_selection.py`、`tests/js/ops/m3_selection.mjs`、`tests/data/surface/selection/`、`tests/test_m3_parity.py`。
+【文件】`facet/analysis/selection.py`、`facet/web/js/core/selection.js`、`facet/analysis/__init__.py#M3`、`tests/test_selection.py`、`tests/js/selection.test.mjs`、`tests/ops/m3_selection.py`、`tests/js/ops/m3_selection.mjs`、`tests/data/surface/selection/`、`tests/test_m3_parity.py`。
 
 【测试】M3 §7.2 的选择函数（环绕分数区间、非周期轴报错、球形选择跨边界与斜晶胞（三斜胞里与暴力枚举 ±3 像比较）、中心原子包含在内、`centroid`）与查询（每个属性与运算符、all/any、五种模式、空条件、`version`、报错文案、1e-5 Å 的边界：保存再打开结果不变）；acceptance S8-8。
 
@@ -1224,7 +1224,7 @@ M3 选择与查询引擎；M4 设定几何、放置核心（含 add_atom/extend�
 
 【U 与负责人决定】U5/D7（IUPAC 二面角符号）；负责人决定：无直接相关项。
 
-【文件】`crystallume/core/structure.py#M4-geometry`、`crystallume/web/js/core/structure.js#M4-geometry`、`tests/test_set_geometry.py`、`tests/js/set_geometry.test.mjs`。
+【文件】`facet/core/structure.py#M4-geometry`、`facet/web/js/core/structure.js#M4-geometry`、`tests/test_set_geometry.py`、`tests/js/set_geometry.test.mjs`。
 
 【测试】M4 §7.1 第 5–7 条：与 `tests/data/manipulate/ase_reference.json` 完全一致（`fix` 0/0.5/1、`mask`、`indices`、`add`、`factor`、`mic` 的 8 个组合）；`set_angle`、`set_dihedral` 与 ASE 对照；二面角符号（5 组随机点）；`add=True`；共线报错；`mask` 与 `indices` 同给报错；共线起点的 `toward`（180° → 150° 朝 +a）；跨面的 `images`（CO 跨 a 面，角设到 150°/170° 后 C–O 保持 1.1500 Å、O 的存储像不变；`set_dihedral` 后键长变化 < 1e-12 Å）。
 
@@ -1234,11 +1234,11 @@ M3 选择与查询引擎；M4 设定几何、放置核心（含 add_atom/extend�
 
 【依据】M4 §3.9（接触抬升闭式解 `t* = max_j [h_j + sqrt(d² − ρ_j²)]`）、§3.10.5 的数据规则、§6.1–6.3；ledger-features L-M4-02（`add_atom(self, symbol, position, props=None, *, frac=False, adsorbate=False) -> int`；`extend(other, *, offset, rotation, center, position, anchor="centroid", normal, orient, mic, frame, adsorbate, keep_props=True, renumber_adsorbates=True)`；**[改]** `adsorbate=True` 遵守 R-ADS：`tags_convention == "oc20"` 时新原子 `tags = 2` 否则 0；编辑前按元素分块时插入后 `sort_by_species()`；每个载荷成键片段一个新 id（从 `next_adsorbate_id` 起）；先 `promote_adsorbates`；`other` 的约束在晶胞不同时经 `apply_basis_change` 换算）、L-M4-05（`site_point(structure, atoms, *, images=None, bond=None, height=None, side="auto", symbol=None) -> SitePoint`；默认键长：本任务只实现共价半径一支 `d = place_bond_factor·(r_cov(X) + r_cov(M))`，读数 `bond 1.98 Å (covalent radii)`；吸附物库一支（负责人决定 L-05）由 M5-T5 在 W3.2 接上；找不到可接触的原子时回退 `add_height`）、L-X-05、R-F10、R-F11（M5 不经 `extend(adsorbate=True)` 插入）、§10.4 第 1、2 条；负责人决定 L-05、L-15（规格里写死的键长数字只作示例，测试按式子现算）；ledger-F0 L-F0-07（F0-D 的 `extend` 与 JS `extend`）、L-F0-14；plan.md P-08。
 
-【实现】新文件 `crystallume/analysis/placement.py` 与 `web/js/core/placement.js`；`add_atom`、`extend` 的放置参数放 `core/structure.py`、`web/js/core/structure.js` 的段 `M4-placement`（不改 F0-D 已冻结的前几个参数）。
+【实现】新文件 `facet/analysis/placement.py` 与 `web/js/core/placement.js`；`add_atom`、`extend` 的放置参数放 `core/structure.py`、`web/js/core/structure.js` 的段 `M4-placement`（不改 F0-D 已冻结的前几个参数）。
 
 【U 与负责人决定】U5（D2：原位修改）；负责人决定 L-05（默认键长的两支；本任务做共价半径一支）、L-15。
 
-【文件】`crystallume/analysis/placement.py`、`crystallume/web/js/core/placement.js`、`crystallume/core/structure.py#M4-placement`、`crystallume/web/js/core/structure.js#M4-placement`、`tests/test_placement.py`、`tests/js/placement.test.mjs`。
+【文件】`facet/analysis/placement.py`、`facet/web/js/core/placement.js`、`facet/core/structure.py#M4-placement`、`facet/web/js/core/structure.js#M4-placement`、`tests/test_placement.py`、`tests/js/placement.test.mjs`。
 
 【测试】M4 §7.1 第 12–14 条：`site_point` 的 §3.9.3 表全部行（顶/桥/hcp/fcc、O/H/C/N 的共价半径默认键长、底面、CONTCAR、Pt(211) 三排；Cu(100) c(2×2) 的显式像得到四重空位；找不到接触原子时带 `fallback`；单层石墨烯默认 `top`）；`add_atom` 返回下标、SD 存在时新原子 [T,T,T]、tags 0、occupancy 1.0、不存在的键不被创建、`frac=True`、`parse_element` 的 11 个输入、`adsorbate=True` 先 promote 再写 id、导出 POSCAR 带 SD；`extend` 的 `position` + `anchor`（binding/contact/bottom）、`orient`（binding_down、flat：NH3 的 N 在下、苯平躺）、`rotation`、`offset`、props 并集、`adsorbate=True` 重置 SD/tags 并写 id、`adsorbate=False` 时 id 按 M5 规则重编号与记录复制、不同晶胞的约束换算、`frame=`。
 
@@ -1246,13 +1246,13 @@ M3 选择与查询引擎；M4 设定几何、放置核心（含 add_atom/extend�
 
 【目标】工具栏的 Move 工具（G）：B 层手柄、屏幕空间拾取、表面平面拖动、取整与吸附、触屏与笔、HUD 与提示栏，以及供 M5 使用的吸附目标接口。
 
-【依据】M4 §3.11、§5.1（工具栏、HUD、修饰键表、提示栏、快捷键对话框 Mouse 行）、§5.5（撤销标签 `Move N atoms`/`Rotate N atoms`，拖动不发 toast）、§5.6、§5.8、§5.9（手柄 B 层、字母 C 层、`never` 导出；`m4-moving` 高亮 `{light: '#d9822b', dark: '#ffb366'}`）；ledger-features L-M4-07（`tools.register({ id: 'move', key: 'G', toolbar: true, selects: true, cursor: 'grab', touch: 'claim', … })`；吸附目标 `registerSnapTargets(provider: (structure) → [{ position: [x, y, z], label }]) → unregister`，从 `render/tools/move.js` 导出并经 `crystallume.tools.get('move')` 暴露，移动工具在 12 px 内吸附）；ledger-F0 L-F0-35（拖动会话 `beginStructureEdit(…, {kind: 'positions', transient: true})`、P-pos 提交 `singleFrame`）、L-F0-38/40/41（叠加层、`pick`/`pointOnLine`/`pointOnPlane`/`worldPerPixel`、工具注册表与延迟认领、`hover(hit, e)`、`begin()`）、L-F0-43/44（`homeOffsets(structure, display, {cuts})`、测量引用 v2）、§6 M4 第 3 条（`banner` → `transient`；`selectFallback` 删除）；M4-T5a 的 `movemath.js`、M4-T2 的 `unwrapGroup`/`movingGroup`；U1（表面平面 = 有真空间隙时的表面，不按 slab 分类）。
+【依据】M4 §3.11、§5.1（工具栏、HUD、修饰键表、提示栏、快捷键对话框 Mouse 行）、§5.5（撤销标签 `Move N atoms`/`Rotate N atoms`，拖动不发 toast）、§5.6、§5.8、§5.9（手柄 B 层、字母 C 层、`never` 导出；`m4-moving` 高亮 `{light: '#d9822b', dark: '#ffb366'}`）；ledger-features L-M4-07（`tools.register({ id: 'move', key: 'G', toolbar: true, selects: true, cursor: 'grab', touch: 'claim', … })`；吸附目标 `registerSnapTargets(provider: (structure) → [{ position: [x, y, z], label }]) → unregister`，从 `render/tools/move.js` 导出并经 `facet.tools.get('move')` 暴露，移动工具在 12 px 内吸附）；ledger-F0 L-F0-35（拖动会话 `beginStructureEdit(…, {kind: 'positions', transient: true})`、P-pos 提交 `singleFrame`）、L-F0-38/40/41（叠加层、`pick`/`pointOnLine`/`pointOnPlane`/`worldPerPixel`、工具注册表与延迟认领、`hover(hit, e)`、`begin()`）、L-F0-43/44（`homeOffsets(structure, display, {cuts})`、测量引用 v2）、§6 M4 第 3 条（`banner` → `transient`；`selectFallback` 删除）；M4-T5a 的 `movemath.js`、M4-T2 的 `unwrapGroup`/`movingGroup`；U1（表面平面 = 有真空间隙时的表面，不按 slab 分类）。
 
 【实现】新文件 `web/js/render/tools/move.js`；图标 `move`、`paste` 放 `ui/icons.js` 的段 `M4`；样式放 `css/app.css` 段 `M4-move`；`main.js` 段 `M4-move` 导入。
 
 【U 与负责人决定】U1、U5（工具栏 Move 工具，D1）、P3（拖动一次一步撤销）；负责人决定：无直接相关项。
 
-【文件】`crystallume/web/js/render/tools/move.js`、`crystallume/web/js/ui/icons.js#M4`、`crystallume/web/css/app.css#M4-move`、`crystallume/web/js/main.js#M4-move`、`tests/js/movetool.test.mjs`。
+【文件】`facet/web/js/render/tools/move.js`、`facet/web/js/ui/icons.js#M4`、`facet/web/css/app.css#M4-move`、`facet/web/js/main.js#M4-move`、`tests/js/movetool.test.mjs`。
 
 【测试】M4 §7.2 第 3、4 条：工具契约（按在未选原子上 `down` 返回 false → 框选；按在已选原子上不动就松开 → `up` 返回 false 按点击处理；Shift/⌘ 在按下与拖动中的含义；第二根手指取消；Esc 取消且不清选区）；测量键的三个场景（底层原子跨 f = 1；原子跨 a 面；CO 拖进真空使切口移动：键改指存储像、测量保留不画），与 F0-A `homeOffsets` 一起测。
 
@@ -1264,25 +1264,25 @@ M3 的 App 接口、命令、公共 API、约束标记与配色；M4 的应用�
 
 | 链 | 端口 | 任务 | 独占的文件 |
 |---|---|---|---|
-| `w2-m3-app` | 8830 | M3-T6 M3 的 App 接口、命令与公共 API、M3-T7 约束标记、图例与配色方案 | `crystallume/web/js/app.js#M3`、`crystallume/web/js/app.js#select`、`crystallume/web/js/app.js#PATH_LABELS`、`crystallume/web/js/app.js#entry-serialization`、`crystallume/web/js/commands/layers.js`、`crystallume/web/js/main.js#M3-commands`、`crystallume/web/js/render/colors.js`、`crystallume/web/js/render/settings.js`、`crystallume/web/js/ui/panels/appearance.js`、`crystallume/web/js/render/viewer.js#HIGHLIGHT_COLORS`、`crystallume/web/css/app.css#M3-markers`、`tests/js/m3_app.test.mjs`、`tests/js/m3_markers.test.mjs` |
-| `w2-m4-edits` | 8831 | M4-T6a 应用层编辑、命令、公共 API 与 Transform 分区骨架 | `crystallume/web/js/core/edits.js`、`crystallume/web/js/app.js#M4`、`crystallume/web/js/commands/atoms.js`、`crystallume/web/js/main.js#M4-commands`、`crystallume/web/js/ui/panels/transform.js`、`crystallume/web/js/main.js#M4-transform`、`tests/js/edits.test.mjs` |
+| `w2-m3-app` | 8830 | M3-T6 M3 的 App 接口、命令与公共 API、M3-T7 约束标记、图例与配色方案 | `facet/web/js/app.js#M3`、`facet/web/js/app.js#select`、`facet/web/js/app.js#PATH_LABELS`、`facet/web/js/app.js#entry-serialization`、`facet/web/js/commands/layers.js`、`facet/web/js/main.js#M3-commands`、`facet/web/js/render/colors.js`、`facet/web/js/render/settings.js`、`facet/web/js/ui/panels/appearance.js`、`facet/web/js/render/viewer.js#HIGHLIGHT_COLORS`、`facet/web/css/app.css#M3-markers`、`tests/js/m3_app.test.mjs`、`tests/js/m3_markers.test.mjs` |
+| `w2-m4-edits` | 8831 | M4-T6a 应用层编辑、命令、公共 API 与 Transform 分区骨架 | `facet/web/js/core/edits.js`、`facet/web/js/app.js#M4`、`facet/web/js/commands/atoms.js`、`facet/web/js/main.js#M4-commands`、`facet/web/js/ui/panels/transform.js`、`facet/web/js/main.js#M4-transform`、`tests/js/edits.test.mjs` |
 | `w2-m4-parity` | — | M4-T9b M4 跨语言平价 | `tests/test_m4_parity.py`、`tests/ops/m4.py`、`tests/js/ops/m4.mjs`、`tests/data/manipulate/` |
-| `w2-m4-cli` | — | M4-T8a crystallume edit 的 M4 子命令（含 edit delete） | `crystallume/server/models.py`、`crystallume/server/routes/build.py`、`crystallume/server/routes/analysis.py`、`crystallume/server/auth.py`、`crystallume/server/deps.py`、`crystallume/client.py`、`crystallume/cli.py`、`crystallume/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py` |
+| `w2-m4-cli` | — | M4-T8a facet edit 的 M4 子命令（含 edit delete） | `facet/server/models.py`、`facet/server/routes/build.py`、`facet/server/routes/analysis.py`、`facet/server/auth.py`、`facet/server/deps.py`、`facet/client.py`、`facet/cli.py`、`facet/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py` |
 
 **合并顺序**：`w2-m4-cli` → `w2-m4-parity` → `w2-m3-app` → `w2-m4-edits`
 
 **出口检查**：
 
-- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`CRYSTALLUME_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
-- M3-T6/T7：`tests/js/m3_app.test.mjs`、`tests/js/m3_markers.test.mjs` 通过；Shift+L/Shift+U 固定/放开选区（toast `Fixed 18 atoms` 的 Undo 只撤销自己）；固定光环为 `CONSTRAINT_COLOR`、默认不进 PNG（`export: 'marker'`）；`crystallume.edit.fixLayers({ bottom: 2 })` 可撤销
-- M4-T6a：`tests/js/edits.test.mjs` 通过；`crystallume.command('edit.translate', { vector: [0, 0, 1] })` 一步撤销；Structure 面板出现 Transform 分区骨架（5 个标签页）
+- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`FACET_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
+- M3-T6/T7：`tests/js/m3_app.test.mjs`、`tests/js/m3_markers.test.mjs` 通过；Shift+L/Shift+U 固定/放开选区（toast `Fixed 18 atoms` 的 Undo 只撤销自己）；固定光环为 `CONSTRAINT_COLOR`、默认不进 PNG（`export: 'marker'`）；`facet.edit.fixLayers({ bottom: 2 })` 可撤销
+- M4-T6a：`tests/js/edits.test.mjs` 通过；`facet.command('edit.translate', { vector: [0, 0, 1] })` 一步撤销；Structure 面板出现 Transform 分区骨架（5 个标签页）
 - M4-T9b：`tests/test_m4_parity.py` 通过；`tests/data/manipulate/` 不再有 skip（`mic_vector` 的用例归 F0-D，若有则保持 skip 并注明）
-- M4-T8a：`crystallume edit translate|rotate|set-distance|set-angle|set-dihedral|add-atom|merge|delete` 的 `tests/test_cli.py` 用例通过；`edit delete --atoms 40` 越界 → 退出码 1、`atom index 40 out of range (structure has 36 atoms)`（负责人决定 L-10）
-- 界面：应用在静态模式（`python3 -m http.server <端口> --directory crystallume/web`）与 `crystallume serve` 下都能启动，`document.body.dataset.ready === 'true'`，控制台无 `pageerror`/`console.error`；命令面板搜 `Modify Constraints`、`Translate`、`Rotate` 能找到并显示 MS 名称
+- M4-T8a：`facet edit translate|rotate|set-distance|set-angle|set-dihedral|add-atom|merge|delete` 的 `tests/test_cli.py` 用例通过；`edit delete --atoms 40` 越界 → 退出码 1、`atom index 40 out of range (structure has 36 atoms)`（负责人决定 L-10）
+- 界面：应用在静态模式（`python3 -m http.server <端口> --directory facet/web`）与 `facet serve` 下都能启动，`document.body.dataset.ready === 'true'`，控制台无 `pageerror`/`console.error`；命令面板搜 `Modify Constraints`、`Translate`、`Rotate` 能找到并显示 MS 名称
 
 #### M3-T6 M3 的 App 接口、命令与公共 API（链 `w2-m3-app`）
 
-【目标】M3 在网页端的应用层接口、命令与 `window.crystallume` 成员。
+【目标】M3 在网页端的应用层接口、命令与 `window.facet` 成员。
 
 【依据】M3 §5.6（命令表；`sel.query` 与 `sel.within` 由 M3-T10 注册）、§5.7（撤销标签与 toast）、§6.2；ledger-features L-M3-09（`app.setConstraints(indices, op, opts)`、`app.layerOptions()`/`setLayerOptions(patch)`、`app.layers()`、`app.adsorbates()`、`app.markAdsorbates(indices, { unmark })`、`app.selectWhere(query, { mode })`；`editActive(…, { rebuild: 'appearance' | 'none' })`；公共 API（`defineApi`，owner `M3`）：`analysis.layers`、`analysis.adsorbates`、`analysis.surfaceAtoms`、`analysis.cn`，顶层 `matchQuery`、`selectWhere`、`selectLayers`、`selectWithin`，`edit.fix`、`edit.free`、`edit.freeAll`、`edit.fixLayers`、`edit.fixHeight`、`edit.markAdsorbates`、`edit.unmarkAdsorbates`、`edit.setTagsFromLayers`；R-F21：`edit.markAdsorbates` 是唯一的标记入口）、L-M3-08；ledger-F0 L-F0-30（`rebuild` 只接受 `'full' | 'appearance' | 'none'`，R10）、L-F0-52（命令包装与 `edits`、覆盖 F0-A 的回退）、L-F0-53、§6 M3 第 5、8 条；快捷键 Shift+L（Lock）、Shift+U（Unlock）。
 
@@ -1290,11 +1290,11 @@ M3 的 App 接口、命令、公共 API、约束标记与配色；M4 的应用�
 
 【U 与负责人决定】U5（D1：Layers、Constraints 的入口）、P3；负责人决定：无直接相关项。
 
-【文件】`crystallume/web/js/app.js#M3`、`crystallume/web/js/app.js#select`（条件性）、`crystallume/web/js/app.js#entry-serialization`（条件性）、`crystallume/web/js/commands/layers.js`、`crystallume/web/js/main.js#M3-commands`、`tests/js/m3_app.test.mjs`。
+【文件】`facet/web/js/app.js#M3`、`facet/web/js/app.js#select`（条件性）、`facet/web/js/app.js#entry-serialization`（条件性）、`facet/web/js/commands/layers.js`、`facet/web/js/main.js#M3-commands`、`tests/js/m3_app.test.mjs`。
 
 【测试】`tests/js/m3_app.test.mjs`：撤销标签与 toast 文案（M3 §5.7 表）、无变化时不入历史、`setLayerOptions` 的签名与 `entry.layers` 持久化、命令参数校验（`axes` 语法、`n` ≥ 1）、`defineApi` 的成员与 owner。
 
-【界面检查】（Chromium，本链端口）选 18 个原子按 Shift+L → toast `Fixed 18 atoms` + Undo；Shift+U → `Freed 18 atoms`；命令面板 `Fix layers…` 无参数时打开 Surface › Layers（W2.4 前是 F0-A 的分区壳）；`crystallume.edit.fixLayers({ bottom: 2 })` 可撤销；`crystallume.analysis.layers()` 返回与 Python 同键的对象。
+【界面检查】（Chromium，本链端口）选 18 个原子按 Shift+L → toast `Fixed 18 atoms` + Undo；Shift+U → `Freed 18 atoms`；命令面板 `Fix layers…` 无参数时打开 Surface › Layers（W2.4 前是 F0-A 的分区壳）；`facet.edit.fixLayers({ bottom: 2 })` 可撤销；`facet.analysis.layers()` 返回与 Python 同键的对象。
 
 #### M3-T7 约束标记、图例与配色方案（链 `w2-m3-app`）
 
@@ -1306,7 +1306,7 @@ M3 的 App 接口、命令、公共 API、约束标记与配色；M4 的应用�
 
 【U 与负责人决定】U1（标记不表示 slab）、U5；负责人决定：无直接相关项。
 
-【文件】`crystallume/web/js/app.js#M3`、`crystallume/web/js/app.js#PATH_LABELS`、`crystallume/web/js/render/settings.js`、`crystallume/web/js/ui/panels/appearance.js`、`crystallume/web/js/render/colors.js`、`crystallume/web/js/render/viewer.js#HIGHLIGHT_COLORS`（条件性）、`crystallume/web/css/app.css#M3-markers`、`tests/js/m3_markers.test.mjs`。
+【文件】`facet/web/js/app.js#M3`、`facet/web/js/app.js#PATH_LABELS`、`facet/web/js/render/settings.js`、`facet/web/js/ui/panels/appearance.js`、`facet/web/js/render/colors.js`、`facet/web/js/render/viewer.js#HIGHLIGHT_COLORS`（条件性）、`facet/web/css/app.css#M3-markers`、`tests/js/m3_markers.test.mjs`。
 
 【测试】`tests/js/m3_markers.test.mjs`：光环下标集合随约束变化、两种强度、颜色按背景明暗、`layer` 配色与层列表一致（读 `findLayersCached`）、颜色签名包含层参数。
 
@@ -1322,11 +1322,11 @@ M3 的 App 接口、命令、公共 API、约束标记与配色；M4 的应用�
 
 【U 与负责人决定】U5（D2：原位编辑）、P3；负责人决定 L-05（加原子的默认键长来源由 M4-T4/M5-T5 决定）。
 
-【文件】`crystallume/web/js/core/edits.js`、`crystallume/web/js/app.js#M4`、`crystallume/web/js/commands/atoms.js`、`crystallume/web/js/main.js#M4-commands`、`crystallume/web/js/ui/panels/transform.js`（骨架）、`crystallume/web/js/main.js#M4-transform`、`tests/js/edits.test.mjs`。
+【文件】`facet/web/js/core/edits.js`、`facet/web/js/app.js#M4`、`facet/web/js/commands/atoms.js`、`facet/web/js/main.js#M4-commands`、`facet/web/js/ui/panels/transform.js`（骨架）、`facet/web/js/main.js#M4-transform`、`tests/js/edits.test.mjs`。
 
 【测试】M4 §7.2 第 5 条（`planPaste` 各模式；Ctrl V 默认的三种分支；偏移取 1×1 网格格矢且不与周期像重合；没有网格时最小 3.0 Å；从顶面复制粘到底面时载荷翻转）与第 10 条（C11：多帧结构上计划函数只用当前帧）；命令参数校验与 `whyNot` 文案（M4 §5.7）。
 
-【界面检查】（Chromium，本链端口）`crystallume.command('edit.translate', { vector: [0, 0, 1] })` → 撤销标签 `Move N atoms`、toast `Moved N atoms by 1.000 Å`；`edit.rotate` 带参数可撤销；会话中执行编辑命令被拒（`Apply or cancel the preview first.`）；Structure 面板出现 Transform 分区与 5 个标签页（内容为占位）。
+【界面检查】（Chromium，本链端口）`facet.command('edit.translate', { vector: [0, 0, 1] })` → 撤销标签 `Move N atoms`、toast `Moved N atoms by 1.000 Å`；`edit.rotate` 带参数可撤销；会话中执行编辑命令被拒（`Apply or cancel the preview first.`）；Structure 面板出现 Transform 分区与 5 个标签页（内容为占位）。
 
 #### M4-T9b M4 跨语言平价（链 `w2-m4-parity`）
 
@@ -1342,17 +1342,17 @@ M3 的 App 接口、命令、公共 API、约束标记与配色；M4 的应用�
 
 【测试】即上。两语言不一致时不改期望：在报告里写明偏离规格的一边。
 
-#### M4-T8a crystallume edit 的 M4 子命令（含 edit delete）（链 `w2-m4-cli`）
+#### M4-T8a facet edit 的 M4 子命令（含 edit delete）（链 `w2-m4-cli`）
 
-【目标】M4 的 CLI：`crystallume edit translate|rotate|set-distance|set-angle|set-dihedral|add-atom|merge`，以及负责人决定 L-10 的 `crystallume edit delete`。M4 不加 REST（M4 K8）。
+【目标】M4 的 CLI：`facet edit translate|rotate|set-distance|set-angle|set-dihedral|add-atom|merge`，以及负责人决定 L-10 的 `facet edit delete`。M4 不加 REST（M4 K8）。
 
-【依据】M4 §6.6；ledger-features L-M4-08（**[改]** 按 §0.3 补上 `[--from FMT] [--index N] -o OUT [--format FMT]`；`edit delete IN --atoms SPEC …`：删除这些原子（`Structure.delete`），吸附物记录按 L-X-04 的删除规则保留、孤儿由 M5 回收；stderr `crystallume: note: deleted 1 atom (35 left)`；`SPEC` 与 M3 `edit fix --atoms` 同一写法，复用 M3-T11a 的 `parse_atom_spec`；越界 → 退出码 1，`atom index 40 out of range (structure has 36 atoms)`）、§0.3 CLI 规则（`nargs=3`，不用 `nargs="+"`）、R-F13、§10.4 第 5 条；负责人决定 L-10。
+【依据】M4 §6.6；ledger-features L-M4-08（**[改]** 按 §0.3 补上 `[--from FMT] [--index N] -o OUT [--format FMT]`；`edit delete IN --atoms SPEC …`：删除这些原子（`Structure.delete`），吸附物记录按 L-X-04 的删除规则保留、孤儿由 M5 回收；stderr `facet: note: deleted 1 atom (35 left)`；`SPEC` 与 M3 `edit fix --atoms` 同一写法，复用 M3-T11a 的 `parse_atom_spec`；越界 → 退出码 1，`atom index 40 out of range (structure has 36 atoms)`）、§0.3 CLI 规则（`nargs=3`，不用 `nargs="+"`）、R-F13、§10.4 第 5 条；负责人决定 L-10。
 
 【实现】`cli.py` 的 `edit` 组追加上述子命令（读写走 `read(..., index=-1)` 与 `_write_or_print`；`set-*` 默认 `--move auto`）；`tests/test_cli.py`。
 
-【U 与负责人决定】U4 不涉及；负责人决定 L-10（`crystallume edit delete`）。
+【U 与负责人决定】U4 不涉及；负责人决定 L-10（`facet edit delete`）。
 
-【文件】API 文件束（plan.md §2.4）：`crystallume/server/models.py`、`crystallume/server/routes/build.py`、`crystallume/server/routes/analysis.py`、`crystallume/server/auth.py`、`crystallume/server/deps.py`、`crystallume/client.py`、`crystallume/cli.py`、`crystallume/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py`（本批次实际只改 `cli.py` 与 `tests/test_cli.py`）。
+【文件】API 文件束（plan.md §2.4）：`facet/server/models.py`、`facet/server/routes/build.py`、`facet/server/routes/analysis.py`、`facet/server/auth.py`、`facet/server/deps.py`、`facet/client.py`、`facet/cli.py`、`facet/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py`（本批次实际只改 `cli.py` 与 `tests/test_cli.py`）。
 
 【测试】每个子命令一次正常路径与读回；`edit delete` 的 note 与越界；`--atoms "0-8,12"` 的闭区间；`edit add-atom --above` 的默认键长读数与 Python `site_point` 相同；退出码 1/2。
 
@@ -1362,23 +1362,23 @@ M3 的 App 接口、命令、公共 API、约束标记与配色；M4 的应用�
 
 | 链 | 端口 | 任务 | 独占的文件 |
 |---|---|---|---|
-| `w2-m3-layers-ui` | 8832 | M3-T8 Surface › Layers 分区 | `crystallume/web/js/ui/panels/surface-layers.js`、`crystallume/web/css/app.css#M3-layers`、`crystallume/web/js/main.js#M3-layers`、`tests/js/layers_ui.test.mjs` |
-| `w2-m3-constraints-ui` | 8833 | M3-T9 约束界面：Fix ▾、右键菜单、Structure › Constraints 分区、悬停行 | `crystallume/web/js/ui/constraints.js`、`crystallume/web/js/ui/icons.js#M3`、`crystallume/web/js/main.js#M3-constraints`、`crystallume/web/css/app.css#M3-constraints`、`tests/js/constraints_ui.test.mjs` |
-| `w2-m3-atomselection` | 8834 | M3-T10 Atom Selection 工具（非模态查询卡片） | `crystallume/web/js/ui/atomselection.js`、`crystallume/web/css/app.css#M3-atomselection`、`crystallume/web/js/main.js#M3-atomselection`、`tests/js/atomselection.test.mjs` |
-| `w2-m4-transform` | 8835 | M4-T7a Transform 分区：Move、Rotate、Geometry | `crystallume/web/js/ui/panels/transform.js#M4-T7a`、`crystallume/web/css/app.css#M4-transform`、`tests/js/transform_ui.test.mjs` |
-| `w2-m4-addatom` | 8836 | M4-T7b Add atom、Insert、幽灵预览与放置工具 | `crystallume/web/js/ui/panels/transform.js#M4-T7b`、`crystallume/web/js/render/tools/place.js`、`crystallume/web/js/ui/paramform.js#elementInput`、`crystallume/web/js/main.js#M4-place`、`crystallume/web/css/app.css#M4-place`、`tests/js/addatom_ui.test.mjs` |
-| `w2-m4-card-clipboard` | 8837 | M4-T7c 选区卡片数值行、测量列表、M4 的选区动作与右键菜单、双击选分子、M4-T6b 剪贴板：复制、剪切、粘贴（含上方粘贴与作为新结构） | `crystallume/web/js/ui/selectioncard.js#value-rows`、`crystallume/web/js/ui/panels/structure.js#measurements-row`、`crystallume/web/js/app.js#_onAtomDblClick`、`crystallume/web/js/ui/atomactions.js`、`crystallume/web/js/io/clipboard.js`、`crystallume/web/js/ui/clipboard.js`、`crystallume/web/js/ui/shell.js#paste-listener`、`crystallume/web/js/main.js#M4-clipboard`、`crystallume/web/css/app.css#M4-card`、`tests/js/clipboard.test.mjs`、`tests/js/atomactions.test.mjs` |
+| `w2-m3-layers-ui` | 8832 | M3-T8 Surface › Layers 分区 | `facet/web/js/ui/panels/surface-layers.js`、`facet/web/css/app.css#M3-layers`、`facet/web/js/main.js#M3-layers`、`tests/js/layers_ui.test.mjs` |
+| `w2-m3-constraints-ui` | 8833 | M3-T9 约束界面：Fix ▾、右键菜单、Structure › Constraints 分区、悬停行 | `facet/web/js/ui/constraints.js`、`facet/web/js/ui/icons.js#M3`、`facet/web/js/main.js#M3-constraints`、`facet/web/css/app.css#M3-constraints`、`tests/js/constraints_ui.test.mjs` |
+| `w2-m3-atomselection` | 8834 | M3-T10 Atom Selection 工具（非模态查询卡片） | `facet/web/js/ui/atomselection.js`、`facet/web/css/app.css#M3-atomselection`、`facet/web/js/main.js#M3-atomselection`、`tests/js/atomselection.test.mjs` |
+| `w2-m4-transform` | 8835 | M4-T7a Transform 分区：Move、Rotate、Geometry | `facet/web/js/ui/panels/transform.js#M4-T7a`、`facet/web/css/app.css#M4-transform`、`tests/js/transform_ui.test.mjs` |
+| `w2-m4-addatom` | 8836 | M4-T7b Add atom、Insert、幽灵预览与放置工具 | `facet/web/js/ui/panels/transform.js#M4-T7b`、`facet/web/js/render/tools/place.js`、`facet/web/js/ui/paramform.js#elementInput`、`facet/web/js/main.js#M4-place`、`facet/web/css/app.css#M4-place`、`tests/js/addatom_ui.test.mjs` |
+| `w2-m4-card-clipboard` | 8837 | M4-T7c 选区卡片数值行、测量列表、M4 的选区动作与右键菜单、双击选分子、M4-T6b 剪贴板：复制、剪切、粘贴（含上方粘贴与作为新结构） | `facet/web/js/ui/selectioncard.js#value-rows`、`facet/web/js/ui/panels/structure.js#measurements-row`、`facet/web/js/app.js#_onAtomDblClick`、`facet/web/js/ui/atomactions.js`、`facet/web/js/io/clipboard.js`、`facet/web/js/ui/clipboard.js`、`facet/web/js/ui/shell.js#paste-listener`、`facet/web/js/main.js#M4-clipboard`、`facet/web/css/app.css#M4-card`、`tests/js/clipboard.test.mjs`、`tests/js/atomactions.test.mjs` |
 
 **合并顺序**：`w2-m3-constraints-ui` → `w2-m3-layers-ui` → `w2-m3-atomselection` → `w2-m4-transform` → `w2-m4-addatom` → `w2-m4-card-clipboard`
 
 **出口检查**：
 
-- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`CRYSTALLUME_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
+- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`FACET_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
 - 验收 S1-10（Layers 4 行，z = 14.29 / 12.03 / 9.76 / 7.50，Δ = 2.26，第 3、4 行 🔒 与 `Free`；Structure › Constraints 显示 `18 of 36 atoms fixed`；底两层蓝色光环）、S4-6（选区卡片与悬停卡显示 `fixed along c (z)`）、S6-3、S8-4、S9-5、S10-4（界面与 API 两条路径）
 - M3 §7.4 第 1、2、4、6 条在 Chromium 中成立（Fix bottom 2 → POSCAR 18 行 `F F F` → Ctrl+Z 后 SD 消失；Atom Selection `Element is Pt` + `Layer from top = 1` → `9 atoms match` → Select；Esc 关卡片保留选区；悬停层行出现层光环）
 - M4 §7.4 第 4–7 条（选区卡片 `Set…` 1.9 → 1.900 Å、CO 整体移动；Ctrl C → 选 3 个 Pt → 右键 `Paste above selection` → 新 CO 键长与复制时相同、POSCAR 新原子 `T T T`；粘贴外来 CIF 文本仍导入为新结构）与双击 O 只选中 {C, O}（D1/E5）
 - `tests/js/atomselection.test.mjs`、`tests/js/clipboard.test.mjs`、`tests/js/transform_ui.test.mjs`、`tests/js/addatom_ui.test.mjs`、`tests/js/layers_ui.test.mjs`、`tests/js/constraints_ui.test.mjs`、`tests/js/atomactions.test.mjs` 通过
-- 界面：应用在静态模式（`python3 -m http.server <端口> --directory crystallume/web`）与 `crystallume serve` 下都能启动，`document.body.dataset.ready === 'true'`，控制台无 `pageerror`/`console.error`；手机视口 390×844 下 Layers 行高 ≥ 44 px、Atom Selection 为底部 sheet
+- 界面：应用在静态模式（`python3 -m http.server <端口> --directory facet/web`）与 `facet serve` 下都能启动，`document.body.dataset.ready === 'true'`，控制台无 `pageerror`/`console.error`；手机视口 390×844 下 Layers 行高 ≥ 44 px、Atom Selection 为底部 sheet
 
 #### M3-T8 Surface › Layers 分区（链 `w2-m3-layers-ui`）
 
@@ -1390,11 +1390,11 @@ M3 的 App 接口、命令、公共 API、约束标记与配色；M4 的应用�
 
 【U 与负责人决定】U1（分区对任何结构都在，需要真空的控件就地说明）、U5；负责人决定：无直接相关项。
 
-【文件】`crystallume/web/js/ui/panels/surface-layers.js`、`crystallume/web/css/app.css#M3-layers`、`crystallume/web/js/main.js#M3-layers`、`tests/js/layers_ui.test.mjs`。
+【文件】`facet/web/js/ui/panels/surface-layers.js`、`facet/web/css/app.css#M3-layers`、`facet/web/js/main.js#M3-layers`、`tests/js/layers_ui.test.mjs`。
 
 【测试】`tests/js/layers_ui.test.mjs`：纯逻辑（行文案与 `aria-label`、默认 N = max(1, ⌊行数/2⌋) 与按单元取整、提示与空状态文案、超过 100 行的截断）。
 
-【界面检查】（Chromium，本链端口）Pt(111) p(3×3) 4L（pbc T T T）→ Shift+5 → Layers 标题 `4 layers · 36 atoms`、4 行 `Pt 9`、z = 14.29/12.03/9.76/7.50、Δ = 2.26；`Fix [bottom] [2]` Apply → 第 3、4 行 🔒 与 `Free`，`crystallume.exportText('poscar')` 含 `Selective dynamics` 与 18 行 `F F F`，Ctrl+Z 后 SD 消失；悬停层行出现层光环、移出消失；SrTiO3 TiO2 对称 7L 上 `Fix middle 3` → 7 个 `[F,F,F]`；CONTCAR 夹具 4 行、无 straddle 提示；MoS2 上的 S 吸附原子标记后 Adsorbates 行显示 `S 1 (from adsorbate ids)`；键盘方向键在行间移动。截图存 `scratchpad/shots/w2-m3-layers-ui/`。
+【界面检查】（Chromium，本链端口）Pt(111) p(3×3) 4L（pbc T T T）→ Shift+5 → Layers 标题 `4 layers · 36 atoms`、4 行 `Pt 9`、z = 14.29/12.03/9.76/7.50、Δ = 2.26；`Fix [bottom] [2]` Apply → 第 3、4 行 🔒 与 `Free`，`facet.exportText('poscar')` 含 `Selective dynamics` 与 18 行 `F F F`，Ctrl+Z 后 SD 消失；悬停层行出现层光环、移出消失；SrTiO3 TiO2 对称 7L 上 `Fix middle 3` → 7 个 `[F,F,F]`；CONTCAR 夹具 4 行、无 straddle 提示；MoS2 上的 S 吸附原子标记后 Adsorbates 行显示 `S 1 (from adsorbate ids)`；键盘方向键在行间移动。截图存 `scratchpad/shots/w2-m3-layers-ui/`。
 
 #### M3-T9 约束界面：Fix ▾、右键菜单、Structure › Constraints 分区、悬停行（链 `w2-m3-constraints-ui`）
 
@@ -1406,7 +1406,7 @@ M3 的 App 接口、命令、公共 API、约束标记与配色；M4 的应用�
 
 【U 与负责人决定】U5（D1：Structure › Constraints 分区）；负责人决定：无直接相关项。
 
-【文件】`crystallume/web/js/ui/constraints.js`、`crystallume/web/js/ui/icons.js#M3`、`crystallume/web/js/main.js#M3-constraints`、`crystallume/web/css/app.css#M3-constraints`、`tests/js/constraints_ui.test.mjs`。
+【文件】`facet/web/js/ui/constraints.js`、`facet/web/js/ui/icons.js#M3`、`facet/web/js/main.js#M3-constraints`、`facet/web/css/app.css#M3-constraints`、`tests/js/constraints_ui.test.mjs`。
 
 【测试】`tests/js/constraints_ui.test.mjs`：动作文案随选区切换（全部固定时主按钮为 Free）、菜单项的显示条件与 kbd（Shift+L/Shift+U）、Constraints 摘要（`22 of 36 atoms fixed`、`18 fully fixed · 4 fixed along c (z) · 14 free`）、没有约束与全 T 时的文案、图标名存在。
 
@@ -1422,11 +1422,11 @@ M3 的 App 接口、命令、公共 API、约束标记与配色；M4 的应用�
 
 【U 与负责人决定】U5（非模态工具，视图仍可用）；负责人决定：无直接相关项。
 
-【文件】`crystallume/web/js/ui/atomselection.js`、`crystallume/web/css/app.css#M3-atomselection`、`crystallume/web/js/main.js#M3-atomselection`、`tests/js/atomselection.test.mjs`。
+【文件】`facet/web/js/ui/atomselection.js`、`facet/web/css/app.css#M3-atomselection`、`facet/web/js/main.js#M3-atomselection`、`tests/js/atomselection.test.mjs`。
 
 【测试】`tests/js/atomselection.test.mjs`：`rowsToQuery`/`queryToRows` 往返、错误文案（`Layer: enter a whole number from 1 to 4.`、`Distance: enter a radius from 0 to 50 Å.`、`Distance from the selection: select atoms first.`）、模式组合，不依赖 DOM。
 
-【界面检查】（Chromium，本链端口）命令面板 `Atom Selection…`（MS 名称可搜到）打开卡片，视图仍可旋转与点选；条件 `Element is Pt` + `Layer from top = 1` → 计数行 `9 atoms match · the selection will have 9 atoms`、视图里查询高亮；Select → 选区 9 个；Esc 关闭卡片、选区仍在；`Distance within 3.0 Å of atom #i` 预填来自右键 `Select atoms within…`；390×844 视口下为底部 sheet 且选区卡片隐藏；Copy as script 复制 `crystallume.selectWhere(...)`。截图存 `scratchpad/shots/w2-m3-atomselection/`。
+【界面检查】（Chromium，本链端口）命令面板 `Atom Selection…`（MS 名称可搜到）打开卡片，视图仍可旋转与点选；条件 `Element is Pt` + `Layer from top = 1` → 计数行 `9 atoms match · the selection will have 9 atoms`、视图里查询高亮；Select → 选区 9 个；Esc 关闭卡片、选区仍在；`Distance within 3.0 Å of atom #i` 预填来自右键 `Select atoms within…`；390×844 视口下为底部 sheet 且选区卡片隐藏；Copy as script 复制 `facet.selectWhere(...)`。截图存 `scratchpad/shots/w2-m3-atomselection/`。
 
 #### M4-T7a Transform 分区：Move、Rotate、Geometry（链 `w2-m4-transform`）
 
@@ -1438,7 +1438,7 @@ M3 的 App 接口、命令、公共 API、约束标记与配色；M4 的应用�
 
 【U 与负责人决定】U5（Transform 分区，D1）、P3；负责人决定：无直接相关项。
 
-【文件】`crystallume/web/js/ui/panels/transform.js#M4-T7a`、`crystallume/web/css/app.css#M4-transform`、`tests/js/transform_ui.test.mjs`。
+【文件】`facet/web/js/ui/panels/transform.js#M4-T7a`、`facet/web/css/app.css#M4-transform`、`tests/js/transform_ui.test.mjs`。
 
 【测试】`tests/js/transform_ui.test.mjs`：说明行的规则名与截断、撤销标签与 toast 文案、Custom… 拾取的状态机（纯逻辑）。
 
@@ -1454,7 +1454,7 @@ M3 的 App 接口、命令、公共 API、约束标记与配色；M4 的应用�
 
 【U 与负责人决定】U5（D2）；负责人决定 L-05（读数注明来源）、L-15。
 
-【文件】`crystallume/web/js/ui/panels/transform.js#M4-T7b`、`crystallume/web/js/render/tools/place.js`、`crystallume/web/js/ui/paramform.js#elementInput`、`crystallume/web/js/main.js#M4-place`、`crystallume/web/css/app.css#M4-place`、`tests/js/addatom_ui.test.mjs`。
+【文件】`facet/web/js/ui/panels/transform.js#M4-T7b`、`facet/web/js/render/tools/place.js`、`facet/web/js/ui/paramform.js#elementInput`、`facet/web/js/main.js#M4-place`、`facet/web/css/app.css#M4-place`、`tests/js/addatom_ui.test.mjs`。
 
 【测试】`tests/js/addatom_ui.test.mjs`：`parseElement` 在元素输入里的 11 个输入（含 X 作为 dummy）、读数文案、Insert 下拉的禁用规则。
 
@@ -1470,7 +1470,7 @@ M3 的 App 接口、命令、公共 API、约束标记与配色；M4 的应用�
 
 【U 与负责人决定】U5、P3；负责人决定：无直接相关项。
 
-【文件】`crystallume/web/js/ui/selectioncard.js#value-rows`、`crystallume/web/js/ui/panels/structure.js#measurements-row`、`crystallume/web/js/app.js#_onAtomDblClick`、`crystallume/web/js/ui/atomactions.js`、`crystallume/web/css/app.css#M4-card`、`tests/js/atomactions.test.mjs`。
+【文件】`facet/web/js/ui/selectioncard.js#value-rows`、`facet/web/js/ui/panels/structure.js#measurements-row`、`facet/web/js/app.js#_onAtomDblClick`、`facet/web/js/ui/atomactions.js`、`facet/web/css/app.css#M4-card`、`tests/js/atomactions.test.mjs`。
 
 【测试】`tests/js/atomactions.test.mjs`：M4 §7.2 第 8 条（键跨 a 面时卡片与 `Set…` 用同一组副本；二面角显示符号与 Python 一致）、第 9 条（真实 `buildDisplayModel` 上 Pt(111) p(3×3) + 顶位 CO + fcc CO，smart 开与关时双击 O 都只选中 {C, O}；双击表面 Pt 选中整个网络）；动作的 order 与 `when`。
 
@@ -1480,13 +1480,13 @@ M3 的 App 接口、命令、公共 API、约束标记与配色；M4 的应用�
 
 【目标】原子剪贴板：编码/解码/校验、`copy`/`cut`/`paste` 事件与 Shift 标志、粘贴监听改为先问剪贴板模块、相应命令与公共 API。
 
-【依据】M4 §2.5、§3.10（3.10.1–3.10.2 载荷与校验；3.10.5 数据规则）、§5.5（`Cut 2 atoms (CO)`、`Pasted 2 atoms (CO)`、`Pasted CO as a new structure`）、§5.6（Ctrl/⌘ C/X/V、Ctrl/⌘+Shift+V 只在命令的 `kbd` 里显示，不注册为 `key`）、§5.7（`edit.copy`、`edit.cut`、`edit.paste`、`edit.pasteNew`、`edit.pasteSpecial`（应该））；ledger-features L-M4-06（`CLIP_MIME = 'application/x-crystallume-atoms+json'`、`encodeClipboard(structure, indices, meta) → { json, text, payload }`、`decodeClipboard({ json, text }, memory) → payload | null`；表面放置的粘贴按 R-ADS；完整的源吸附物复制其 `info.surface.adsorbates` 记录（`id` 改为新 id、`site = null`、`bonds = []`，不写 `firstAtom`，R-F34）；目标没有 `info.surface` 时建 `kind: "adsorbates"` 块，`autoName = 目标名`，M4 不改名）、L-M4-07（`edit.copy`/`cut`/`paste`/`clipboard` 的 `defineApi`）、§10.4 第 4 条；ledger-F0 L-F0-24（extxyz 里的 `crystallume_clip=<id>` 按普通字符串往返）；简报 §4（不要把 Ctrl/⌘ C/V/X 注册为命令，会破坏粘贴导入）；M4 §9：`ui/shell.js` 只改粘贴监听。
+【依据】M4 §2.5、§3.10（3.10.1–3.10.2 载荷与校验；3.10.5 数据规则）、§5.5（`Cut 2 atoms (CO)`、`Pasted 2 atoms (CO)`、`Pasted CO as a new structure`）、§5.6（Ctrl/⌘ C/X/V、Ctrl/⌘+Shift+V 只在命令的 `kbd` 里显示，不注册为 `key`）、§5.7（`edit.copy`、`edit.cut`、`edit.paste`、`edit.pasteNew`、`edit.pasteSpecial`（应该））；ledger-features L-M4-06（`CLIP_MIME = 'application/x-facet-atoms+json'`、`encodeClipboard(structure, indices, meta) → { json, text, payload }`、`decodeClipboard({ json, text }, memory) → payload | null`；表面放置的粘贴按 R-ADS；完整的源吸附物复制其 `info.surface.adsorbates` 记录（`id` 改为新 id、`site = null`、`bonds = []`，不写 `firstAtom`，R-F34）；目标没有 `info.surface` 时建 `kind: "adsorbates"` 块，`autoName = 目标名`，M4 不改名）、L-M4-07（`edit.copy`/`cut`/`paste`/`clipboard` 的 `defineApi`）、§10.4 第 4 条；ledger-F0 L-F0-24（extxyz 里的 `facet_clip=<id>` 按普通字符串往返）；简报 §4（不要把 Ctrl/⌘ C/V/X 注册为命令，会破坏粘贴导入）；M4 §9：`ui/shell.js` 只改粘贴监听。
 
-【实现】新文件 `web/js/io/clipboard.js`、`web/js/ui/clipboard.js`；`ui/shell.js` 的粘贴监听（HEAD `shell.js:976-984`，W0 之后以监听函数定位）改为先交给 `ui/clipboard.js`，拿不到 Crystallume 载荷时照旧导入；命令与 `defineApi` 放 `ui/clipboard.js`；`main.js` 段 `M4-clipboard`。
+【实现】新文件 `web/js/io/clipboard.js`、`web/js/ui/clipboard.js`；`ui/shell.js` 的粘贴监听（HEAD `shell.js:976-984`，W0 之后以监听函数定位）改为先交给 `ui/clipboard.js`，拿不到 Facet 载荷时照旧导入；命令与 `defineApi` 放 `ui/clipboard.js`；`main.js` 段 `M4-clipboard`。
 
 【U 与负责人决定】U5（D2：粘贴原位修改；作为新结构粘贴走 `addStructure`）；负责人决定：无直接相关项。
 
-【文件】`crystallume/web/js/io/clipboard.js`、`crystallume/web/js/ui/clipboard.js`、`crystallume/web/js/ui/shell.js#paste-listener`、`crystallume/web/js/main.js#M4-clipboard`、`tests/js/clipboard.test.mjs`。
+【文件】`facet/web/js/io/clipboard.js`、`facet/web/js/ui/clipboard.js`、`facet/web/js/ui/shell.js#paste-listener`、`facet/web/js/main.js#M4-clipboard`、`tests/js/clipboard.test.mjs`。
 
 【测试】M4 §7.2 第 6、7 条：往返（自定义类型、仅文本 + 内存、仅带标记的 extxyz、无标记文本返回 null）；载荷里跨面的分子已展开；伪造载荷（坐标 NaN、原子数超限、`anchor` 越界、`type` 不符）被当作普通文本；Shift 标志在 keyup/blur/粘贴后清除；会话中粘贴被拦；从固定底层复制的 Pt 粘到表面上方后为 [T,T,T]、tags 0、有新 id；`Keep constraints and tags` 保留原值；`same` 模式保留；完整吸附物的记录被复制改 id；CONTCAR 上已有 CO 时第一次粘贴先 promote。
 
@@ -1498,7 +1498,7 @@ M3 的 App 接口、命令、公共 API、约束标记与配色；M4 的应用�
 
 | 链 | 端口 | 任务 | 独占的文件 |
 |---|---|---|---|
-| `w2-docs` | 8838 | M3-T12b M3 界面与查询的文档、快捷键对话框与提示栏、M4-T8b M4 的文档、快捷键对话框 Mouse 行与导览 | `README.md`、`docs/PLUGINS.md`、`docs/SCHEMA.md`、`docs/DEPLOY.md`、`CHANGELOG.md`、`crystallume/web/js/ui/shell.js#help-tour` |
+| `w2-docs` | 8838 | M3-T12b M3 界面与查询的文档、快捷键对话框与提示栏、M4-T8b M4 的文档、快捷键对话框 Mouse 行与导览 | `README.md`、`docs/PLUGINS.md`、`docs/SCHEMA.md`、`docs/DEPLOY.md`、`CHANGELOG.md`、`facet/web/js/ui/shell.js#help-tour` |
 | `w2-e2e-layers` | 8839 | M3-T13 M3 的 Playwright 冒烟、第 2 波验收子集与层分析性能 | `tests/e2e/harness.mjs`、`tests/test_e2e.py`、`tests/e2e/layers.spec.mjs`、`tests/e2e/w2_acceptance.spec.mjs`、`tests/poscar_canon.py`、`tests/e2e/poscar_canon.mjs`、`tests/js/perf/layers.perf.mjs` |
 | `w2-e2e-manipulate` | 8840 | M4-T9c M4 的 Playwright 冒烟与性能 | `tests/e2e/manipulate.spec.mjs`、`tests/js/perf/movetool.perf.mjs`、`tests/test_manipulate_perf.py` |
 | `w2-xmodule` | — | W2-X1 第 2 波跨模块回归测试（M2 × M3 × M4） | `tests/test_w2_crossmodule.py`、`tests/js/w2_crossmodule.test.mjs` |
@@ -1507,11 +1507,11 @@ M3 的 App 接口、命令、公共 API、约束标记与配色；M4 的应用�
 
 **出口检查**：
 
-- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`CRYSTALLUME_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
+- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`FACET_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
 - Playwright（`pytest -m slow tests/test_e2e.py`）：`tests/e2e/layers.spec.mjs`（M3 §7.4 第 1–6 条）、`tests/e2e/manipulate.spec.mjs`（M4 §7.4 第 1–9 条）、`tests/e2e/w2_acceptance.spec.mjs`（E2E-2 第 1–4 步与第 5 步的 Layers 部分、E2E-3 第 4 步）通过，截图在 `tests/e2e/out/`
 - 性能（`slow`）：`tests/js/perf/layers.perf.mjs`、`tests/js/perf/movetool.perf.mjs`、`tests/test_manipulate_perf.py` 在 M3 §7.5 与 M4 §7.5 的预算内（CI ×3）
 - 跨模块：`tests/test_w2_crossmodule.py`、`tests/js/w2_crossmodule.test.mjs` 通过：S6-3、S8-4、S8-6、S8-8、S9-5、S10-4、S4-6；固定后移动、标记后粘贴的 R-ADS 规则
-- 文档：README、`docs/PLUGINS.md`（含"与 ASE 的差异"一节）、`docs/SCHEMA.md`（约束规则、查询 JSON、`adsorbate_id`、剪贴板载荷 `crystallume.atoms/1`）、快捷键对话框 Mouse 行与提示栏、导览更新；文档例子能运行；随后进入波末三视角审查
+- 文档：README、`docs/PLUGINS.md`（含"与 ASE 的差异"一节）、`docs/SCHEMA.md`（约束规则、查询 JSON、`adsorbate_id`、剪贴板载荷 `facet.atoms/1`）、快捷键对话框 Mouse 行与提示栏、导览更新；文档例子能运行；随后进入波末三视角审查
 
 #### M3-T12b M3 界面与查询的文档、快捷键对话框与提示栏（链 `w2-docs`）
 
@@ -1519,11 +1519,11 @@ M3 的 App 接口、命令、公共 API、约束标记与配色；M4 的应用�
 
 【依据】M3 §9 T12、§3.11.1（查询 JSON 写进 `docs/SCHEMA.md`）、§5.6（快捷键 Shift+L、Shift+U）、§6.2；ledger-features L-M3-05、L-M3-06、L-M3-09；简报 §5。
 
-【实现】README（Layers 分区、约束、Atom Selection）、`docs/PLUGINS.md`（JS API：`crystallume.edit.fix/free/...`、`analysis.layers/adsorbates/surfaceAtoms/cn`、`selectWhere`、`matchQuery`；`entry.layers`；`display.constraints`；默认值对照表）、`docs/SCHEMA.md`（约束规则、tags、查询 JSON）、`docs/DEPLOY.md`（若实现了可选的 `/analysis/select`）、快捷键对话框鼠标段与提示栏的手写部分（`ui/shell.js`，以符号定位）、CHANGELOG。
+【实现】README（Layers 分区、约束、Atom Selection）、`docs/PLUGINS.md`（JS API：`facet.edit.fix/free/...`、`analysis.layers/adsorbates/surfaceAtoms/cn`、`selectWhere`、`matchQuery`；`entry.layers`；`display.constraints`；默认值对照表）、`docs/SCHEMA.md`（约束规则、tags、查询 JSON）、`docs/DEPLOY.md`（若实现了可选的 `/analysis/select`）、快捷键对话框鼠标段与提示栏的手写部分（`ui/shell.js`，以符号定位）、CHANGELOG。
 
 【U 与负责人决定】U1、U5；负责人决定：无直接相关项。
 
-【文件】`README.md`、`docs/PLUGINS.md`、`docs/SCHEMA.md`、`docs/DEPLOY.md`、`CHANGELOG.md`、`crystallume/web/js/ui/shell.js#help-tour`。
+【文件】`README.md`、`docs/PLUGINS.md`、`docs/SCHEMA.md`、`docs/DEPLOY.md`、`CHANGELOG.md`、`facet/web/js/ui/shell.js#help-tour`。
 
 【测试】文档里的例子在开发环境里逐个运行。
 
@@ -1535,11 +1535,11 @@ M3 的 App 接口、命令、公共 API、约束标记与配色；M4 的应用�
 
 【依据】M4 §5.1（Mouse 行：`['Drag a selected atom', 'Move the selection (Move tool; along the surface when there is a vacuum gap)']`、`['Drag an arrow, square or ring', 'Move along an axis, in a plane, or rotate']`）、§5.6（README "Mouse and keys" 的 Move tool 一句）、§6、§10 M7 一节（"与 ASE 的差异"：`mask` 与 `indices` 同给报错、`set_angle/set_dihedral` 支持 `mic`/`images`、`move=` 的 GUI 语义）；ledger-features L-M4-01…08；简报 §5。
 
-【实现】README（Move tool 与 Transform 分区、剪贴板）、`docs/PLUGINS.md`（Python 方法、JS `edit.*`、`registerSnapTargets`、"与 ASE 的差异"一节、CLI `crystallume edit …` 含 `edit delete`）、`docs/SCHEMA.md`（`adsorbate_id` 规则、剪贴板载荷 `crystallume.atoms/1`）、快捷键对话框 Mouse 行与提示栏、导览（`ui/shell.js`，以符号定位）、CHANGELOG。
+【实现】README（Move tool 与 Transform 分区、剪贴板）、`docs/PLUGINS.md`（Python 方法、JS `edit.*`、`registerSnapTargets`、"与 ASE 的差异"一节、CLI `facet edit …` 含 `edit delete`）、`docs/SCHEMA.md`（`adsorbate_id` 规则、剪贴板载荷 `facet.atoms/1`）、快捷键对话框 Mouse 行与提示栏、导览（`ui/shell.js`，以符号定位）、CHANGELOG。
 
 【U 与负责人决定】U1（Move tool 的说明写"有真空间隙时沿表面"）；负责人决定 L-10。
 
-【文件】`README.md`、`docs/PLUGINS.md`、`docs/SCHEMA.md`、`docs/DEPLOY.md`、`CHANGELOG.md`、`crystallume/web/js/ui/shell.js#help-tour`。
+【文件】`README.md`、`docs/PLUGINS.md`、`docs/SCHEMA.md`、`docs/DEPLOY.md`、`CHANGELOG.md`、`facet/web/js/ui/shell.js#help-tour`。
 
 【测试】文档例子与 CLI 例子逐个运行。
 
@@ -1599,15 +1599,15 @@ M5 无依赖或只依赖前两波的起步：吸附物库、二维 Delaunay、�
 
 | 链 | 端口 | 任务 | 独占的文件 |
 |---|---|---|---|
-| `w3-m5-library` | — | M5-T1 吸附物库、校验与加载（双语言）；build/adsorbate 骨架 | `crystallume/web/data/adsorbates.json`、`scripts/gen_adsorbates.py`、`crystallume/build/adsorbate.py`、`crystallume/web/js/build/adsorbates.js`、`crystallume/build/__init__.py#M5-T1`、`crystallume/core/defaults.py#M5-adsorbates`、`crystallume/web/js/core/defaults.js#M5-adsorbates`、`tests/test_adsorbate_library.py`、`tests/js/adsorbate_library.test.mjs` |
-| `w3-m5-delaunay` | — | M5-T2 二维 Delaunay 三角剖分（两语言逐行同构） | `crystallume/core/delaunay.py`、`crystallume/web/js/core/delaunay.js`、`tests/test_delaunay.py`、`tests/js/delaunay.test.mjs` |
-| `w3-m5-frame` | — | M5-T3 基底、表面坐标系与位点原子（双语言）；sites 骨架与 slab 夹具 | `crystallume/analysis/sites.py`、`crystallume/web/js/core/sites.js`、`crystallume/analysis/__init__.py#M5-sites`、`crystallume/core/defaults.py#M5-sites`、`crystallume/web/js/core/defaults.js#M5-sites`、`tests/surface_fixtures.py`、`tests/data/surface/slabs/`、`tests/test_sites_frame.py`、`tests/js/sites_frame.test.mjs` |
+| `w3-m5-library` | — | M5-T1 吸附物库、校验与加载（双语言）；build/adsorbate 骨架 | `facet/web/data/adsorbates.json`、`scripts/gen_adsorbates.py`、`facet/build/adsorbate.py`、`facet/web/js/build/adsorbates.js`、`facet/build/__init__.py#M5-T1`、`facet/core/defaults.py#M5-adsorbates`、`facet/web/js/core/defaults.js#M5-adsorbates`、`tests/test_adsorbate_library.py`、`tests/js/adsorbate_library.test.mjs` |
+| `w3-m5-delaunay` | — | M5-T2 二维 Delaunay 三角剖分（两语言逐行同构） | `facet/core/delaunay.py`、`facet/web/js/core/delaunay.js`、`tests/test_delaunay.py`、`tests/js/delaunay.test.mjs` |
+| `w3-m5-frame` | — | M5-T3 基底、表面坐标系与位点原子（双语言）；sites 骨架与 slab 夹具 | `facet/analysis/sites.py`、`facet/web/js/core/sites.js`、`facet/analysis/__init__.py#M5-sites`、`facet/core/defaults.py#M5-sites`、`facet/web/js/core/defaults.js#M5-sites`、`tests/surface_fixtures.py`、`tests/data/surface/slabs/`、`tests/test_sites_frame.py`、`tests/js/sites_frame.test.mjs` |
 
 **合并顺序**：`w3-m5-frame` → `w3-m5-library` → `w3-m5-delaunay`
 
 **出口检查**：
 
-- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`CRYSTALLUME_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
+- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`FACET_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
 - M5-T1：`tests/test_adsorbate_library.py`、`tests/js/adsorbate_library.test.mjs` 通过（52 个条目、§4.1 的 8 条校验、查找与 E20 建议、自定义框架规则）；`adsorbates.json` 经 `webdata` 读取（L-M2-06、R-F30）
 - M5-T2：`tests/test_delaunay.py`、`tests/js/delaunay.test.mjs` 通过（空圆性质、三角形数 2n − 2 − h、12×12 方格 242、蜂窝 338 点 624、输入打乱后合并结果相同）
 - M5-T3：`tests/test_sites_frame.py`、`tests/js/sites_frame.test.mjs` 通过（恰好一半原子跨边界、CONTCAR 底层 0.9999、真空沿 a、法向 −y 时与理想 slab 相同；`surface_normal(s, exclude=吸附物 ∪ 漂浮片段)`，R-F27）；`tests/surface_fixtures.py --write` 产物与函数一致
@@ -1617,13 +1617,13 @@ M5 无依赖或只依赖前两波的起步：吸附物库、二维 Delaunay、�
 
 【目标】吸附物库 `adsorbates.json`（52 个条目）与它的 schema、校验、查找、`Adsorbate` 对象与自动框架；建立 `build/adsorbate.py` 与 `web/js/build/adsorbates.js` 的分段骨架；加入 M5 的 `adsorbate_*` 键。
 
-【依据】M5 §2.1、§3.9（自动框架与 `reference`）、§4.1（库文件、条目表、8 条校验）、§4.2（加载：经共用数据模块 `webdata`；实现归 M2 T2，已在 W1.1 合入，V-F14 第 1 条）、§4.7（`adsorbate_*` 键）、§6.1/§6.2 的库部分；ledger-features L-M5-01（schema `crystallume.adsorbates/1`）、R-F30、R-F31（启动任务 `registerBootTask('adsorbates', loadAdsorbateLibrary)` 由 M5-T9a 在分区文件里注册）、L-X-08 M5 行；V-F05（`Adsorbate.to_structure` 的注释：放进盒子时 `vacuum` 是周期像之间沿每根晶格矢量的总间隙，pbc T T T，`vacuum=None` 表示不装箱，不是默认值）；U4。
+【依据】M5 §2.1、§3.9（自动框架与 `reference`）、§4.1（库文件、条目表、8 条校验）、§4.2（加载：经共用数据模块 `webdata`；实现归 M2 T2，已在 W1.1 合入，V-F14 第 1 条）、§4.7（`adsorbate_*` 键）、§6.1/§6.2 的库部分；ledger-features L-M5-01（schema `facet.adsorbates/1`）、R-F30、R-F31（启动任务 `registerBootTask('adsorbates', loadAdsorbateLibrary)` 由 M5-T9a 在分区文件里注册）、L-X-08 M5 行；V-F05（`Adsorbate.to_structure` 的注释：放进盒子时 `vacuum` 是周期像之间沿每根晶格矢量的总间隙，pbc T T T，`vacuum=None` 表示不装箱，不是默认值）；U4。
 
-【实现】`crystallume/web/data/adsorbates.json`（按 M5 §4.1 表；生成器 `scripts/gen_adsorbates.py` 扩展自 v1 原型 `scratchpad/proto/m5/library.py`，开发期运行）；新文件 `crystallume/build/adsorbate.py` 与 `web/js/build/adsorbates.js`：骨架段 `M5-T1`（库）、`M5-T5`（放置）、`M5-T6`（结构集成）、`M5-T7`（批量与覆盖度），每段自带 import 小块；段 `M5-T1` 内实现加载包装（Python `load_web_data`，JS `loadAdsorbateLibrary()`/`adsorbateLibrary()`）、校验、查找（id、别名、化学式、元素符号；E20 的建议）、`Adsorbate`、`adsorbate_from_structure`、`Adsorbate.to_structure`；`build/__init__.py` 段 `M5-T1` 导出；defaults 段 `M5-adsorbates`（`adsorbate_*` 全部键）。
+【实现】`facet/web/data/adsorbates.json`（按 M5 §4.1 表；生成器 `scripts/gen_adsorbates.py` 扩展自 v1 原型 `scratchpad/proto/m5/library.py`，开发期运行）；新文件 `facet/build/adsorbate.py` 与 `web/js/build/adsorbates.js`：骨架段 `M5-T1`（库）、`M5-T5`（放置）、`M5-T6`（结构集成）、`M5-T7`（批量与覆盖度），每段自带 import 小块；段 `M5-T1` 内实现加载包装（Python `load_web_data`，JS `loadAdsorbateLibrary()`/`adsorbateLibrary()`）、校验、查找（id、别名、化学式、元素符号；E20 的建议）、`Adsorbate`、`adsorbate_from_structure`、`Adsorbate.to_structure`；`build/__init__.py` 段 `M5-T1` 导出；defaults 段 `M5-adsorbates`（`adsorbate_*` 全部键）。
 
 【U 与负责人决定】U4（`to_structure` 的 `vacuum` 是总间隙、不是默认值，V-F05）；负责人决定：无直接相关项。
 
-【文件】`crystallume/web/data/adsorbates.json`、`scripts/gen_adsorbates.py`、`crystallume/build/adsorbate.py`（新建骨架）、`crystallume/web/js/build/adsorbates.js`（新建骨架）、`crystallume/build/__init__.py#M5-T1`、`crystallume/core/defaults.py#M5-adsorbates`、`crystallume/web/js/core/defaults.js#M5-adsorbates`、`tests/test_adsorbate_library.py`、`tests/js/adsorbate_library.test.mjs`。
+【文件】`facet/web/data/adsorbates.json`、`scripts/gen_adsorbates.py`、`facet/build/adsorbate.py`（新建骨架）、`facet/web/js/build/adsorbates.js`（新建骨架）、`facet/build/__init__.py#M5-T1`、`facet/core/defaults.py#M5-adsorbates`、`facet/web/js/core/defaults.js#M5-adsorbates`、`tests/test_adsorbate_library.py`、`tests/js/adsorbate_library.test.mjs`。
 
 【测试】`test_adsorbate_library`（8 条校验、52 个条目）、`test_adsorbate_lookup`（id、别名、化学式、元素符号、E20 建议）、`test_adsorbate_frame_custom`（§3.9 规则：水、甲醇、苯、乙烯、CO2、CH4）的两语言版本；JS 在 Node 下经 `setWebData` 加载；`adsorbate_*` 键两语言相等。
 
@@ -1635,11 +1635,11 @@ M5 无依赖或只依赖前两波的起步：吸附物库、二维 Delaunay、�
 
 【依据】M5 §3.3（3.3.2 算法与算术顺序写死；P1）、§7.2（`test_delaunay_random`、`test_delaunay_degenerate`）、§7.3（Delaunay 单独做三角形集合完全相等的比较）；ledger-features L-M5-02（文件 `core/delaunay.py`、`web/js/core/delaunay.js`）；P2（不用 scipy）。
 
-【实现】新文件 `crystallume/core/delaunay.py` 与 `web/js/core/delaunay.js`（蛇形插入网格 `site_order_cell` 的值由调用方传入，本模块不读 defaults）。
+【实现】新文件 `facet/core/delaunay.py` 与 `web/js/core/delaunay.js`（蛇形插入网格 `site_order_cell` 的值由调用方传入，本模块不读 defaults）。
 
 【U 与负责人决定】无直接相关的 U 项与负责人决定（纯几何）。
 
-【文件】`crystallume/core/delaunay.py`、`crystallume/web/js/core/delaunay.js`、`tests/test_delaunay.py`、`tests/js/delaunay.test.mjs`。
+【文件】`facet/core/delaunay.py`、`facet/web/js/core/delaunay.js`、`tests/test_delaunay.py`、`tests/js/delaunay.test.mjs`。
 
 【测试】2000 个随机点：空圆性质（抽查 300 个三角形）、三角形数 = 2n − 2 − h；12×12 正方格子 242 个三角形；蜂窝 338 点 624 个三角形；输入顺序打乱后合并结果相同；两语言对同一组点（JSON 常量）给出相同的三角形集合（跨语言比较放到 M5-T12a，本任务两边各自断言同一期望）。
 
@@ -1649,11 +1649,11 @@ M5 无依赖或只依赖前两波的起步：吸附物库、二维 Delaunay、�
 
 【依据】M5 §3.1（前提、基底与表面坐标系，E1）、§3.2（位点原子：`auto` v2、exposed、layers、window、selected；遮挡剔除 D12、E14）、§3.16（E1–E3 等文案）、§4.7（`site_*` 与 `coverage_min_separation`）、§7.1（`tests/surface_fixtures.py` 与 `python -m tests.surface_fixtures --write` → `tests/data/surface/slabs/*.json`；派生夹具固定存档）；ledger-features L-M5-02（`site_atoms` 的名字，R-F06：不得把任何函数命名为 `surface_atoms`）、R-F27 与 V-F14 第 2 条（`surface_normal(s, frame=…, exclude=ads ∪ loose)`；E3 文案 `vacuum_gap_hint(s, exclude=…)`；不建基底视图来求法向）、L-X-08（删除 `coverage_translation_tolerance`）、§10.5 第 9 条；ledger-F0 R16（显示不排除吸附物）、§6 M5 第 0、1 条；M3 的 `bond_graph`、`coordination_numbers`、`find_adsorbates`、`surface_atoms`、`cluster_heights`、`periodic_components`；U1（上下表面用与显示同一个切口，U1-d）。
 
-【实现】新文件 `crystallume/analysis/sites.py` 与 `web/js/core/sites.js`：骨架段 `M5-T3`、`M5-T4`、`M5-T11`；段 `M5-T3` 内实现 `view`、`surface_setup`、有限片段、位点原子方法、遮挡剔除与 `site_atoms`；`analysis/__init__.py` 段 `M5-sites` 导出 `site_atoms`（M5-T4 之后在同段追加其余名字）；defaults 段 `M5-sites`；`tests/surface_fixtures.py`（从原型 `slabs.py` 移植的 `pt111(n, layers)`、`cu100`、`fcc110`、`fcc211`、`bcc110`、`bcc100`、`bcc111`、`hcp0001`、`graphene`、`mos2`、`tio2_110`、`rutile_110(M)`、`ceo2_111`、`nacl_100`、`sto_001(layers, term)`、`zno_10m10`、`corundum_0001`、`supercell(s, M)` 与派生夹具）。
+【实现】新文件 `facet/analysis/sites.py` 与 `web/js/core/sites.js`：骨架段 `M5-T3`、`M5-T4`、`M5-T11`；段 `M5-T3` 内实现 `view`、`surface_setup`、有限片段、位点原子方法、遮挡剔除与 `site_atoms`；`analysis/__init__.py` 段 `M5-sites` 导出 `site_atoms`（M5-T4 之后在同段追加其余名字）；defaults 段 `M5-sites`；`tests/surface_fixtures.py`（从原型 `slabs.py` 移植的 `pt111(n, layers)`、`cu100`、`fcc110`、`fcc211`、`bcc110`、`bcc100`、`bcc111`、`hcp0001`、`graphene`、`mos2`、`tio2_110`、`rutile_110(M)`、`ceo2_111`、`nacl_100`、`sto_001(layers, term)`、`zno_10m10`、`corundum_0001`、`supercell(s, M)` 与派生夹具）。
 
 【U 与负责人决定】U1（上下表面用与显示同一切口；没有间隙时只给 `vacuum_gap_hint`）；负责人决定：无直接相关项。
 
-【文件】`crystallume/analysis/sites.py`（新建骨架）、`crystallume/web/js/core/sites.js`（新建骨架）、`crystallume/analysis/__init__.py#M5-sites`、`crystallume/core/defaults.py#M5-sites`、`crystallume/web/js/core/defaults.js#M5-sites`、`tests/surface_fixtures.py`、`tests/data/surface/slabs/`、`tests/test_sites_frame.py`、`tests/js/sites_frame.test.mjs`。
+【文件】`facet/analysis/sites.py`（新建骨架）、`facet/web/js/core/sites.js`（新建骨架）、`facet/analysis/__init__.py#M5-sites`、`facet/core/defaults.py#M5-sites`、`facet/web/js/core/defaults.js#M5-sites`、`tests/surface_fixtures.py`、`tests/data/surface/slabs/`、`tests/test_sites_frame.py`、`tests/js/sites_frame.test.mjs`。
 
 【测试】`test_sites_frame`（恰好一半原子跨边界、CONTCAR 底层 0.9999、真空沿 a、法向沿 −y：位点原子与理想 slab 相同、框架中逐位相同）、`test_sites_vacuum_with_adsorbates`（10 Å 真空两面各一个 CO 仍能建立框架）、`test_sites_methods`（五种方法在 Pt(110)、Pt(211)、TiO2(110)、CeO2(111) 上的位点原子数）、`test_sites_occlusion`（fcc(111) 4L `layers=4`、hcp(0001) `layers=3`、Cu(100) 6L `layers=3`，精确与 0.01 Å 噪声：剔除 4 个、W4）、`test_sites_supported_cluster`（Pt4/Pt(111)：台面 13 + 团簇 4；Pt4/TiO2 `include_adsorbates`）、`test_sites_gas_molecule`（6 Å 上方的 CO 被排除）、`test_sites_errors` 中 E1–E3 的文案；夹具 JSON 与函数一致。
 
@@ -1663,37 +1663,37 @@ M5 无依赖或只依赖前两波的起步：吸附物库、二维 Delaunay、�
 
 | 链 | 端口 | 任务 | 独占的文件 |
 |---|---|---|---|
-| `w3-m5-sites` | — | M5-T4 位点生成与分类（双语言） | `crystallume/analysis/sites.py#M5-T4`、`crystallume/web/js/core/sites.js#M5-T4`、`crystallume/analysis/__init__.py#M5-sites`、`tests/surface_fixtures.py`、`tests/data/surface/slabs/`、`tests/data/surface/sites/`、`tests/ops/m5_sites.py`、`tests/js/ops/m5_sites.mjs`、`tests/test_sites.py`、`tests/js/sites.test.mjs` |
-| `w3-m5-placement` | — | M5-T5 放置核心 place_adsorbate 与目标距离（双语言）；接上 M4 的默认键长 | `crystallume/build/adsorbate.py#M5-T5`、`crystallume/web/js/build/adsorbates.js#M5-T5`、`crystallume/build/__init__.py#M5-T5`、`crystallume/analysis/placement.py`、`crystallume/web/js/core/placement.js`、`tests/test_place_adsorbate.py`、`tests/js/place_adsorbate.test.mjs` |
-| `w3-m5-integration` | — | M5-T6 结构集成：apply_placements、记录、命名、删除与超胞处理器（双语言） | `crystallume/build/adsorbate.py#M5-T6`、`crystallume/web/js/build/adsorbates.js#M5-T6`、`crystallume/build/__init__.py#M5-T6`、`crystallume/core/infohandlers.py#M5`、`crystallume/web/js/core/infohandlers.js#M5`、`tests/test_adsorbate_integration.py`、`tests/js/adsorbate_integration.test.mjs` |
-| `w3-m5-markers` | 8841 | M5-T8 位点标记叠加层与 Pick site 工具 | `crystallume/web/js/render/sitemarkers.js`、`crystallume/web/js/render/tools/sitepick.js`、`crystallume/web/js/main.js#M5-sitepick`、`crystallume/web/css/app.css#M5-markers`、`crystallume/web/js/ui/icons.js#M5`、`tests/data/surface/sitemarkers/`、`tests/js/sitemarkers.test.mjs` |
-| `w3-m5-topbottom` | — | M5-T11 上下表面对称操作 find_top_bottom_operation（双语言）、M3-T14 M3 与 M5 的交叉测试 | `crystallume/analysis/sites.py#M5-T11`、`crystallume/web/js/core/sites.js#M5-T11`、`crystallume/analysis/__init__.py#M5-topbottom`、`tests/test_top_bottom.py`、`tests/js/top_bottom.test.mjs`、`tests/test_sites_m3_cross.py` |
-| `w3-m5-calibration` | — | M5-T13 参考数据与吸附物系数校准 | `crystallume/web/data/adsorbates.json`、`tests/data/surface/adsorb/reference.json`、`scripts/calibrate_adsorbates.py`、`tests/test_adsorbate_reference.py` |
+| `w3-m5-sites` | — | M5-T4 位点生成与分类（双语言） | `facet/analysis/sites.py#M5-T4`、`facet/web/js/core/sites.js#M5-T4`、`facet/analysis/__init__.py#M5-sites`、`tests/surface_fixtures.py`、`tests/data/surface/slabs/`、`tests/data/surface/sites/`、`tests/ops/m5_sites.py`、`tests/js/ops/m5_sites.mjs`、`tests/test_sites.py`、`tests/js/sites.test.mjs` |
+| `w3-m5-placement` | — | M5-T5 放置核心 place_adsorbate 与目标距离（双语言）；接上 M4 的默认键长 | `facet/build/adsorbate.py#M5-T5`、`facet/web/js/build/adsorbates.js#M5-T5`、`facet/build/__init__.py#M5-T5`、`facet/analysis/placement.py`、`facet/web/js/core/placement.js`、`tests/test_place_adsorbate.py`、`tests/js/place_adsorbate.test.mjs` |
+| `w3-m5-integration` | — | M5-T6 结构集成：apply_placements、记录、命名、删除与超胞处理器（双语言） | `facet/build/adsorbate.py#M5-T6`、`facet/web/js/build/adsorbates.js#M5-T6`、`facet/build/__init__.py#M5-T6`、`facet/core/infohandlers.py#M5`、`facet/web/js/core/infohandlers.js#M5`、`tests/test_adsorbate_integration.py`、`tests/js/adsorbate_integration.test.mjs` |
+| `w3-m5-markers` | 8841 | M5-T8 位点标记叠加层与 Pick site 工具 | `facet/web/js/render/sitemarkers.js`、`facet/web/js/render/tools/sitepick.js`、`facet/web/js/main.js#M5-sitepick`、`facet/web/css/app.css#M5-markers`、`facet/web/js/ui/icons.js#M5`、`tests/data/surface/sitemarkers/`、`tests/js/sitemarkers.test.mjs` |
+| `w3-m5-topbottom` | — | M5-T11 上下表面对称操作 find_top_bottom_operation（双语言）、M3-T14 M3 与 M5 的交叉测试 | `facet/analysis/sites.py#M5-T11`、`facet/web/js/core/sites.js#M5-T11`、`facet/analysis/__init__.py#M5-topbottom`、`tests/test_top_bottom.py`、`tests/js/top_bottom.test.mjs`、`tests/test_sites_m3_cross.py` |
+| `w3-m5-calibration` | — | M5-T13 参考数据与吸附物系数校准 | `facet/web/data/adsorbates.json`、`tests/data/surface/adsorb/reference.json`、`scripts/calibrate_adsorbates.py`、`tests/test_adsorbate_reference.py` |
 
 **合并顺序**：`w3-m5-sites` → `w3-m5-topbottom` → `w3-m5-integration` → `w3-m5-placement` → `w3-m5-calibration` → `w3-m5-markers`
 
 **出口检查**：
 
-- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`CRYSTALLUME_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
+- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`FACET_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
 - M5-T4：`tests/test_sites.py`、`tests/js/sites.test.mjs` 通过；M5 §7.3 原型位点表的全部计数与类标签；`test_sites_invariance` 含 (0, ½)、(¼, ½)、(½, ½) 平移与空位用例（负责人决定 L-03）；多元素摘要 `4 site atoms (Ti2O2)`（L-09）
 - 验收（Python 与 JS 的单元测试）：S1-5、S2-4、S3-3、S4-3/S4-4、S5-3、S6-4/S6-5、S7-3、S8-5、S8-7（G-15 已按 L-03 修正，不再 xfail）、S9-6、S10-5、S11-5、S12-3、S13-3、S13-5
 - M5-T5：`tests/test_place_adsorbate.py` 通过；高度一律按 M5 §3.10 的式子从 `adsorbates.json` 读系数现算（L-15）；`test_m4_m5_single_atom_height`（≤ 1e-9 Å，R-F11）与 `test_m4_default_bond_from_library`（L-05）通过；验收 S1-6（S1-6′ 式）、S2-5、S3-4、S4-5、S5-4/S5-4′/S5-5/S5-6、S6-6–S6-8、S7-4、S13-4
 - M5-T6：`tests/test_adsorbate_integration.py` 通过（R-ADS、插入顺序 Pt×36, C, C, O, O、记录无 `firstAtom`、名字只用 `autoName`（L-12）、超胞复制记录）；验收 S1-8、S1-9、S1-10（Python 导出）
 - M5-T11/M3-T14：`tests/test_top_bottom.py` 与 `tests/test_sites_m3_cross.py` 通过；验收 S9-7
 - M5-T13：`tests/data/surface/adsorb/reference.json` 每项带出处；`adsorbates.json` 的 8 条校验仍通过
-- 界面：应用在静态模式（`python3 -m http.server <端口> --directory crystallume/web`）与 `crystallume serve` 下都能启动，`document.body.dataset.ready === 'true'`，控制台无 `pageerror`/`console.error`；位点标记（夹具 SiteSet）按类型显示形状，PNG 默认不含标记
+- 界面：应用在静态模式（`python3 -m http.server <端口> --directory facet/web`）与 `facet serve` 下都能启动，`document.body.dataset.ready === 'true'`，控制台无 `pageerror`/`console.error`；位点标记（夹具 SiteSet）按类型显示形状，PNG 默认不含标记
 
 #### M5-T4 位点生成与分类（双语言）（链 `w3-m5-sites`）
 
 【目标】位点识别的后半部分：周期平铺、外接圆心合并、归属与自检、过滤、微面三重位、按类的接近方向、子类型与标签、指纹与分类、组成与颜色、已占用与邻近吸附物、`assign_sites`、`nearest_sites`、`site_presets`、`SiteSet` 与序列化。
 
-【依据】M5 §3.3.1、§3.3.3、§3.4–3.8、§3.15、§3.16、§4.8（`crystallume.sites/1`）、§5.2 的摘要写法、§7.1（金标格式改用 `crystallume.cases/1`，plan.md P-03）、§7.2（`test_sites_counts`、`test_sites_invariance`、`test_sites_microfacet`、`test_subtype_v2`、`test_local_normal_class`、`test_classify_order`、`test_labels_stable_after_placement`、`test_sites_vacancy`、`test_sites_adsorbates_and_occupancy`、`test_fingerprint_boundary`、`test_assign_sites`）、§7.3（原型位点表；类序与 `#n` 由按规格写的实现重新生成）；ledger-features L-M5-02（导出名单：`adsorption_sites`、`site_atoms`、`find_sites`、`assign_sites`、`site_presets`、`SiteSet`、`Site`、`SiteClass`）、L-M5-03（**[新]** `nearest_sites(site_set, points)`，供 M6 的配位记录用，负责人决定 L-07）、§10.5 第 4、5 条；负责人决定 L-03（桥位保留判据改用键图近邻距离，平铺与归属之前把表面原子平移到规范原点）、L-09（多元素表面 `4 site atoms (Ti2O2)`）、L-14（"hollow 的所有边界边在键图中相连"即启用局部法向，以 M5 §3.5 为准）；M5-T2 的 Delaunay、M5-T3 的框架；M1 `gauss_reduce_2d`（缺省 `"obtuse"`）。
+【依据】M5 §3.3.1、§3.3.3、§3.4–3.8、§3.15、§3.16、§4.8（`facet.sites/1`）、§5.2 的摘要写法、§7.1（金标格式改用 `facet.cases/1`，plan.md P-03）、§7.2（`test_sites_counts`、`test_sites_invariance`、`test_sites_microfacet`、`test_subtype_v2`、`test_local_normal_class`、`test_classify_order`、`test_labels_stable_after_placement`、`test_sites_vacancy`、`test_sites_adsorbates_and_occupancy`、`test_fingerprint_boundary`、`test_assign_sites`）、§7.3（原型位点表；类序与 `#n` 由按规格写的实现重新生成）；ledger-features L-M5-02（导出名单：`adsorption_sites`、`site_atoms`、`find_sites`、`assign_sites`、`site_presets`、`SiteSet`、`Site`、`SiteClass`）、L-M5-03（**[新]** `nearest_sites(site_set, points)`，供 M6 的配位记录用，负责人决定 L-07）、§10.5 第 4、5 条；负责人决定 L-03（桥位保留判据改用键图近邻距离，平铺与归属之前把表面原子平移到规范原点）、L-09（多元素表面 `4 site atoms (Ti2O2)`）、L-14（"hollow 的所有边界边在键图中相连"即启用局部法向，以 M5 §3.5 为准）；M5-T2 的 Delaunay、M5-T3 的框架；M1 `gauss_reduce_2d`（缺省 `"obtuse"`）。
 
 【实现】`analysis/sites.py` 与 `web/js/core/sites.js` 的段 `M5-T4`；`analysis/__init__.py` 段 `M5-sites` 追加导出；金标 `tests/data/surface/sites/*.json`（op `adsorptionSites`）与两语言 op 文件；按需扩展 `tests/surface_fixtures.py` 与 `tests/data/surface/slabs/`。
 
 【U 与负责人决定】U1；负责人决定 L-03、L-07（`nearest_sites`）、L-09、L-14。
 
-【文件】`crystallume/analysis/sites.py#M5-T4`、`crystallume/web/js/core/sites.js#M5-T4`、`crystallume/analysis/__init__.py#M5-sites`、`tests/surface_fixtures.py`、`tests/data/surface/slabs/`、`tests/data/surface/sites/`、`tests/ops/m5_sites.py`、`tests/js/ops/m5_sites.mjs`、`tests/test_sites.py`、`tests/js/sites.test.mjs`。
+【文件】`facet/analysis/sites.py#M5-T4`、`facet/web/js/core/sites.js#M5-T4`、`facet/analysis/__init__.py#M5-sites`、`tests/surface_fixtures.py`、`tests/data/surface/slabs/`、`tests/data/surface/sites/`、`tests/ops/m5_sites.py`、`tests/js/ops/m5_sites.mjs`、`tests/test_sites.py`、`tests/js/sites.test.mjs`。
 
 【测试】上列 M5 §7.2 的位点测试全部；`test_sites_invariance` 加 (0, ½)、(¼, ½)、(½, ½) 平移与空位用例；TiO2(110) 2×1 去掉一个 O_br：Ti 分为 1 + 2 + 1、空位处 `short bridge (Ti2)`；acceptance 的位点检查 S1-5…S13-5（见本批次出口检查）。
 
@@ -1707,7 +1707,7 @@ M5 无依赖或只依赖前两波的起步：吸附物库、二维 Delaunay、�
 
 【U 与负责人决定】U5（D2）；负责人决定 L-05、L-15。
 
-【文件】`crystallume/build/adsorbate.py#M5-T5`、`crystallume/web/js/build/adsorbates.js#M5-T5`、`crystallume/build/__init__.py#M5-T5`、`crystallume/analysis/placement.py`、`crystallume/web/js/core/placement.js`、`tests/test_place_adsorbate.py`、`tests/js/place_adsorbate.test.mjs`。
+【文件】`facet/build/adsorbate.py#M5-T5`、`facet/web/js/build/adsorbates.js#M5-T5`、`facet/build/__init__.py#M5-T5`、`facet/analysis/placement.py`、`facet/web/js/core/placement.js`、`tests/test_place_adsorbate.py`、`tests/js/place_adsorbate.test.mjs`。
 
 【测试】`test_place_analytic`（O/Pt(111) fcc、CO top、O/Cu(100) hollow，±1e-4，按有效半径现算）、`test_place_modes`、`test_place_bidentate`/`test_place_flat`、`test_place_env`、`test_slab_radii`（Pt 1.386、Cu 1.278、Ru 1.353、W 1.370 ± 1e-3；Ti 1.288）、`test_anion_floor`、`test_place_lift`/`test_place_fallback`、`test_clash`、`test_w5_coads`、`test_ase_compat`（`add_adsorbate(slab, mol, 1.8, "fcc", mol_index=0)` 不转动分子；ASE 形式的位置参数由 M5-T6 的 `add_adsorbate` 提供时在那边测）、`test_format_decimal`、`test_m4_m5_single_atom_height`（Pt(111) top/bridge/fcc/hcp 与 Cu(100) 4 重位）、`test_m4_default_bond_from_library`（O 在 Cu(100) 4 重位、H 在 Pt(111) fcc，M4 与 M5 同一高度）。
 
@@ -1721,7 +1721,7 @@ M5 无依赖或只依赖前两波的起步：吸附物库、二维 Delaunay、�
 
 【U 与负责人决定】U5（D2：放吸附物原位修改 slab）；负责人决定 L-12（只用 `autoName`）。
 
-【文件】`crystallume/build/adsorbate.py#M5-T6`、`crystallume/web/js/build/adsorbates.js#M5-T6`、`crystallume/build/__init__.py#M5-T6`、`crystallume/core/infohandlers.py#M5`、`crystallume/web/js/core/infohandlers.js#M5`、`tests/test_adsorbate_integration.py`、`tests/js/adsorbate_integration.test.mjs`。
+【文件】`facet/build/adsorbate.py#M5-T6`、`facet/web/js/build/adsorbates.js#M5-T6`、`facet/build/__init__.py#M5-T6`、`facet/core/infohandlers.py#M5`、`facet/web/js/core/infohandlers.js#M5`、`tests/test_adsorbate_integration.py`、`tests/js/adsorbate_integration.test.mjs`。
 
 【测试】`test_props_and_info`、`test_promote_on_first_place`（CONTCAR + 没有 id 的 CO：放一个 O 后旧 CO id 1、新 O id 2，基底位点不变）、`test_insertion_order`（Pt(111) 放两个 CO → symbols Pt×36, C, C, O, O；POSCAR 无 Export note；不分块的 slab 追加在末尾；`src` 正确）、`test_adsorbate_naming`（改用 `autoName`：后缀、删除后恢复、用户改名后不再改、`CONTCAR + CO`）、`test_partial_deletion`、`test_poscar_roundtrip`（CO 两行 `T T T`、底层 `F F F`，按空白切分比较）、`test_extxyz_roundtrip`、`test_multiframe`（W9）、`test_supercell_copies_records`（M1 超胞 2×2×1 后记录 ×4、id 与 `site.point` 正确，名字 `… 2×2×1 + 4CO`）；验收 S1-8、S1-9、S1-10 的 Python 部分。
 
@@ -1731,15 +1731,15 @@ M5 无依赖或只依赖前两波的起步：吸附物库、二维 Delaunay、�
 
 【依据】M5 §5.3（形状：top 球半径 0.28 Å；bridge 沿桥轴的短棒长 0.7 Å、半径 0.10 Å；hollow 位点平面内的正 k 边形薄片外接圆半径 0.32 Å，k > 6 时画圆；位置 `point + site_marker_height·normal`，由 `drawnCopies(points, model, {repeat: true})` 按显示包裹与显示超胞复制；每类一个 `InstancedMesh`；Select 工具下标记不可拾取；Pick site：单击 = 选位点（`click` 返回 true）、Shift+单击 = 多选、双击 = 放置（`overlaydblclick`）、右键 = 标记菜单（`overlaycontext`）、Esc 回到 Select；悬停 ×1.5、选中加白色描边环、已占用 40% 不透明度；副本总数 > 100 000 时只拾取 (0, 0) 像；导出 `marker`）、§5.9；ledger-features L-M5-09（`viewer.overlays.add({ id: 'adsorption-sites', tier: 'top', export: 'marker', pickable: true, pickIn: ['site-pick'], … })`；`tools.register({ id: 'site-pick', icon: 'target', toolbar: false, selects: false, cursor: 'crosshair', touch: 'claim', … })`）；ledger-F0 §6 M5 第 2、3 条（`handler.hover(hit, e)`、`click(e, hit) → boolean`、`claims: () => false`；`markerLayer({ tier: 'top', export: 'marker', pickIn: ['site-pick'] })`；先用 `markerLayer` 交付球形版本也可以）、L-F0-37/38/40/41；M5-T3 的 `site_marker_height` 键。
 
-【实现】新文件 `web/js/render/sitemarkers.js`（`showSiteMarkers(app, siteSet, opts)`、`hideSiteMarkers(app)`、实例数据与颜色、拾取映射）、`web/js/render/tools/sitepick.js`（工具与回调注册 `setSitePickHandlers({ onSelect, onPlace, onContext, onHover })`，M5-T9a 设置这些回调）；`main.js` 段 `M5-sitepick`；样式放 `css/app.css` 段 `M5-markers`（悬停提示等）；需要新图标时放 `ui/icons.js` 段 `M5`（`target` 由 F0-A 提供）；夹具 `tests/data/surface/sitemarkers/pt111_p3x3.sites.json`（手写的 `crystallume.sites/1`）。
+【实现】新文件 `web/js/render/sitemarkers.js`（`showSiteMarkers(app, siteSet, opts)`、`hideSiteMarkers(app)`、实例数据与颜色、拾取映射）、`web/js/render/tools/sitepick.js`（工具与回调注册 `setSitePickHandlers({ onSelect, onPlace, onContext, onHover })`，M5-T9a 设置这些回调）；`main.js` 段 `M5-sitepick`；样式放 `css/app.css` 段 `M5-markers`（悬停提示等）；需要新图标时放 `ui/icons.js` 段 `M5`（`target` 由 F0-A 提供）；夹具 `tests/data/surface/sitemarkers/pt111_p3x3.sites.json`（手写的 `facet.sites/1`）。
 
 【U 与负责人决定】U1（标记不表示 slab）；负责人决定：无直接相关项。
 
-【文件】`crystallume/web/js/render/sitemarkers.js`、`crystallume/web/js/render/tools/sitepick.js`、`crystallume/web/js/main.js#M5-sitepick`、`crystallume/web/css/app.css#M5-markers`、`crystallume/web/js/ui/icons.js#M5`、`tests/data/surface/sitemarkers/`、`tests/js/sitemarkers.test.mjs`。
+【文件】`facet/web/js/render/sitemarkers.js`、`facet/web/js/render/tools/sitepick.js`、`facet/web/js/main.js#M5-sitepick`、`facet/web/css/app.css#M5-markers`、`facet/web/js/ui/icons.js#M5`、`tests/data/surface/sitemarkers/`、`tests/js/sitemarkers.test.mjs`。
 
 【测试】`tests/js/sitemarkers.test.mjs`：从 SiteSet 生成的实例数据（每类数量、形状参数）、副本到位点下标的映射、解析射线–球求交的拾取、> 100 000 副本时只拾取 (0, 0) 像、单击/双击/右键的回调分派（不依赖 WebGL）。
 
-【界面检查】（Chromium，本链端口）载入 Pt(111) p(3×3) 4L 夹具，在控制台 `(await import('/js/render/sitemarkers.js')).showSiteMarkers(crystallume.app, <夹具 SiteSet>)`：top 球、bridge 棒、fcc/hcp 三角片出现在表面上方，颜色按类；显示超胞 2×2×1 时标记一起复制；悬停放大；切到 site-pick 工具（`crystallume.app.setTool('site-pick')` 或 F0-A 的等价调用）后单击选中位点（白色描边）、双击触发 `onPlace` 回调（打印日志）；Select 工具下点击表面原子照常选原子；默认导出 PNG 不含标记，勾选 `Include markers` 后才含。截图存 `scratchpad/shots/w3-m5-markers/`。
+【界面检查】（Chromium，本链端口）载入 Pt(111) p(3×3) 4L 夹具，在控制台 `(await import('/js/render/sitemarkers.js')).showSiteMarkers(facet.app, <夹具 SiteSet>)`：top 球、bridge 棒、fcc/hcp 三角片出现在表面上方，颜色按类；显示超胞 2×2×1 时标记一起复制；悬停放大；切到 site-pick 工具（`facet.app.setTool('site-pick')` 或 F0-A 的等价调用）后单击选中位点（白色描边）、双击触发 `onPlace` 回调（打印日志）；Select 工具下点击表面原子照常选原子；默认导出 PNG 不含标记，勾选 `Include markers` 后才含。截图存 `scratchpad/shots/w3-m5-markers/`。
 
 #### M5-T11 上下表面对称操作 find_top_bottom_operation（双语言）（链 `w3-m5-topbottom`）
 
@@ -1751,7 +1751,7 @@ M5 无依赖或只依赖前两波的起步：吸附物库、二维 Delaunay、�
 
 【U 与负责人决定】U1（只用基底，切口与显示同一个）；负责人决定：无直接相关项。
 
-【文件】`crystallume/analysis/sites.py#M5-T11`、`crystallume/web/js/core/sites.js#M5-T11`、`crystallume/analysis/__init__.py#M5-topbottom`、`tests/test_top_bottom.py`、`tests/js/top_bottom.test.mjs`。
+【文件】`facet/analysis/sites.py#M5-T11`、`facet/web/js/core/sites.js#M5-T11`、`facet/analysis/__init__.py#M5-topbottom`、`tests/test_top_bottom.py`、`tests/js/top_bottom.test.mjs`。
 
 【测试】上面的 8 个场景两语言；216 原子 ≤ 5 ms（JS）/ ≤ 0.1 s（Python）的粗测（正式预算在 M5-T14）。
 
@@ -1775,11 +1775,11 @@ M5 无依赖或只依赖前两波的起步：吸附物库、二维 Delaunay、�
 
 【依据】M5 §9 T13、§3.10（系数的含义）、§4.1（条目字段）；ledger-features L-M5-01；负责人决定 L-15（测试不抄数字：本任务改系数不会破坏 M5-T5 的测试，因为它们读 `adsorbates.json` 现算；acceptance 里"当前库系数下"的数字只是示例）；P2（开发期脚本不进包、测试不依赖）。
 
-【实现】`tests/data/surface/adsorb/reference.json`（Pt、Ru、Cu、Ag、Fe 或 W，与 TiO2、RuO2 或 CeO2 的参考键长，每项带来源）；`scripts/calibrate_adsorbates.py`（开发期运行；M5-T5 合入前用 v2 原型 `scratchpad/proto/m5v2/v2place.py` 计算，误差表写进报告，不写成仓库里的报告文件）；更新 `crystallume/web/data/adsorbates.json` 的系数与几何（保持 52 个条目与 8 条校验）。
+【实现】`tests/data/surface/adsorb/reference.json`（Pt、Ru、Cu、Ag、Fe 或 W，与 TiO2、RuO2 或 CeO2 的参考键长，每项带来源）；`scripts/calibrate_adsorbates.py`（开发期运行；M5-T5 合入前用 v2 原型 `scratchpad/proto/m5v2/v2place.py` 计算，误差表写进报告，不写成仓库里的报告文件）；更新 `facet/web/data/adsorbates.json` 的系数与几何（保持 52 个条目与 8 条校验）。
 
 【U 与负责人决定】U6（系数取值由负责人按校准结果定案）；负责人决定 L-15。
 
-【文件】`crystallume/web/data/adsorbates.json`、`tests/data/surface/adsorb/reference.json`、`scripts/calibrate_adsorbates.py`、`tests/test_adsorbate_reference.py`。
+【文件】`facet/web/data/adsorbates.json`、`tests/data/surface/adsorb/reference.json`、`scripts/calibrate_adsorbates.py`、`tests/test_adsorbate_reference.py`。
 
 【测试】`tests/test_adsorbate_reference.py`：`reference.json` 的每项有来源与数值；`adsorbates.json` 仍通过 M5-T1 的校验。
 
@@ -1789,21 +1789,21 @@ M5 无依赖或只依赖前两波的起步：吸附物库、二维 Delaunay、�
 
 | 链 | 端口 | 任务 | 独占的文件 |
 |---|---|---|---|
-| `w3-m5-coverage` | — | M5-T7 批量放置、两面、覆盖度与 1/n 超胞、批量生成（双语言） | `crystallume/build/adsorbate.py#M5-T7`、`crystallume/web/js/build/adsorbates.js#M5-T7`、`crystallume/build/__init__.py#M5-T7`、`tests/test_adsorbate_batch.py`、`tests/js/adsorbate_batch.test.mjs` |
-| `w3-m5-panel` | 8842 | M5-T9a Surface › Adsorbates 分区（一）：Sites、Adsorbate、Placement 三块与命令 | `crystallume/web/js/ui/panels/surface-adsorbates.js`、`crystallume/web/js/main.js#M5-adsorbates`、`crystallume/web/css/app.css#M5-panel`、`tests/js/adsorbates_ui.test.mjs` |
-| `w3-m5-perf` | — | M5-T14 M5 性能：向量化与基准 | `crystallume/analysis/sites.py`、`crystallume/web/js/core/sites.js`、`crystallume/build/adsorbate.py#M5-T5`、`crystallume/web/js/build/adsorbates.js#M5-T5`、`tests/test_sites_perf.py`、`tests/js/perf/sites.perf.mjs` |
+| `w3-m5-coverage` | — | M5-T7 批量放置、两面、覆盖度与 1/n 超胞、批量生成（双语言） | `facet/build/adsorbate.py#M5-T7`、`facet/web/js/build/adsorbates.js#M5-T7`、`facet/build/__init__.py#M5-T7`、`tests/test_adsorbate_batch.py`、`tests/js/adsorbate_batch.test.mjs` |
+| `w3-m5-panel` | 8842 | M5-T9a Surface › Adsorbates 分区（一）：Sites、Adsorbate、Placement 三块与命令 | `facet/web/js/ui/panels/surface-adsorbates.js`、`facet/web/js/main.js#M5-adsorbates`、`facet/web/css/app.css#M5-panel`、`tests/js/adsorbates_ui.test.mjs` |
+| `w3-m5-perf` | — | M5-T14 M5 性能：向量化与基准 | `facet/analysis/sites.py`、`facet/web/js/core/sites.js`、`facet/build/adsorbate.py#M5-T5`、`facet/web/js/build/adsorbates.js#M5-T5`、`tests/test_sites_perf.py`、`tests/js/perf/sites.perf.mjs` |
 | `w3-m5-parity` | — | M5-T12a M5 跨语言平价（一）与 M2 集成金标 | `tests/test_m5_parity.py`、`tests/data/surface/sites_m2/`、`tests/ops/m5_parity.py`、`tests/js/ops/m5_parity.mjs` |
 
 **合并顺序**：`w3-m5-coverage` → `w3-m5-perf` → `w3-m5-parity` → `w3-m5-panel`
 
 **出口检查**：
 
-- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`CRYSTALLUME_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
+- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`FACET_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
 - M5-T7：`tests/test_adsorbate_batch.py` 与 JS 对应测试通过；`count=N` 为本次新增 N 个（负责人决定 L-18）；覆盖度的 1×1 胞来自 `reference_mesh(s, exclude=…)`、`source` 为 `record` 而不是 `info`（R-F17）；验收 S1-7、S2-6、S2-7、S3-5、S9-7
 - M5-T12a：`tests/test_m5_parity.py` 通过（位点类表与每个位点的字段、`place_adsorbate`、`apply_placements`、`find_top_bottom_operation`、`assign_sites`、Delaunay 三角形集合；比较排除 `bulk.name`，L-11）；M2 集成金标（用 `build.surface` 生成的 slab 与夹具版位点计数相同）
 - M5-T14：`pytest -m slow tests/test_sites_perf.py tests/test_js_perf.py` 在 M5 §7.5 的 3 倍预算内；验收 S16-2、S16-3（位点与放置部分）
 - 界面：Adsorbates 分区 Find sites → `9 site atoms (Pt) · 54 sites in 4 classes`；类列表 `aria-label` 为 `top (Pt), 9 sites` 等；选 CO 与 fcc 类后读数与 `placeAdsorbate` 一致（±0.005）；Place → toast `Added CO on fcc (Pt3)`，一步撤销；放置前后 Delete 与 Export 一直可用（没有预览会话，K14）；Pick site 双击放置
-- 界面：应用在静态模式（`python3 -m http.server <端口> --directory crystallume/web`）与 `crystallume serve` 下都能启动，`document.body.dataset.ready === 'true'`，控制台无 `pageerror`/`console.error`
+- 界面：应用在静态模式（`python3 -m http.server <端口> --directory facet/web`）与 `facet serve` 下都能启动，`document.body.dataset.ready === 'true'`，控制台无 `pageerror`/`console.error`
 
 #### M5-T7 批量放置、两面、覆盖度与 1/n 超胞、批量生成（双语言）（链 `w3-m5-coverage`）
 
@@ -1815,7 +1815,7 @@ M5 无依赖或只依赖前两波的起步：吸附物库、二维 Delaunay、�
 
 【U 与负责人决定】U5（D2）、P4（批量生成的是新结构）；负责人决定 L-18。
 
-【文件】`crystallume/build/adsorbate.py#M5-T7`、`crystallume/web/js/build/adsorbates.js#M5-T7`、`crystallume/build/__init__.py#M5-T7`、`tests/test_adsorbate_batch.py`、`tests/js/adsorbate_batch.test.mjs`。
+【文件】`facet/build/adsorbate.py#M5-T7`、`facet/web/js/build/adsorbates.js#M5-T7`、`facet/build/__init__.py#M5-T7`、`tests/test_adsorbate_batch.py`、`tests/js/adsorbate_batch.test.mjs`。
 
 【测试】`test_plan_skip_blocked`（top 位有 CO 时 O 放 9 个 fcc：放 6 个、skipped 3；`skip_blocked=False` 放 9 个）、`test_both_sides`（Pt(111) 4L 上下 O 等高且仍有反演；绕 x 转 90° 同样可用；顶面已有 CO 时 W15；SrTiO3 6L → E14）、`test_coverage_theta`、`test_coverage_fill`（Cu(100) p(2×2) θ = 0.5 → 两个 O 相距 3.615；Pt(111) p(2×2) θ = 0.5、min sep 3.0 → 1 个 + W8；已有吸附物作种子）、`test_coverage_supercells`（方格 n = 2/4/8/9、六方 n = 3/7；p(3×3) slab 上 n = 3 的 √3 项 `applicable = false`）、`test_adsorption_structures`、`test_count_adds_n`（L-18：S1 上 `count=1` 总是新增 1 个）；验收 S1-7、S2-6、S2-7、S3-5、S9-7。
 
@@ -1823,13 +1823,13 @@ M5 无依赖或只依赖前两波的起步：吸附物库、二维 Delaunay、�
 
 【目标】Adsorbates 分区的前三块（Sites、Adsorbate、Placement）、幽灵预览、位点标记与 Pick site 的接线、命令与公共 API 的单个放置部分（Coverage 与 Placed 列表、批量操作在 W3.4 的 M5-T9b）。
 
-【依据】M5 §5.1、§5.2、§5.4、§5.5（"Place on all equivalent sites" 由 M5-T9b 做）、§5.7、§5.8（本任务的命令：`sites.find`、`adsorbate.add`、`tool.sitePick`、`sites.toggle`、`adsorbate.select`、`adsorbate.remove`、`adsorbate.fromSelection`；右键菜单与选区动作（选区动作 order 取 77–79，plan.md P-11）；原子信息）、§5.9、§5.10（缓存与失效，`EditResult.map` 重映射）；ledger-features L-M5-09（`registerPanelSection('surface', { id: 'adsorbates', order: 40 })`；位点摘要按负责人决定 L-09；悬停与选中位点的幽灵用 `ghostLayer`，**不开会话**；吸附目标 `crystallume.tools.get('move').registerSnapTargets`；`sites` 只是 `app` 的内部事件，不改 `api/public.js`，R-F26；**没有** `adsorbate.mark` 与 `edit.markAdsorbate`，分区里的 "Mark as adsorbate" 调用 M3 的 `sel.markAdsorbate`，R-F21；公共 API（`defineApi`，owner `M5`）本任务注册 `build.adsorbates()`、`build.adsorbate(name, { mode })`、`analysis.sites(s?, opts)`、`analysis.assignSites(s?, opts)`、`edit.addAdsorbate(name | Adsorbate, opts)`、`edit.removeAdsorbates(ids?)`、`surface.showSites(on, opts)`）、R-F31（`registerBootTask('adsorbates', loadAdsorbateLibrary)`；失败不阻止启动，分区显示原因与 Retry）；ledger-F0 §6 M5 第 4、6、7、8 条（放置用 `editActive(..., { singleFrame: true })`）、L-F0-49/50（`requireCell`、`requireVacuumGap`、`emptyActions`、`registerSelectionAction`、`registerAtomInfo`）；M5-T8 的 `sitemarkers.js`/`sitepick.js`；U1（`available()` 只说缺什么，不说"不是 slab"）、U5（原位修改 slab，要保留原 slab 用 Duplicate）、P3。
+【依据】M5 §5.1、§5.2、§5.4、§5.5（"Place on all equivalent sites" 由 M5-T9b 做）、§5.7、§5.8（本任务的命令：`sites.find`、`adsorbate.add`、`tool.sitePick`、`sites.toggle`、`adsorbate.select`、`adsorbate.remove`、`adsorbate.fromSelection`；右键菜单与选区动作（选区动作 order 取 77–79，plan.md P-11）；原子信息）、§5.9、§5.10（缓存与失效，`EditResult.map` 重映射）；ledger-features L-M5-09（`registerPanelSection('surface', { id: 'adsorbates', order: 40 })`；位点摘要按负责人决定 L-09；悬停与选中位点的幽灵用 `ghostLayer`，**不开会话**；吸附目标 `facet.tools.get('move').registerSnapTargets`；`sites` 只是 `app` 的内部事件，不改 `api/public.js`，R-F26；**没有** `adsorbate.mark` 与 `edit.markAdsorbate`，分区里的 "Mark as adsorbate" 调用 M3 的 `sel.markAdsorbate`，R-F21；公共 API（`defineApi`，owner `M5`）本任务注册 `build.adsorbates()`、`build.adsorbate(name, { mode })`、`analysis.sites(s?, opts)`、`analysis.assignSites(s?, opts)`、`edit.addAdsorbate(name | Adsorbate, opts)`、`edit.removeAdsorbates(ids?)`、`surface.showSites(on, opts)`）、R-F31（`registerBootTask('adsorbates', loadAdsorbateLibrary)`；失败不阻止启动，分区显示原因与 Retry）；ledger-F0 §6 M5 第 4、6、7、8 条（放置用 `editActive(..., { singleFrame: true })`）、L-F0-49/50（`requireCell`、`requireVacuumGap`、`emptyActions`、`registerSelectionAction`、`registerAtomInfo`）；M5-T8 的 `sitemarkers.js`/`sitepick.js`；U1（`available()` 只说缺什么，不说"不是 slab"）、U5（原位修改 slab，要保留原 slab 用 Duplicate）、P3。
 
 【实现】新文件 `web/js/ui/panels/surface-adsorbates.js`（本任务实现分区注册、三块、命令、`defineApi`、启动任务、吸附目标、原子信息行与选区动作；Coverage 与 Placed 两块留空壳给 M5-T9b）；`main.js` 段 `M5-adsorbates`；样式放 `css/app.css` 段 `M5-panel`。快捷键 Shift+S（`sites.toggle`）、Shift+A（`adsorbate.add`）按提议注册，M7 在 W5.1 复核冲突。
 
 【U 与负责人决定】U1、U5（D1、D2）、P3；负责人决定 L-09；Shift+A、Shift+S 由 M7 复核。
 
-【文件】`crystallume/web/js/ui/panels/surface-adsorbates.js`、`crystallume/web/js/main.js#M5-adsorbates`、`crystallume/web/css/app.css#M5-panel`、`tests/js/adsorbates_ui.test.mjs`。
+【文件】`facet/web/js/ui/panels/surface-adsorbates.js`、`facet/web/js/main.js#M5-adsorbates`、`facet/web/css/app.css#M5-panel`、`tests/js/adsorbates_ui.test.mjs`。
 
 【测试】`tests/js/adsorbates_ui.test.mjs`：摘要与类列表 `aria-label` 文案（含多元素 `4 site atoms (Ti2O2)`）、读数 `C–Pt 2.10 Å · 1.36 Å above the site` 的格式（数字由 `placeAdsorbate` 现算）、缓存键与失效规则、命令参数校验与 `whyNot`。
 
@@ -1845,7 +1845,7 @@ M5 无依赖或只依赖前两波的起步：吸附物库、二维 Delaunay、�
 
 【U 与负责人决定】无直接相关的 U 项与负责人决定（只做不改结果的优化）。
 
-【文件】`crystallume/analysis/sites.py`、`crystallume/web/js/core/sites.js`、`crystallume/build/adsorbate.py#M5-T5`、`crystallume/web/js/build/adsorbates.js#M5-T5`、`tests/test_sites_perf.py`、`tests/js/perf/sites.perf.mjs`。
+【文件】`facet/analysis/sites.py`、`facet/web/js/core/sites.js`、`facet/build/adsorbate.py#M5-T5`、`facet/web/js/build/adsorbates.js#M5-T5`、`tests/test_sites_perf.py`、`tests/js/perf/sites.perf.mjs`。
 
 【测试】预算：Pt(111) p(6×6) 6L 216 原子找位点 JS ≤ 30 ms / Python ≤ 0.3 s；约 1 万原子（p(40×40) 6L）JS ≤ 400 ms / Python ≤ 4 s；弛豫 1 万原子 JS ≤ 800 ms / Python ≤ 8 s；单次放置 JS ≤ 2 ms / Python ≤ 20 ms；1600 个位点 × CO JS ≤ 300 ms；上下对称操作 1 万原子 JS ≤ 100 ms / Python ≤ 2 s；实测数字写进报告。
 
@@ -1869,19 +1869,19 @@ Adsorbates 分区的 Coverage、Placed 列表与批量操作；M5 的 REST/客�
 
 | 链 | 端口 | 任务 | 独占的文件 |
 |---|---|---|---|
-| `w3-m5-panel2` | 8843 | M5-T9b Surface › Adsorbates 分区（二）：Coverage、Placed adsorbates 与批量操作 | `crystallume/web/js/ui/panels/surface-adsorbates.js`、`crystallume/web/css/app.css#M5-panel`、`tests/js/adsorbates_ui2.test.mjs` |
-| `w3-m5-api` | — | M5-T10a M5 的 REST、客户端与 CLI（sites、adsorb） | `crystallume/server/models.py`、`crystallume/server/routes/build.py`、`crystallume/server/routes/analysis.py`、`crystallume/server/auth.py`、`crystallume/server/deps.py`、`crystallume/client.py`、`crystallume/cli.py`、`crystallume/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py` |
+| `w3-m5-panel2` | 8843 | M5-T9b Surface › Adsorbates 分区（二）：Coverage、Placed adsorbates 与批量操作 | `facet/web/js/ui/panels/surface-adsorbates.js`、`facet/web/css/app.css#M5-panel`、`tests/js/adsorbates_ui2.test.mjs` |
+| `w3-m5-api` | — | M5-T10a M5 的 REST、客户端与 CLI（sites、adsorb） | `facet/server/models.py`、`facet/server/routes/build.py`、`facet/server/routes/analysis.py`、`facet/server/auth.py`、`facet/server/deps.py`、`facet/client.py`、`facet/cli.py`、`facet/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py` |
 | `w3-m5-parity2` | — | M5-T12b M5 跨语言平价（二）：批量与覆盖度 | `tests/test_m5_parity.py` |
 
 **合并顺序**：`w3-m5-api` → `w3-m5-parity2` → `w3-m5-panel2`
 
 **出口检查**：
 
-- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`CRYSTALLUME_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
-- M5-T10a：`/analysis/sites`（登录）、`/build/adsorbate`（公开；需要位点识别或对称操作的请求在云模式下需登录，K17）、`GET /build/adsorbates` 在 `ROUTE_METHODS` 中；新模型 `extra="forbid"`；CLI `crystallume sites`、`crystallume adsorb`（`--count` 帮助按 L-18、`--site-index`）通过；acceptance S1 的 CLI 序列（按 R-F13 改写）stderr 无 `crystallume: warning:`
+- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`FACET_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
+- M5-T10a：`/analysis/sites`（登录）、`/build/adsorbate`（公开；需要位点识别或对称操作的请求在云模式下需登录，K17）、`GET /build/adsorbates` 在 `ROUTE_METHODS` 中；新模型 `extra="forbid"`；CLI `facet sites`、`facet adsorb`（`--count` 帮助按 L-18、`--site-index`）通过；acceptance S1 的 CLI 序列（按 R-F13 改写）stderr 无 `facet: warning:`
 - M5-T12b：`tests/test_m5_parity.py` 的批量与覆盖度部分通过
 - 界面：Coverage 块 `θ = 0.22 ML (per 1×1 cell) · 0.22 per site atom`；Fill to θ 0.22 → `Added 1 CO (θ = 0.22 ML per 1×1 cell)`（S1-7）；`Place on all 9 equivalent sites` 的计数与跳过 toast；Cells for 1/n coverage n = 3 在 Ag(111) p(1×1) 上 `(√3×√3)R30°` 的 Apply 一步撤销（S3-5）；Placed 列表 `CO #1 · fcc (Pt3) · top`；`Create one structure per class…` 一次加 4 个结构
-- 界面：应用在静态模式（`python3 -m http.server <端口> --directory crystallume/web`）与 `crystallume serve` 下都能启动，`document.body.dataset.ready === 'true'`，控制台无 `pageerror`/`console.error`
+- 界面：应用在静态模式（`python3 -m http.server <端口> --directory facet/web`）与 `facet serve` 下都能启动，`document.body.dataset.ready === 'true'`，控制台无 `pageerror`/`console.error`
 
 #### M5-T9b Surface › Adsorbates 分区（二）：Coverage、Placed adsorbates 与批量操作（链 `w3-m5-panel2`）
 
@@ -1893,7 +1893,7 @@ Adsorbates 分区的 Coverage、Placed 列表与批量操作；M5 的 REST/客�
 
 【U 与负责人决定】U5（原位修改）、P4；负责人决定 L-18。
 
-【文件】`crystallume/web/js/ui/panels/surface-adsorbates.js`、`crystallume/web/css/app.css#M5-panel`、`tests/js/adsorbates_ui2.test.mjs`。
+【文件】`facet/web/js/ui/panels/surface-adsorbates.js`、`facet/web/css/app.css#M5-panel`、`tests/js/adsorbates_ui2.test.mjs`。
 
 【测试】`tests/js/adsorbates_ui2.test.mjs`：θ 读数、来源 tip 与 `Is this the 1×1 cell?` 的条件、Placed 行文案、批量 toast（`Added 4 CO on fcc (Pt3) — skipped 3 sites next to CO #1`）、确认阈值。
 
@@ -1901,7 +1901,7 @@ Adsorbates 分区的 Coverage、Placed 列表与批量操作；M5 的 REST/客�
 
 #### M5-T10a M5 的 REST、客户端与 CLI（sites、adsorb）（链 `w3-m5-api`）
 
-【目标】M5 的外部接口：REST 三个端点、客户端三个方法、CLI `crystallume sites` 与 `crystallume adsorb`。
+【目标】M5 的外部接口：REST 三个端点、客户端三个方法、CLI `facet sites` 与 `facet adsorb`。
 
 【依据】M5 §6.3–6.5、§7.2 的 REST/客户端/CLI 段；ledger-features L-M5-10（`POST /api/v1/analysis/sites`（登录）、`POST /api/v1/build/adsorbate`（公开；需要位点识别或对称操作的请求在云模式下需登录，K17）、`GET /api/v1/build/adsorbates`；模型 `extra="forbid"`；`bondLength`（键长）与 `sites.distance`（位点偏移）分开；客户端 `adsorption_sites(self, structure, **params) -> dict`、`add_adsorbate(self, structure, adsorbate, **params) -> Structure | list[Structure]`、`adsorbates(self) -> dict`；CLI 按账本原文：`sites` 的 `--format`（输入）与 `--json`，`adsorb` 的 `--from`/`--format`、`--site-index K`（`--index` 是帧选择）、`--each-class -o DIR/` 写 `index.json`、`--substitute EL | --vacancy`、`--list`；`--count N` 的帮助 `add N more adsorbates; those already on the surface are kept and act as seeds`）、§0.3、R-F13、R-F14、§10.5 第 2、9 条；负责人决定 L-18。
 
@@ -1909,7 +1909,7 @@ Adsorbates 分区的 Coverage、Placed 列表与批量操作；M5 的 REST/客�
 
 【U 与负责人决定】U4 不涉及；负责人决定 L-18（`--count` 的帮助文案）。
 
-【文件】API 文件束（plan.md §2.4）：`crystallume/server/models.py`、`crystallume/server/routes/build.py`、`crystallume/server/routes/analysis.py`、`crystallume/server/auth.py`、`crystallume/server/deps.py`、`crystallume/client.py`、`crystallume/cli.py`、`crystallume/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py`。
+【文件】API 文件束（plan.md §2.4）：`facet/server/models.py`、`facet/server/routes/build.py`、`facet/server/routes/analysis.py`、`facet/server/auth.py`、`facet/server/deps.py`、`facet/client.py`、`facet/cli.py`、`facet/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py`。
 
 【测试】`test_sites_endpoint`（200、400 无真空、422 未知字段/越界、云模式未登录 401、`detail: classes`、`maxSites` 截断）、`test_adsorb_endpoint`（200、400 E10/E12/E14、原子数上限 400、`each` 返回列表）；`tests/test_hardening.py`（匿名 + 1 万原子 + `coverage` 在云模式下 401，本地 `max_atoms=100` 时 400）；客户端三条；CLI：`sites --json`、`sites --assign`、`adsorb … -o` 读回、`adsorb --each-class -o DIR/` 的文件与 `index.json`、`adsorb --list`、`--count 1` 新增 1 个、错误返回 1；acceptance S1 的 CLI 序列（`--surface-cell 3x3` 等按账本改写）。
 
@@ -1933,7 +1933,7 @@ Adsorbates 分区的 Coverage、Placed 列表与批量操作；M5 的 REST/客�
 
 | 链 | 端口 | 任务 | 独占的文件 |
 |---|---|---|---|
-| `w3-docs` | 8844 | M5-T10b M5 的文档、应用内帮助与导览 | `README.md`、`docs/PLUGINS.md`、`docs/SCHEMA.md`、`docs/DEPLOY.md`、`CHANGELOG.md`、`crystallume/web/js/ui/shell.js#help-tour` |
+| `w3-docs` | 8844 | M5-T10b M5 的文档、应用内帮助与导览 | `README.md`、`docs/PLUGINS.md`、`docs/SCHEMA.md`、`docs/DEPLOY.md`、`CHANGELOG.md`、`facet/web/js/ui/shell.js#help-tour` |
 | `w3-e2e-adsorbates` | 8845 | M5-T12c M5 的 Playwright 冒烟 | `tests/e2e/harness.mjs`、`tests/test_e2e.py`、`tests/e2e/adsorbates.spec.mjs` |
 | `w3-e2e-acceptance` | 8846 | W3-E2E 第 3 波验收 E2E（M1–M5 合起来） | `tests/e2e/w3_acceptance.spec.mjs` |
 
@@ -1941,22 +1941,22 @@ Adsorbates 分区的 Coverage、Placed 列表与批量操作；M5 的 REST/客�
 
 **出口检查**：
 
-- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`CRYSTALLUME_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
+- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`FACET_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
 - Playwright：`tests/e2e/adsorbates.spec.mjs`（M5 §7.4 第 1–7 步，改为 Node 版，L-06）与 `tests/e2e/w3_acceptance.spec.mjs`（E2E-1 全部 15 步、E2E-2 全部 7 步、E2E-3 第 5 步、E2E-4 第 4–5 步）通过，截图在 `tests/e2e/out/`
 - 验收 S1 全部（S1-1–S1-12）、S2、S3、S13、S14（S14-1–S14-8）在 Python、JS 与界面三条路径成立
-- 文档：README、`docs/PLUGINS.md`（M5 §6.2 对照表、平躺芳香分子的构型名）、`docs/SCHEMA.md`（`props.adsorbate_id`、`info.surface.adsorbates` 含 `definition` 与 `tagsConvention`、`crystallume.sites/1`、`crystallume.adsorbates/1`、`web/data/*.json` 的读取约定）、`docs/DEPLOY.md`（REST 三行与登录规则 K17）、应用内帮助与导览；随后进入波末三视角审查
+- 文档：README、`docs/PLUGINS.md`（M5 §6.2 对照表、平躺芳香分子的构型名）、`docs/SCHEMA.md`（`props.adsorbate_id`、`info.surface.adsorbates` 含 `definition` 与 `tagsConvention`、`facet.sites/1`、`facet.adsorbates/1`、`web/data/*.json` 的读取约定）、`docs/DEPLOY.md`（REST 三行与登录规则 K17）、应用内帮助与导览；随后进入波末三视角审查
 
 #### M5-T10b M5 的文档、应用内帮助与导览（链 `w3-docs`）
 
 【目标】M5 的文档与应用内文案（从 M5-T10 拆出的文档部分）。
 
-【依据】M5 §10 M7 一节（`docs/SCHEMA.md` 写入 `props.adsorbate_id`、`info.surface.adsorbates`（含 `definition`、`tagsConvention`）、`crystallume.sites/1`、`crystallume.adsorbates/1`、`web/data/*.json` 的读取约定；`docs/PLUGINS.md` 写入 §6.2 的对照表与平躺芳香分子的构型名对照 G8；REST 表加三行；`/build/*` 中需要分析的请求的登录规则 K17 写进 `docs/DEPLOY.md`）、§6；ledger-features L-M5-01…10、L-X-04、L-X-05；负责人决定 L-05（M4 与 M5 的默认键长同一来源）、L-15、L-18；U5（放吸附物原位修改，Duplicate 保留原 slab）。
+【依据】M5 §10 M7 一节（`docs/SCHEMA.md` 写入 `props.adsorbate_id`、`info.surface.adsorbates`（含 `definition`、`tagsConvention`）、`facet.sites/1`、`facet.adsorbates/1`、`web/data/*.json` 的读取约定；`docs/PLUGINS.md` 写入 §6.2 的对照表与平躺芳香分子的构型名对照 G8；REST 表加三行；`/build/*` 中需要分析的请求的登录规则 K17 写进 `docs/DEPLOY.md`）、§6；ledger-features L-M5-01…10、L-X-04、L-X-05；负责人决定 L-05（M4 与 M5 的默认键长同一来源）、L-15、L-18；U5（放吸附物原位修改，Duplicate 保留原 slab）。
 
 【实现】README（Adsorbates 分区、位点标记与 Pick site）、`docs/PLUGINS.md`、`docs/SCHEMA.md`、`docs/DEPLOY.md`、应用内帮助与导览（`ui/shell.js`，以符号定位）、CHANGELOG。
 
 【U 与负责人决定】U5；负责人决定 L-05、L-15、L-18。
 
-【文件】`README.md`、`docs/PLUGINS.md`、`docs/SCHEMA.md`、`docs/DEPLOY.md`、`CHANGELOG.md`、`crystallume/web/js/ui/shell.js#help-tour`。
+【文件】`README.md`、`docs/PLUGINS.md`、`docs/SCHEMA.md`、`docs/DEPLOY.md`、`CHANGELOG.md`、`facet/web/js/ui/shell.js#help-tour`。
 
 【测试】文档里的 Python 与 CLI 例子逐个运行，结果写进报告。
 
@@ -2002,15 +2002,15 @@ M6 的数据与常量、界面命名、解析金标（只写期望），给匹�
 
 | 链 | 端口 | 任务 | 独占的文件 |
 |---|---|---|---|
-| `w4-m6-data` | — | M6-T0 M6 的数据与常量（双语言） | `crystallume/core/defaults.py#M6`、`crystallume/web/js/core/defaults.js#M6`、`crystallume/core/structure.py#PROP_DEFAULTS`、`crystallume/web/js/core/structure.js#PROP_DEFAULTS`、`crystallume/core/elements.py`、`crystallume/web/js/core/elements.js`、`crystallume/config.py`、`tests/test_m6_data.py`、`tests/js/m6_data.test.mjs` |
-| `w4-m6-naming` | — | M6-T4n 界面命名 interface_name（双语言，从 M6-T4/T5 提前拆出） | `crystallume/core/naming.py#M6`、`crystallume/web/js/core/naming.js#M6`、`crystallume/core/naming.py#M2`、`crystallume/web/js/core/naming.js#M2`、`tests/test_interface_name.py`、`tests/js/interface_name.test.mjs` |
+| `w4-m6-data` | — | M6-T0 M6 的数据与常量（双语言） | `facet/core/defaults.py#M6`、`facet/web/js/core/defaults.js#M6`、`facet/core/structure.py#PROP_DEFAULTS`、`facet/web/js/core/structure.js#PROP_DEFAULTS`、`facet/core/elements.py`、`facet/web/js/core/elements.js`、`facet/config.py`、`tests/test_m6_data.py`、`tests/js/m6_data.test.mjs` |
+| `w4-m6-naming` | — | M6-T4n 界面命名 interface_name（双语言，从 M6-T4/T5 提前拆出） | `facet/core/naming.py#M6`、`facet/web/js/core/naming.js#M6`、`facet/core/naming.py#M2`、`facet/web/js/core/naming.js#M2`、`tests/test_interface_name.py`、`tests/js/interface_name.test.mjs` |
 | `w4-m6-golden` | — | M6-T3a 界面的解析金标（只写期望） | `tests/data/surface/interface/`、`tests/test_interface_golden_shape.py`、`tests/ops/m6_recipes.py`、`tests/js/ops/m6_recipes.mjs` |
 
 **合并顺序**：`w4-m6-data` → `w4-m6-naming` → `w4-m6-golden`
 
 **出口检查**：
 
-- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`CRYSTALLUME_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
+- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`FACET_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
 - M6-T0：`tests/test_m6_data.py`、`tests/js/m6_data.test.mjs` 通过：`interface_*` 键两语言相等，没有 `interface_vacuum`、`interface_preview_vacuum`、`interface_vacuum_max`、`interface_confirm_atoms`（L-X-08）；`PROP_DEFAULTS` 两份都有 `interface_layer: 0`；`CATION_RADII` 两语言逐项相同；`hbn` 原型 a = 2.504 Å、pbc T T F（F0-D T10 已交付，只核对）
 - M6-T4n：`tests/test_interface_name.py`、`tests/js/interface_name.test.mjs` 通过：`graphene/Ni(111)`、`MoS2 p(4×4)/Au(111) (√19×√19)R23.4°`、M1 p(2×2) 之后 `MoS2 p(8×8)/Au(111) (2√19×2√19)R23.4°`、`hBN/graphene/Ni(111)`；`surface_name` 的 interface 分支已接上（L-X-07）
 - M6-T3a：`tests/data/surface/interface/` 外壳正确、全部带理由 skip
@@ -2025,7 +2025,7 @@ M6 的数据与常量、界面命名、解析金标（只写期望），给匹�
 
 【U 与负责人决定】U3（M6 完整交付）、U4（不加任何真空默认值；删除预览占位真空）；负责人决定：无直接相关项。
 
-【文件】`crystallume/core/defaults.py#M6`、`crystallume/web/js/core/defaults.js#M6`、`crystallume/core/structure.py#PROP_DEFAULTS`、`crystallume/web/js/core/structure.js#PROP_DEFAULTS`、`crystallume/core/elements.py`、`crystallume/web/js/core/elements.js`、`crystallume/config.py`、`tests/test_m6_data.py`、`tests/js/m6_data.test.mjs`。
+【文件】`facet/core/defaults.py#M6`、`facet/web/js/core/defaults.js#M6`、`facet/core/structure.py#PROP_DEFAULTS`、`facet/web/js/core/structure.js#PROP_DEFAULTS`、`facet/core/elements.py`、`facet/web/js/core/elements.js`、`facet/config.py`、`tests/test_m6_data.py`、`tests/js/m6_data.test.mjs`。
 
 【测试】键与值两语言逐键相等；被删除的键不存在；`PROP_DEFAULTS["interface_layer"] == 0` 两语言；`CATION_RADII` 逐项相同；`hbn` 原型参数；`Settings` 读环境变量。
 
@@ -2039,7 +2039,7 @@ M6 的数据与常量、界面命名、解析金标（只写期望），给匹�
 
 【U 与负责人决定】U3；负责人决定 L-12、L-17（不复制自动名哨兵）。
 
-【文件】`crystallume/core/naming.py#M6`、`crystallume/web/js/core/naming.js#M6`、`crystallume/core/naming.py#M2`、`crystallume/web/js/core/naming.js#M2`、`tests/test_interface_name.py`、`tests/js/interface_name.test.mjs`。
+【文件】`facet/core/naming.py#M6`、`facet/web/js/core/naming.js#M6`、`facet/core/naming.py#M2`、`facet/web/js/core/naming.js#M2`、`tests/test_interface_name.py`、`tests/js/interface_name.test.mjs`。
 
 【测试】用手写的 `info.surface`（kind interface，L-X-03 字段）覆盖 L-M6-04 与 L-X-07 表里 M6 的全部例子（`graphene/Ni(111)`、`graphene p(3×3)/Pt(111) (√7×√7)R19.1°`、`MoS2 p(4×4)/Au(111) (√19×√19)R23.4°`、`graphene p(10×10)/Ir(111) p(9×9)`、`graphene (√7×√7)R19.1°/graphene (√7×√7)R19.1° 21.8° twist`、`hBN/graphene/Ni(111)`、带 CO 的基底 `… + CO`）；`supercell_matrix` 给出时的重算；两语言逐字相同。
 
@@ -2049,7 +2049,7 @@ M6 的数据与常量、界面命名、解析金标（只写期望），给匹�
 
 【依据】M6 §3.15（场景逐个走通的数字）、§7.2；acceptance S15a-1/2/3/5、S15b-1/2/3、S15c-1/2/3（graphene/Ni(111) 561 类、8 个 Pareto；MoS2/Au(111) 148 类、12 个；tBLG 任意扭转 21 类、目标 21.8° ± 0.5° 2 类；28 原子、|cell[0]| = 6.5085 Å、c = 18.35 Å 等）与 §0.2 的 `m6v2_counts.py` 说明；ledger-features R-F01（M6 的金标在最终函数上重新生成：本任务只写解析与已核对的计数，类序与首行由 M6-T3b 用最终实现生成）；ledger-F0 L-F0-27；plan.md P-03。
 
-【实现】`tests/data/surface/interface/*.json`（`crystallume.cases/1`；ops `interfaceMatches`、`makeInterface`；输入用配方：内置石墨烯、MoS2 原型用 M2-T7a 的 `bulk`，Ni(111)/Au(111) 用本任务在 `tests/ops/m6_recipes.py` 与 `tests/js/ops/m6_recipes.mjs` 注册的 `cleavedSlab` 配方（调用 `build.surface`/`buildSurface`，显式参数）），全部带 skip：`op <name> is registered by M6-T3b (W4.3)`。
+【实现】`tests/data/surface/interface/*.json`（`facet.cases/1`；ops `interfaceMatches`、`makeInterface`；输入用配方：内置石墨烯、MoS2 原型用 M2-T7a 的 `bulk`，Ni(111)/Au(111) 用本任务在 `tests/ops/m6_recipes.py` 与 `tests/js/ops/m6_recipes.mjs` 注册的 `cleavedSlab` 配方（调用 `build.surface`/`buildSurface`，显式参数）），全部带 skip：`op <name> is registered by M6-T3b (W4.3)`。
 
 【U 与负责人决定】U2（结果 pbc T T T）、U3、U4（`vacuum` 必填，0 = 超晶格）；负责人决定 L-07（S15a-3 只断言集合与锚 C）。
 
@@ -2063,16 +2063,16 @@ M6 的数据与常量、界面命名、解析金标（只写期望），给匹�
 
 | 链 | 端口 | 任务 | 独占的文件 |
 |---|---|---|---|
-| `w4-m6-match-py` | — | M6-T1 晶格匹配核心（Python） | `crystallume/analysis/latticematch.py`、`crystallume/analysis/__init__.py#M6`、`tests/test_latticematch.py` |
-| `w4-m6-match-js` | — | M6-T2 晶格匹配核心（JS，含分片异步搜索） | `crystallume/web/js/core/latticematch.js`、`tests/js/latticematch.test.mjs` |
-| `w4-m6-build-py` | — | M6-T4 界面构建（Python）：prepare_layer、make_interface、层间距与配位记录 | `crystallume/build/interface.py`、`crystallume/build/__init__.py#M6`、`tests/test_interface.py` |
-| `w4-m6-build-js` | — | M6-T5 界面构建（JS） | `crystallume/web/js/build/interface.js`、`tests/js/interface.test.mjs` |
+| `w4-m6-match-py` | — | M6-T1 晶格匹配核心（Python） | `facet/analysis/latticematch.py`、`facet/analysis/__init__.py#M6`、`tests/test_latticematch.py` |
+| `w4-m6-match-js` | — | M6-T2 晶格匹配核心（JS，含分片异步搜索） | `facet/web/js/core/latticematch.js`、`tests/js/latticematch.test.mjs` |
+| `w4-m6-build-py` | — | M6-T4 界面构建（Python）：prepare_layer、make_interface、层间距与配位记录 | `facet/build/interface.py`、`facet/build/__init__.py#M6`、`tests/test_interface.py` |
+| `w4-m6-build-js` | — | M6-T5 界面构建（JS） | `facet/web/js/build/interface.js`、`tests/js/interface.test.mjs` |
 
 **合并顺序**：`w4-m6-match-py` → `w4-m6-match-js` → `w4-m6-build-py` → `w4-m6-build-js`
 
 **出口检查**：
 
-- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`CRYSTALLUME_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
+- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`FACET_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
 - M6-T1/T2：`tests/test_latticematch.py`、`tests/js/latticematch.test.mjs` 通过；全仓库没有 `reduce_basis_shortest`、`SWAP_REL`、`TIE_EPS`、私有 `hnf_2d`（R-F01、R-F12）；λ1 预筛与二分的相对余量 ≥ 2·`gauss_tolerance` 有单元测试断言
 - M6-T4/T5：`tests/test_interface.py`、`tests/js/interface.test.mjs` 通过；`make_interface` 缺 `vacuum` → `TypeError`（Python）/E-VAC（JS），上限 1000 Å，0 = 超晶格（R-F05）；结果 `pbc = [T,T,T]`（U2）；`info.surface.kind == "interface"`、`version == 2`、`autoName`，没有顶层 `info.interface`（R-F16）；吸附物记录合并时不改写 `firstAtom`（L-17）
 - 验收（Python 与 JS 的单元测试，匹配结果由手写或 `match_from_matrices` 给出）：S15a-2、S15a-4、S15a-5、S15c-2 的结构与属性部分
@@ -2083,11 +2083,11 @@ M6 的数据与常量、界面命名、解析金标（只写期望），给匹�
 
 【依据】M6 §3.3–3.7、§3.11（常量与内部常数）、§3.12（等价安全算术规则，第 10 条改用 `format_decimal`）、§3.13、§3.14、§7.1 的匹配部分；ledger-features L-M6-01（签名原文；**[改]** 最短基约化一律 `gauss_reduce_2d(u, v, angle=None)`，删除 `reduce_basis_shortest` 与 `SWAP_REL`/`TIE_EPS`；规范形用 M1 `hermite_normal_form_2d`；子格枚举用 M1 `hnf_matrices_2d`；λ1 预筛与二分带 ≥ 2·`gauss_tolerance` 的相对余量）、R-F01（附录 A-1：换用 M1 的约化后 graphene/斜方 435 类、MoS2/斜方 147 类、graphene/Ni(111) 549 类逐项相同、顺序相同）、R-F12、§10.6 第 1 条；原型 `scratchpad/proto/m6v2/match_v2.py`（v2 规则）与 `scratchpad/proto/m6/match2d.py`（实现按规格，不照搬原型，M6 附录 C）。
 
-【实现】新文件 `crystallume/analysis/latticematch.py`；`analysis/__init__.py` 段 `M6` 导出。
+【实现】新文件 `facet/analysis/latticematch.py`；`analysis/__init__.py` 段 `M6` 导出。
 
 【U 与负责人决定】U3；负责人决定：无直接相关项（约化规则由账本 R-F01 定）。
 
-【文件】`crystallume/analysis/latticematch.py`、`crystallume/analysis/__init__.py#M6`、`tests/test_latticematch.py`。
+【文件】`facet/analysis/latticematch.py`、`facet/analysis/__init__.py#M6`、`tests/test_latticematch.py`。
 
 【测试】M6 §7.1 的匹配部分（两个引擎、计数上限与 `max_work`、遍历顺序、畸变网格、手动与 Keep 模式、Pareto 与排序、`auto_twist_area`）；graphene/Ni(111) `max_strain=0.03, max_area=400` 的类数与 Pareto 数与 acceptance S15a-1 一致（561/8）；MoS2/Au(111) 148/12；tBLG 任意扭转 21 类、21.8° ± 0.5° 2 类；预筛余量的断言。
 
@@ -2097,11 +2097,11 @@ M6 的数据与常量、界面命名、解析金标（只写期望），给匹�
 
 【依据】与 M6-T1 相同的规格节与账本条目（M6 §3.3–3.7、§3.11–3.14；ledger-features L-M6-01：`Mesh2D`、`latticeRotations`、`matchMeshes(sub, ovl, opts)`、`matchMeshesAsync(sub, ovl, opts, { signal, onProgress, sliceMs = 12 })`、`matchFromMatrices`、`autoTwistArea`；删除私有约化，R-F01）；M6 §3.12（两语言等价的算术规则：运算顺序写死）；原型 `scratchpad/proto/m6/match2d.mjs`、`scratchpad/proto/m6v2/rot_v2.mjs`。
 
-【实现】新文件 `crystallume/web/js/core/latticematch.js`（按规格与两份原型独立实现，与 M6-T1 对照同一组期望）。
+【实现】新文件 `facet/web/js/core/latticematch.js`（按规格与两份原型独立实现，与 M6-T1 对照同一组期望）。
 
 【U 与负责人决定】U3；负责人决定：无直接相关项。
 
-【文件】`crystallume/web/js/core/latticematch.js`、`tests/js/latticematch.test.mjs`。
+【文件】`facet/web/js/core/latticematch.js`、`tests/js/latticematch.test.mjs`。
 
 【测试】与 M6-T1 相同的用例的 JS 版；`matchMeshesAsync` 与同步版本结果相同、可中止、`onProgress` 单调；每片 ≤ `sliceMs`（粗测）。两语言逐项相同由 M6-T3b 检查。
 
@@ -2111,11 +2111,11 @@ M6 的数据与常量、界面命名、解析金标（只写期望），给匹�
 
 【依据】M6 §3.2、§3.8–3.10、§3.14、§4；ledger-features L-M6-02（`prepare_layer(structure, *, flip=False, primitive=True, frame=None)` 的 7 步：前提与 `vacuum_gap_hint` 文案（V-F02、V-F03）、`standardize_slab`（M2，R-F22）、c 长度 `t + 2·PREP_PAD`、`reference_mesh(s, exclude=吸附物)`（L-M1-07）、`primitive_cell(...).supercell_matrix` 的面内块作 K（R-F02）、翻转、promote）、L-M6-03（签名原文；`vacuum` 必填、总间隙、≤ `max_vacuum` 1000 Å、0 = 超晶格；每层面内超胞用 `cellops.make_supercell(layer, embed(M @ T))`；形变在副本上保持面内分数坐标与 z（不调用 M1 `deform`，R-F12）；`concat_structures([S2′, O2′], cell=…, pbc=[T, T, T], renumber_adsorbates=True)`；`props.interface_layer`、`tags`、SD 按 M6 §4.1；`info.surface` 按 L-X-03；吸附物记录合并**没有 `firstAtom`**、不复制 `autoName`（L-17、R-F34）；`mark_edited(out, "atoms")`；`info.source = "builder:interface"`；名字 `surface_name`；**配位记录**：`sites = adsorption_sites(S2, side="top")`（S2 为层叠前的基底副本）、覆盖层最下层用 M3 `cluster_heights` 求、对每个原子 `nearest_sites(sites, [r_j])`（M5，L-M5-03），`lateral ≤ site_moved_threshold` 时取 `subtype ?? kind`，写入 `info.surface.interface.registry = {preset, sites}`；状态行 `anchor C on top, second C on fcc hollow` 的规则；`adsorption_sites` 报错时 `registry.sites = null`、状态行 `no adsorption sites found on the substrate`）、L-X-03、L-X-04、L-X-05、R-F05、R-F16、§10.6 第 2–5 条；ledger-F0 §6 M6 第 1–10 条；U2、U4、C3（标志按各层应变后的晶胞换算）。
 
-【实现】新文件 `crystallume/build/interface.py`（Python 用 `build.make_interface`，`build.interface` 是子模块）；`build/__init__.py` 段 `M6` 导出。`interface_matches` 是对 `match_meshes` 的薄封装（同批 M6-T1 实现，端到端测试在 W4.3 的 M6-T3b）；本任务的单元测试用手写的匹配结果（M6 §6.1 的字段）调用内部构建函数，不依赖 M6-T1 的代码。
+【实现】新文件 `facet/build/interface.py`（Python 用 `build.make_interface`，`build.interface` 是子模块）；`build/__init__.py` 段 `M6` 导出。`interface_matches` 是对 `match_meshes` 的薄封装（同批 M6-T1 实现，端到端测试在 W4.3 的 M6-T3b）；本任务的单元测试用手写的匹配结果（M6 §6.1 的字段）调用内部构建函数，不依赖 M6-T1 的代码。
 
 【U 与负责人决定】U1（前提只说缺什么）、U2、U3、U4；负责人决定 L-07、L-17。
 
-【文件】`crystallume/build/interface.py`、`crystallume/build/__init__.py#M6`、`tests/test_interface.py`。
+【文件】`facet/build/interface.py`、`facet/build/__init__.py#M6`、`tests/test_interface.py`。
 
 【测试】M6 §7.1 的构建部分（层准备的左手晶胞、真空沿 a、跨边界；层间距三种方法与 Custom 的界；错位预设；应变分配；props、SD、tags 规则；`info.surface` 字段；吸附物记录合并；警告文案；`return_parts` 的名字与 `autoName = null`；配位记录与状态行）；E-VAC、E-MATCH、`match 250 is out of range (200 matches; raise max_results)` 的文案。
 
@@ -2125,11 +2125,11 @@ M6 的数据与常量、界面命名、解析金标（只写期望），给匹�
 
 【依据】与 M6-T4 相同的规格节与账本条目（M6 §3.2、§3.8–3.10、§4；ledger-features L-M6-02、L-M6-03：JS `makeInterface(sub, ovl, { vacuum, … })`，`vacuum == null` → E-VAC；`interfaceMatchesAsync(sub, ovl, opts, { signal, onProgress, sliceMs = 12 })`）；JS 侧依赖 M1 `core/cellops.js`、M2 `standardizeSlab`、M3 `clusterHeights`、M5 `adsorptionSites`/`nearestSites`、F0-D `concatStructures`。
 
-【实现】新文件 `crystallume/web/js/build/interface.js`（与 M6-T4 对照同一组期望；`interfaceMatches` 对 `matchMeshes` 的封装在 W4.3 端到端核对）。
+【实现】新文件 `facet/web/js/build/interface.js`（与 M6-T4 对照同一组期望；`interfaceMatches` 对 `matchMeshes` 的封装在 W4.3 端到端核对）。
 
 【U 与负责人决定】U2、U3、U4；负责人决定 L-07、L-17。
 
-【文件】`crystallume/web/js/build/interface.js`、`tests/js/interface.test.mjs`。
+【文件】`facet/web/js/build/interface.js`、`tests/js/interface.test.mjs`。
 
 【测试】与 M6-T4 相同用例的 JS 版（手写匹配结果）；两语言逐项相同由 M6-T3b 检查。
 
@@ -2140,18 +2140,18 @@ M6 的数据与常量、界面命名、解析金标（只写期望），给匹�
 | 链 | 端口 | 任务 | 独占的文件 |
 |---|---|---|---|
 | `w4-m6-parity` | — | M6-T3b 界面金标在最终函数上生成、跨语言平价与端到端核对 | `tests/data/surface/interface/`、`tests/test_m6_parity.py`、`tests/ops/m6.py`、`tests/js/ops/m6.mjs`、`scripts/dev/check_interface_pmg.py` |
-| `w4-m6-api` | — | M6-T6 M6 的 REST、客户端、CLI、服务器上限与条件登录 | `crystallume/server/models.py`、`crystallume/server/routes/build.py`、`crystallume/server/routes/analysis.py`、`crystallume/server/auth.py`、`crystallume/server/deps.py`、`crystallume/client.py`、`crystallume/cli.py`、`crystallume/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py` |
-| `w4-m6-ui-search` | 8847 | M6-T7a Surface › Interface 分区（一）：骨架、选层、匹配参数与异步搜索 | `crystallume/web/js/ui/panels/surface-interface.js`、`crystallume/web/js/main.js#M6-interface`、`crystallume/web/css/app.css#M6`、`tests/js/interface_ui.test.mjs` |
+| `w4-m6-api` | — | M6-T6 M6 的 REST、客户端、CLI、服务器上限与条件登录 | `facet/server/models.py`、`facet/server/routes/build.py`、`facet/server/routes/analysis.py`、`facet/server/auth.py`、`facet/server/deps.py`、`facet/client.py`、`facet/cli.py`、`facet/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py` |
+| `w4-m6-ui-search` | 8847 | M6-T7a Surface › Interface 分区（一）：骨架、选层、匹配参数与异步搜索 | `facet/web/js/ui/panels/surface-interface.js`、`facet/web/js/main.js#M6-interface`、`facet/web/css/app.css#M6`、`tests/js/interface_ui.test.mjs` |
 
 **合并顺序**：`w4-m6-parity` → `w4-m6-api` → `w4-m6-ui-search`
 
 **出口检查**：
 
-- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`CRYSTALLUME_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
+- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`FACET_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
 - M6-T3b：`tests/test_m6_parity.py` 通过；`tests/data/surface/interface/` 不再有 skip；acceptance S15a-1–S15a-5、S15b-1–S15b-3、S15c-1–S15c-3 在 Python 与 JS 中成立（S15a-3 只断言集合与锚 C，L-07）
-- M6-T6：`/analysis/interface`（登录）、`/build/interface`（需要搜索时登录，只给两个矩阵时公开）在 `ROUTE_METHODS` 中；`vacuum` 缺失 422、> 1000 422；CLI `crystallume build interface …` 省略 `--vacuum` 退出码 2（`--list` 除外），状态行作为 `crystallume: note:` 打到 stderr
+- M6-T6：`/analysis/interface`（登录）、`/build/interface`（需要搜索时登录，只给两个矩阵时公开）在 `ROUTE_METHODS` 中；`vacuum` 缺失 422、> 1000 422；CLI `facet build interface …` 省略 `--vacuum` 退出码 2（`--list` 除外），状态行作为 `facet: note:` 打到 stderr
 - 界面：Surface › Interface 分区存在（order 50）；两层都选石墨烯、`Max strain` 0、`Twist` Target 21.8 ± 0.5 → 状态行 `2 matches`（≤ 10 s）；Ni(111) + 石墨烯、`Max strain` 3、`Max area` 400、`Twist` Any → `561 matches · 8 best trade-offs`（≤ 15 s），第一项含 `6 atoms`；搜索期间可 Stop、不锁住编辑（不用 `startTask`）
-- 界面：应用在静态模式（`python3 -m http.server <端口> --directory crystallume/web`）与 `crystallume serve` 下都能启动，`document.body.dataset.ready === 'true'`，控制台无 `pageerror`/`console.error`
+- 界面：应用在静态模式（`python3 -m http.server <端口> --directory facet/web`）与 `facet serve` 下都能启动，`document.body.dataset.ready === 'true'`，控制台无 `pageerror`/`console.error`
 
 #### M6-T3b 界面金标在最终函数上生成、跨语言平价与端到端核对（链 `w4-m6-parity`）
 
@@ -2169,7 +2169,7 @@ M6 的数据与常量、界面命名、解析金标（只写期望），给匹�
 
 #### M6-T6 M6 的 REST、客户端、CLI、服务器上限与条件登录（链 `w4-m6-api`）
 
-【目标】M6 的外部接口：两个路由（含"需要搜索才要求登录"的条件依赖与服务器上限）、客户端两个方法、CLI `crystallume build interface`。
+【目标】M6 的外部接口：两个路由（含"需要搜索才要求登录"的条件依赖与服务器上限）、客户端两个方法、CLI `facet build interface`。
 
 【依据】M6 §6.3–6.4、§7.3；ledger-features L-M6-07（`POST /api/v1/analysis/interface`（登录）、`POST /api/v1/build/interface`（需要搜索时登录；只给两个矩阵时公开）；**[改]** `InterfaceBuildRequest.vacuum: float = Field(..., ge=0, le=1000)`；新模型 `extra="forbid"`；`shift`、`shiftCart` 长度 2、`distance` 数值 0.5–20 Å；客户端 `interface_matches(self, substrate, overlayer, **search) -> dict`、`build_interface(self, substrate, overlayer, *, vacuum: float, **options) -> Structure`；CLI 选项按账本原文，`--vacuum` 为 `required=True`，只有 `--list` 不构建、不需要它）、L-M6-03（状态行作为 note）、§0.3、R-F05、R-F13、R-F14；M6-T0 的 `max_interface_work`、`max_interface_vector_pairs`；U4-c。
 
@@ -2177,7 +2177,7 @@ M6 的数据与常量、界面命名、解析金标（只写期望），给匹�
 
 【U 与负责人决定】U3、U4-c；负责人决定 L-07（状态行作为 CLI note）。
 
-【文件】API 文件束（plan.md §2.4）：`crystallume/server/models.py`、`crystallume/server/routes/build.py`、`crystallume/server/routes/analysis.py`、`crystallume/server/auth.py`、`crystallume/server/deps.py`、`crystallume/client.py`、`crystallume/cli.py`、`crystallume/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py`。
+【文件】API 文件束（plan.md §2.4）：`facet/server/models.py`、`facet/server/routes/build.py`、`facet/server/routes/analysis.py`、`facet/server/auth.py`、`facet/server/deps.py`、`facet/client.py`、`facet/cli.py`、`facet/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py`。
 
 【测试】M6 §7.3（200、422 缺 `vacuum`/越界/未知字段、400 科学错误、云模式下搜索请求未登录 401、只给矩阵时匿名可用、服务器上限 400）；`tests/test_hardening.py`；客户端两条；CLI：`--list --json`、`--pick N`、`--variant K`、`--keep-input-cell`、省略 `--vacuum` 退出码 2、stderr 的配位 note。
 
@@ -2191,7 +2191,7 @@ M6 的数据与常量、界面命名、解析金标（只写期望），给匹�
 
 【U 与负责人决定】U1（层选择器不把 slab 排前、不标记 slab）、U3；负责人决定：无直接相关项。
 
-【文件】`crystallume/web/js/ui/panels/surface-interface.js`（新建，含段落）、`crystallume/web/js/main.js#M6-interface`、`crystallume/web/css/app.css#M6`、`tests/js/interface_ui.test.mjs`。
+【文件】`facet/web/js/ui/panels/surface-interface.js`（新建，含段落）、`facet/web/js/main.js#M6-interface`、`facet/web/css/app.css#M6`、`tests/js/interface_ui.test.mjs`。
 
 【测试】`tests/js/interface_ui.test.mjs`：控制器状态机（输入变化 → 防抖 → 取消上一轮 → 结果；`rev` 变化 → 过期）、结果项 `aria-label`（`6 atoms, area 5.4 square ångströms, twist 0 degrees, mismatch 1.18 percent, substrate 1 by 1, overlayer 1 by 1`）、禁用原因文案。
 
@@ -2203,19 +2203,19 @@ Interface 分区的构建选项、预览与创建；Manual 矩阵、Registry、�
 
 | 链 | 端口 | 任务 | 独占的文件 |
 |---|---|---|---|
-| `w4-m6-ui-build` | 8848 | M6-T7b Interface 分区（二）：构建选项、预览与 Create | `crystallume/web/js/ui/panels/surface-interface.js#M6-T7b`、`tests/js/interface_build_ui.test.mjs` |
-| `w4-m6-ui-manual` | 8849 | M6-T7c Interface 分区（三）：Manual 矩阵、Registry 与位点菜单、命令、公共 API、右键菜单 | `crystallume/web/js/ui/panels/surface-interface.js#M6-T7c`、`crystallume/web/js/ui/panels/projects.js#context-menu`、`tests/js/interface_manual_ui.test.mjs` |
+| `w4-m6-ui-build` | 8848 | M6-T7b Interface 分区（二）：构建选项、预览与 Create | `facet/web/js/ui/panels/surface-interface.js#M6-T7b`、`tests/js/interface_build_ui.test.mjs` |
+| `w4-m6-ui-manual` | 8849 | M6-T7c Interface 分区（三）：Manual 矩阵、Registry 与位点菜单、命令、公共 API、右键菜单 | `facet/web/js/ui/panels/surface-interface.js#M6-T7c`、`facet/web/js/ui/panels/projects.js#context-menu`、`tests/js/interface_manual_ui.test.mjs` |
 | `w4-m6-perf` | — | M6-T8a M6 性能基准与预算测试 | `tests/test_interface_perf.py`、`tests/js/perf/interface.perf.mjs`、`tests/perf/bench_interface.py` |
 
 **合并顺序**：`w4-m6-ui-build` → `w4-m6-ui-manual` → `w4-m6-perf`
 
 **出口检查**：
 
-- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`CRYSTALLUME_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
+- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`FACET_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
 - 界面：`Vacuum` 为空时不开预览会话、Create 不可用（tip `Enter the vacuum (total gap in Å; 0 for none).`），填写后才开 P-swap 预览，清空即取消（R-F32、V-F04）；Create 一步撤销、新增结构（P4）；状态行报告配位（L-07，必须）；E2E-5 第 2、4 步
-- 命令：`crystallume.command('build.layers', { … })` 不给 `vacuum` → `invalid-params`；只给两个矩阵时 `estimate` 返回精确原子数；超过 `LIMITS.maxAtoms` → `too-large` 文案；命令面板搜 `Build Layers`、`Heterostructure` 能找到
+- 命令：`facet.command('build.layers', { … })` 不给 `vacuum` → `invalid-params`；只给两个矩阵时 `estimate` 返回精确原子数；超过 `LIMITS.maxAtoms` → `too-large` 文案；命令面板搜 `Build Layers`、`Heterostructure` 能找到
 - 性能（`slow`）：`tests/test_interface_perf.py`、`tests/js/perf/interface.perf.mjs` 在 M6 §3.13 与 §7.5 的预算内；验收 S16-10
-- 界面：应用在静态模式（`python3 -m http.server <端口> --directory crystallume/web`）与 `crystallume serve` 下都能启动，`document.body.dataset.ready === 'true'`，控制台无 `pageerror`/`console.error`
+- 界面：应用在静态模式（`python3 -m http.server <端口> --directory facet/web`）与 `facet serve` 下都能启动，`document.body.dataset.ready === 'true'`，控制台无 `pageerror`/`console.error`
 
 #### M6-T7b Interface 分区（二）：构建选项、预览与 Create（链 `w4-m6-ui-build`）
 
@@ -2227,7 +2227,7 @@ Interface 分区的构建选项、预览与创建；Manual 矩阵、Registry、�
 
 【U 与负责人决定】U3、U4（真空框为空、不预填、为空时不开预览）、P3、P4；负责人决定 L-07。
 
-【文件】`crystallume/web/js/ui/panels/surface-interface.js#M6-T7b`、`tests/js/interface_build_ui.test.mjs`。
+【文件】`facet/web/js/ui/panels/surface-interface.js#M6-T7b`、`tests/js/interface_build_ui.test.mjs`。
 
 【测试】`tests/js/interface_build_ui.test.mjs`：会话只在真空已填时存在的状态机、状态行句式（`anchor C on top, second C on fcc hollow`；只剩一个原子与多原子分组两种）、距离菜单的异常值提示、toast 文案。
 
@@ -2243,11 +2243,11 @@ Interface 分区的构建选项、预览与创建；Manual 矩阵、Registry、�
 
 【U 与负责人决定】U3、U4（命令参数 `vacuum` 必填）、U5；负责人决定：无直接相关项。
 
-【文件】`crystallume/web/js/ui/panels/surface-interface.js#M6-T7c`、`crystallume/web/js/ui/panels/projects.js#context-menu`、`tests/js/interface_manual_ui.test.mjs`。
+【文件】`facet/web/js/ui/panels/surface-interface.js#M6-T7c`、`facet/web/js/ui/panels/projects.js#context-menu`、`tests/js/interface_manual_ui.test.mjs`。
 
 【测试】`tests/js/interface_manual_ui.test.mjs`：命令参数校验（缺 `vacuum` → `invalid-params`、名字找不到的文案）、`estimate`、Manual 读数、预设换算。
 
-【界面检查】（Chromium，本链端口）Manual 模式选 1×1 与 √3 预设，面积、原子数、失配即时更新；Registry 菜单在 Ni(111) 上有 Top/Bridge/fcc hollow/hcp hollow，`More sites…` 列出 M5 的位点；`crystallume.command('build.layers', { substrate: 'Ni(111) 4L', overlayer: 'graphene' })` 不给 vacuum → `invalid-params`；给 vacuum 15 → 新增结构、一步撤销；命令面板搜 `Build Layers`、`Heterostructure`、`Moiré` 能找到；项目列表右键 `Use as substrate` 把该结构填进 Substrate。截图存 `scratchpad/shots/w4-m6-ui-manual/`。
+【界面检查】（Chromium，本链端口）Manual 模式选 1×1 与 √3 预设，面积、原子数、失配即时更新；Registry 菜单在 Ni(111) 上有 Top/Bridge/fcc hollow/hcp hollow，`More sites…` 列出 M5 的位点；`facet.command('build.layers', { substrate: 'Ni(111) 4L', overlayer: 'graphene' })` 不给 vacuum → `invalid-params`；给 vacuum 15 → 新增结构、一步撤销；命令面板搜 `Build Layers`、`Heterostructure`、`Moiré` 能找到；项目列表右键 `Use as substrate` 把该结构填进 Substrate。截图存 `scratchpad/shots/w4-m6-ui-manual/`。
 
 #### M6-T8a M6 性能基准与预算测试（链 `w4-m6-perf`）
 
@@ -2269,7 +2269,7 @@ Interface 分区的构建选项、预览与创建；Manual 矩阵、Registry、�
 
 | 链 | 端口 | 任务 | 独占的文件 |
 |---|---|---|---|
-| `w4-docs` | 8850 | M6-T8b M6 的文档、应用内帮助与导览 | `README.md`、`docs/PLUGINS.md`、`docs/SCHEMA.md`、`docs/DEPLOY.md`、`CHANGELOG.md`、`crystallume/web/js/ui/shell.js#help-tour` |
+| `w4-docs` | 8850 | M6-T8b M6 的文档、应用内帮助与导览 | `README.md`、`docs/PLUGINS.md`、`docs/SCHEMA.md`、`docs/DEPLOY.md`、`CHANGELOG.md`、`facet/web/js/ui/shell.js#help-tour` |
 | `w4-e2e-interface` | 8851 | M6-T8c M6 的 Playwright 冒烟（E2E-5） | `tests/e2e/harness.mjs`、`tests/test_e2e.py`、`tests/e2e/interface.spec.mjs` |
 | `w4-xmodule` | — | W4-X1 第 4 波跨模块回归测试（M6 × M1/M2/M3/M5） | `tests/test_w4_crossmodule.py`、`tests/js/w4_crossmodule.test.mjs` |
 
@@ -2277,7 +2277,7 @@ Interface 分区的构建选项、预览与创建；Manual 矩阵、Registry、�
 
 **出口检查**：
 
-- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`CRYSTALLUME_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
+- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`FACET_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
 - Playwright：`tests/e2e/interface.spec.mjs`（acceptance E2E-5 全部 4 步与 M6 §7.4）通过，截图在 `tests/e2e/out/`；MD-5 按 R-F32 改写后可手动走通（没有 `shown with 10 Å` 的占位预览）
 - 跨模块：`tests/test_w4_crossmodule.py`、`tests/js/w4_crossmodule.test.mjs` 通过（界面上的 M1 超胞改名、M2 改真空保留 `interface`/`adsorbates` 键、M5 在界面上放吸附物、带吸附物的基底 `… + CO`、S15a-6）
 - 文档：`docs/PLUGINS.md`（JS/Python API、REST、CLI，`make_interface` 与 `build.interface` 的差别）、`docs/SCHEMA.md`（`props.interface_layer`、`info.surface.kind = "interface"`、`info.surface.interface` 含 `registry`）、`docs/DEPLOY.md`（REST 两行与两个环境变量）、README、应用内帮助（mismatch 与 strain 的区别、默认层间距的适用范围）与导览；随后进入波末三视角审查
@@ -2292,7 +2292,7 @@ Interface 分区的构建选项、预览与创建；Manual 矩阵、Registry、�
 
 【U 与负责人决定】U3、U4；负责人决定 L-07。
 
-【文件】`README.md`、`docs/PLUGINS.md`、`docs/SCHEMA.md`、`docs/DEPLOY.md`、`CHANGELOG.md`、`crystallume/web/js/ui/shell.js#help-tour`。
+【文件】`README.md`、`docs/PLUGINS.md`、`docs/SCHEMA.md`、`docs/DEPLOY.md`、`CHANGELOG.md`、`facet/web/js/ui/shell.js#help-tour`。
 
 【测试】文档例子逐个运行（Python、CLI 的 `build interface --list`）。
 
@@ -2336,19 +2336,19 @@ Interface 分区的构建选项、预览与创建；Manual 矩阵、Registry、�
 
 | 链 | 端口 | 任务 | 独占的文件 |
 |---|---|---|---|
-| `w5-api-audit` | 8852 | M7-T1 API 审计：清单测试、命名与选项统一、快捷键与动作配额 | `crystallume/server/models.py`、`crystallume/server/routes/build.py`、`crystallume/server/routes/analysis.py`、`crystallume/server/auth.py`、`crystallume/server/deps.py`、`crystallume/client.py`、`crystallume/cli.py`、`crystallume/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py`、`crystallume/core/`、`crystallume/analysis/`、`crystallume/build/__init__.py`、`crystallume/build/surface.py`、`crystallume/build/adsorbate.py`、`crystallume/build/interface.py`、`crystallume/web/js/core/`、`crystallume/web/js/build/surface.js`、`crystallume/web/js/build/adsorbates.js`、`crystallume/web/js/build/interface.js`、`crystallume/web/js/commands/`、`crystallume/web/js/api/cellapi.js`、`crystallume/web/js/render/tools/`、`crystallume/web/js/render/sitemarkers.js`、`crystallume/web/js/io/clipboard.js`、`crystallume/web/js/ui/cellsections.js`、`crystallume/web/js/ui/cellsupercell.js`、`crystallume/web/js/ui/cellmenus.js`、`crystallume/web/js/ui/constraints.js`、`crystallume/web/js/ui/atomselection.js`、`crystallume/web/js/ui/atomactions.js`、`crystallume/web/js/ui/clipboard.js`、`crystallume/web/js/ui/panels/surface-cleave.js`、`crystallume/web/js/ui/panels/surface-slab.js`、`crystallume/web/js/ui/panels/surface-layers.js`、`crystallume/web/js/ui/panels/surface-adsorbates.js`、`crystallume/web/js/ui/panels/surface-interface.js`、`crystallume/web/js/ui/panels/transform.js`、`tests/data/api_inventory.json`、`tests/test_api_inventory.py`、`tests/js/api_inventory.test.mjs` |
-| `w5-bulk-name` | 8853 | M7-T6 体相名两种语言统一（负责人决定 L-11） | `crystallume/build/crystal.py`、`crystallume/web/js/build/crystal.js`、`crystallume/web/js/build/reference.js`、`crystallume/web/js/ui/panels/build.js`、`scripts/gen_reference_data.py`、`tests/test_build.py`、`tests/data/surface/`、`tests/test_m2_parity.py`、`tests/test_m5_parity.py`、`tests/test_m6_parity.py`、`tests/test_bulk_name.py` |
+| `w5-api-audit` | 8852 | M7-T1 API 审计：清单测试、命名与选项统一、快捷键与动作配额 | `facet/server/models.py`、`facet/server/routes/build.py`、`facet/server/routes/analysis.py`、`facet/server/auth.py`、`facet/server/deps.py`、`facet/client.py`、`facet/cli.py`、`facet/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py`、`facet/core/`、`facet/analysis/`、`facet/build/__init__.py`、`facet/build/surface.py`、`facet/build/adsorbate.py`、`facet/build/interface.py`、`facet/web/js/core/`、`facet/web/js/build/surface.js`、`facet/web/js/build/adsorbates.js`、`facet/web/js/build/interface.js`、`facet/web/js/commands/`、`facet/web/js/api/cellapi.js`、`facet/web/js/render/tools/`、`facet/web/js/render/sitemarkers.js`、`facet/web/js/io/clipboard.js`、`facet/web/js/ui/cellsections.js`、`facet/web/js/ui/cellsupercell.js`、`facet/web/js/ui/cellmenus.js`、`facet/web/js/ui/constraints.js`、`facet/web/js/ui/atomselection.js`、`facet/web/js/ui/atomactions.js`、`facet/web/js/ui/clipboard.js`、`facet/web/js/ui/panels/surface-cleave.js`、`facet/web/js/ui/panels/surface-slab.js`、`facet/web/js/ui/panels/surface-layers.js`、`facet/web/js/ui/panels/surface-adsorbates.js`、`facet/web/js/ui/panels/surface-interface.js`、`facet/web/js/ui/panels/transform.js`、`tests/data/api_inventory.json`、`tests/test_api_inventory.py`、`tests/js/api_inventory.test.mjs` |
+| `w5-bulk-name` | 8853 | M7-T6 体相名两种语言统一（负责人决定 L-11） | `facet/build/crystal.py`、`facet/web/js/build/crystal.js`、`facet/web/js/build/reference.js`、`facet/web/js/ui/panels/build.js`、`scripts/gen_reference_data.py`、`tests/test_build.py`、`tests/data/surface/`、`tests/test_m2_parity.py`、`tests/test_m5_parity.py`、`tests/test_m6_parity.py`、`tests/test_bulk_name.py` |
 | `w5-perf` | 8854 | M7-T5 性能总检查（S16 与 E2E-6） | `tests/test_surface_perf.py`、`tests/test_perf_budgets.py`、`tests/e2e/perf.spec.mjs`、`tests/js/perf/pipeline.perf.mjs` |
 
 **合并顺序**：`w5-bulk-name` → `w5-api-audit` → `w5-perf`
 
 **出口检查**：
 
-- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`CRYSTALLUME_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
+- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`FACET_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 通过；`git status` 干净
 - M7-T1：`tests/test_api_inventory.py`、`tests/js/api_inventory.test.mjs` 通过（两本账本的名字、签名（仅限关键字）、REST 路由与 `ROUTE_METHODS`、新模型 `extra="forbid"`、CLI 选项约定、命令 id 与 MS 别名、选区动作顺序、`SURFACE_DEFAULTS` 各段的键全部在代码里；账本里"已解决的冲突"列出的旧名字都不存在）；快捷键冲突检查（G、N、Shift+N、Shift+5、Shift+L、Shift+U、Shift+A、Shift+S、mod+Enter）无冲突；MD-7 的 9 个 MS 名称都能在命令面板搜到
 - M7-T6：`tests/test_bulk_name.py` 通过（同一原型与参数下 Python 与 JS 的体相名逐字相同）；各模块平价测试不再排除 `bulk.name`（L-11 解除）
 - M7-T5：`pytest -m slow tests/test_perf_budgets.py tests/test_surface_perf.py tests/test_js_perf.py` 与 `tests/e2e/perf.spec.mjs`（E2E-6）在预算内（断言 2 倍预算，CI 再 ×3）；验收 S16-1–S16-10；超预算项已列给负责人
-- 界面：应用在静态模式（`python3 -m http.server <端口> --directory crystallume/web`）与 `crystallume serve` 下都能启动，`document.body.dataset.ready === 'true'`，控制台无 `pageerror`/`console.error`
+- 界面：应用在静态模式（`python3 -m http.server <端口> --directory facet/web`）与 `facet serve` 下都能启动，`document.body.dataset.ready === 'true'`，控制台无 `pageerror`/`console.error`
 
 #### M7-T1 API 审计：清单测试、命名与选项统一、快捷键与动作配额（链 `w5-api-audit`）
 
@@ -2360,7 +2360,7 @@ Interface 分区的构建选项、预览与创建；Manual 矩阵、Registry、�
 
 【U 与负责人决定】U1–U6（acceptance §0.6 的合规项都要有对应的名字与选项）；负责人决定 L-06（aria-label）、L-10、L-18；键的重新分配需负责人确认。
 
-【文件】`crystallume/server/models.py`、`crystallume/server/routes/build.py`、`crystallume/server/routes/analysis.py`、`crystallume/server/auth.py`、`crystallume/server/deps.py`、`crystallume/client.py`、`crystallume/cli.py`、`crystallume/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py`、`crystallume/core/`、`crystallume/analysis/`、`crystallume/build/__init__.py`、`crystallume/build/surface.py`、`crystallume/build/adsorbate.py`、`crystallume/build/interface.py`、`crystallume/web/js/core/`、`crystallume/web/js/build/surface.js`、`crystallume/web/js/build/adsorbates.js`、`crystallume/web/js/build/interface.js`、`crystallume/web/js/commands/`、`crystallume/web/js/api/cellapi.js`、`crystallume/web/js/render/tools/`、`crystallume/web/js/render/sitemarkers.js`、`crystallume/web/js/io/clipboard.js`、`crystallume/web/js/ui/cellsections.js`、`crystallume/web/js/ui/cellsupercell.js`、`crystallume/web/js/ui/cellmenus.js`、`crystallume/web/js/ui/constraints.js`、`crystallume/web/js/ui/atomselection.js`、`crystallume/web/js/ui/atomactions.js`、`crystallume/web/js/ui/clipboard.js`、`crystallume/web/js/ui/panels/surface-cleave.js`、`crystallume/web/js/ui/panels/surface-slab.js`、`crystallume/web/js/ui/panels/surface-layers.js`、`crystallume/web/js/ui/panels/surface-adsorbates.js`、`crystallume/web/js/ui/panels/surface-interface.js`、`crystallume/web/js/ui/panels/transform.js`、`tests/data/api_inventory.json`、`tests/test_api_inventory.py`、`tests/js/api_inventory.test.mjs`（目录条目以 `/` 结尾；体相名相关的 `crystallume/build/crystal.py`、`crystallume/web/js/build/crystal.js`、`crystallume/web/js/ui/panels/build.js` 归 `w5-bulk-name`，本链不改）。
+【文件】`facet/server/models.py`、`facet/server/routes/build.py`、`facet/server/routes/analysis.py`、`facet/server/auth.py`、`facet/server/deps.py`、`facet/client.py`、`facet/cli.py`、`facet/config.py`、`tests/test_server.py`、`tests/test_client.py`、`tests/test_cli.py`、`tests/test_hardening.py`、`tests/test_limits.py`、`facet/core/`、`facet/analysis/`、`facet/build/__init__.py`、`facet/build/surface.py`、`facet/build/adsorbate.py`、`facet/build/interface.py`、`facet/web/js/core/`、`facet/web/js/build/surface.js`、`facet/web/js/build/adsorbates.js`、`facet/web/js/build/interface.js`、`facet/web/js/commands/`、`facet/web/js/api/cellapi.js`、`facet/web/js/render/tools/`、`facet/web/js/render/sitemarkers.js`、`facet/web/js/io/clipboard.js`、`facet/web/js/ui/cellsections.js`、`facet/web/js/ui/cellsupercell.js`、`facet/web/js/ui/cellmenus.js`、`facet/web/js/ui/constraints.js`、`facet/web/js/ui/atomselection.js`、`facet/web/js/ui/atomactions.js`、`facet/web/js/ui/clipboard.js`、`facet/web/js/ui/panels/surface-cleave.js`、`facet/web/js/ui/panels/surface-slab.js`、`facet/web/js/ui/panels/surface-layers.js`、`facet/web/js/ui/panels/surface-adsorbates.js`、`facet/web/js/ui/panels/surface-interface.js`、`facet/web/js/ui/panels/transform.js`、`tests/data/api_inventory.json`、`tests/test_api_inventory.py`、`tests/js/api_inventory.test.mjs`（目录条目以 `/` 结尾；体相名相关的 `facet/build/crystal.py`、`facet/web/js/build/crystal.js`、`facet/web/js/ui/panels/build.js` 归 `w5-bulk-name`，本链不改）。
 
 【测试】即上；全量测试通过。
 
@@ -2376,7 +2376,7 @@ Interface 分区的构建选项、预览与创建；Manual 矩阵、Registry、�
 
 【U 与负责人决定】U6；负责人决定 L-11（P-12 的写法需负责人确认）。
 
-【文件】`crystallume/build/crystal.py`、`crystallume/web/js/build/crystal.js`、`crystallume/web/js/build/reference.js`、`crystallume/web/js/ui/panels/build.js`、`scripts/gen_reference_data.py`、`tests/test_build.py`、`tests/data/surface/`、`tests/test_m2_parity.py`、`tests/test_m5_parity.py`、`tests/test_m6_parity.py`、`tests/test_bulk_name.py`。
+【文件】`facet/build/crystal.py`、`facet/web/js/build/crystal.js`、`facet/web/js/build/reference.js`、`facet/web/js/ui/panels/build.js`、`scripts/gen_reference_data.py`、`tests/test_build.py`、`tests/data/surface/`、`tests/test_m2_parity.py`、`tests/test_m5_parity.py`、`tests/test_m6_parity.py`、`tests/test_bulk_name.py`。
 
 【测试】即上；全量测试与平价测试通过。
 
@@ -2386,7 +2386,7 @@ Interface 分区的构建选项、预览与创建；Manual 矩阵、Registry、�
 
 【目标】把各模块的性能预算合成一次总检查：S16a（216 原子）与 S16b（10 086 原子）的全流程，以及浏览器内的 E2E-6。
 
-【依据】acceptance S16（S16-1–S16-10 的期望表）、§3.1（`tests/test_surface_perf.py`，`slow`，2× 预算断言）、§3.2 E2E-6（页面里用 `performance.now()` 计时：`crystallume.build.surface(bulkPt, { miller: [1, 1, 1], layers: 6, vacuum: 15, supercell: [[41, 0], [0, 41]] })` 10 086 原子 ≤ 120 ms；`crystallume.analysis.layers(s)` ≤ 40 ms；`crystallume.analysis.sites(s)` ≤ 800 ms 且计数 top 1681、bridge 5043、hollow 3362；50 次交替 `fixLayers` 每次 ≤ 120 ms、`app.history.bytes` ≤ 64 MiB；断言用 2× 预算，CI 再 ×3）、各模块 §7 的预算表（M1 §7.4、M2 §7.5、M3 §7.5、M4 §7.5、M5 §7.5、M6 §3.13）；简报 §6（每个模块写出性能预算）；plan.md P-10。
+【依据】acceptance S16（S16-1–S16-10 的期望表）、§3.1（`tests/test_surface_perf.py`，`slow`，2× 预算断言）、§3.2 E2E-6（页面里用 `performance.now()` 计时：`facet.build.surface(bulkPt, { miller: [1, 1, 1], layers: 6, vacuum: 15, supercell: [[41, 0], [0, 41]] })` 10 086 原子 ≤ 120 ms；`facet.analysis.layers(s)` ≤ 40 ms；`facet.analysis.sites(s)` ≤ 800 ms 且计数 top 1681、bridge 5043、hollow 3362；50 次交替 `fixLayers` 每次 ≤ 120 ms、`app.history.bytes` ≤ 64 MiB；断言用 2× 预算，CI 再 ×3）、各模块 §7 的预算表（M1 §7.4、M2 §7.5、M3 §7.5、M4 §7.5、M5 §7.5、M6 §3.13）；简报 §6（每个模块写出性能预算）；plan.md P-10。
 
 【实现】`tests/test_perf_budgets.py`（`slow`，S16a/S16b 的 Python 部分）、在 `tests/test_surface_perf.py` 补 S16 的切面部分、`tests/js/perf/pipeline.perf.mjs`（JS 全流水线）、`tests/e2e/perf.spec.mjs`（E2E-6，`slow`）。只测与报告；超预算项写清实测、预算、所在函数，交负责人在波末审查后安排修复（本链不改实现文件）。
 
@@ -2406,25 +2406,25 @@ Interface 分区的构建选项、预览与创建；Manual 矩阵、Registry、�
 |---|---|---|---|
 | `w5-acceptance` | — | M7-T3 验收场景的自动测试（S1–S16） | `tests/test_acceptance_surface.py`、`tests/test_acceptance_cli.py`、`tests/test_acceptance_rest.py`、`tests/data/surface/acceptance/`、`tests/ops/acceptance.py`、`tests/js/ops/acceptance.mjs`、`scripts/gen_acceptance_fixtures.py` |
 | `w5-e2e` | 8855 | M7-T4 最终端到端（E2E-1…E2E-5）与演示截图（MD-1…MD-8） | `tests/e2e/harness.mjs`、`tests/test_e2e.py`、`tests/e2e/e2e1_cleave_fix_adsorb_export.spec.mjs`、`tests/e2e/e2e2_contcar_roundtrip.spec.mjs`、`tests/e2e/e2e3_srtio3_terminations.spec.mjs`、`tests/e2e/e2e4_graphene.spec.mjs`、`tests/e2e/e2e5_interfaces.spec.mjs`、`tests/e2e/w1_acceptance.spec.mjs`、`tests/e2e/w2_acceptance.spec.mjs`、`tests/e2e/w3_acceptance.spec.mjs`、`tests/e2e/demo_walkthrough.spec.mjs` |
-| `w5-docs` | 8856 | M7-T2 文档定稿：README、PLUGINS、SCHEMA、DEPLOY、应用内帮助、快捷键对话框与导览 | `README.md`、`docs/PLUGINS.md`、`docs/SCHEMA.md`、`docs/DEPLOY.md`、`crystallume/web/js/ui/shell.js#help-tour`、`tests/test_docs_examples.py` |
-| `w5-release` | 8857 | M7-T7 版本 0.4.0、CHANGELOG 与段落标记清理 | `crystallume/_version.py`、`crystallume/web/js/app.js#VERSION`、`docker-compose.yml`、`CHANGELOG.md`、`tests/test_segments.py`、`crystallume/core/defaults.py`、`crystallume/web/js/core/defaults.js`、`crystallume/core/structure.py`、`crystallume/web/js/core/structure.js`、`crystallume/core/naming.py`、`crystallume/web/js/core/naming.js`、`crystallume/core/lattice.py`、`crystallume/web/js/core/lattice.js`、`crystallume/core/intmath.py`、`crystallume/web/js/core/intmath.js`、`crystallume/core/cellops.py`、`crystallume/web/js/core/cellops.js`、`crystallume/core/infohandlers.py`、`crystallume/web/js/core/infohandlers.js`、`crystallume/build/__init__.py`、`crystallume/analysis/__init__.py`、`crystallume/build/surface.py`、`crystallume/web/js/build/surface.js`、`crystallume/analysis/sites.py`、`crystallume/web/js/core/sites.js`、`crystallume/build/adsorbate.py`、`crystallume/web/js/build/adsorbates.js`、`crystallume/web/js/ui/panels/transform.js`、`crystallume/web/js/ui/panels/surface-interface.js`、`crystallume/web/js/main.js`、`crystallume/web/css/app.css`、`crystallume/web/js/ui/icons.js`、`crystallume/web/js/app.js#segments` |
+| `w5-docs` | 8856 | M7-T2 文档定稿：README、PLUGINS、SCHEMA、DEPLOY、应用内帮助、快捷键对话框与导览 | `README.md`、`docs/PLUGINS.md`、`docs/SCHEMA.md`、`docs/DEPLOY.md`、`facet/web/js/ui/shell.js#help-tour`、`tests/test_docs_examples.py` |
+| `w5-release` | 8857 | M7-T7 版本 0.4.0、CHANGELOG 与段落标记清理 | `facet/_version.py`、`facet/web/js/app.js#VERSION`、`docker-compose.yml`、`CHANGELOG.md`、`tests/test_segments.py`、`facet/core/defaults.py`、`facet/web/js/core/defaults.js`、`facet/core/structure.py`、`facet/web/js/core/structure.js`、`facet/core/naming.py`、`facet/web/js/core/naming.js`、`facet/core/lattice.py`、`facet/web/js/core/lattice.js`、`facet/core/intmath.py`、`facet/web/js/core/intmath.js`、`facet/core/cellops.py`、`facet/web/js/core/cellops.js`、`facet/core/infohandlers.py`、`facet/web/js/core/infohandlers.js`、`facet/build/__init__.py`、`facet/analysis/__init__.py`、`facet/build/surface.py`、`facet/web/js/build/surface.js`、`facet/analysis/sites.py`、`facet/web/js/core/sites.js`、`facet/build/adsorbate.py`、`facet/web/js/build/adsorbates.js`、`facet/web/js/ui/panels/transform.js`、`facet/web/js/ui/panels/surface-interface.js`、`facet/web/js/main.js`、`facet/web/css/app.css`、`facet/web/js/ui/icons.js`、`facet/web/js/app.js#segments` |
 
 **合并顺序**：`w5-acceptance` → `w5-e2e` → `w5-docs` → `w5-release`
 
 **出口检查**：
 
-- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`CRYSTALLUME_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 已随段落标记一起删除；`git status` 干净
+- 通用：在集成分支上 `$DEVPY -m pytest -q -p no:cacheprovider` 全部通过（含 `tests/test_js_unit.py` 收集的 `tests/js/*.test.mjs`）；`FACET_REQUIRE_NODE=1` 下同样通过；`tests/test_segments.py` 已随段落标记一起删除；`git status` 干净
 - 验收：`tests/test_acceptance_surface.py`（`test_s01`…`test_s16`）、`tests/test_acceptance_cli.py`（S1、S9、S14 的 CLI 序列，含省略 `--vacuum` 退出码 2）、`tests/test_acceptance_rest.py`（S1：`/build/surface` → `/analysis/sites` → `/build/adsorbate` → `/io/export`；缺 `vacuum` → 422）全部通过；`tests/data/surface/acceptance/` 的 `pipeline` 金标两语言通过（P6）；G-15、G-32、G-39 已按 L-03、L-12、L-19 裁决，不再有 xfail
-- 端到端：`CRYSTALLUME_REQUIRE_NODE=1 CRYSTALLUME_REQUIRE_E2E=1 $DEVPY -m pytest -m slow` 全部通过：E2E-1…E2E-6（acceptance §3.2，E2E-4 第 3 步按 L-16、MD-5 按 R-F32 改写）；MD-1…MD-8 的截图已交审查（`scratchpad/shots/w5-e2e/`）
+- 端到端：`FACET_REQUIRE_NODE=1 FACET_REQUIRE_E2E=1 $DEVPY -m pytest -m slow` 全部通过：E2E-1…E2E-6（acceptance §3.2，E2E-4 第 3 步按 L-16、MD-5 按 R-F32 改写）；MD-1…MD-8 的截图已交审查（`scratchpad/shots/w5-e2e/`）
 - U1–U6 合规：acceptance §0.6 的 U1-a…U6 逐条在 E2E 或验收测试里有对应断言（由 `w5-acceptance` 在报告里列出对照表）
-- 发布：`crystallume.__version__ == "0.4.0"`，`tests/test_version.py` 通过（`app.js` 的 VERSION 与 compose 镜像标签一致）；`CHANGELOG.md` 有 0.4.0 一节，列出行为变化（JS 读写 POSCAR 的 SD、extxyz 写 `move_mask`、`build.crystal(vacuum=)` 的 `DeprecationWarning`（L-02）、体相名统一（L-11）、`repeat` 与 `make_supercell` 的关系等）；文档里的例子全部能运行
-- 界面：应用在静态模式（`python3 -m http.server <端口> --directory crystallume/web`）与 `crystallume serve` 下都能启动，`document.body.dataset.ready === 'true'`，控制台无 `pageerror`/`console.error`
+- 发布：`facet.__version__ == "0.4.0"`，`tests/test_version.py` 通过（`app.js` 的 VERSION 与 compose 镜像标签一致）；`CHANGELOG.md` 有 0.4.0 一节，列出行为变化（JS 读写 POSCAR 的 SD、extxyz 写 `move_mask`、`build.crystal(vacuum=)` 的 `DeprecationWarning`（L-02）、体相名统一（L-11）、`repeat` 与 `make_supercell` 的关系等）；文档里的例子全部能运行
+- 界面：应用在静态模式（`python3 -m http.server <端口> --directory facet/web`）与 `facet serve` 下都能启动，`document.body.dataset.ready === 'true'`，控制台无 `pageerror`/`console.error`
 
 #### M7-T3 验收场景的自动测试（S1–S16）（链 `w5-acceptance`）
 
 【目标】把 acceptance.md 的场景变成自动测试：Python 公开 API 的 `test_sNN_*`、CLI 与 REST 的版本、两语言的 `pipeline` 金标。
 
-【依据】acceptance §3.1（总表与规则：金标用 `crystallume.cases/1` 外壳并新增 op `pipeline`，放在 `tests/ops/acceptance.py` 与 `tests/js/ops/acceptance.mjs`，不改 `tests/cases.py`；`input.recipe` 或 `input.file`（S14 用 `tests/data/surface/contcar_pt111.vasp`）；`args.steps` 依次列出 `surface`、`setVacuum`、`makeSupercell`、`fixLayers`、`fix`、`fixHeight`、`delete`、`sites`、`addAdsorbate`、`addAdsorbates`、`read`、`write`、`interfaceMatches`、`makeInterface`，每步可 `save`；`expect` 用公共比较器；期望值来源顺序：解析解 > 本文原型数字 > 开发期 ASE/pymatgen 核对后固化）、§1（C-1…C-9）、§2（S1–S16 的期望表与容差 §0.5）、§0.6（U1–U6 合规项）；负责人决定 L-03、L-12、L-15（吸附高度按 S1-6′ 的式子现算）、L-18、L-19；plan.md P-16（CLI 序列按 ledger-features R-F13 改写：`--surface-cell`、`--index`、`--from`/`--format`）。
+【依据】acceptance §3.1（总表与规则：金标用 `facet.cases/1` 外壳并新增 op `pipeline`，放在 `tests/ops/acceptance.py` 与 `tests/js/ops/acceptance.mjs`，不改 `tests/cases.py`；`input.recipe` 或 `input.file`（S14 用 `tests/data/surface/contcar_pt111.vasp`）；`args.steps` 依次列出 `surface`、`setVacuum`、`makeSupercell`、`fixLayers`、`fix`、`fixHeight`、`delete`、`sites`、`addAdsorbate`、`addAdsorbates`、`read`、`write`、`interfaceMatches`、`makeInterface`，每步可 `save`；`expect` 用公共比较器；期望值来源顺序：解析解 > 本文原型数字 > 开发期 ASE/pymatgen 核对后固化）、§1（C-1…C-9）、§2（S1–S16 的期望表与容差 §0.5）、§0.6（U1–U6 合规项）；负责人决定 L-03、L-12、L-15（吸附高度按 S1-6′ 的式子现算）、L-18、L-19；plan.md P-16（CLI 序列按 ledger-features R-F13 改写：`--surface-cell`、`--index`、`--from`/`--format`）。
 
 【实现】`tests/test_acceptance_surface.py`、`tests/test_acceptance_cli.py`（`subprocess` 跑 S1、S9、S14 的 CLI 序列，检查 stdout/stderr 与退出码）、`tests/test_acceptance_rest.py`（`TestClient` 跑 S1）、`tests/data/surface/acceptance/*.json`（S1、S8、S9、S13、S14、S15 存完整原子列表，其余存解析期望）、`tests/ops/acceptance.py`、`tests/js/ops/acceptance.mjs`、`scripts/gen_acceptance_fixtures.py`（开发期运行）。报告里附 U1-a…U6 与测试的对照表。
 
@@ -2438,17 +2438,17 @@ Interface 分区的构建选项、预览与创建；Manual 矩阵、Registry、�
 
 【目标】按 acceptance §3.2 定稿全部 Playwright 冒烟（E2E-1…E2E-5；E2E-6 在 W5.1 的 `w5-perf`），合并各波的临时验收 spec，并为 MD-1…MD-8 生成交审查的截图。
 
-【依据】acceptance §3.2（运行方式：`tests/e2e/*.spec.mjs`、共用 `harness.mjs`、`--no-sandbox --use-angle=swiftshader --enable-unsafe-swiftshader --ignore-gpu-blocklist`、视口 1280×800、收集 `pageerror` 与 `console.error`、`section(name)` 与可访问名称定位、截图 `tests/e2e/out/<spec>-<step>.png`、数值断言读 `window.crystallume`）与 E2E-1…E2E-5 的步骤；§3.3（MD-1…MD-8 的看点）；负责人决定 L-06、L-15、L-16（E2E-4 第 3 步用内嵌编辑器）、L-18；ledger-features R-F32（MD-5 没有 10 Å 占位预览）；plan.md P-14、P-16。
+【依据】acceptance §3.2（运行方式：`tests/e2e/*.spec.mjs`、共用 `harness.mjs`、`--no-sandbox --use-angle=swiftshader --enable-unsafe-swiftshader --ignore-gpu-blocklist`、视口 1280×800、收集 `pageerror` 与 `console.error`、`section(name)` 与可访问名称定位、截图 `tests/e2e/out/<spec>-<step>.png`、数值断言读 `window.facet`）与 E2E-1…E2E-5 的步骤；§3.3（MD-1…MD-8 的看点）；负责人决定 L-06、L-15、L-16（E2E-4 第 3 步用内嵌编辑器）、L-18；ledger-features R-F32（MD-5 没有 10 Å 占位预览）；plan.md P-14、P-16。
 
-【实现】五个 spec 文件 `tests/e2e/e2e1_cleave_fix_adsorb_export.spec.mjs` … `e2e5_interfaces.spec.mjs`（复用 W1–W4 的 spec 中已写好的步骤后删除 `w1/w2/w3_acceptance.spec.mjs`）；`harness.mjs` 按 §3.2 补齐（`CRYSTALLUME_CHROMIUM` 环境变量、SwiftShader 参数）；`tests/test_e2e.py` 支持 `CRYSTALLUME_REQUIRE_E2E=1`；`tests/e2e/demo_walkthrough.spec.mjs` 按 MD-1…MD-8 的看点脚本化走一遍并截图到 `scratchpad/shots/w5-e2e/`（需要人眼判断的项在报告里逐条写明看什么），390×844 窄屏一次（MD-6）。
+【实现】五个 spec 文件 `tests/e2e/e2e1_cleave_fix_adsorb_export.spec.mjs` … `e2e5_interfaces.spec.mjs`（复用 W1–W4 的 spec 中已写好的步骤后删除 `w1/w2/w3_acceptance.spec.mjs`）；`harness.mjs` 按 §3.2 补齐（`FACET_CHROMIUM` 环境变量、SwiftShader 参数）；`tests/test_e2e.py` 支持 `FACET_REQUIRE_E2E=1`；`tests/e2e/demo_walkthrough.spec.mjs` 按 MD-1…MD-8 的看点脚本化走一遍并截图到 `scratchpad/shots/w5-e2e/`（需要人眼判断的项在报告里逐条写明看什么），390×844 窄屏一次（MD-6）。
 
 【U 与负责人决定】U1–U6；负责人决定 L-06、L-15、L-16、L-18。
 
 【文件】`tests/e2e/harness.mjs`、`tests/test_e2e.py`、`tests/e2e/e2e1_cleave_fix_adsorb_export.spec.mjs`、`tests/e2e/e2e2_contcar_roundtrip.spec.mjs`、`tests/e2e/e2e3_srtio3_terminations.spec.mjs`、`tests/e2e/e2e4_graphene.spec.mjs`、`tests/e2e/e2e5_interfaces.spec.mjs`、`tests/e2e/w1_acceptance.spec.mjs`、`tests/e2e/w2_acceptance.spec.mjs`、`tests/e2e/w3_acceptance.spec.mjs`（删除）、`tests/e2e/demo_walkthrough.spec.mjs`。
 
-【测试】`CRYSTALLUME_REQUIRE_E2E=1 $DEVPY -m pytest -m slow tests/test_e2e.py`。
+【测试】`FACET_REQUIRE_E2E=1 $DEVPY -m pytest -m slow tests/test_e2e.py`。
 
-【界面检查】（Chromium，本链端口）E2E-1…E2E-5 全部步骤；MD-1（S1 全流程的叠加层、标记形状、幽灵 CO、固定光环、N 与 Shift+N、G 拖动只多一步撤销）、MD-2（S5、S6 侧视顶面朝上、(211) 台阶局部法向）、MD-3（S8 删桥氧、Atom Selection 非模态）、MD-4（CONTCAR 一整块、悬停卡、导入无提示）、MD-5（键盘导航与 120 ms 预览、Stop、真空未填时没有预览）、MD-6（216 原子无可感知延迟；窄屏底部抽屉、行高 ≥ 44 px）、MD-7、MD-8（`crystallume serve` 下重复 S1，客户端结果与本地相同）的截图交审查。
+【界面检查】（Chromium，本链端口）E2E-1…E2E-5 全部步骤；MD-1（S1 全流程的叠加层、标记形状、幽灵 CO、固定光环、N 与 Shift+N、G 拖动只多一步撤销）、MD-2（S5、S6 侧视顶面朝上、(211) 台阶局部法向）、MD-3（S8 删桥氧、Atom Selection 非模态）、MD-4（CONTCAR 一整块、悬停卡、导入无提示）、MD-5（键盘导航与 120 ms 预览、Stop、真空未填时没有预览）、MD-6（216 原子无可感知延迟；窄屏底部抽屉、行高 ≥ 44 px）、MD-7、MD-8（`facet serve` 下重复 S1，客户端结果与本地相同）的截图交审查。
 
 #### M7-T2 文档定稿：README、PLUGINS、SCHEMA、DEPLOY、应用内帮助、快捷键对话框与导览（链 `w5-docs`）
 
@@ -2456,11 +2456,11 @@ Interface 分区的构建选项、预览与创建；Manual 矩阵、Registry、�
 
 【依据】简报 §5（文档清单：README、`docs/PLUGINS.md`（JS/Python API、REST）、`docs/SCHEMA.md`（props、`info.surface`）、`docs/DEPLOY.md`（REST 表）、应用内帮助、快捷键对话框和导览）、P7（应用界面英文、文档沿用现有的简明英文风格）；两本账本的全部公开条目（以 W5.1 的 `tests/data/api_inventory.json` 为准）；ledger-features §0.3（真空语义）、L-X-01…08；负责人决定 L-02（二维原型的每侧真空）、L-11、L-13、L-16；U1–U6（文档不出现 slab 模式、不写默认真空）。
 
-【实现】README（功能总览、Mouse and keys 一节：G、N、Shift+N、Shift+5、Shift+L、Shift+U、Shift+A、Shift+S 以 W5.1 审计后的为准）、`docs/PLUGINS.md`（完整的 JS/Python/REST/客户端/CLI 表，`defineApi` 的命名空间）、`docs/SCHEMA.md`（props 与 `info.surface` 全表、`crystallume.sites/1`、`crystallume.adsorbates/1`、`crystallume.atoms/1`、查询 JSON）、`docs/DEPLOY.md`（全部 REST 行、限额与环境变量、云模式登录规则）、应用内帮助、快捷键对话框、导览（`ui/shell.js`，以符号定位）；`tests/test_docs_examples.py`（抽取文档中的 Python 代码块与 CLI 例子在临时目录运行；标 `slow`）。CHANGELOG 由 `w5-release` 负责，本链不改。
+【实现】README（功能总览、Mouse and keys 一节：G、N、Shift+N、Shift+5、Shift+L、Shift+U、Shift+A、Shift+S 以 W5.1 审计后的为准）、`docs/PLUGINS.md`（完整的 JS/Python/REST/客户端/CLI 表，`defineApi` 的命名空间）、`docs/SCHEMA.md`（props 与 `info.surface` 全表、`facet.sites/1`、`facet.adsorbates/1`、`facet.atoms/1`、查询 JSON）、`docs/DEPLOY.md`（全部 REST 行、限额与环境变量、云模式登录规则）、应用内帮助、快捷键对话框、导览（`ui/shell.js`，以符号定位）；`tests/test_docs_examples.py`（抽取文档中的 Python 代码块与 CLI 例子在临时目录运行；标 `slow`）。CHANGELOG 由 `w5-release` 负责，本链不改。
 
 【U 与负责人决定】U1–U6（文档不出现 slab 模式与默认真空）；负责人决定 L-02、L-11、L-13、L-16。
 
-【文件】`README.md`、`docs/PLUGINS.md`、`docs/SCHEMA.md`、`docs/DEPLOY.md`、`crystallume/web/js/ui/shell.js#help-tour`、`tests/test_docs_examples.py`。
+【文件】`README.md`、`docs/PLUGINS.md`、`docs/SCHEMA.md`、`docs/DEPLOY.md`、`facet/web/js/ui/shell.js#help-tour`、`tests/test_docs_examples.py`。
 
 【测试】`pytest -m slow tests/test_docs_examples.py`。
 
@@ -2470,15 +2470,15 @@ Interface 分区的构建选项、预览与创建；Manual 矩阵、Registry、�
 
 【目标】发布准备：版本号升到 0.4.0、整理 CHANGELOG、删除 W1-S0 引入的段落标记与它的测试。
 
-【依据】F0-D §4.5（行为变化写进 CHANGELOG，版本进 0.4）；`tests/test_version.py`（`app.js` 的 `VERSION` 与 `docker-compose.yml` 的镜像标签必须等于 `crystallume.__version__`）；负责人决定 L-02、L-11；plan.md P-01（段落标记只是开发期的归属手段，W5 清理）。
+【依据】F0-D §4.5（行为变化写进 CHANGELOG，版本进 0.4）；`tests/test_version.py`（`app.js` 的 `VERSION` 与 `docker-compose.yml` 的镜像标签必须等于 `facet.__version__`）；负责人决定 L-02、L-11；plan.md P-01（段落标记只是开发期的归属手段，W5 清理）。
 
-【实现】`crystallume/_version.py` → `0.4.0`；`web/js/app.js` 的 `export const VERSION` 一行；`docker-compose.yml` 的镜像标签；`CHANGELOG.md`：把各波 Unreleased 的条目整理成 0.4.0 一节（新功能按模块；行为变化：JS 读写 POSCAR 的 Selective dynamics、extxyz 写 `move_mask` 不再写 `selective_dynamics:L:3`、`build.crystal(..., vacuum=)` 每侧真空的 `DeprecationWarning`、Build 面板 `Cell height c (Å)`、体相名统一、`repeat` 与 `make_supercell` 的关系、`info.warning` → `info.warnings`、二面角符号）；删除全部 `--- surface-modeling … ---` 与 `--- end … ---` 标记行（只删注释行，不动代码）与 `tests/test_segments.py`。
+【实现】`facet/_version.py` → `0.4.0`；`web/js/app.js` 的 `export const VERSION` 一行；`docker-compose.yml` 的镜像标签；`CHANGELOG.md`：把各波 Unreleased 的条目整理成 0.4.0 一节（新功能按模块；行为变化：JS 读写 POSCAR 的 Selective dynamics、extxyz 写 `move_mask` 不再写 `selective_dynamics:L:3`、`build.crystal(..., vacuum=)` 每侧真空的 `DeprecationWarning`、Build 面板 `Cell height c (Å)`、体相名统一、`repeat` 与 `make_supercell` 的关系、`info.warning` → `info.warnings`、二面角符号）；删除全部 `--- surface-modeling … ---` 与 `--- end … ---` 标记行（只删注释行，不动代码）与 `tests/test_segments.py`。
 
 【U 与负责人决定】U6；负责人决定 L-02、L-11（CHANGELOG 的行为变化）。
 
-【文件】`crystallume/_version.py`、`crystallume/web/js/app.js#VERSION`、`docker-compose.yml`、`CHANGELOG.md`、`tests/test_segments.py`、`crystallume/core/defaults.py`、`crystallume/web/js/core/defaults.js`、`crystallume/core/structure.py`、`crystallume/web/js/core/structure.js`、`crystallume/core/naming.py`、`crystallume/web/js/core/naming.js`、`crystallume/core/lattice.py`、`crystallume/web/js/core/lattice.js`、`crystallume/core/intmath.py`、`crystallume/web/js/core/intmath.js`、`crystallume/core/cellops.py`、`crystallume/web/js/core/cellops.js`、`crystallume/core/infohandlers.py`、`crystallume/web/js/core/infohandlers.js`、`crystallume/build/__init__.py`、`crystallume/analysis/__init__.py`、`crystallume/build/surface.py`、`crystallume/web/js/build/surface.js`、`crystallume/analysis/sites.py`、`crystallume/web/js/core/sites.js`、`crystallume/build/adsorbate.py`、`crystallume/web/js/build/adsorbates.js`、`crystallume/web/js/ui/panels/transform.js`、`crystallume/web/js/ui/panels/surface-interface.js`、`crystallume/web/js/main.js`、`crystallume/web/css/app.css`、`crystallume/web/js/ui/icons.js`、`crystallume/web/js/app.js#segments`（`tests/test_segments.py` 删除；其余带段落的文件只删标记行，`app.js#segments` 指 `class App` 末尾的三对标记）。
+【文件】`facet/_version.py`、`facet/web/js/app.js#VERSION`、`docker-compose.yml`、`CHANGELOG.md`、`tests/test_segments.py`、`facet/core/defaults.py`、`facet/web/js/core/defaults.js`、`facet/core/structure.py`、`facet/web/js/core/structure.js`、`facet/core/naming.py`、`facet/web/js/core/naming.js`、`facet/core/lattice.py`、`facet/web/js/core/lattice.js`、`facet/core/intmath.py`、`facet/web/js/core/intmath.js`、`facet/core/cellops.py`、`facet/web/js/core/cellops.js`、`facet/core/infohandlers.py`、`facet/web/js/core/infohandlers.js`、`facet/build/__init__.py`、`facet/analysis/__init__.py`、`facet/build/surface.py`、`facet/web/js/build/surface.js`、`facet/analysis/sites.py`、`facet/web/js/core/sites.js`、`facet/build/adsorbate.py`、`facet/web/js/build/adsorbates.js`、`facet/web/js/ui/panels/transform.js`、`facet/web/js/ui/panels/surface-interface.js`、`facet/web/js/main.js`、`facet/web/css/app.css`、`facet/web/js/ui/icons.js`、`facet/web/js/app.js#segments`（`tests/test_segments.py` 删除；其余带段落的文件只删标记行，`app.js#segments` 指 `class App` 末尾的三对标记）。
 
-【测试】`tests/test_version.py`；全量测试（含 node）通过；`grep -r "surface-modeling" crystallume tests` 无结果。
+【测试】`tests/test_version.py`；全量测试（含 node）通过；`grep -r "surface-modeling" facet tests` 无结果。
 
 【界面检查】（Chromium，本链端口）应用的关于/帮助里显示 0.4.0；删除标记后应用照常启动、各面板与分区正常。
 

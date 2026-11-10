@@ -41,14 +41,14 @@
 
 | 文件 | 第 0 波归属 | 之后追加者 |
 |---|---|---|
-| `crystallume/core/structure.py`、`web/js/core/structure.js` | F0-D T1 / T2 | M1、M2、M3、M4 追加方法（不改本账本冻结的签名） |
-| `crystallume/core/constraints.py`、`web/js/core/constraints.js` | F0-D T3（**含** `move_flags`、`set_move_flags`、`clear_constraints`、`constraint_summary`、`axis_labels`、`cartesian_name`，见 L-F0-13） | 无 |
-| `crystallume/core/defaults.py`、`web/js/core/defaults.js` | F0-D T7 建立（含 F0-A 的键） | 各模块在自己的任务里追加键，两份同时改 |
-| `crystallume/analysis/vacuum.py`、`web/js/core/vacuum.js` | **F0-D T7 全部**（含 `surface_normal`，[改]：原属 F0-A T7a） | 无 |
-| `crystallume/core/lattice.py`、`web/js/core/lattice.js` | F0-D T7 建立 → F0-A T7a 追加 | M1 追加 |
-| `crystallume/analysis/geometry.py`、`web/js/core/geometry.js` | **F0-D T9**（二面角 + [改] 精确最小像） | M4 追加 `rotation_matrix`、`align_rotation`、`edit_frame` 等 |
+| `facet/core/structure.py`、`web/js/core/structure.js` | F0-D T1 / T2 | M1、M2、M3、M4 追加方法（不改本账本冻结的签名） |
+| `facet/core/constraints.py`、`web/js/core/constraints.js` | F0-D T3（**含** `move_flags`、`set_move_flags`、`clear_constraints`、`constraint_summary`、`axis_labels`、`cartesian_name`，见 L-F0-13） | 无 |
+| `facet/core/defaults.py`、`web/js/core/defaults.js` | F0-D T7 建立（含 F0-A 的键） | 各模块在自己的任务里追加键，两份同时改 |
+| `facet/analysis/vacuum.py`、`web/js/core/vacuum.js` | **F0-D T7 全部**（含 `surface_normal`，[改]：原属 F0-A T7a） | 无 |
+| `facet/core/lattice.py`、`web/js/core/lattice.js` | F0-D T7 建立 → F0-A T7a 追加 | M1 追加 |
+| `facet/analysis/geometry.py`、`web/js/core/geometry.js` | **F0-D T9**（二面角 + [改] 精确最小像） | M4 追加 `rotation_matrix`、`align_rotation`、`edit_frame` 等 |
 | `web/js/core/bonds.js` | **F0-D T9**（[改] 只改第 96 行的像范围上限，L-F0-20） | M3 新建 `core/bondgraph.js`，不改本文件 |
-| `crystallume/server/routes/build.py` | **F0-D T6**（[改] 只改 32-39、95 行的原子数估算）；F0-A T8（126-147 行，插件参数） | M1、M2、M5、M6 加路由 |
+| `facet/server/routes/build.py` | **F0-D T6**（[改] 只改 32-39、95 行的原子数估算）；F0-A T8（126-147 行，插件参数） | M1、M2、M5、M6 加路由 |
 | `web/js/api/namespaces.js`（新） | **F0-A T2**（[改] L-F0-53） | 各模块调用 `defineApi`，不改 `api/public.js` |
 | `web/js/render/display.js` | F0-A T5（含 [改] smart 键规则、外观面板一行修正） | 无 |
 | `web/js/ui/overlays.js` | **F0-A T2**（toast 多动作；[改] F0-A 规格写的 `ui/toast.js` 不存在，toast 在 `ui/overlays.js:20`） | 无 |
@@ -74,7 +74,7 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
 | R11 | 精确最小像：M4 v2 T1（第 2 波）实现 | [改] 提前到 **F0-D T9**（第 0 波）：现有 `get_distance(mic=True)` 在斜晶胞上错（附录 A 复现 9.99 Å 而非 2.77 Å），M3 的球形选择与 M4 同在第 2 波，不应互相等待；算法按 M4 v2 §3.2.2 并补上不依赖 M1 的约化（L-F0-20） |
 | R12 | JS 写晶胞：F0-D 只给 `setPositions`，M1 打算直接改 `_base`/`_baseCell` | [改] 新增 `write_frame`/`writeFrame` 低层原语；`setPositions` 增加 `mark` 选项，使刚性重定向不误删空间群（L-F0-06） |
 | R13 | M3 要 `registerHoverLine`、选区动作的 `items`/`rows`/`menu: 'blank'`、配色 `extras` | 悬停行用 F0-A 的 `registerAtomInfo`；其余三项 [改] 补进 F0-A T10/T4a（L-F0-50、L-F0-51） |
-| R14 | `crystallume.edit.*` 等成员由各模块直接改 `api/public.js` | [改] `defineApi(path, fn)` 注册（L-F0-53），避免 7 个任务改同一个文件 |
+| R14 | `facet.edit.*` 等成员由各模块直接改 `api/public.js` | [改] `defineApi(path, fn)` 注册（L-F0-53），避免 7 个任务改同一个文件 |
 | R15 | 网页 smart 键：只要有 C/H/O 就关掉所有金属–金属键（`render/display.js:16-21`） | [改] F0-A T5 改为按键判断的 smart 规则（与 M3 `bond_graph(metal_pairs="smart")` 同一定义，L-F0-55） |
 | R16 | M5 v2 要 `gap_cut`/`surface_normal` 加 `exclude`，并建议显示也排除吸附物 | 分析函数加 `exclude=None`（L-F0-15–17）；**显示不排除**（保留 F0-A v2 已验证的漂浮分子规则；排除带 id 的吸附物会让拖进真空的分子在中点翻到 slab 下方，即 F0-A v1 的缺陷）。两者只在吸附物把真空挤到门槛以下且没有 `info.surface.axis` 提示时不同 |
 | R17 | M1 v2 要 `_adopt(other)`；M2 v2 要 `make_contiguous(..., return_shifts=True)`；M1 v2 要 `vacuum_axis` 由 M1 追加到 F0-D 的文件 | `_adopt(other, *, src=None)` 归 F0-D T1/T2（L-F0-07）；整数平移由新的只读函数 `contiguous_shifts` 给出（返回类型不随参数变化，L-F0-18）；`vacuum_axis` 由 F0-D T7 提供（= `surface_normal(..., require_gap=True)` 的轴，L-F0-17），真空模块仍只有一个归属任务 |
@@ -85,7 +85,7 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
 
 ### L-F0-01 逐原子属性不变量与逐值复制
 
-- **提供方**：F0-D T1（Python）、T2（JS）。**文件**：`crystallume/core/structure.py`、`crystallume/web/js/core/structure.js`。
+- **提供方**：F0-D T1（Python）、T2（JS）。**文件**：`facet/core/structure.py`、`facet/web/js/core/structure.js`。
 - **Python**：`copy_value(v) -> Any`
 - **JS**：`export function copyValue(v)`
 - **语义**（F0-D §3.1，照原文）：
@@ -109,7 +109,7 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
   | `occupancy` | `1.0` | 有限数 → `float` | `1.0`，同格式 |
   | `residue_names`/`residue`、`residue_ids`、`chain_ids` | `"MOL"`、`1`、`"A"` | — | — |
   | `labels`、`label`、`atom_names`（`PROP_SYMBOL_DEFAULT`） | 新原子的元素符号 | — | — |
-  | `masses` | 元素标准原子量（`crystallume/data/elements.json`） | — | — |
+  | `masses` | 元素标准原子量（`facet/data/elements.json`） | — | — |
   | `poscar_species` | 同元素第一个块的标签，无则元素符号 | — | — |
   | `momenta`、`velocities`、`initial_magmoms`、`initial_charges`（`PROP_SHAPED_ZERO`） | 与该列已有行同形状的 0 | — | — |
   | 其他键 | `None`/`null`（写出器视为缺失） | — | — |
@@ -162,7 +162,7 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
 
 - **提供方**：F0-D T2。**文件**：`web/js/core/structure.js`。Python 不需要（没有界面缓存）。
 - **JS**：`Structure.prototype.rev: number`（构造时 0，不序列化、不进快照）；`touch() → this`（`rev++`）。
-- **语义**（F0-D K13）：下列方法各调用一次 `touch()`：`remap`（因而 `deleteAtoms`、`addAtom`、`extend`、`sortBySpecies`、`select` 的结果构造）、`setProp`、`removeProp`、`setPositions`、`writeFrame`、`translate`、`wrap`、`setSymbols`、`setPbc`、`keepFrame`、`markEdited`、`makeContiguous`、`applyBasisChange`；M1–M6 新增的原位方法同样必须调用（经 `markEdited`、`writeFrame` 或直接 `touch()`）。直接给属性赋值不递增（文档写明，脚本改完调用 `crystallume.edit.touch()`，L-F0-34）。
+- **语义**（F0-D K13）：下列方法各调用一次 `touch()`：`remap`（因而 `deleteAtoms`、`addAtom`、`extend`、`sortBySpecies`、`select` 的结果构造）、`setProp`、`removeProp`、`setPositions`、`writeFrame`、`translate`、`wrap`、`setSymbols`、`setPbc`、`keepFrame`、`markEdited`、`makeContiguous`、`applyBasisChange`；M1–M6 新增的原位方法同样必须调用（经 `markEdited`、`writeFrame` 或直接 `touch()`）。直接给属性赋值不递增（文档写明，脚本改完调用 `facet.edit.touch()`，L-F0-34）。
 - **消费方**：F0-A `structureKey`（L-F0-34）、真空模块的缓存（L-F0-16）、各面板签名；M3/M5 的缓存可用它作键。
 - **已解决的冲突**：工程审查建议 `version`、M2 v1 写 `version++`、M3 v2 §10.1-8 写"名字统一为 `version`" → 一律 `rev` + `touch()`（R8；F0-D K13、F0-A A-D4、M1 已按此写，改动最少）。
 
@@ -273,7 +273,7 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
 
 ### L-F0-11 常量对象 `SURFACE_DEFAULTS`
 
-- **提供方**：F0-D T7 建立（含下表全部第 0 波的键）。**文件**：`crystallume/core/defaults.py`、`crystallume/web/js/core/defaults.js`。
+- **提供方**：F0-D T7 建立（含下表全部第 0 波的键）。**文件**：`facet/core/defaults.py`、`facet/web/js/core/defaults.js`。
 - **Python**：
   ```python
   class Defaults(collections.abc.Mapping):            # 只读：d.key 与 d["key"] 都可用
@@ -303,7 +303,7 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
 
 ### L-F0-12 命名基础
 
-- **提供方**：F0-D T1（Python）、T2（JS）。**文件**：`crystallume/core/naming.py`、`crystallume/web/js/core/naming.js`。
+- **提供方**：F0-D T1（Python）、T2（JS）。**文件**：`facet/core/naming.py`、`facet/web/js/core/naming.js`。
 - **Python**：`TIMES = "×"`；`format_repeat(reps: Sequence[int]) -> str`；`add_repeat_suffix(name: str, reps: Sequence[int]) -> str`
 - **JS**：`TIMES`、`formatRepeat(reps)`、`addRepeatSuffix(name, reps)`
 - **语义**（F0-D §3.14）：`format_repeat((2,2,1)) → "2×2×1"`；`add_repeat_suffix`：全为 1 → 原名；Python 空名 → 空名；名字以 ` A×B×C`、旧 ` AxBxC` 或 JS 旧 ` (A×B×C)` 结尾（正则 `^(.*\S)\s+\(?(\d+)[x×](\d+)[x×](\d+)\)?$`，括号须成对）→ 逐项相乘后替换；否则追加 ` 2×2×1`。
@@ -312,7 +312,7 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
 
 ### L-F0-13 约束 `core/constraints`（[改]：读写函数与轴名规则并入 F0-D）
 
-- **提供方**：F0-D T3（纯函数与轴名）、T1/T2（`Structure` 的两个薄方法）。**文件**：`crystallume/core/constraints.py`、`crystallume/web/js/core/constraints.js`（测试 `tests/test_constraints_core.py`、`tests/js/constraints-core.test.mjs`；M3 用 `tests/test_fix_free.py`）。
+- **提供方**：F0-D T3（纯函数与轴名）、T1/T2（`Structure` 的两个薄方法）。**文件**：`facet/core/constraints.py`、`facet/web/js/core/constraints.js`（测试 `tests/test_constraints_core.py`、`tests/js/constraints-core.test.mjs`；M3 用 `tests/test_fix_free.py`）。
 - **Python**：
   ```python
   MOVE_FLAGS_KEY = "selective_dynamics"
@@ -354,7 +354,7 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
 
 ### L-F0-15 真空间隙基础：`axis_gaps`、`find_vacuum_gaps`、`find_vacuum_gap`（只读）
 
-- **提供方**：F0-D T7。**文件**：`crystallume/analysis/vacuum.py`（加入 `crystallume.analysis.__all__`）、`crystallume/web/js/core/vacuum.js`（只从 `core/util.js`、`core/defaults.js` 导入，避免与 `core/lattice.js` 循环）。
+- **提供方**：F0-D T7。**文件**：`facet/analysis/vacuum.py`（加入 `facet.analysis.__all__`）、`facet/web/js/core/vacuum.js`（只从 `core/util.js`、`core/defaults.js` 导入，避免与 `core/lattice.js` 循环）。
 - **Python**：
   ```python
   def axis_gaps(structure, axis: int, *, frame=None, exclude=None) -> dict | None      # [改] exclude：计算时忽略的原子（下标序列或长度 N 的布尔掩码）
@@ -439,7 +439,7 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
 
 ### L-F0-19 分数坐标包裹与 `core/lattice` 的建立
 
-- **提供方**：F0-D T7。**文件**：`crystallume/core/lattice.py`（追加）、`crystallume/web/js/core/lattice.js`（新建）。
+- **提供方**：F0-D T7。**文件**：`facet/core/lattice.py`（追加）、`facet/web/js/core/lattice.js`（新建）。
 - **Python**：`wrap_fractional(frac, pbc=(True, True, True), eps=1e-12) -> np.ndarray`
 - **JS**：`wrapFractional(frac /* number[3] 或 Float64Array(3n) */, pbc = [true, true, true], eps = 1e-12) → 同形状的新数组`；`core/lattice.js` 重新导出 `core/util.js` 的 `cellFromParams`、`cellParams`、`fracToCart`、`cartToFrac`、`det3`、`inv3`。
 - **语义**：只沿周期轴；`w = f − floor(f + eps)`，`w ≥ 1 − eps` 时取 0（Python `Structure.wrap` 的现行规则，`structure.py:515-531`；JS `wrap()` 改用它，容差从 1e-9 改为 1e-12）。**真空模块不用它**（L-F0-15 的 `gap_wrap_eps`）。
@@ -448,7 +448,7 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
 
 ### L-F0-20 精确最小像（[改] R11：从 M4 T1 提前到 F0-D T9）
 
-- **提供方**：**F0-D T9**。**文件**：`crystallume/analysis/geometry.py`（替换 `minimum_image_vectors` 的实现，`:21-40`）、`crystallume/web/js/core/geometry.js`（新建，与二面角同文件）；`web/js/core/bonds.js:96`（像范围上限）。
+- **提供方**：**F0-D T9**。**文件**：`facet/analysis/geometry.py`（替换 `minimum_image_vectors` 的实现，`:21-40`）、`facet/web/js/core/geometry.js`（新建，与二面角同文件）；`web/js/core/bonds.js:96`（像范围上限）。
 - **Python**：
   ```python
   def mic_vector(v, cell, pbc, *, axes=None) -> tuple[np.ndarray, tuple[int, int, int]]   # 新：(最小像矢量, 加上的整数像)
@@ -474,11 +474,11 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
 - **错误**：周期矢量线性相关 `ValueError`/`Error` `mic_vector: the periodic cell vectors are linearly dependent`；`v` 不是 3 个有限数 `TypeError` `mic_vector: v must be three finite numbers`。
 - **复杂度**：约化后通常 9 或 27 个候选；1 万个矢量 Python 向量化 ≤ 10 ms（M4 `perf2.py` 4.7 ms）。
 - **消费方**：现有 `get_distance(mic=True)` 等（修正）；M3 球形选择与 `distance` 查询；M4 `vdiff`、`set_distance/angle/dihedral(mic=True)`、复制载荷；M5 冲突检查与选区拼块；M6 面内接触距离（`axes=(0, 1)`）；JS 显示的键、配位、多面体（`findPeriodicNeighbors`）。
-- **已解决的冲突**：M4 v2 T1 实现 → F0-D T9（M4 T1 直接使用，不再实现）；M4 v2 的约化依赖 M1 `gauss_reduce_2d`/`niggli_reduce`（第 1 波）→ 本条自带确定性的逐对约化（只影响速度）；ASE 只在"每个结果都短于最短晶胞长的一半"时才用取整法，Crystallume 现行实现不检查这一条（报告 07 第 13 条）。
+- **已解决的冲突**：M4 v2 T1 实现 → F0-D T9（M4 T1 直接使用，不再实现）；M4 v2 的约化依赖 M1 `gauss_reduce_2d`/`niggli_reduce`（第 1 波）→ 本条自带确定性的逐对约化（只影响速度）；ASE 只在"每个结果都短于最短晶胞长的一半"时才用取整法，Facet 现行实现不检查这一条（报告 07 第 13 条）。
 
 ### L-F0-21 二面角
 
-- **提供方**：F0-D T9。**文件**：`web/js/core/geometry.js`、`crystallume/analysis/geometry.py`。
+- **提供方**：F0-D T9。**文件**：`web/js/core/geometry.js`、`facet/analysis/geometry.py`。
 - **JS**：`dihedralFromVectors(b0, b1, b2) → number`（[0, 360)，IUPAC 符号，公式与 Python 逐项相同）、`signedAngle(deg) → number`（映射到 (−180, 180]）。
 - **Python**：`dihedral_from_vectors(b0, b1, b2) -> float`（不变）；**[改]** 新增 `signed_angle(deg: float) -> float`（两种语言对称）。
 - **语义**：`b0 = r_j − r_i`、`b1 = r_k − r_j`、`b2 = r_l − r_k`；查看器测量列表（`render/viewer.js:1949-1961` 的 `measureValue`）与选区卡片（`ui/selectioncard.js:54-64` 的 `geometryValue`）显示 `signedAngle(dihedralFromVectors(...))`，一位小数加 `°`。网页上的二面角符号因此翻转（更正）。
@@ -487,16 +487,16 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
 
 ### L-F0-22 元素半径
 
-- **提供方**：F0-D T9。**文件**：`crystallume/data/elements.json`（加 `bondiRadius`）、`crystallume/core/elements.py`、`crystallume/web/js/core/elements.js`。
+- **提供方**：F0-D T9。**文件**：`facet/data/elements.json`（加 `bondiRadius`）、`facet/core/elements.py`、`facet/web/js/core/elements.js`。
 - **Python**：`covalent_radius(symbol) -> float`（**未知元素与 `X` 回退 0.5 Å**，原为 1.5）；`bondi_radius(symbol) -> float | None`（新）。
 - **JS**：`element(sym).rcov`、`element(sym).rbondi`（新列，无值为 `null`）；**[改]** 薄函数 `covalentRadius(sym) → number`、`bondiRadius(sym) → number | null`（与 Python 同名，消费方不必知道表的列名）。
 - **语义**：共价半径 H–Cm 两边本来相同，Bk–Lr 的 7 个值 JS 改用 `elements.json`；Bondi（1964，Mantina 等 2009 补主族元素）。**新算法只用共价半径或 Bondi 半径**；Python `vdw_radius`（Alvarez 2013）与 JS 显示半径 `rvdw` 有 21 个元素不同，各自用途不变，**不供算法使用**。
 - **消费方**：M4/M5 的重叠与吸附高度、M6 层间距默认值（`bondi_radius`）、M3 键图（共价半径）。
-- **已解决的冲突**：M6 v1 要两种语言一致的 `vdw_radius` → 用 `bondi_radius`（K16）。Python 的 `METALS`/`ANIONS` 不属于 F0：由 M2 T2（第 1 波）追加到 `crystallume/core/elements.py`，内容与 JS `core/elements.js:160-166` 逐项相同（测试核对）；M3、M4、M5 都从那里导入，M4 **不得**在 `analysis/fragments.py` 另定义一份（M2 v2 §10.1）。
+- **已解决的冲突**：M6 v1 要两种语言一致的 `vdw_radius` → 用 `bondi_radius`（K16）。Python 的 `METALS`/`ANIONS` 不属于 F0：由 M2 T2（第 1 波）追加到 `facet/core/elements.py`，内容与 JS `core/elements.js:160-166` 逐项相同（测试核对）；M3、M4、M5 都从那里导入，M4 **不得**在 `analysis/fragments.py` 另定义一份（M2 v2 §10.1）。
 
 ### L-F0-23 POSCAR 读写与原子顺序
 
-- **提供方**：F0-D T4（读写）、T1/T2（`poscar_order`、`canonical_order`、`sort_by_species`）。**文件**：`crystallume/io/poscar.py`、`web/js/io/poscar.js`、`core/structure.py`、`core/structure.js`。
+- **提供方**：F0-D T4（读写）、T1/T2（`poscar_order`、`canonical_order`、`sort_by_species`）。**文件**：`facet/io/poscar.py`、`web/js/io/poscar.js`、`core/structure.py`、`core/structure.js`。
 - **Python**：`read_poscar(text: str) -> Structure`（多帧 XDATCAR 返回带帧的结构）；`write_poscar(structure, *, order="species") -> str`（`order="keep"` 为可选项 O-4）；`poscar_order(symbols, order=None, blocks=None) -> list[int]`；`canonical_order(symbols, layers=None, blocks=None) -> list[int]`。
 - **JS**：`readPOSCAR(text, filename = '')`；`writePOSCAR(s, { order = 'species' } = {})`；`poscarOrder(symbols, order = null, blocks = null)`；`canonicalOrder(symbols, layers = null, blocks = null)`。
 - **语义**（F0-D §3.10，照原文）：
@@ -511,21 +511,21 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
 
 ### L-F0-24 extxyz 读写
 
-- **提供方**：F0-D T5。**文件**：`crystallume/io/xyz.py`、`web/js/io/xyz.js`。
+- **提供方**：F0-D T5。**文件**：`facet/io/xyz.py`、`web/js/io/xyz.js`。
 - **Python**：`kv_tokenize(line: str) -> list[tuple[str, str | None]]`、`convert_value(raw: str | None) -> Any`、`format_info_value(key: str, value) -> str | None`（`None` = 跳过）、`extxyz_columns(structure) -> tuple[list, list[tuple[str, str]]]`（列、跳过的 `(key, reason)`）、`read_xyz(text) -> list[Structure]`（不变）、`write_extxyz(structure, *, constraints="exact") -> str`（`"fix-partial"` 为可选项 O-3）。
 - **JS**：`kvTokenize(line)`、`convertValue(raw)`、`formatInfoValue(key, value)`、`extxyzColumns(s) → { columns, skipped }`、`readXYZ(text, filename = '')`、`writeXYZ(s, { extended = true, constraints = 'exact' } = {})`。旧的 `parseKeyValues` 删除（被 `kvTokenize` 取代）。
-- **语义**（F0-D §3.11，照原文）：词法与 ASE `key_val_str_to_dict` 相同（引号、`{}`、`[]`、反斜杠转义）；`convert_value` 只认 ASCII 正则（不得用 `int()`/`float()` 试转；`inf`/`nan` 保留为字符串；|整数| > 2^53−1 按浮点；`_JSON ` 前缀解码失败时保留原串并写备注 `info 'surface': could not decode the _JSON value; kept as text`）；保留任意宽度与类型的列（JS 删掉只留宽度 1 R/I 的过滤）；`charge` 列读成 `charges`；`name` 一律字符串，JS 不再把 `config_type` 当名字。约束列：读 `move_mask`（宽度 1 → `[b,b,b]`；宽度 3 → `cartesian_to_lattice_flags`，收紧写备注 `move_mask: the Cartesian constraints of 2 atom(s) do not follow the cell vectors and were tightened`；其他宽度忽略并写 `move_mask must have 1 or 3 columns; it was ignored`；同时有旧 `selective_dynamics` 列时写 `both move_mask and selective_dynamics columns were found; move_mask was used`），旧 `selective_dynamics:L:3` 照常读；写 `move_mask:L:1`（能写宽度 1 就写 1）或 `L:3`，全部可动时不写，**不再写 `selective_dynamics`**（D5/U5）。info 写法与 ASE 互通（K15：`stress`/`virial` 9 个数，一维数值/布尔列表空格分隔，读回会变类型的字符串写成 `_JSON "…"`，嵌套与字典用 `_JSON`，转义反斜杠）；跳过 `format`、`filename`、`source`、`warnings`。多帧：结果类 props/info 只写第 1 帧（W9）。剪贴板键 `crystallume_clip=<id>` 按普通字符串往返。
+- **语义**（F0-D §3.11，照原文）：词法与 ASE `key_val_str_to_dict` 相同（引号、`{}`、`[]`、反斜杠转义）；`convert_value` 只认 ASCII 正则（不得用 `int()`/`float()` 试转；`inf`/`nan` 保留为字符串；|整数| > 2^53−1 按浮点；`_JSON ` 前缀解码失败时保留原串并写备注 `info 'surface': could not decode the _JSON value; kept as text`）；保留任意宽度与类型的列（JS 删掉只留宽度 1 R/I 的过滤）；`charge` 列读成 `charges`；`name` 一律字符串，JS 不再把 `config_type` 当名字。约束列：读 `move_mask`（宽度 1 → `[b,b,b]`；宽度 3 → `cartesian_to_lattice_flags`，收紧写备注 `move_mask: the Cartesian constraints of 2 atom(s) do not follow the cell vectors and were tightened`；其他宽度忽略并写 `move_mask must have 1 or 3 columns; it was ignored`；同时有旧 `selective_dynamics` 列时写 `both move_mask and selective_dynamics columns were found; move_mask was used`），旧 `selective_dynamics:L:3` 照常读；写 `move_mask:L:1`（能写宽度 1 就写 1）或 `L:3`，全部可动时不写，**不再写 `selective_dynamics`**（D5/U5）。info 写法与 ASE 互通（K15：`stress`/`virial` 9 个数，一维数值/布尔列表空格分隔，读回会变类型的字符串写成 `_JSON "…"`，嵌套与字典用 `_JSON`，转义反斜杠）；跳过 `format`、`filename`、`source`、`warnings`。多帧：结果类 props/info 只写第 1 帧（W9）。剪贴板键 `facet_clip=<id>` 按普通字符串往返。
 - **消费方**：M2/M5/M6（`info.surface`、`info.interface` 等嵌套值经 `_JSON` 往返）、M3（`move_mask` 读写的约束语义）、M4（剪贴板）、F0-D 导出检查 W5/W6/W8/W9。
 - **已解决的冲突**：v1 的 `stress="_JSON [...]"` 让 ASE 打不开文件 → K15；宽度 3 经 ASE 写 POSCAR 丢约束 → W6 警告与可选 `fix-partial`。
 
 ### L-F0-25 写出器能力表与导出检查（含 REST、客户端、CLI、网页通道）
 
-- **提供方**：F0-D T6（库、服务器、客户端、CLI、JS 契约）、T8（网页 toast 与对话框）。**文件**：`crystallume/io/capabilities.py`（新）、`crystallume/io/__init__.py`、`web/js/io/capabilities.js`（新）、`web/js/io/index.js`、`web/js/api/extensions.js`、`server/models.py`、`server/routes/io.py`、`client.py`、`cli.py`。
+- **提供方**：F0-D T6（库、服务器、客户端、CLI、JS 契约）、T8（网页 toast 与对话框）。**文件**：`facet/io/capabilities.py`（新）、`facet/io/__init__.py`、`web/js/io/capabilities.js`（新）、`web/js/io/index.js`、`web/js/api/extensions.js`、`server/models.py`、`server/routes/io.py`、`client.py`、`cli.py`。
 - **Python**：
   ```python
   WRITER_CAPABILITIES: Mapping[str, dict]               # 下表
   def validate_capabilities(name: str, caps: dict) -> dict
-  class ExportWarning(UserWarning)                      # crystallume.io 导出
+  class ExportWarning(UserWarning)                      # facet.io 导出
   def export_report(structure, format: str, *, frame: int | None = None) -> dict    # {"warnings": [...], "notes": [...]}
   def export_warnings(structure, format: str, *, frame=None) -> list[str]
   def export_notes(structure, format: str, *, frame=None) -> list[str]
@@ -533,27 +533,27 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
   def write(dest, structure, format=None) -> None       # 写完对每条警告 warnings.warn(msg, ExportWarning, stacklevel=2)；说明不发
   def to_text(structure, format) -> str                 # 不变，不发警告
   ```
-- **JS**：`WRITER_CAPABILITIES`、`validateCapabilities(name, caps)`；`exportReport(s, formatId, { frame } = {}) → { warnings, notes }`；`exportStructure(s, id) → { text /* string | Promise<string>（服务器格式） */, filename, mime, warnings, notes }`（**保持同步**：`warnings`/`notes` 总是本地算出的数组）；`formats.register` 校验能力表（不合法时 `console.warn` 后忽略整个能力表）；`installServerFormats` 把 `GET /formats` 的 `capabilities` 抄进注册项。公共 API：`crystallume.exportReport(format, s = app.structure) → { warnings, notes }`（新）、`crystallume.exportText(format, s)`（不变）。
+- **JS**：`WRITER_CAPABILITIES`、`validateCapabilities(name, caps)`；`exportReport(s, formatId, { frame } = {}) → { warnings, notes }`；`exportStructure(s, id) → { text /* string | Promise<string>（服务器格式） */, filename, mime, warnings, notes }`（**保持同步**：`warnings`/`notes` 总是本地算出的数组）；`formats.register` 校验能力表（不合法时 `console.warn` 后忽略整个能力表）；`installServerFormats` 把 `GET /formats` 的 `capabilities` 抄进注册项。公共 API：`facet.exportReport(format, s = app.structure) → { warnings, notes }`（新）、`facet.exportText(format, s)`（不变）。
 - **能力表**（两种语言内容相同）：
 
   | id | `label` | `frames` | `cell` | `constraints` | `occupancy` | `order` | `pbc` | `overlap` | `handedness` |
   |---|---|---|---|---|---|---|---|---|---|
-  | `json` | Crystallume JSON | all | true | lattice | true | keep | stored | false | false |
+  | `json` | Facet JSON | all | true | lattice | true | keep | stored | false | false |
   | `extxyz` | Extended XYZ | all | true | cartesian | true | keep | stored | true | false |
   | `xyz` | plain XYZ | all | false | none | false | keep | none | false | false |
   | `poscar` | POSCAR | one | required | lattice | false | species | periodic | true | true |
   | `cif` | CIF | one | required | none | true | keep | periodic | true | false |
   | `pdb` | PDB | all | true | none | false | keep | periodic | false | false |
 
-- **检查与文案**（F0-D §3.12.2，照原文；**警告** = 影响计算或丢数据，**说明** = 不影响计算）：W1 `{F} holds one frame: wrote frame {k+1} of {n}`；W2 `plain XYZ does not store the unit cell; use Extended XYZ to keep it`；W3 `{F} needs a unit cell: the atoms were placed in a box with 10 Å of vacuum on each side (20 Å between periodic images)`；W4 `{m} atom(s) are fixed or partly fixed (selective dynamics), but {F} cannot store constraints; use POSCAR, Extended XYZ or Crystallume JSON to keep them`；W5 `Extended XYZ stores constraints along x, y and z (ASE move_mask): the partial constraints of {t} atom(s) are along cell vectors that are not x, y or z and were tightened; POSCAR keeps them exactly`；W6 `Extended XYZ stores these constraints as ASE FixCartesian masks because {p} atom(s) are only partly fixed; ASE's VASP writer ignores FixCartesian and would write every atom as free, so export POSCAR from Crystallume for VASP`；W7 `{q} site(s) are partially occupied, but {F} cannot store occupancy; they are written as full atoms`；W8 `property '{key}' was not written: {reason}`（reason ∈ `it has missing values`、`its rows have different lengths`、`its values are not all numbers, booleans or single words`、`its name is not a valid column name`）；W9 `forces, energy are known only for frame 1 and were written for that frame only`；W10 `the cell is left-handed (negative volume); VASP stops on such cells, so swap two cell vectors first`；W11 `{r} pair(s) of atoms are closer than 0.5 Å (e.g. atoms 12 and 13, 0.00 Å apart)`（序号从 1 开始）；N1 `POSCAR groups atoms by element, so the atom order in the file differs from the order in the structure; sort the atoms by species to make them match`；N2 `POSCAR is always periodic: c was not periodic and is written as a cell vector with a {w} Å gap between periodic images`。不报告 tags、`adsorbate_id`、labels、info 的丢失（K9）。
+- **检查与文案**（F0-D §3.12.2，照原文；**警告** = 影响计算或丢数据，**说明** = 不影响计算）：W1 `{F} holds one frame: wrote frame {k+1} of {n}`；W2 `plain XYZ does not store the unit cell; use Extended XYZ to keep it`；W3 `{F} needs a unit cell: the atoms were placed in a box with 10 Å of vacuum on each side (20 Å between periodic images)`；W4 `{m} atom(s) are fixed or partly fixed (selective dynamics), but {F} cannot store constraints; use POSCAR, Extended XYZ or Facet JSON to keep them`；W5 `Extended XYZ stores constraints along x, y and z (ASE move_mask): the partial constraints of {t} atom(s) are along cell vectors that are not x, y or z and were tightened; POSCAR keeps them exactly`；W6 `Extended XYZ stores these constraints as ASE FixCartesian masks because {p} atom(s) are only partly fixed; ASE's VASP writer ignores FixCartesian and would write every atom as free, so export POSCAR from Facet for VASP`；W7 `{q} site(s) are partially occupied, but {F} cannot store occupancy; they are written as full atoms`；W8 `property '{key}' was not written: {reason}`（reason ∈ `it has missing values`、`its rows have different lengths`、`its values are not all numbers, booleans or single words`、`its name is not a valid column name`）；W9 `forces, energy are known only for frame 1 and were written for that frame only`；W10 `the cell is left-handed (negative volume); VASP stops on such cells, so swap two cell vectors first`；W11 `{r} pair(s) of atoms are closer than 0.5 Å (e.g. atoms 12 and 13, 0.00 Å apart)`（序号从 1 开始）；N1 `POSCAR groups atoms by element, so the atom order in the file differs from the order in the structure; sort the atoms by species to make them match`；N2 `POSCAR is always periodic: c was not periodic and is written as a cell vector with a {w} Å gap between periodic images`。不报告 tags、`adsorbate_id`、labels、info 的丢失（K9）。
 - **错误**：能力表非法 `ValueError` `writer 'myfmt': capabilities.constraints must be one of lattice, cartesian, none`；插件不声明能力时 `export_report` 返回空结果。
-- **通道**：REST `POST /api/v1/io/export` 的 `ExportResponse` 加 `warnings: list[str] = []`、`notes: list[str] = []`；`GET /api/v1/formats` 写出器条目加 `capabilities`；客户端 `export_structure(...)` 不变，新增 `export_structure_with_warnings(structure, format) -> ExportResult`（`text`、`filename`、`mimetype`、`warnings`、`notes`）；CLI `convert` 与 `build … -o` 在 stderr 打印 `crystallume: warning: …` / `crystallume: note: …`（内部屏蔽 `ExportWarning` 以免重复；退出码不变）；CLI `info` 有间隙时打印中性的一行 `Vacuum gap  : 15.00 Å along c`（任何结构同样处理，U1），`--json` 加 `vacuumGap`。可选 O-6：`POST /api/v1/analysis/vacuum` + 客户端 `vacuum_gap(structure, axis=None, min_width=None)`。
+- **通道**：REST `POST /api/v1/io/export` 的 `ExportResponse` 加 `warnings: list[str] = []`、`notes: list[str] = []`；`GET /api/v1/formats` 写出器条目加 `capabilities`；客户端 `export_structure(...)` 不变，新增 `export_structure_with_warnings(structure, format) -> ExportResult`（`text`、`filename`、`mimetype`、`warnings`、`notes`）；CLI `convert` 与 `build … -o` 在 stderr 打印 `facet: warning: …` / `facet: note: …`（内部屏蔽 `ExportWarning` 以免重复；退出码不变）；CLI `info` 有间隙时打印中性的一行 `Vacuum gap  : 15.00 Å along c`（任何结构同样处理，U1），`--json` 加 `vacuumGap`。可选 O-6：`POST /api/v1/analysis/vacuum` + 客户端 `vacuum_gap(structure, axis=None, min_width=None)`。
 - **消费方**：M3（CLI 打印约束丢失警告）、M7（REST 表）、网页导出（L-F0-28）。
 - **已解决的冲突**：v1 的 `export_structure(with_warnings=True)` → 新方法（返回类型不随参数变化）；`exportStructure` 的同步契约（工程 #11）。
 
 ### L-F0-26 原子重叠检查 `close_contacts`
 
-- **提供方**：F0-D T6。**文件**：`crystallume/analysis/contacts.py`（新）、`web/js/core/contacts.js`（新；不改现有成键代码）。
+- **提供方**：F0-D T6。**文件**：`facet/analysis/contacts.py`（新）、`web/js/core/contacts.js`（新；不改现有成键代码）。
 - **Python**：`close_contacts(structure, cutoff=None, *, pbc=None, limit=None) -> list[tuple[int, int, float]]`
 - **JS**：`closeContacts(s, { cutoff, pbc, limit } = {}) → Array<[i, j, d]>`
 - **语义**（F0-D §3.12.3）：`cutoff` 缺省 `overlap_distance`（0.5 Å）；`pbc` 缺省结构的 pbc；网格 O(N)；同一原子与自己的像也算；`(min(i,j), max(i,j), d)` 去重后按 `(i, j, d)` 排序；`limit` 截断。超过 20 万原子时导出检查跳过并写说明 `the overlap check was skipped for more than 200 000 atoms`。
@@ -561,43 +561,43 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
 
 ### L-F0-27 跨语言测试桥与公共用例格式（[改]：每个模块自己的 op 文件）
 
-- **提供方**：F0-D T0。**文件**：`tests/js_bridge.py`、`tests/conftest.py`、`tests/cases.py`、`tests/test_cases.py`、`tests/test_js_unit.py`、`tests/js/helpers.mjs`、`tests/js/cases.mjs`、`tests/js/cases.test.mjs`、`tests/ops/__init__.py`（[改]）、`tests/js/ops/`（[改]）、`tests/data/surface/README.md`、`tests/data/surface/contcar_pt111.vasp`、`crystallume/web/js/package.json`（`{"type": "module"}`）、`pyproject.toml`（追加）。
+- **提供方**：F0-D T0。**文件**：`tests/js_bridge.py`、`tests/conftest.py`、`tests/cases.py`、`tests/test_cases.py`、`tests/test_js_unit.py`、`tests/js/helpers.mjs`、`tests/js/cases.mjs`、`tests/js/cases.test.mjs`、`tests/ops/__init__.py`（[改]）、`tests/js/ops/`（[改]）、`tests/data/surface/README.md`、`tests/data/surface/contcar_pt111.vasp`、`facet/web/js/package.json`（`{"type": "module"}`）、`pyproject.toml`（追加）。
 - **Python**：
   ```python
   # tests/js_bridge.py
   REPO: Path; WEB_JS: Path; MIN_NODE_MAJOR = 22
   class NodeUnavailable(RuntimeError): ...
   class JSError(RuntimeError): stderr: str
-  def find_node() -> tuple[str, tuple[int, int, int]]                  # $CRYSTALLUME_NODE（路径，或 0/off/false/no 关闭），再找 PATH
+  def find_node() -> tuple[str, tuple[int, int, int]]                  # $FACET_NODE（路径，或 0/off/false/no 关闭），再找 PATH
   def run_js(source: str, payload: Any = None, timeout: float = 30.0) -> Any
-      # source 是 async function(input, web) 的函数体；web(rel) 导入 crystallume/web/js/<rel>；类型化数组转为普通数组；返回 JSON 结果
+      # source 是 async function(input, web) 的函数体；web(rel) 导入 facet/web/js/<rel>；类型化数组转为普通数组；返回 JSON 结果
   def run_node_tests(paths: Sequence[str | Path], *, timeout: float = 300.0) -> subprocess.CompletedProcess
       # 显式文件列表交给 node --test --test-reporter=tap（不得传目录：Node 22/24 会失败）
   # tests/conftest.py：session fixture js -> run_js；Node 不可用时 pytest.skip("JS parity tests need Node.js >= 22: <原因>")，
-  #   CRYSTALLUME_REQUIRE_NODE ∈ {1, true, yes} 时 pytest.fail；用到 js 的测试自动加 js 标记
+  #   FACET_REQUIRE_NODE ∈ {1, true, yes} 时 pytest.fail；用到 js 的测试自动加 js 标记
   # tests/cases.py
-  def load_cases(root: Path = REPO / "tests" / "data") -> list[dict]   # [改] 递归读 tests/data/**/*.json 中 schema == "crystallume.cases/1" 的文件
+  def load_cases(root: Path = REPO / "tests" / "data") -> list[dict]   # [改] 递归读 tests/data/**/*.json 中 schema == "facet.cases/1" 的文件
   def compare(expect: dict, actual: dict, tol: dict) -> None           # 失败抛 AssertionError，信息含用例 id
   OPS: dict[str, Callable]; def op(name: str) -> Callable              # 装饰器；重名注册抛 ValueError
   ```
 - **JS**：`tests/js/helpers.mjs`：`repoPath(rel)`、`loadCases()`、`approx(a, b, tol)`、`compare(expect, actual, tol)`（与 `cases.py` 同一比较语义）；`tests/js/cases.mjs`：`export const OPS`、`export function op(name, fn)`。
-- **用例外壳 `crystallume.cases/1`**（F0-D §7.1，照原文）：`{"schema": "crystallume.cases/1", "cases": [{id, op, args, input, expect, tol, skip}]}`；`input` 为 `{"structure": …}`、`{"text": …}` 或 `{"file": "相对 tests/data 的路径"}`；`args` 用 camelCase，Python 分派显式映射为 snake_case；比较器 `structure`、`value`、`sourceMap`、`warnings`（`equals`/`contains`/`count`）、`text`、`error`；未注册的 op 视为失败，除非写了带理由的 `skip`。
-- **[改] 配方输入**（M1 v2 请求）：`input` 另可为 `{"recipe": {"name": "fcc111", "args": {…}}}`，由注册的配方构造器生成结构（大结构不存坐标）；Python `RECIPES: dict[str, Callable]` 与 `@recipe("name")`（`tests/cases.py`），JS `recipe(name, fn)`（`tests/js/cases.mjs`）；配方与 op 一样放在各模块自己的 op 文件里，重名注册报错；两种语言的同名配方必须给出同一结构（用一个 `crystallume.cases/1` 用例核对）。
+- **用例外壳 `facet.cases/1`**（F0-D §7.1，照原文）：`{"schema": "facet.cases/1", "cases": [{id, op, args, input, expect, tol, skip}]}`；`input` 为 `{"structure": …}`、`{"text": …}` 或 `{"file": "相对 tests/data 的路径"}`；`args` 用 camelCase，Python 分派显式映射为 snake_case；比较器 `structure`、`value`、`sourceMap`、`warnings`（`equals`/`contains`/`count`）、`text`、`error`；未注册的 op 视为失败，除非写了带理由的 `skip`。
+- **[改] 配方输入**（M1 v2 请求）：`input` 另可为 `{"recipe": {"name": "fcc111", "args": {…}}}`，由注册的配方构造器生成结构（大结构不存坐标）；Python `RECIPES: dict[str, Callable]` 与 `@recipe("name")`（`tests/cases.py`），JS `recipe(name, fn)`（`tests/js/cases.mjs`）；配方与 op 一样放在各模块自己的 op 文件里，重名注册报错；两种语言的同名配方必须给出同一结构（用一个 `facet.cases/1` 用例核对）。
 - **[改] op 的归属**：每个模块把自己的 op 放在 `tests/ops/<module>.py`（例如 `f0d.py`、`f0a.py`、`m1.py`）与 `tests/js/ops/<module>.mjs`，由 `tests/ops/__init__.py` 与 `cases.test.mjs` 按文件名排序自动导入；不改 `tests/cases.py`、`tests/js/cases.mjs`。用例文件放 `tests/data/<area>/…`（F0-D 用 `tests/data/surface/f0d/`；F0-A 的 `gaps.json`、`params/coerce.json`、`lattice/directions.json`、`measure/migrate.json` 也改用此外壳）。唯一的 CONTCAR 夹具：`tests/data/surface/contcar_pt111.vasp`（Pt(111) p(3×3) 4 层 36 原子，SD 底 2 层 `F F F`，两个底层原子在 f = 0.99999，末尾有速度块）。
 - **pyproject**：在现有三项上**追加** `addopts = "-q -m 'not slow'"` 与 `markers = ["js: needs Node.js >= 22 (…)", "slow: end-to-end browser tests (run with: pytest -m slow)"]`。
-- **消费方**：所有模块的跨语言测试；M7 在 CI 设 `CRYSTALLUME_REQUIRE_NODE=1`。
+- **消费方**：所有模块的跨语言测试；M7 在 CI 设 `FACET_REQUIRE_NODE=1`。
 - **已解决的冲突**：原型的 `MIN_NODE_MAJOR = 22` 保留，Node 20 不支持；`node --test 目录` → 显式文件列表（工程 #9）。
 
 ### L-F0-28 F0-D 的网页钩子（命令、备注、导出提示）
 
 - **提供方**：F0-D T8。**文件**：`web/js/app.js`（`importFiles`/`importText`/`exportStructureFile` 三段）、`main.js`、`ui/panels/structure.js`、`ui/shell.js`（粘贴的两处 toast）、`api/public.js`。
 - **命令**（经 L-F0-52 注册，参数经 `validateParams` 校验）：`edit.sortBySpecies`（Sort atoms by species，参数 `{order?: string[]}`，校验失败 toast `order must be a list of element symbols, e.g. ["Pt", "C", "O"]`；已分组时 `Atoms are already grouped by species`、不记历史；否则撤销标签 `Sort atoms by species`、toast `Sorted 38 atoms by species (Pt, C, O)` + Undo）；`edit.clearNotes`（Clear structure notes，撤销标签 `Clear notes`）；`file.exportNotes`（Show notes from the last export）。不新增快捷键。
-- **公共 API**（经 L-F0-53 `defineApi`）：`crystallume.edit.sortBySpecies(order?)`、`crystallume.edit.clearNotes()`、`crystallume.analysis.vacuumGap(s = app.structure, axis = null) → VacuumGap | null`；顶层 `crystallume.exportReport(format, s)`（L-F0-25）。
-- **界面**：导入 toast 只附**本步新增**的读取备注（一条放括号里，多条 `(… ; +2 more)` + `Details`）；Crystallume JSON 自带的备注不弹出；结构面板 Summary 下 `Notes (3)` 折叠列表 + `Clear notes`；导出成功后有警告时 `Saved slab.cif — <第一条警告> (+2 more)` + `Details`，含 W4/W6/W7/W10/W11 时 `timeout: 0`，否则 9000 ms；只有说明时按钮 `Notes`；对话框 `Export notes`，N1 存在时带动作 `Sort atoms by species`。**导入不加任何 slab 提示或开关（U1）**，Periodic 行保持只读。
+- **公共 API**（经 L-F0-53 `defineApi`）：`facet.edit.sortBySpecies(order?)`、`facet.edit.clearNotes()`、`facet.analysis.vacuumGap(s = app.structure, axis = null) → VacuumGap | null`；顶层 `facet.exportReport(format, s)`（L-F0-25）。
+- **界面**：导入 toast 只附**本步新增**的读取备注（一条放括号里，多条 `(… ; +2 more)` + `Details`）；Facet JSON 自带的备注不弹出；结构面板 Summary 下 `Notes (3)` 折叠列表 + `Clear notes`；导出成功后有警告时 `Saved slab.cif — <第一条警告> (+2 more)` + `Details`，含 W4/W6/W7/W10/W11 时 `timeout: 0`，否则 9000 ms；只有说明时按钮 `Notes`；对话框 `Export notes`，N1 存在时带动作 `Sort atoms by species`。**导入不加任何 slab 提示或开关（U1）**，Periodic 行保持只读。
 
 ### L-F0-29 默认参数表对齐（D7）
 
-- **提供方**：F0-D T10。**文件**：`scripts/gen_reference_data.py`（新）、`crystallume/build/crystal.py`、`web/js/build/crystal.js`、`web/js/build/reference.js`（新，生成）、`web/js/ui/panels/build.js`、`tests/test_build.py`。
+- **提供方**：F0-D T10。**文件**：`scripts/gen_reference_data.py`（新）、`facet/build/crystal.py`、`web/js/build/crystal.js`、`web/js/build/reference.js`（新，生成）、`web/js/ui/panels/build.js`、`tests/test_build.py`。
 - **语义**（F0-D §3.15.2，照原文）：逐项取更准确的值（fcc/bcc/hcp 默认取 JS 室温实验值，sc 取 Python 3.359，Cr 2.884；纤锌矿 `u` 与 MX2 厚度按化合物；MoS2 `c` 两边 18；Python 加 `hbn`；fluorite/mos2 原子顺序取 Python）；参考表放 Python、生成 JS；严格逐原型 `toJSON` 对 `to_dict` 测试。名字（`Cu fcc` / `Cu (Face-centred cubic)`）本期不动（M7 定）。
 - **消费方**：M2 切面金标的体相、M6 hBN 原型。
 
@@ -605,7 +605,7 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
 
 ## 2. F0-A 提供的条目（L-F0-30 … L-F0-56）
 
-路径相对 `crystallume/web/js/`。F0-A 只有网页侧，Python 侧只有参数 schema（L-F0-47）与晶格方向函数（L-F0-46）。
+路径相对 `facet/web/js/`。F0-A 只有网页侧，Python 侧只有参数 schema（L-F0-47）与晶格方向函数（L-F0-46）。
 
 ### L-F0-30 原位编辑 `editActive`
 
@@ -639,7 +639,7 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
 
 - **提供方**：F0-A T2。**文件**：`app.js`（`:338-371`）。
 - **JS**：`app.addStructure(s, { look = null, scene = null, newProject = false, replaceProject = newProject ? true : 'auto', name = null, label = null, activate = true } = {}) → { entry, historyEntry }`
-- **语义**（F0-A §3.3）：`replaceProject: 'auto'`（现有行为：项目未改动时替换整个项目）只给 `importFiles`、`loadSample`、Build 面板；`false` = 总是加入当前项目、一步撤销；`true` = 替换。toast 附 `newWarnings([], getWarnings(s.info))`。公共 API `crystallume.addStructure` 仍返回条目 id。
+- **语义**（F0-A §3.3）：`replaceProject: 'auto'`（现有行为：项目未改动时替换整个项目）只给 `importFiles`、`loadSample`、Build 面板；`false` = 总是加入当前项目、一步撤销；`true` = 替换。toast 附 `newWarnings([], getWarnings(s.info))`。公共 API `facet.addStructure` 仍返回条目 id。
 - **必须传 `replaceProject: false` 的调用方**：Structure 面板 Duplicate（`ui/panels/structure.js:185`）、M2 切面、M6 Build Layers、M4 合并为新结构与"作为新结构粘贴"、M5"另存为新结构"。
 - **已解决的冲突**：M2 v1 期望返回条目、M6 v1 期望返回 id → `{entry, historyEntry}`（id 为 `entry.id`）；报告 02 建议的 `keepCurrent: true` → `replaceProject: false`。
 
@@ -661,7 +661,7 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
 ### L-F0-34 `structureKey`、`notifyStructureChanged` 与脚本的 `edit.touch()`
 
 - **提供方**：F0-A T2。**文件**：`core/analyses.js`（`:103-107`）、`app.js`。
-- **JS**：`structureKey(app) → '<active>:<serial>:<length>:<frame>:<rev>:<digest>'`；`app.notifyStructureChanged()`；`crystallume.edit.touch()`（= 前者）。
+- **JS**：`structureKey(app) → '<active>:<serial>:<length>:<frame>:<rev>:<digest>'`；`app.notifyStructureChanged()`；`facet.edit.touch()`（= 前者）。
 - **语义**：`rev` 来自 L-F0-05，使只改 props/info 的编辑（固定原子、tags、`adsorbate_id`）也改变面板签名与分析缓存键；`structureDigest` 不变（仍兜住脚本直接改坐标）。`notifyStructureChanged`：`touch()`；与上次重建时的摘要比较（坐标、晶胞、元素或原子数变了 → `'full'`，否则 `'appearance'`）；`markDirty()`；发 `structure`；**不写历史**。F0-D 合入前 `editActive` 临时做 `s.rev = (s.rev ?? 0) + 1`。
 - **消费方**：M3/M5 的面板签名与缓存（`adsorbate_id`、约束变化可见）；插件脚本。
 - **已解决的冲突**：报告 02 缺陷 4（`structureKey` 不感知 props）。
@@ -743,7 +743,7 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
 ### L-F0-39 命名高亮 `setHighlight`
 
 - **提供方**：F0-A T4a。**文件**：`render/viewer.js`。
-- **JS**：`viewer.setHighlight(name, srcIndices | null, { color, grow = 1.15, opacity = 1, strength = 1.4, contrast = true, export = 'marker' } = {})`；`viewer.clearHighlight(name)`；`viewer.highlightNames()`。公共 API `crystallume.highlight(name, indices, opts)`。
+- **JS**：`viewer.setHighlight(name, srcIndices | null, { color, grow = 1.15, opacity = 1, strength = 1.4, contrast = true, export = 'marker' } = {})`；`viewer.clearHighlight(name)`；`viewer.highlightNames()`。公共 API `facet.highlight(name, indices, opts)`。
 - **语义**（F0-A §3.10）：保留名 `select`、`hover`（随主题强调色）；其他名字惰性创建、**不随主题改色**（修 `viewer.js:883, 893`）；`color` 接受颜色串、`{light, dark}` 或 `'var(--token)'`（主题变化时重新解析）；双色边（深色内线 + 彩色外圈）缺省开；多个名字按 `grow` 由小到大绘制；编辑后经 `remapIndexed` 重映射；P-swap 且 `sameAtoms` 为假时隐藏；不保存。**F0-A 不规定任何名字的颜色**。
 - **消费方**：M3（`fixed`、`fixed-partial`、`query`、`layer`，颜色令牌 `--constraint`，外圈亮度宜 ≥ 0.25）、M4（`m4-moving`）、M5（悬停类与吸附物列表）。
 - **已解决的冲突**：F0-A v1 的 `HIGHLIGHT_COLORS` 删除，名字与颜色归调用模块；M3 的 `export: 'png'` → `'marker'`。
@@ -779,16 +779,16 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
                   click(e, hit) → boolean, cancel(press, reason /* 'esc' | 'lost' | 'pointercancel' | 'switch' | 'second-finger' | 'session' */),
                   hover(hit, e), keydown(e) → boolean };
   app.setTool(id = 'select', opts = {}) → boolean ; app.tool（字符串）; app.toolDef ; viewer.toolHandler ; viewer.toolSelects ; viewer.cancelToolPress(reason = 'switch')
-  crystallume.tools = { list, get, set: (id, opts) => app.setTool(id, opts) }
+  facet.tools = { list, get, set: (id, opts) => app.setTool(id, opts) }
   ```
 - **语义**（F0-A §3.13）：**延迟认领**：`down()` 返回 true 后挂起，指针移动超过点击阈值才 `begin()`；没有移动就按普通点击处理（选择、Shift 加选、Ctrl/⌘ 反选、双击选分子、触屏多选照旧，`handler.click` 返回 true 时才拦下）。右键旋转、中键/Alt 平移、滚轮与双键缩放、R+拖动缩放框在所有工具里不变。`selects` 决定点击与空白处框选是否仍选择原子（`select`、`move` 为真）。`touch: 'claim'` 时单指/笔尖按下询问 `claims(hit)`。P-swap 期间 `down` 拿不到原子命中。未知工具 `console.warn('Unknown tool “<id>”; using Select.')`；`when` 为假时 toast `whyNot` 或 `<Tool title> is not available now.`。提示栏、HUD、工具栏按钮（`toolbar: true`，`aria-pressed`）、快捷键对话框 Mouse 区由注册表生成；选区卡片在 `selects` 为假的工具下隐藏。
-- **消费方**：M4 `move`（G，`toolbar: true`，`selects: true`，`cursor: 'grab'`，`touch: 'claim'`，`begin` 中开 P-pos 会话）；M5 `site-pick`（`toolbar: false`，`selects: false`，`cursor: 'crosshair'`，`touch: 'claim'`，`claims: () => false`）。插件工具 `crystallume.registerTool` 为可选 C4。
+- **消费方**：M4 `move`（G，`toolbar: true`，`selects: true`，`cursor: 'grab'`，`touch: 'claim'`，`begin` 中开 P-pos 会话）；M5 `site-pick`（`toolbar: false`，`selects: false`，`cursor: 'crosshair'`，`touch: 'claim'`，`claims: () => false`）。插件工具 `facet.registerTool` 为可选 C4。
 - **已解决的冲突**：M4 v2 的 `ToolHandler.selectFallback` 删除（由 `ToolDef.selects` 决定）、`hover(hit, e)` 参数顺序、新增 `begin()`；M4 A-CR4（`up()` 返回 false 走点击）由延迟认领代替；M5 v1 的 `registerTool` → `tools.register`，`cursor: 'target'` 不是合法 CSS 光标 → `'crosshair'`（图标仍为 `target`）。
 
 ### L-F0-42 逐原子可见性掩码
 
 - **提供方**：F0-A T5。**文件**：`render/display.js`、`render/viewer.js`、`main.js`、`ui/selectioncard.js`、`ui/shell.js`。
-- **JS**：`viewer.setVisibility(name, spec /* null | { hide: indices } | { show: indices } | Uint8Array(n) */)`；`viewer.hiddenCount`；`viewer.visibilityNames()`；`viewer.isVisible(i)`；`viewer.remapIndexed(map, n1)`；`buildDisplayModel(s, display, { imageCenters, visible, cuts })`；公共 API `crystallume.setVisibility(name, spec)`；视图事件 `visibility { hidden, names }`；命令 `view.showAll`。
+- **JS**：`viewer.setVisibility(name, spec /* null | { hide: indices } | { show: indices } | Uint8Array(n) */)`；`viewer.hiddenCount`；`viewer.visibilityNames()`；`viewer.isVisible(i)`；`viewer.remapIndexed(map, n1)`；`buildDisplayModel(s, display, { imageCenters, visible, cuts })`；公共 API `facet.setVisibility(name, spec)`；视图事件 `visibility { hidden, names }`；命令 `view.showAll`。
 - **语义**（F0-A §3.8.1）：多个名字取"与"；被隐藏的原子不绘制，因而不能被点击、悬停或框选；长度不符的掩码被忽略并警告；编辑后按旧 → 新映射搬移（新原子可见），不再隐藏任何原子的掩码被删除；切换结构条目时清空；不进 scene、不保存。有掩码隐藏原子时 `sel.all`（Ctrl+A）与 `sel.invert` 只作用于可见原子并提示 `Selected <n> visible atoms (<m> hidden).`；选区卡片标题 `12 selected (9 hidden)`；删除或替换含隐藏原子时确认 `<m> of the <n> selected atoms are hidden. Delete them too?`（按钮 `Delete all 12` / `Only the 3 visible` / `Cancel`）；状态栏 `216 hidden` + `Show all`。按索引的选择（API、Atom Selection）不受影响。
 - **消费方**：M3"只显示顶部 N 层"（`setVisibility('layers', { show })`）。
 
@@ -832,23 +832,23 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
 ### L-F0-45 沿任意方向观察与 N 键
 
 - **提供方**：F0-A T7b。**文件**：`render/viewer.js`、`main.js`、`ui/shell.js`、`api/public.js`。
-- **JS**：`viewer.viewAlong(target, { up = 'auto', ortho = 'auto', animate = !reducedMotion(), refit = true } = {}) → { dir, up, label }`；`target` ∈ `'a' 'b' 'c' 'x' 'y' 'z'`（可加 `-`）、`'normal'`、`'-normal'`、`[x, y, z]`、`{uvw}`、`{uvtw}`、`{hkl}`、`{hkil}`；公共 API `crystallume.view(target, opts)`（兼容旧的轴字符串）、`crystallume.viewAlong(target, opts)`；命令 `view.normal`（N）、`view.normalBelow`（Shift+N）、`view.along`（参数恰好一个：`{uvw?: vector(int), hkl?: miller, vector?: vector}`）。
+- **JS**：`viewer.viewAlong(target, { up = 'auto', ortho = 'auto', animate = !reducedMotion(), refit = true } = {}) → { dir, up, label }`；`target` ∈ `'a' 'b' 'c' 'x' 'y' 'z'`（可加 `-`）、`'normal'`、`'-normal'`、`[x, y, z]`、`{uvw}`、`{uvtw}`、`{hkl}`、`{hkil}`；公共 API `facet.view(target, opts)`（兼容旧的轴字符串）、`facet.viewAlong(target, opts)`；命令 `view.normal`（N）、`view.normalBelow`（Shift+N）、`view.along`（参数恰好一个：`{uvw?: vector(int), hkl?: miller, vector?: vector}`）。
 - **语义**（F0-A §3.14.1）：`'normal'` = `surfaceNormal(s).normal`（L-F0-17）；侧视且有表面时屏幕"上" = 法向的垂直分量（顶面朝上）；俯视/仰视时"右" = 第一根面内晶轴（标准取向即 a）；无表面时取与方向垂直的最短格矢作"右"。方向标签按法向来源：`along the surface normal` / `from below the surface` / `along c* (normal to a and b)` / `along the widest vacuum (b)`；`along [u v w] of the current cell`、`along the normal of (h k l) of the current cell`。来源为 `'ab-plane'` 时照样转向并 toast `No vacuum gap found: looking along c* (normal to a and b).`（U1"没有间隙时给出说明"）。
 - **错误**：`viewAlong: use a direction like [1, 1, 0], {uvw: [1, 1, 0]}, {hkl: [1, 1, 1]} or "normal".`；`Lattice directions and Miller indices must be whole numbers.`；`That direction has zero length.`；`Looking along a lattice direction needs a unit cell.`；`Looking along the surface normal needs a unit cell.`；`Look along: give exactly one of uvw, hkl or vector.`。
 - **消费方**：M2（切面预览 `viewAlong({hkl}, {up: U})`、`fitView()`）、M3、M5（看表面）。
 
 ### L-F0-46 晶格方向辅助函数
 
-- **提供方**：F0-A T7a（追加到 F0-D T7 建立的文件）。**文件**：`web/js/core/lattice.js`、`crystallume/core/lattice.py`（`__all__` 同步；`reciprocal_cell`/`plane_spacings` 也从 `crystallume.core` 重新导出）。
+- **提供方**：F0-A T7a（追加到 F0-D T7 建立的文件）。**文件**：`web/js/core/lattice.js`、`facet/core/lattice.py`（`__all__` 同步；`reciprocal_cell`/`plane_spacings` 也从 `facet.core` 重新导出）。
 - **Python**：`miller_normal(cell, hkl) -> ndarray`（单位矢量，`n = hkl @ inv(cell)ᵀ`）、`lattice_direction(cell, uvw) -> ndarray`、`is_hexagonal_cell(cell, length_tol=1e-3, angle_tol=0.1) -> dict | None`（`{"axis": k, "gamma": 120 | 60}`）、`hkl_to_hkil(hkl) -> tuple[int, int, int, int]`、`hkil_to_hkl(hkil) -> tuple[int, int, int]`、`uvw_to_uvtw(uvw, *, integer=False) -> tuple`、`uvtw_to_uvw(uvtw) -> tuple[float, float, float]`、`centered_cell_hint(cell) -> dict | None`（`{"kind": "fcc" | "bcc", "to_conventional": 3×3 int}`）；`reciprocal_cell` 已有。
-- **JS**：`reciprocalCell`、`millerNormal`、`latticeDirection`、`isHexagonalCell(cell, { lengthTol = 1e-3, angleTol = 0.1 } = {})`、`hklToHkil`、`hkilToHkl`、`uvwToUvtw(v, { integer = false } = {})`、`uvtwToUvw`、`centeredCellHint`（键 `toConventional`）、`formatIndices(v, bracket /* '(' | '[' | '{' | '<' */)`（负数用 U+0305 上划线）、`ariaIndices(v)`（"1 0 minus 1 0"）、`surfaceNormal`（重新导出）。公共 API `crystallume.lattice = { millerNormal, latticeDirection, isHexagonalCell, hklToHkil, hkilToHkl, uvwToUvtw, uvtwToUvw, centeredCellHint, surfaceNormal }`。
+- **JS**：`reciprocalCell`、`millerNormal`、`latticeDirection`、`isHexagonalCell(cell, { lengthTol = 1e-3, angleTol = 0.1 } = {})`、`hklToHkil`、`hkilToHkl`、`uvwToUvtw(v, { integer = false } = {})`、`uvtwToUvw`、`centeredCellHint`（键 `toConventional`）、`formatIndices(v, bracket /* '(' | '[' | '{' | '<' */)`（负数用 U+0305 上划线）、`ariaIndices(v)`（"1 0 minus 1 0"）、`surfaceNormal`（重新导出）。公共 API `facet.lattice = { millerNormal, latticeDirection, isHexagonalCell, hklToHkil, hkilToHkl, uvwToUvtw, uvtwToUvw, centeredCellHint, surfaceNormal }`。
 - **语义与错误**（F0-A §3.14.3–3.14.4）：`hkil_to_hkl` 在 `h + k + i ≠ 0` 时 `ValueError`/`Error` `in (h k i l), i must be −(h + k) = -1`（公式中的 `−` 是 U+2212，算出的数用 ASCII `-`）；`is_hexagonal_cell` 只用于 Miller 控件的四指数显示（网格类型由 M1 的 `mesh_type` 判断）；(h k l) 总是相对**当前晶胞**，指数不会被悄悄换算。
 - **消费方**：M2（`isHexagonalCell`、`hklToHkil`/`hkilToHkl`、`millerNormal`、`formatIndices`）、M1（在同文件追加 `dSpacing`、`woodPresets`、`mesh_type`、`millerBasisNote`）。
 
 ### L-F0-47 参数 schema 新类型（JS、Python、CLI、REST 同一套）
 
-- **提供方**：F0-A T8。**文件**：`web/js/core/params.js`（新）、`crystallume/core/params.py`（新）、`web/js/ui/paramform.js`、`web/js/core/analyses.js`（`defaultParams` 迁出后重新导出）、`crystallume/cli.py`（`:73-107`）、`crystallume/server/routes/build.py`（`:126-147`）、`crystallume/server/routes/analysis.py`。
-- **JS**：`export class ParamError extends Error {}`；`parseIndices(text, { fractions = false } = {}) → number[] | number[][]`；`coerceParam(spec, value)`（失败抛 `ParamError`）；`validateParams(schema, values, { strict = false, title = null } = {}) → { values, errors: string[], warnings: string[] }`；`defaultParams(schema, structure = null)`。公共 API `crystallume.params = { parse, coerce, validate }`。
+- **提供方**：F0-A T8。**文件**：`web/js/core/params.js`（新）、`facet/core/params.py`（新）、`web/js/ui/paramform.js`、`web/js/core/analyses.js`（`defaultParams` 迁出后重新导出）、`facet/cli.py`（`:73-107`）、`facet/server/routes/build.py`（`:126-147`）、`facet/server/routes/analysis.py`。
+- **JS**：`export class ParamError extends Error {}`；`parseIndices(text, { fractions = false } = {}) → number[] | number[][]`；`coerceParam(spec, value)`（失败抛 `ParamError`）；`validateParams(schema, values, { strict = false, title = null } = {}) → { values, errors: string[], warnings: string[] }`；`defaultParams(schema, structure = null)`。公共 API `facet.params = { parse, coerce, validate }`。
 - **Python**：`class ParamError(ValueError)`；`parse_indices(text: str, *, fractions: bool = False) -> list`；`parse_cli_value(spec: dict, text: str) -> Any`；`coerce_param(spec: dict, value) -> Any`；`validate_params(schema, values, *, strict=False, title=None) -> tuple[dict, list[str], list[str]]`；`default_params(schema) -> dict`。
 - **schema**（F0-A §3.15）：`int`/`float` 新增 `unit`（只显示）与 `required`（必填、初始为空，U4）；`vector`：`integer = false`、`nonzero = false`、`size = 3`（2 或 3）、`frame = 'cartesian'`、`frames = [frame]`、`unit = 'Å'`，值 `[x, y, z]`；`miller`：`max = 30`（硬上限）、`warnAbove = 12`、`hexagonal = 'auto'`，值总是三指数（输入四指数时换算，不约去公因子），缺省 `[1, 1, 1]`；`imatrix`：`size = 3`、`max = 50`、`maxDet = null`、`warnDet = 400`、`positive = true`、`presets = null`，缺省单位矩阵。字段可由调用方覆盖（M1 `max: 1000, maxDet: 1e6`；M2 想要硬上限 12 就写 `max: 12`）。
 - **[改] 缺省值**（M1 v2 请求）：`defaultParams`（给表单用）对没有 `default` 键的参数用类型缺省（`min ?? 0`、全 0 矢量、`[1, 1, 1]`、单位矩阵）、对 `default: null` 给 `null`；`validateParams`/`validate_params`（给命令与 API 用）**不替调用方编值**：缺省的可选参数，spec 有 `default` 键（含 `null`）时取它，否则不出现在结果里；`required` 的参数缺省时报 `<Label>: enter a value.`。
@@ -888,7 +888,7 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
   renderSections(panelId, app, el, shell, { slot = 'main' } = {}) ; refreshSections(panelId, reason)
   openSection(panelId, sectionId, { focus, tab } = {}) ; shell.openLeft(id, { section, focus, tab })
   requireCell(app) → true | string ; requireVacuumGap(app) → true | string ; requireNoPreview(app) → true | string
-  crystallume.registerPanelSection(panelId, s, o)
+  facet.registerPanelSection(panelId, s, o)
   ```
 - **语义**（F0-A §3.17、§5.2）：每个分区渲染在自己的 `<details class="sec">` 容器里、**按自己的签名单独重绘**（用户正在该分区输入时延后）；展开状态记在偏好 `sections`；渲染出错显示 `This section failed to load: <message>`；`available()` 返回字符串时主体只显示原因与 `emptyActions`。**分区总是显示，不随 slab/非 slab 改变（U1）**；`badge` 只放该工具的当前参数，**不得**放"slab""bulk"之类的分类。Surface 面板：左侧第 5 个面板（Shift+5，`panel.surface`），无结构时整面板空状态（`Load a bulk crystal first.` …），分区与顺序：
 
@@ -923,7 +923,7 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
     rows(app, sel) → [{ label, value }] | null,                                                       // [改] 卡片信息行
   }) → dispose
   registerAtomInfo(fn /* (app, srcIndex, ctx: { where: 'hover' | 'card' }) → [{ label, value }] | null */, { order = 100 } = {}) → dispose
-  crystallume.registerSelectionAction(a, o) ; crystallume.registerAtomInfo(fn, o)
+  facet.registerSelectionAction(a, o) ; facet.registerAtomInfo(fn, o)
   ```
 - **语义**：
   - 现有 5 个动作改由注册表提供：Centre（10）、Same element（20）、Measure（30，1–4 个原子）、Replace…（40）、Delete（50）。
@@ -959,7 +959,7 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
                       estimate /* (app, params) → 原子数 */, edits = false /* 为真时组合 canEdit 与 editWhyNot */ }) → dispose
   export const LIMITS = { maxAtoms: 200_000 /* 偏好 maxAtoms 可调到 2 000 000 */, confirmAtoms: 30_000 }
   ```
-- **语义**（F0-A §3.16）：**校验放在 `register` 生成的包装函数里**，`commands.run`、`commands.get(id).run(...)`、嵌入页 `crystallume:call command`、插件都经过：参数不是普通对象 → `<title>: pass the parameters as an object.`；`validateParams(c.params, params, {strict: true, title})` 有错 → 抛 `{ code: 'invalid-params', message: errors[0] }`；`estimate` 超过 `LIMITS.maxAtoms` → `{ code: 'too-large', message: '<title>: this would make <n> atoms; the limit is <max>.' }`；超过 `confirmAtoms` 时交互调用先确认；不带参数调用时照旧 `run(app)`（打开对应分区，交互式）。`title` 去掉结尾的 `…`。F0-A 为 M1–M6 的命令提供"打开对应分区"的回退实现，只在该 id **尚未注册**时注册且先于模块导入，模块的真实实现总能覆盖它。命令面板按别名打分（比同类标题低 5 分）并显示灰色别名。`CATEGORY_ORDER` 在 `'Edit'` 后加 `'Cell'`、`'Surface'`。
+- **语义**（F0-A §3.16）：**校验放在 `register` 生成的包装函数里**，`commands.run`、`commands.get(id).run(...)`、嵌入页 `facet:call command`、插件都经过：参数不是普通对象 → `<title>: pass the parameters as an object.`；`validateParams(c.params, params, {strict: true, title})` 有错 → 抛 `{ code: 'invalid-params', message: errors[0] }`；`estimate` 超过 `LIMITS.maxAtoms` → `{ code: 'too-large', message: '<title>: this would make <n> atoms; the limit is <max>.' }`；超过 `confirmAtoms` 时交互调用先确认；不带参数调用时照旧 `run(app)`（打开对应分区，交互式）。`title` 去掉结尾的 `…`。F0-A 为 M1–M6 的命令提供"打开对应分区"的回退实现，只在该 id **尚未注册**时注册且先于模块导入，模块的真实实现总能覆盖它。命令面板按别名打分（比同类标题低 5 分）并显示灰色别名。`CATEGORY_ORDER` 在 `'Edit'` 后加 `'Cell'`、`'Surface'`。
 - **命令表**（ID 固定；"守卫"列的 `edits` = 组合 `canEdit`）：
 
   | ID | 标题 | 别名（MS） | 键 | 类别 | 守卫 | 参数 | 归属 |
@@ -997,7 +997,7 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
 - **消费方**：M1–M6 全部命令；嵌入页。
 - **已解决的冲突**：报告 02 的"嵌入页可带任意参数调用任意命令"→ 包装函数里校验；`commands.get(id).run(params)` 原来绕过校验（工程 E26）。
 
-### L-F0-53 `crystallume.*` 命名空间的注册接口（[改] 新增）
+### L-F0-53 `facet.*` 命名空间的注册接口（[改] 新增）
 
 - **提供方**：F0-A T2。**文件**：`web/js/api/namespaces.js`（新）、`web/js/api/public.js`（`createAPI` 合并已注册成员）。
 - **JS**：
@@ -1005,9 +1005,9 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
   export const API_NAMESPACES = Object.freeze(['edit', 'build', 'analysis', 'surface', 'lattice', 'params', 'tools']);   // [改] 'surface'：M2/M5 v2
   export function defineApi(path /* 'edit.fix' | 'build.surface' | 'exportReport' */, fn, { owner = null, replace = false } = {}) → dispose
   ```
-- **语义**：`path` 为 `'<namespace>.<name>'`（namespace 在 `API_NAMESPACES` 中）或单个顶层名字；在 `createAPI` 之前注册的成员在创建时并入，之后注册的立即出现在活的 `crystallume` 对象上；同名已存在且 `replace` 为假 → `Error` `defineApi: crystallume.edit.fix is already defined (by M3)`（括号里是 `owner`）；`fn` 不是函数 → `TypeError` `defineApi: expected a function for crystallume.edit.fix`。`crystallume.edit.*` 的成员**必须**经 `app.editActive`/`replaceActiveStructure` 实现（一次调用一步撤销）；返回值由各模块定义。F0-A 自己的 `crystallume.edit = { run, begin, touch, session }`：`run(label, fn, opts)` = `app.editActive`，返回 `{entry: {id, label} | null, value}`；`begin` = `app.beginStructureEdit`；`touch` = `app.notifyStructureChanged`；`session`（getter）。
-- **消费方**：F0-D T8（`edit.sortBySpecies`、`edit.clearNotes`、`analysis.vacuumGap`）；M1（`edit.setCell`、`edit.makeSupercell`、`lattice.*` 追加）、M2（`build.surface`、`build.terminations`、`surface.cleave`、`edit.setVacuum/addVacuum/centerSlab/flipSlab`）、M3（`edit.fix`、`edit.free`、`analysis.layers`）、M4（`edit.translate`、`edit.rotate`…）、M5（`build.adsorbates`、`edit.addAdsorbate`、`analysis.sites`、`surface.showSites`、`surface.coverage`）、M6（`build.interface`）。各模块**不再直接修改** `api/public.js`。M5 v1/v2 的 `crystallume.registry.adsorbates.register`（可选项 L10，"留接口不实现"）不在本期命名空间内；需要时由 M7 加入 `API_NAMESPACES`。
-- **已解决的冲突**：M3 T6、M4、M5 的任务表都把 `api/public.js` 列为自己的文件 → 改为调用 `defineApi`；M3 v2 §10.7-6 与 M4 的"合并 `crystallume.edit` 命名空间"→ 由本条的重名检查保证。
+- **语义**：`path` 为 `'<namespace>.<name>'`（namespace 在 `API_NAMESPACES` 中）或单个顶层名字；在 `createAPI` 之前注册的成员在创建时并入，之后注册的立即出现在活的 `facet` 对象上；同名已存在且 `replace` 为假 → `Error` `defineApi: facet.edit.fix is already defined (by M3)`（括号里是 `owner`）；`fn` 不是函数 → `TypeError` `defineApi: expected a function for facet.edit.fix`。`facet.edit.*` 的成员**必须**经 `app.editActive`/`replaceActiveStructure` 实现（一次调用一步撤销）；返回值由各模块定义。F0-A 自己的 `facet.edit = { run, begin, touch, session }`：`run(label, fn, opts)` = `app.editActive`，返回 `{entry: {id, label} | null, value}`；`begin` = `app.beginStructureEdit`；`touch` = `app.notifyStructureChanged`；`session`（getter）。
+- **消费方**：F0-D T8（`edit.sortBySpecies`、`edit.clearNotes`、`analysis.vacuumGap`）；M1（`edit.setCell`、`edit.makeSupercell`、`lattice.*` 追加）、M2（`build.surface`、`build.terminations`、`surface.cleave`、`edit.setVacuum/addVacuum/centerSlab/flipSlab`）、M3（`edit.fix`、`edit.free`、`analysis.layers`）、M4（`edit.translate`、`edit.rotate`…）、M5（`build.adsorbates`、`edit.addAdsorbate`、`analysis.sites`、`surface.showSites`、`surface.coverage`）、M6（`build.interface`）。各模块**不再直接修改** `api/public.js`。M5 v1/v2 的 `facet.registry.adsorbates.register`（可选项 L10，"留接口不实现"）不在本期命名空间内；需要时由 M7 加入 `API_NAMESPACES`。
+- **已解决的冲突**：M3 T6、M4、M5 的任务表都把 `api/public.js` 列为自己的文件 → 改为调用 `defineApi`；M3 v2 §10.7-6 与 M4 的"合并 `facet.edit` 命名空间"→ 由本条的重名检查保证。
 
 ### L-F0-54 进度 `startTask`
 
@@ -1032,7 +1032,7 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
   export function registerBootTask(name, fn /* () => Promise<void> */) → void      // 模块在导入时注册（例如 M2 的 loadOxidationStates、M5 的吸附物库）
   export function bootTasks() → Promise<Array<{ name, ok, error }>>
   ```
-- **语义**：`main.js` 在导入全部模块之后、发出 `crystallume` 的 ready 事件与嵌入页握手之前 `await bootTasks()`；每个任务各有 10 s 超时；失败或超时不阻止启动：`console.error` 并 toast `Some data failed to load: <name>.`，依赖它的分区用 `available()` 返回 `<Section> needs data that failed to load; reload the page.`。同名重复注册报错 `registerBootTask: “<name>” is already registered`。Node 测试中不运行 `main.js`，模块自己的数据读取函数可直接调用。
+- **语义**：`main.js` 在导入全部模块之后、发出 `facet` 的 ready 事件与嵌入页握手之前 `await bootTasks()`；每个任务各有 10 s 超时；失败或超时不阻止启动：`console.error` 并 toast `Some data failed to load: <name>.`，依赖它的分区用 `available()` 返回 `<Section> needs data that failed to load; reload the page.`。同名重复注册报错 `registerBootTask: “<name>” is already registered`。Node 测试中不运行 `main.js`，模块自己的数据读取函数可直接调用。
 - **消费方**：M2（`web/data/oxidation_states.json`：Cleave 分区与 ready 之前需要）、M5（吸附物库 `web/data/*.json`）。M2、M5 **不直接改** `main.js` 的启动顺序。
 - **已解决的冲突**：M2 v2 §10.2 的"`main.js` 在注册 Cleave 分区与发出 ready 之前 `await loadOxidationStates()`（T2 改 `main.js`）"→ 用注册接口，`main.js` 只归 F0-A。
 
@@ -1069,7 +1069,7 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
   两行都替换为：`M2 定；\`vacuum: {type: 'float', unit: 'Å', min: 0, required: true}\`，含义为 slab 与下一个周期像之间的总间隙，没有默认值（U4）`。`surface.cleave` 行同样补上 `min: 0` 与"总间隙"。
 - **V4（F0-D §3.5.1 `center` 一行）**：在"给了 `vacuum` …"之前加一句：`\`vacuum\` 是每侧的量（现有语义，不改）；新 API 中的 \`vacuum\` 一律指总间隙，文档与 docstring 写清两者不同（U4）。`
 
-不构成违规、但需要知道的两点：(1) `info.surface.axis` 只在 Crystallume 生成的结构上存在，它让切口门槛从 5 Å 降到 2 Å——这是"有没有来源信息"的区别，同一规则对所有结构生效，且提示必须仍是最宽的真空才被采纳（L-F0-17），不是 slab/非 slab 的区分；(2) `surface_normal` 的返回值带 `surface: bool`，它是工具可用性的内部判据（"有且只有一根真空轴"），不显示为标记。
+不构成违规、但需要知道的两点：(1) `info.surface.axis` 只在 Facet 生成的结构上存在，它让切口门槛从 5 Å 降到 2 Å——这是"有没有来源信息"的区别，同一规则对所有结构生效，且提示必须仍是最宽的真空才被采纳（L-F0-17），不是 slab/非 slab 的区分；(2) `surface_normal` 的返回值带 `surface: bool`，它是工具可用性的内部判据（"有且只有一根真空轴"），不显示为标记。
 
 ---
 
@@ -1090,7 +1090,7 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
 | E-09 | JS `clone()` 回到第 0 帧并把坐标取整到 1e-10 | 01 §3.2、02 §2-5 | F0-D §3.5.2，T2 |
 | E-10 | 警告键不统一：Python `info.warnings`（列表），JS `info.warning`（`"; "` 连接的字符串），网页 toast 只读 `info.warning`（`app.js:901`）；派生结构带着过期的载入警告 | 01 §0-6、I8 | F0-D §3.6（L-F0-09），T1/T2/T8；F0-A toast 只显示本步新增（L-F0-30） |
 | E-11 | Python `delete` 对越界下标取模（`n+1` 静默删掉第 1 个原子） | F0-D M-5 | F0-D §3.5.1（`IndexError`），T1 |
-| E-12 | 编辑后保留过期的空间群与计算结果：删原子后结构面板（`ui/panels/structure.js:112`）、`crystallume info`（`cli.py:264`）、`summary()`（`neighbors.py:318`）仍显示原空间群；extxyz 照写旧 `energy`，ASE 当成新结构的能量；`deleteSelected`/`replaceSelected` 不清空间群 | 04 §0-7、领域 F0-D F3、工程 F0-D #6、工程 F0-A #29 | F0-D §3.7 `mark_edited`（L-F0-10），T1/T2；F0-A §3.2 删除/替换时 `invalidateSymmetryInfo`，T2 |
+| E-12 | 编辑后保留过期的空间群与计算结果：删原子后结构面板（`ui/panels/structure.js:112`）、`facet info`（`cli.py:264`）、`summary()`（`neighbors.py:318`）仍显示原空间群；extxyz 照写旧 `energy`，ASE 当成新结构的能量；`deleteSelected`/`replaceSelected` 不清空间群 | 04 §0-7、领域 F0-D F3、工程 F0-D #6、工程 F0-A #29 | F0-D §3.7 `mark_edited`（L-F0-10），T1/T2；F0-A §3.2 删除/替换时 `invalidateSymmetryInfo`，T2 |
 | E-13 | 构建器写的 `info.prototype/a/c/u/thickness` 在改晶格后过期，并以 `a=3.92` 形式写进 extxyz | 01 I9、领域 F0-D F17 | F0-D `invalidate_build_info`（`mark_edited("cell")`），T1/T2；M1/M2 调用 |
 | E-14 | JS `wrap` 容差 1e-9（值可略为负），Python 1e-12（`structure.js:238`） | 01 I11 | F0-D `wrap_fractional`（L-F0-19），T7/T2 |
 | E-15 | **JS POSCAR 读取丢 Selective dynamics**（`io/poscar.js:58-74`，跳过 SD 行只读 3 个词），写出从不写 SD（`:92-106`） | 01 §6.3-10、02 §2、03 §8-8、04 §4、05 §3.7-1/§6.6-1 | F0-D §3.10（L-F0-23），T4 |
@@ -1142,9 +1142,9 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
 | E-61 | GLB 导出总是写 1×1×1 晶胞、跳过线框（`viewer.js:1881-1895`） | 03 §8-3 | **推迟**：与表面功能无关 |
 | E-62 | "height" 配色用绘制坐标的笛卡尔 z（`colors.js:160-164`） | 03 §2.3-7 | **推迟**：C5 标准取向下 z 就是法向；按层着色由 M3 的配色方案提供 |
 | E-63 | **`/build/supercell` 的原子数估算忽略帧**（`server/routes/build.py:95` 以 `len(s)` 调用 `_check_repeat`，`:32-39`），而 `repeat()` 平铺每一帧，多帧结构会远超上限 | 04 §3.2、§7-7 | **[新派]** F0-D T6：`:95` 改为 `_check_repeat(len(s) * s.n_frames, …)`；文案不变；`/build/crystal`（`:56`）新建的晶体只有一帧，不受影响 |
-| E-64 | **`CRYSTALLUME_MAX_PAIRS` 注释不实**（`server/routes/analysis.py:35` 说可覆盖，实际没有代码读它，`:47` 的 `getattr(settings, "max_pairs")` 恒为缺省） | 04 §3.2 | **[新派]** F0-D T6（该文件在 T6 的 O-6 中）：删掉 `getattr` 与不实注释，`MAX_PAIRS = 50_000_000` 保持常量；可配置性无消费方，推迟 |
+| E-64 | **`FACET_MAX_PAIRS` 注释不实**（`server/routes/analysis.py:35` 说可覆盖，实际没有代码读它，`:47` 的 `getattr(settings, "max_pairs")` 恒为缺省） | 04 §3.2 | **[新派]** F0-D T6（该文件在 T6 的 O-6 中）：删掉 `getattr` 与不实注释，`MAX_PAIRS = 50_000_000` 保持常量；可配置性无消费方，推迟 |
 | E-65 | JS `toJSON` 省略空的 `frames`、`props`、`info` | 04 §6.3 | **不改**：文档等价；跨语言比较按规范化后的值（L-F0-27） |
-| E-66 | **最小像先 round 再查 27 个像，斜晶胞上错**（`crystallume/analysis/geometry.py:21-40`）：极端剪切给 2.73 Å 而非 0.50 Å；真实斜 c 的 slab 晶胞 2000 个随机矢量中错 2 个；本账本复现：同一 fcc 晶格的斜基 `b' = b + 8a` 上 `get_distance(0, 1, mic=True)` 给 9.99 Å（应为 2.77 Å） | 07 第 13 条、`algo-checks/mic_check.py`、附录 A-1 | **[新派]** F0-D T9（原 M4 T1），算法见 L-F0-20 与 §5 |
+| E-66 | **最小像先 round 再查 27 个像，斜晶胞上错**（`facet/analysis/geometry.py:21-40`）：极端剪切给 2.73 Å 而非 0.50 Å；真实斜 c 的 slab 晶胞 2000 个随机矢量中错 2 个；本账本复现：同一 fcc 晶格的斜基 `b' = b + 8a` 上 `get_distance(0, 1, mic=True)` 给 9.99 Å（应为 2.77 Å） | 07 第 13 条、`algo-checks/mic_check.py`、附录 A-1 | **[新派]** F0-D T9（原 M4 T1），算法见 L-F0-20 与 §5 |
 | E-67 | **JS `findPeriodicNeighbors` 的像范围上限 4**（`core/bonds.js:96`），平面间距小于 `cutMax/4` 的斜基上漏键：同一 fcc 晶格 `b' = b + 8a` 时配位 11、`b + 12a` 时 4（应为 12）；显示的成键像、补全配位、多面体、配位统计都受影响 | 本账本排查（附录 A-1） | **[新派]** F0-D T9（L-F0-20） |
 | E-68 | 选区卡片的距离/角度用 Float32 绘制坐标；找不到全部绘制副本时退回原始存储坐标（`ui/selectioncard.js:66-71`），不取最小像 | 本账本排查 | **[新派]** F0-A T5：找到副本时用 Float64 `r_src + storedImage(model, d)·cell`；退回路径改为以第一个原子为起点的最小像链（`P_{k+1} = P_k + micVector(r_{k+1} − r_k).vector`） |
 | E-69 | 双击选分子与片段沿用显示层的键对开关，网页默认设置下设定几何会带动表面金属原子 | 领域 M4 第 1 条 | **推迟到 M4**（第 2 波，`selectMolecule` 建在 M3 的 `bond_graph` 上）；第 0 波的 E-60 修正减轻显示部分 |
@@ -1156,7 +1156,7 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
 
 ### 5.1 为什么"先 round 再查 27 个像"会错
 
-现行 `minimum_image_vectors`（`crystallume/analysis/geometry.py:21-40`）先在给定基里把分数坐标取整到 [−0.5, 0.5]，再试 ±1 的 27 个组合。只有当基是 Minkowski（或 Voronoi）约化的，最短像才保证落在这 27 个候选里；对斜基，真正的最短像可能要在某个方向平移 2、3……个格矢。例：方晶格的斜基 `[[1,0,0],[10,1,0],[0,0,1]]` 上 `v = (0.3, 0.6, 0)` 给出 2.73 Å，正确值 0.50 Å（`algo-checks/mic_check.py`）。这种基并不罕见：M1 的重定义晶格与非约化超胞矩阵、M6 的晶格匹配、导入的弛豫胞都会产生。本账本复现（附录 A-1）：同一 fcc Pt 晶格写成 `b' = b + 8a` 后 `get_distance(0, 1, mic=True)` 返回 9.99 Å（应为 2.77 Å），`b + 12a` 时 17.75 Å。
+现行 `minimum_image_vectors`（`facet/analysis/geometry.py:21-40`）先在给定基里把分数坐标取整到 [−0.5, 0.5]，再试 ±1 的 27 个组合。只有当基是 Minkowski（或 Voronoi）约化的，最短像才保证落在这 27 个候选里；对斜基，真正的最短像可能要在某个方向平移 2、3……个格矢。例：方晶格的斜基 `[[1,0,0],[10,1,0],[0,0,1]]` 上 `v = (0.3, 0.6, 0)` 给出 2.73 Å，正确值 0.50 Å（`algo-checks/mic_check.py`）。这种基并不罕见：M1 的重定义晶格与非约化超胞矩阵、M6 的晶格匹配、导入的弛豫胞都会产生。本账本复现（附录 A-1）：同一 fcc Pt 晶格写成 `b' = b + 8a` 后 `get_distance(0, 1, mic=True)` 返回 9.99 Å（应为 2.77 Å），`b + 12a` 时 17.75 Å。
 
 ### 5.2 修法：带可证上界的精确枚举，约化只为提速（L-F0-20）
 
@@ -1183,7 +1183,7 @@ F0-D 合入前 F0-A 用的临时实现（F0-A §10.1 末）在 F0-D 合入的同
 
 ### 5.4 测试（F0-D T9）
 
-- 金标 `tests/data/geometry/mic.json`（`crystallume.cases/1`，op `micVector`）：上面 5 种晶胞 + Cu c(2×2) 胞 + `[[1,0,0],[7.3,0.4,0],[0,0,10]]`；半格矢组合与随机矢量；三轴与只 a/b；期望值为穷举结果与像；两种语言比较像（逐个相等）与矢量（1e-12 Å）。
+- 金标 `tests/data/geometry/mic.json`（`facet.cases/1`，op `micVector`）：上面 5 种晶胞 + Cu c(2×2) 胞 + `[[1,0,0],[7.3,0.4,0],[0,0,10]]`；半格矢组合与随机矢量；三轴与只 a/b；期望值为穷举结果与像；两种语言比较像（逐个相等）与矢量（1e-12 Å）。
 - 回归：`Structure(fcc Pt, cell=[a, b + 8a, c]).get_distance(0, 1, mic=True) == 2.7719`（1e-4）；JS `findPeriodicNeighbors` 在 `b + 8a`、`b + 12a` 上配位全为 12；`distance_matrix` 与逐对 `mic_vector` 一致。
 - 性能：1 万个矢量 Python ≤ 10 ms（向量化快速路径与逐个结果相同）、JS ≤ 20 ms。
 
@@ -1214,7 +1214,7 @@ M2 v2 已按 U1–U4 改好（pbc T T T、`vacuum` 必填、去掉 `banner`、`t
 2. "没有表面"的报错（§6.1 的 `'{s.name}' has no vacuum gap or non-periodic axis; cleave a surface first`）→ 用 `require_gap(s)`，文案即 `vacuum_gap_hint`（L-F0-17：所有表面工具同一句话，界面经 `requireVacuumGap`）；需要提示"先切面"时作为第二句附在界面上。
 3. 启动顺序"`main.js` 在注册 Cleave 分区与发出 ready 之前 `await loadOxidationStates()`"→ `registerBootTask('oxidation-states', loadOxidationStates)`（L-F0-56），M2 T2 不改 `main.js`。
 4. 命令：`surface.cleave` 的参数名 `miller`、新增 `surface.flip`、`surface.center` 已写进命令表（L-F0-52）；`surface.supercell` 不存在。
-5. 公共 API `crystallume.surface.cleave`、`build.surface/terminations`、`edit.setVacuum/addVacuum/centerSlab/flipSlab` 经 `defineApi`（`surface` 已在 `API_NAMESPACES` 中）。
+5. 公共 API `facet.surface.cleave`、`build.surface/terminations`、`edit.setVacuum/addVacuum/centerSlab/flipSlab` 经 `defineApi`（`surface` 已在 `API_NAMESPACES` 中）。
 6. Python `METALS`/`ANIONS` 由 M2 T2 加进 `core/elements.py`，内容与 JS 逐项相同（L-F0-22）。
 7. M2 v2 R13（"F0-A 与 F0-D 对共用切口的描述还不一致"）已由本账本 L-F0-16 解决：M2 只经 `surface_normal`/`require_gap` 的 `cut` 与 `make_contiguous` 使用切口，无需再改。
 8. 照旧有效、再确认一次：`addStructure` 返回 `{entry, historyEntry}`；新 slab 从新的 info 开始；`info.surface` 必须是纯 JSON 并含 `axis`（F0 只读这个键）；`apply_basis_change` + `mark_edited(s, "cell")`；`canonical_order` 等价的原子顺序（K14）。
@@ -1228,7 +1228,7 @@ M2 v2 已按 U1–U4 改好（pbc T T T、`vacuum` 必填、去掉 `banner`、`t
 5. F0-A：`registerHoverLine` → `registerAtomInfo`（返回 `[{label, value}]`）；选区动作的 `items`、`rows`、`menu: 'blank'`、`enabled`、label 函数由 F0-A T10 提供（L-F0-50）；**Fix ▾ 的 order 用 35**（不是 15）；配色 `extras` → `app.registerColorExtra('layers', …)`（L-F0-51）；Constraints 分区 `registerPanelSection('structure', { id: 'constraints', slot: 'transform', order: 20 })`；光环名字与颜色归 M3（`export: 'marker'`）；`shell.floatingCard` 不在 F0-A-core，M3 先自己实现。
 6. `smartPairDefault` 的现有缺陷由 F0-A T5 修（L-F0-55，与 M3 `bond_graph(metal_pairs="smart")` 同一定义），M3 不需要改显示代码。
 7. 球形选择与 `distance` 查询用 F0-D T9 的 `mic_vector`（第 0 波已修好）。
-8. `crystallume.edit.fix/free`、`crystallume.analysis.layers` 用 `defineApi`；M3 T6 的文件表去掉 `api/public.js`。
+8. `facet.edit.fix/free`、`facet.analysis.layers` 用 `defineApi`；M3 T6 的文件表去掉 `api/public.js`。
 
 ### M4（原子操作，v2）
 
@@ -1237,7 +1237,7 @@ M2 v2 已按 U1–U4 改好（pbc T T T、`vacuum` 必填、去掉 `banner`、`t
 3. F0-A 改名：`banner` → `transient`（拖动会话传 `transient: true`，Transform 分区不传）；`ToolHandler.selectFallback` 删除（由 `ToolDef.selects`）；`hover(hit, e)`；新增 `begin()`；A-CR1 由测量引用 v2、A-CR4 由延迟认领代替；`homeOffsets(structure, display, {cuts})`；`surfaceNormal` 看 `.surface`；P-pos 提交选项 `singleFrame`（不是 `keepFrame`）。
 4. F0-D：`keep_frame(index=0)`/`keepFrame` 已提供（删去 M4 的后备实现）；**JS `extend` 由 F0-D T2 实现**，M4 往两种语言的 `extend` 追加仅限关键字的放置参数，保留 `renumber_adsorbates=True`；`_remap` 返回 `self`；读约束用 `moveFlags`/`move_flags`；移动部分原子用 `set_positions(..., mark="positions")`。
 5. 扩展 `translate(vector, *, indices=None, frac=False)` 时，给了 `indices`（部分原子）必须 `mark_edited(s, "positions")`；全部原子平移不调用。
-6. `crystallume.edit.translate/rotate/...` 用 `defineApi`。
+6. `facet.edit.translate/rotate/...` 用 `defineApi`。
 
 ### M5（吸附物，按 v1 §10 + v2 已写出的 §0–§7）
 
@@ -1249,7 +1249,7 @@ M2 v2 已按 U1–U4 改好（pbc T T T、`vacuum` 必填、去掉 `banner`、`t
 4. 悬停幽灵用 `ghostLayer`（**不开会话**）；调高度/取向时才开 P-ghost 会话；放置 `editActive(..., { singleFrame: true })`。
 5. 新原子 `tags = 0`、`adsorbate_id = next_adsorbate_id(slab)` 经 `added_props` 传入；放置前 slab 已按元素分块时，同一编辑步内追加后 `sort_by_species()`（K14）。
 6. smart 配位数与显示同一定义（L-F0-55、M3 `bond_graph(metal_pairs="smart")`）；吸附高度、重叠只用共价半径或 `bondi_radius`。
-7. 分区 `registerPanelSection('surface', { id: 'adsorbates', order: 40 })`；`crystallume.build.adsorbates`、`edit.addAdsorbate`、`analysis.sites` 用 `defineApi`。
+7. 分区 `registerPanelSection('surface', { id: 'adsorbates', order: 40 })`；`facet.build.adsorbates`、`edit.addAdsorbate`、`analysis.sites` 用 `defineApi`。
 8. `overlaydblclick`、`overlaycontext` 已在事件表中；触屏长按属可选 C2，桌面右键是必须项。
 
 ### M6（界面与异质结，按 v1 §10 + v2 已写出的 §0–§5）
@@ -1266,7 +1266,7 @@ M2 v2 已按 U1–U4 改好（pbc T T T、`vacuum` 必填、去掉 `banner`、`t
 8. 两种语言一致的 `vdw_radius` → `bondi_radius`/`bondiRadius`（L-F0-22）。
 9. `M2.detect_slab(s)` 与 `{"isSlab", "axis", "gap"}` → `require_gap(s)` / `surface_normal(s, require_gap=True)`；`SURFACE_DEFAULTS.slab_min_gap` → `vacuum_gap_min`。
 10. 面内接触距离"先约化再查 9 个像"→ `mic_vector(v, cell, pbc, axes=(0, 1))`（可证精确）。
-11. `crystallume.build.interface` 用 `defineApi`；`interface_*` 常量在 M6 的任务里加进两份 `SURFACE_DEFAULTS`。
+11. `facet.build.interface` 用 `defineApi`；`interface_*` 常量在 M6 的任务里加进两份 `SURFACE_DEFAULTS`。
 
 ---
 
@@ -1274,19 +1274,19 @@ M2 v2 已按 U1–U4 改好（pbc T T T、`vacuum` 必填、去掉 `banner`、`t
 
 | 任务 | 增加或改变的内容 | 新增/改动的文件 | 规模变化 |
 |---|---|---|---|
-| F0-D T0 | `tests/ops/__init__.py`（按文件名排序自动导入 `tests/ops/*.py`）、`tests/js/ops/`（`cases.test.mjs` 自动导入）；`load_cases` 递归读 `tests/data/**/*.json` 中 `schema == "crystallume.cases/1"` 的文件；配方输入 `RECIPES`/`@recipe` 与 JS `recipe()` | `tests/ops/__init__.py`、`tests/ops/f0d.py`、`tests/js/ops/f0d.mjs` | 不变（S） |
+| F0-D T0 | `tests/ops/__init__.py`（按文件名排序自动导入 `tests/ops/*.py`）、`tests/js/ops/`（`cases.test.mjs` 自动导入）；`load_cases` 递归读 `tests/data/**/*.json` 中 `schema == "facet.cases/1"` 的文件；配方输入 `RECIPES`/`@recipe` 与 JS `recipe()` | `tests/ops/__init__.py`、`tests/ops/f0d.py`、`tests/js/ops/f0d.mjs` | 不变（S） |
 | F0-D T1/T2 | `_adopt(other, *, src=None)`（M1 v2）；`write_frame`/`writeFrame`；`set_positions(..., mark=)`；`Structure.move_flags()`/`constraint_summary()` 调用 T3 的函数（不是 `get_move_mask`）；JS `extend` | — | 不变（M） |
 | F0-D T3 | 加 `move_flags`、`set_move_flags`、`clear_constraints`、模块级 `constraint_summary`、`axis_labels`、`cartesian_name`（规则 L-F0-13） | — | S → S+ |
 | F0-D T6 | `server/routes/build.py:95` 的原子数估算按 `len(s) × s.n_frames`（E-63）；`server/routes/analysis.py:35, 47` 的不实注释与死代码（E-64） | `server/routes/build.py`（只改这几行；F0-A T8 改 126-147 行，先合者为准，冲突只在行段之外） | 不变（M） |
 | F0-D T7 | 真空模块按 L-F0-15–18 实现，**含 `surface_normal`**（原 F0-A T7a）、`display_cuts`、`require_gap`、`vacuum_axis`、`contiguous_shifts`、分析函数的 `exclude` 参数、新 `gap_cut`/`unwrap_along_gap`/`find_surface_gap`/`vacuum_gap_hint`、`make_contiguous` 的切口来源、JS 缓存；`SURFACE_DEFAULTS` 一次建好 L-F0-11 的 9 个键；金标 `tests/data/surface/f0d/vacuum.json` + F0-A 的 `gaps.json`（按 1e-5 并列容差重生成） | — | S → M |
 | F0-D T8 | 公共 API 经 `defineApi` 注册（依赖 F0-A T2 的 `api/namespaces.js`） | — | 不变 |
-| F0-D T9 | **精确最小像**（Python `mic_vector`、`minimum_image_vectors` 新实现、`Structure._vector`、`distance_matrix`；JS `micVector`、`reduceBasis`）；`core/bonds.js:96` 去掉像数上限（E-67）；Python `signed_angle`；JS `covalentRadius`/`bondiRadius`；金标 `tests/data/geometry/mic.json` | `crystallume/analysis/geometry.py`、`web/js/core/bonds.js`、`tests/test_geometry_mic.py`、`tests/js/geometry.test.mjs` | S → M |
+| F0-D T9 | **精确最小像**（Python `mic_vector`、`minimum_image_vectors` 新实现、`Structure._vector`、`distance_matrix`；JS `micVector`、`reduceBasis`）；`core/bonds.js:96` 去掉像数上限（E-67）；Python `signed_angle`；JS `covalentRadius`/`bondiRadius`；金标 `tests/data/geometry/mic.json` | `facet/analysis/geometry.py`、`web/js/core/bonds.js`、`tests/test_geometry_mic.py`、`tests/js/geometry.test.mjs` | S → M |
 | F0-D T11 | 文档另含 E-29 | — | 不变 |
 | F0-A T2 | `api/namespaces.js`（`defineApi`，L-F0-53）；`startTask(label, {cancel})`；toast 改在 **`ui/overlays.js`**；Structure 面板 `Replace… Apply` 加 `toastUndo`（E-49）；`rebuild` 取值校验 | `web/js/api/namespaces.js`（新）、`ui/overlays.js`（代替不存在的 `ui/toast.js`） | M → M+ |
 | F0-A T4a | `app.registerColorExtra` 与 `ctx.extras`（L-F0-51） | — | 不变（L） |
 | F0-A T4b | `EVENTS` 加 `overlaydblclick`、`overlaycontext` | — | 不变 |
 | F0-A T5 | 切口一律取 `displayCuts`（不自写提示轴逻辑）；`smartBondFilter`（E-60，L-F0-55）；`appearance.js:402`（E-56）；测量稳定 id（E-46）；选区卡片 Float64 与最小像退回（E-68，`ui/selectioncard.js:54-71`） | `ui/panels/appearance.js`（`:402`、`:512-517`） | L → L+ |
-| F0-A T7a | `surface_normal` 移交 F0-D T7；本任务只追加 L-F0-46 的晶格函数、`core/lattice.js` 重新导出 `surfaceNormal`；`crystallume.lattice` 经 `defineApi` | 不再改 `core/vacuum.js`、`analysis/vacuum.py` | M → S |
+| F0-A T7a | `surface_normal` 移交 F0-D T7；本任务只追加 L-F0-46 的晶格函数、`core/lattice.js` 重新导出 `surfaceNormal`；`facet.lattice` 经 `defineApi` | 不再改 `core/vacuum.js`、`analysis/vacuum.py` | M → S |
 | F0-A T10 | `registerSelectionAction` 的扩展（label/icon 函数、`enabled`、`items`、`rows`、`menu: 'blank' \| 'both'`、`ctx`、配额规则）与 `registerAtomInfo` 的 `ctx.where`（L-F0-50）；`core/boot.js` 的 `registerBootTask` 与 `main.js` 的等待（L-F0-56） | `web/js/core/boot.js`（新） | 不变（L） |
 | F0-A T8 | `defaultParams` 与 `validateParams` 的缺省值规则（L-F0-47）；`imatrixInput` 的 `presets(ctx)`、`positive: false`（L-F0-48） | — | 不变（L） |
 | F0-A T9 | 命令表加 `surface.flip`、`surface.center` 的回退实现，`surface.cleave` 参数名 `miller`（L-F0-52） | — | 不变 |
@@ -1308,7 +1308,7 @@ M2 v2 已按 U1–U4 改好（pbc T T T、`vacuum` 必填、去掉 `banner`、`t
 
 运行：
 ```
-cd scratchpad/proto/xcheck/mic && python3 -I py_mic_audit.py /home/user/crystallume && /opt/node22/bin/node js_mic_audit.mjs /home/user/crystallume/crystallume/web/js \
+cd scratchpad/proto/xcheck/mic && python3 -I py_mic_audit.py /home/user/crystallume && /opt/node22/bin/node js_mic_audit.mjs /home/user/crystallume/facet/web/js \
   && /opt/node22/bin/node js_mic_audit.mjs "$PWD/jscopy" && python3 -I -B mic_ledger.py cases.json && /opt/node22/bin/node mic_ledger.mjs cases.json
 cd ../gap && python3 -I -B wrapcmp.py && /opt/node22/bin/node cmp.mjs ../../f0a_v2/cases.json
 ```

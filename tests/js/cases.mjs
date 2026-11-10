@@ -1,4 +1,4 @@
-// The JS side of the shared cases (`crystallume.cases/1`): op and recipe registries, input resolution, runner.
+// The JS side of the shared cases (`facet.cases/1`): op and recipe registries, input resolution, runner.
 // Mirrors tests/cases.py; the loader and comparator live in helpers.mjs. Each module registers its ops and recipes
 // in its own tests/js/ops/<module>.mjs (imported in file-name order by loadOps()), never here:
 //
@@ -8,8 +8,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { AssertionError } from 'node:assert';
-import { Structure } from '../../crystallume/web/js/core/structure.js';
-import { parseStructure } from '../../crystallume/web/js/io/index.js';
+import { Structure } from '../../facet/web/js/core/structure.js';
+import { parseStructure } from '../../facet/web/js/io/index.js';
 import { DATA, INPUT_KINDS, compare, repoPath } from './helpers.mjs';
 
 /** JS side of every case op, by name (filled by the modules in tests/js/ops). */

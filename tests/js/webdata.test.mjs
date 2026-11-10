@@ -1,6 +1,6 @@
-// The shared data module core/webdata.js (M5 §4.2, ledger L-M2-06): crystallume/web/data/*.json, one copy that the
+// The shared data module core/webdata.js (M5 §4.2, ledger L-M2-06): facet/web/data/*.json, one copy that the
 // browser fetches next to the app and Node reads with fs. tests/test_webdata.py runs the same checks on the Python
-// twin (crystallume/core/webdata.py); both files hold the same JSON constant PARITY_CASES (between the BEGIN and END
+// twin (facet/core/webdata.py); both files hold the same JSON constant PARITY_CASES (between the BEGIN and END
 // PARITY_CASES lines): the data file names with the error text that both languages must give. The last tests load the
 // module under an http: URL (Node module hooks) to exercise the browser path: fetch next to the app, without cache.
 // Run: node --test tests/js/webdata.test.mjs (or through pytest: tests/test_js_unit.py).
@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { register } from 'node:module';
 import { pathToFileURL } from 'node:url';
-import { loadWebData, setWebData, webData } from '../../crystallume/web/js/core/webdata.js';
+import { loadWebData, setWebData, webData } from '../../facet/web/js/core/webdata.js';
 import { repoPath } from './helpers.mjs';
 
 // BEGIN PARITY_CASES (JSON: the same constant as in tests/test_webdata.py)
@@ -34,14 +34,14 @@ const PARITY_CASES = {
 };
 // END PARITY_CASES
 
-const fileJSON = (name) => JSON.parse(readFileSync(repoPath(`crystallume/web/data/${name}`), 'utf8'));
+const fileJSON = (name) => JSON.parse(readFileSync(repoPath(`facet/web/data/${name}`), 'utf8'));
 
 test('webData is null until a file is loaded', () => {
   for (const name of PARITY_CASES.valid) assert.equal(webData(name), null);
   assert.equal(webData(PARITY_CASES.missing), null);
 });
 
-test('loadWebData reads crystallume/web/data/<name> with fs under Node, once', async () => {
+test('loadWebData reads facet/web/data/<name> with fs under Node, once', async () => {
   for (const name of PARITY_CASES.valid) {
     const first = loadWebData(name);
     assert.equal(loadWebData(name), first, 'one promise while it loads');
@@ -87,10 +87,10 @@ test('setWebData puts a value in place of a file (tests, plugins)', async () => 
 });
 
 // ---------------------------------------------------------------------------------------------- the browser path
-// Serve crystallume/web as http://app.test/ to the module loader, so that webdata.js runs with an http: import.meta.url
+// Serve facet/web as http://app.test/ to the module loader, so that webdata.js runs with an http: import.meta.url
 // as in the browser, and stand in for fetch.
 const ORIGIN = 'http://app.test/';
-const WEB = `${pathToFileURL(repoPath('crystallume/web')).href}/`;
+const WEB = `${pathToFileURL(repoPath('facet/web')).href}/`;
 register(`data:text/javascript,${encodeURIComponent(`
 const ORIGIN = ${JSON.stringify(ORIGIN)}, WEB = ${JSON.stringify(WEB)};
 export async function resolve(specifier, context, next) {
@@ -115,7 +115,7 @@ async function withFetch(respond, fn) {
 test('in the browser the data is fetched next to the app, without the HTTP cache', async () => {
   const browser = await import(`${ORIGIN}js/core/webdata.js`);
   const name = PARITY_CASES.valid[0];
-  const text = readFileSync(repoPath(`crystallume/web/data/${name}`), 'utf8');
+  const text = readFileSync(repoPath(`facet/web/data/${name}`), 'utf8');
   await withFetch(() => new Response(text, { status: 200 }), async (calls) => {
     assert.equal(browser.webData(name), null);
     const value = await browser.loadWebData(name);

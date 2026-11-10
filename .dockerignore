@@ -13,3 +13,6 @@ tests
 docs
 *.db
 .env
+.github
+examples
+scripts

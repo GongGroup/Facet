@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from crystallume.config import Settings
-from crystallume.server import create_app
+from facet.config import Settings
+from facet.server import create_app
 
 from .js_bridge import require_node, run_js
 
@@ -29,7 +29,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 def js():
     """``js(source, payload=None, timeout=30.0)`` runs web-module code under Node.js (``tests/js_bridge.run_js``).
 
-    Skips the test when Node.js >= 22 is missing; ``CRYSTALLUME_REQUIRE_NODE=1`` makes that a failure.
+    Skips the test when Node.js >= 22 is missing; ``FACET_REQUIRE_NODE=1`` makes that a failure.
     """
     require_node()
     return run_js

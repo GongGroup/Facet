@@ -26,7 +26,7 @@ the implemented Python M1 and cross-checked with the v2 prototype); until every 
 written.  Large structures are recipe inputs (``{"recipe": {"name": "fcc111", "args": {...}}}``), never coordinates;
 bulk crystals use the shared recipe ``bulk`` of M2 (``tests/ops/m2_recipes.py``).
 
-Needs numpy and this checkout's ``crystallume`` and ``tests`` packages (it adds the repository root to ``sys.path``).
+Needs numpy and this checkout's ``facet`` and ``tests`` packages (it adds the repository root to ``sys.path``).
 """
 
 from __future__ import annotations
@@ -45,8 +45,8 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[2]
 sys.path.insert(0, str(REPO))
 
-from crystallume import Structure  # noqa: E402
-from crystallume.io import parse_text  # noqa: E402
+from facet import Structure  # noqa: E402
+from facet.io import parse_text  # noqa: E402
 from tests.m1_recipes import (  # noqa: E402
     FACES,
     S3,
@@ -57,7 +57,7 @@ from tests.m1_recipes import (  # noqa: E402
     xorshift32_step,
 )
 
-SCHEMA = "crystallume.cases/1"
+SCHEMA = "facet.cases/1"
 KEY_ORDER = ("id", "op", "args", "input", "expect", "tol", "skip", "xfail", "note")
 RECIPE_CHECK = "m1_recipes_check.json"
 M1_CASES = "m1_cases.json"

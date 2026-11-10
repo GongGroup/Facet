@@ -1,6 +1,6 @@
 """F0-A T8 (parameter schema): ops of the shared cases in ``tests/data/surface/coerce.json``.
 
-The JS halves are in ``tests/js/ops/f0a_params.mjs``.  Every op calls a function of ``crystallume.core.params`` on its
+The JS halves are in ``tests/js/ops/f0a_params.mjs``.  Every op calls a function of ``facet.core.params`` on its
 literal ``args`` (the cases have no input structure):
 
 - ``parseIndices`` (``text``, ``fractions``) -> ``value``;
@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
-from crystallume.core import params
+from facet.core import params
 
 from ..cases import CaseInput, op
 

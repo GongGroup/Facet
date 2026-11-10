@@ -13,7 +13,7 @@
 | L-07 | G-21 界面配位报告 | 状态行升为"必须"，并在 `info.surface.interface.registry` 记录覆盖层最下层每个原子的配位（top/bridge/fcc/hcp） | M6 |
 | L-08 | G-24 表面网格倍数提示 | 用通用文案 `Using the input cell: the surface cell has N times the area of the smallest one`，能写 Wood 记号时附上 | M2 |
 | L-09 | G-25 多元素表面的位点摘要 | 用与类标签相同的组成写法，如 `4 site atoms (Ti2O2)` | M5 |
-| L-10 | G-28 CLI 删除原子 | 提供 `crystallume edit delete FILE --atoms SPEC -o OUT`（第 2 波，随 M4 的 `crystallume edit` 组） | M4 |
+| L-10 | G-28 CLI 删除原子 | 提供 `facet edit delete FILE --atoms SPEC -o OUT`（第 2 波，随 M4 的 `facet edit` 组） | M4 |
 | L-11 | G-30 体相名两种语言不同 | 收尾阶段统一（M7）；在此之前跨语言比较排除 `bulk.name` | M7 |
 | L-12 | G-32 自动名哨兵的键名 | 只留 `info.surface.autoName`（M2 是 `info.surface` 的属主）；M1 §3.5.4、M5 K10/§4.5/§10、M6 §4.1 改用它；M5 只删除 v1 自己的 `baseName` | M2、M1、M5、M6 |
 | L-13 | G-33 已有结构 `set_vacuum(0)` | 确认 M2 的规则：0 Å 只在切面与界面构建时有定义（保持体相层间距）；对已有结构报 E12d，文案说明可改用 V = 0 切面或 `oriented_cell`。U4 的"允许填 0"指切面与界面构建 | M2 |

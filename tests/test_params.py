@@ -1,4 +1,4 @@
-"""The parameter schema in ``crystallume.core.params`` (F0-A T8): typed indices, coercion, validation, form defaults,
+"""The parameter schema in ``facet.core.params`` (F0-A T8): typed indices, coercion, validation, form defaults,
 the command line's ``--param`` and the REST plugin endpoints.
 
 The shared cases ``tests/data/surface/coerce.json`` run in both languages (``tests/test_cases.py``,
@@ -23,13 +23,13 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
-from crystallume import Client
-from crystallume import io as cl_io
-from crystallume.cli import main, parse_params
-from crystallume.client import ClientError
-from crystallume.config import Settings
-from crystallume.core import params
-from crystallume.core.params import (
+from facet import Client
+from facet import io as cl_io
+from facet.cli import main, parse_params
+from facet.client import ClientError
+from facet.config import Settings
+from facet.core import params
+from facet.core.params import (
     ParamError,
     coerce_param,
     default_params,
@@ -37,7 +37,7 @@ from crystallume.core.params import (
     parse_indices,
     validate_params,
 )
-from crystallume.server import BackgroundServer, create_app
+from facet.server import BackgroundServer, create_app
 
 DATA = Path(__file__).resolve().parent / "data"
 M = "\u2212"
@@ -45,7 +45,7 @@ BAR = "\u0305"
 
 PLUGIN = textwrap.dedent('''
     """A plugin whose builders and analysis declare the new parameter types (tests/test_params.py)."""
-    from crystallume import Structure
+    from facet import Structure
 
     PLUGIN = {"name": "paramtest", "version": "0.1"}
 
@@ -108,7 +108,7 @@ def test_names_and_error_class():
 
 def test_golden_file_covers_every_message():
     doc = json.loads((DATA / "surface" / "coerce.json").read_text(encoding="utf-8"))
-    assert doc["schema"] == "crystallume.cases/1"
+    assert doc["schema"] == "facet.cases/1"
     cases = doc["cases"]
     assert len(cases) >= 50
     assert {c["op"] for c in cases} == {"parseIndices", "coerceText", "coerceParam", "validateParams", "defaultParams"}
@@ -281,9 +281,9 @@ def test_cli_build_custom_with_new_types(tmp_path, plugin_dir, capsys):
     capsys.readouterr()
     assert main(["build", "custom", "slab", "--param", "hkl=1,0,0,0", "--param", "vacuum=15", *plugins]) == 1
     err = capsys.readouterr().err
-    assert err.strip() == f"crystallume: error: --param hkl: in (h k i l), i must be {M}(h + k) = -1."
+    assert err.strip() == f"facet: error: --param hkl: in (h k i l), i must be {M}(h + k) = -1."
     assert main(["build", "custom", "slab", "--param", "hkl=1,1,1", *plugins]) == 1
-    assert capsys.readouterr().err.strip() == "crystallume: error: --param vacuum: enter a value."
+    assert capsys.readouterr().err.strip() == "facet: error: --param vacuum: enter a value."
     # a builder without a schema gets the old conversion
     raw = tmp_path / "raw.json"
     assert main(["build", "custom", "raw", "--param", "hkl=[1, 0, -1, 0]", "--param", "name=x", "-o", str(raw),
@@ -337,7 +337,7 @@ def test_rest_builder_without_schema_and_analysis(client):
 
 BAD_PLUGIN = textwrap.dedent('''
     """A plugin whose declared params are themselves invalid (tests/test_params.py)."""
-    from crystallume import Structure
+    from facet import Structure
 
     PLUGIN = {"name": "badparams", "version": "0.1"}
 

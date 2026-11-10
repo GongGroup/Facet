@@ -6,8 +6,8 @@
 //
 // Other modules reuse `bulk` and do not register their own (registering a name twice throws).
 import { recipe } from '../cases.mjs';
-import { buildCrystal, prototypes } from '../../../crystallume/web/js/build/crystal.js';
-import * as REF from '../../../crystallume/web/js/build/reference.js';
+import { buildCrystal, prototypes } from '../../../facet/web/js/build/crystal.js';
+import * as REF from '../../../facet/web/js/build/reference.js';
 
 const NAME = 'recipe bulk';
 const ALLOWED = ['prototype', 'elements', 'a', 'c', 'u', 'thickness', 'repeat', 'name'];

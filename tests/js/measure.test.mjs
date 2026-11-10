@@ -5,17 +5,17 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import * as THREE from '../../crystallume/web/vendor/three/three.module.js';
-import { Structure } from '../../crystallume/web/js/core/structure.js';
-import { parseStructure } from '../../crystallume/web/js/io/index.js';
-import { makeScene } from '../../crystallume/web/js/render/settings.js';
-import { buildDisplayModel, keyOf, storedImage } from '../../crystallume/web/js/render/display.js';
-import { Viewer } from '../../crystallume/web/js/render/viewer.js';
-import { App } from '../../crystallume/web/js/app.js';
+import * as THREE from '../../facet/web/vendor/three/three.module.js';
+import { Structure } from '../../facet/web/js/core/structure.js';
+import { parseStructure } from '../../facet/web/js/io/index.js';
+import { makeScene } from '../../facet/web/js/render/settings.js';
+import { buildDisplayModel, keyOf, storedImage } from '../../facet/web/js/render/display.js';
+import { Viewer } from '../../facet/web/js/render/viewer.js';
+import { App } from '../../facet/web/js/app.js';
 import {
   parseRef, formatRef, normalizeRefs, measurementPoints, migrateMeasurementKeys, cleanMeasurementList,
   remapMeasurementList, measurementsRemovedNote, newMeasurementId, wholeCellShifts,
-} from '../../crystallume/web/js/core/measure.js';
+} from '../../facet/web/js/core/measure.js';
 import { fake2d } from './fake2d.mjs';
 import { repoPath } from './helpers.mjs';
 
@@ -306,7 +306,7 @@ describe('the app: entries keep {id, type, refs}; projects save {type, refs} and
   test('an opened 0.3 project: keys become refs against the structure and the project’s wrapping; saving writes refs, no ids', () => {
     const app = makeApp();
     const doc = {
-      schema: 'crystallume.project/1', id: 'p2', name: 'Old', structures: [{ id: 's1', name: 'S', structure: slab().toJSON(), measurements: [{ type: 'distance', keys: ['0:0,0,0', '1:0,0,-1'] }, { type: 'distance', keys: ['0:0'] }] }],
+      schema: 'facet.project/1', id: 'p2', name: 'Old', structures: [{ id: 's1', name: 'S', structure: slab().toJSON(), measurements: [{ type: 'distance', keys: ['0:0,0,0', '1:0,0,-1'] }, { type: 'distance', keys: ['0:0'] }] }],
       activeStructure: 's1', scene: { display: { wrap: true } },
     };
     app.loadProjectJSON(doc);

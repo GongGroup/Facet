@@ -1,5 +1,5 @@
 {
-  "schema": "crystallume.cases/1",
+  "schema": "facet.cases/1",
   "description": "F0-D T0: the shared CONTCAR fixture, the crystal recipe and the input kinds of the case shell",
   "cases": [
     {
@@ -210,11 +210,11 @@
     },
     {
       "id": "structure-input-keeps-props-and-info",
-      "note": "a crystallume.structure/1 input; null in expect.structure.props means the key is absent",
+      "note": "a facet.structure/1 input; null in expect.structure.props means the key is absent",
       "op": "load",
       "input": {
         "structure": {
-          "schema": "crystallume.structure/1",
+          "schema": "facet.structure/1",
           "name": "NaCl pair",
           "symbols": ["Na", "Cl"],
           "positions": [[0, 0, 0], [2.82, 2.82, 2.82]],

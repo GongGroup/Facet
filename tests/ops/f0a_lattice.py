@@ -1,6 +1,6 @@
 """F0-A T7a (lattice directions): ops of the shared cases in ``tests/data/surface/directions.json``.
 
-The JS halves are in ``tests/js/ops/f0a_lattice.mjs``.  Every op calls functions of ``crystallume.core.lattice`` on
+The JS halves are in ``tests/js/ops/f0a_lattice.mjs``.  Every op calls functions of ``facet.core.lattice`` on
 its literal ``args`` (the cases have no input structure) and returns the result as ``value``, with the JS key names
 (``to_conventional`` -> ``toConventional``) and arrays as lists:
 
@@ -27,7 +27,7 @@ from typing import Any, Sequence
 
 import numpy as np
 
-from crystallume.core import lattice
+from facet.core import lattice
 
 from ..cases import CaseInput, op
 

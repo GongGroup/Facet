@@ -3,9 +3,9 @@
 // made from App.prototype with a stand-in viewer (the real one needs WebGL).
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { App } from '../../crystallume/web/js/app.js';
-import { Structure } from '../../crystallume/web/js/core/structure.js';
-import { makeScene } from '../../crystallume/web/js/render/settings.js';
+import { App } from '../../facet/web/js/app.js';
+import { Structure } from '../../facet/web/js/core/structure.js';
+import { makeScene } from '../../facet/web/js/render/settings.js';
 
 const water = (name = 'H2O') => new Structure({ name, symbols: ['O', 'H', 'H'], positions: [[0, 0, 0], [0.76, 0.59, 0], [-0.76, 0.59, 0]] });
 

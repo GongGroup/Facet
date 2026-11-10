@@ -41,16 +41,16 @@ globalThis.setTimeout = (fn, ms, ...a) => { const t = realSetTimeout(fn, ms, ...
 /** The messages of the toasts shown since `from` (an index into `created`). */
 const toastsSince = (from) => created.slice(from).filter((el) => el.tag === 'span' && el.classes.has('msg')).map((el) => el.textContent);
 
-const THREE = await import('../../crystallume/web/vendor/three/three.module.js');
-const { createToolRegistry, tools, toolCommandId, toolKeyProblems, toolHint, genericHud, CANCEL_REASONS } = await import('../../crystallume/web/js/render/tools/index.js');
-const { App } = await import('../../crystallume/web/js/app.js');
-const { selectTool } = await import('../../crystallume/web/js/render/tools/select.js');
-const { measureTool, MEASURE_ATOMS } = await import('../../crystallume/web/js/render/tools/measure.js');
-const { Viewer } = await import('../../crystallume/web/js/render/viewer.js');
-const { Overlays } = await import('../../crystallume/web/js/render/overlays.js');
-const { makeScene } = await import('../../crystallume/web/js/render/settings.js');
-const { commands } = await import('../../crystallume/web/js/core/commands.js');
-const { matchKey } = await import('../../crystallume/web/js/ui/keys.js');
+const THREE = await import('../../facet/web/vendor/three/three.module.js');
+const { createToolRegistry, tools, toolCommandId, toolKeyProblems, toolHint, genericHud, CANCEL_REASONS } = await import('../../facet/web/js/render/tools/index.js');
+const { App } = await import('../../facet/web/js/app.js');
+const { selectTool } = await import('../../facet/web/js/render/tools/select.js');
+const { measureTool, MEASURE_ATOMS } = await import('../../facet/web/js/render/tools/measure.js');
+const { Viewer } = await import('../../facet/web/js/render/viewer.js');
+const { Overlays } = await import('../../facet/web/js/render/overlays.js');
+const { makeScene } = await import('../../facet/web/js/render/settings.js');
+const { commands } = await import('../../facet/web/js/core/commands.js');
+const { matchKey } = await import('../../facet/web/js/ui/keys.js');
 
 /** Run fn with console[level] recorded; returns [result, the messages]. */
 function quiet(level, fn) {
@@ -220,7 +220,7 @@ describe('keys: only the command binds them (M7 KC-03)', () => {
   });
 
   test('the keys of Select and Measure are the keys of the commands main.js registers', () => {
-    const src = readFileSync(new URL('../../crystallume/web/js/main.js', import.meta.url), 'utf8');
+    const src = readFileSync(new URL('../../facet/web/js/main.js', import.meta.url), 'utf8');
     const cmds = [...src.matchAll(/R\(\{ id: '(tool\.\w+)'([^\n]*)/g)].map(([, id, rest]) => ({ id, key: /\bkey: '([^']+)'/.exec(rest)?.[1] }));
     assert.deepEqual(cmds.filter((c) => c.key).map((c) => [c.id, c.key]), [['tool.measure', 'm'], ['tool.select', 'v']]);
     assert.deepEqual(toolKeyProblems([tools.get('select'), tools.get('measure')], cmds), []);
@@ -798,7 +798,7 @@ describe('Esc levels ① and ④ (M7 KC-05)', () => {
   });
 
   test('the Esc command in main.js runs ① before ④ before ⑤', () => {
-    const src = readFileSync(new URL('../../crystallume/web/js/main.js', import.meta.url), 'utf8');
+    const src = readFileSync(new URL('../../facet/web/js/main.js', import.meta.url), 'utf8');
     const body = /id: 'sel\.clear'[\s\S]*?\n {2}\} \}\);/.exec(src)?.[0] ?? '';
     const at = (s) => body.indexOf(s);
     assert.ok(at("app.viewer.cancelToolPress('esc')") > 0, '① cancel a drag');

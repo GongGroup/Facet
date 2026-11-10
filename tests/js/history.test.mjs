@@ -1,11 +1,11 @@
 // Undo storage v2 (core/history.js): property packing, structure snapshots, position deltas and the stacks.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Structure } from '../../crystallume/web/js/core/structure.js';
+import { Structure } from '../../facet/web/js/core/structure.js';
 import {
   HISTORY_DEFAULTS, HistoryStore, HistoryError, historyBudget, packProps, unpackProps, snapStructure, snapPositions,
   structureFromSnap, applyPositionsSnap, patchPositions, mergePositions, snapBytes, entryBytes,
-} from '../../crystallume/web/js/core/history.js';
+} from '../../facet/web/js/core/history.js';
 
 /** Pt(111) slab, ABC stacking on the γ = 120° mesh, bottom two layers fixed, tags from the top. */
 function slab(nx = 3, L = 4, { frames = 0 } = {}) {
