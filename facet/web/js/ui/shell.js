@@ -1,5 +1,14 @@
-/** Application shell: top bar, rail, drawer, inspector, viewport overlays, shortcuts, palette and tour. */
+/**
+ * Application shell, laid out as Materials Studio is: a menu bar (ui/menubar.js) and a toolbar strip at the top,
+ * the explorers (rail and drawer) on the left, the 3D view, the appearance inspector on the right; plus the
+ * viewport overlays, shortcuts, the command palette and the tour. On phones the menu bar and the strip give way to
+ * a compact top bar whose More menu holds the same menus.
+ */
 import { h, ic, btn } from './dom.js';
+import { MenuBar, appMenus, menuItems, compactMenu } from './menubar.js';
+import { MENU_ICONS, MENU_LABELS, commandShown, flattenMenus } from './menumodel.js';
+import { styles } from '../render/styles.js';
+import { looks } from '../render/looks.js';
 import { LOGO } from './icons.js';
 import { toast, showMenu, closeMenu, menuOpen, dialog, openModal, modalOpen, installTooltips, confirmDialog } from './overlays.js';
 import { commands } from '../core/commands.js';
@@ -13,7 +22,7 @@ import { VERSION } from '../app.js';
 import { keyLabel, matchKey, parseKey, hasMod, isMac, MOD, ALT } from './keys.js';
 import { canDownload, NO_DOWNLOADS } from '../storage/files.js';
 import { SelectionCard, selectSameElement, selectNeighbours, selectFragment, selectAll, measureFrom, selectionActions, actionMenuItems, menuTarget, deleteSelection } from './selectioncard.js';
-import { attachSections, openSection } from './sections.js';
+import { attachSections, openSection, panelSections } from './sections.js';
 import { atomInfoRows } from './atominfo.js';
 
 export const leftPanels = new Map();
@@ -127,6 +136,8 @@ export class Shell {
     matchMedia('(max-width: 920px)').addEventListener?.('change', (e) => {
       this._autoHidden = null;
       app.viewer.fitMargins = fitMargins();
+      closeMenu();
+      this._placeChrome();   // the toolbar groups move between the strip and the phone layout
       if (e.matches) { this.leftOpen = false; this.inspectorOpen = false; }
       else { this.leftOpen = app.prefs.leftOpen ?? true; this.inspectorOpen = app.prefs.inspectorOpen ?? true; this._fitPanels(); this.renderDrawer(); }
       this.syncPanels();
@@ -189,30 +200,53 @@ export class Shell {
     this.titleInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.titleInput.blur(); if (e.key === 'Escape') { this.titleInput.value = app.project.name; this.titleInput.blur(); } });
     this.saveChip = h('button.save-chip', { type: 'button', 'data-state': 'idle', 'aria-haspopup': 'menu' }, h('span.dot'), h('span.lbl', 'Not saved yet'));
     this.saveChip.addEventListener('click', () => this.saveMenu(this.saveChip));
-    this.undoBtn = btn('', { icon: 'undo', cls: 'ghost icon', tip: 'Undo', kbd: keyLabel('mod+z'), on: () => app.undo() });
-    this.redoBtn = btn('', { icon: 'redo', cls: 'ghost icon', tip: 'Redo', kbd: keyLabel('mod+shift+z'), on: () => app.redo() });
-    const openBtn = btn('Open', { icon: 'open', cls: 'ghost desktop-only', tip: 'Open structure or project files (CIF, POSCAR, XYZ, PDB, JSON)', kbd: keyLabel('mod+o'), on: () => commands.run('file.open') });
-    const saveBtn = btn('Save', { icon: 'save', cls: 'ghost', tip: 'Save the project', kbd: keyLabel('mod+s'), on: (e) => this.saveMenu(e.currentTarget) });
+    // the Standard toolbar: New, Open, Save, Export | Undo, Redo (on phones it sits in the top bar)
+    this.undoBtn = btn('', { icon: 'undo', cls: 'ghost icon hist', tip: 'Undo', kbd: keyLabel('mod+z'), on: () => app.undo() });
+    this.redoBtn = btn('', { icon: 'redo', cls: 'ghost icon hist', tip: 'Redo', kbd: keyLabel('mod+shift+z'), on: () => app.redo() });
+    const newBtn = btn('', { icon: 'filePlus', cls: 'ghost icon desktop-only', tip: 'New project', on: () => this.runCommand('project.new') });
+    const openBtn = btn('', { icon: 'open', cls: 'ghost icon desktop-only', tip: 'Open structure or project files (CIF, POSCAR, XYZ, PDB, XSD, JSON)', kbd: keyLabel('mod+o'), on: () => commands.run('file.open') });
+    const saveBtn = btn('', { icon: 'save', cls: 'ghost icon', tip: 'Save the project', kbd: keyLabel('mod+s'), on: (e) => this.saveMenu(e.currentTarget) });
+    saveBtn.setAttribute('aria-haspopup', 'menu');
     this.exportBtn = btn('Export', { icon: 'download', cls: 'primary export', tip: 'Export an image, 3D model or structure file', on: (e) => this.exportMenu(e.currentTarget) });
-    const paletteBtn = btn('', { icon: 'command', cls: 'ghost icon desktop-only', tip: 'Command palette — find any action', kbd: keyLabel('mod+k'), on: () => this.openPalette() });
-    const helpBtn = btn('', { icon: 'help', cls: 'ghost icon', tip: 'Help, shortcuts and tour', kbd: '?', on: (e) => this.helpMenu(e.currentTarget) });
+    this.exportBtn.setAttribute('aria-haspopup', 'menu');
+    this.stdGroup = h('div.tgroup.std', { role: 'group', 'aria-label': 'Standard' }, newBtn, openBtn, saveBtn, this.exportBtn, h('span.sep.desktop-only'), this.undoBtn, this.redoBtn);
+    const paletteBtn = btn('', { icon: 'search', cls: 'ghost icon desktop-only', tip: 'Command palette — find any action, also by its Materials Studio name', kbd: keyLabel('mod+k'), on: () => this.openPalette() });
+    const helpBtn = btn('', { icon: 'help', cls: 'ghost icon mobile-only', tip: 'Help, shortcuts and tour', kbd: '?', on: (e) => this.helpMenu(e.currentTarget) });
     this.themeBtn = btn('', { icon: 'moon', cls: 'ghost icon desktop-only', tip: 'Switch light / dark interface', on: () => this.cycleTheme() });
-    const moreBtn = btn('', { icon: 'more', cls: 'ghost icon mobile-only', tip: 'More', on: (e) => this.moreMenu(e.currentTarget) });
+    const moreBtn = btn('', { icon: 'more', cls: 'ghost icon mobile-only', tip: 'Menus', on: (e) => this.moreMenu(e.currentTarget) });
+    moreBtn.setAttribute('aria-haspopup', 'menu');
     this.userSlot = h('span.user-slot');
+    // the menu bar: File, Edit, View, Modify, Build, Tools, Window, Help (phones: the More menu holds them)
+    this.menubar = new MenuBar(this, leftPanels);
+    this.topActions = h('div.top-actions', this.userSlot, paletteBtn, helpBtn, this.themeBtn, moreBtn);
     this.top = h('header.topbar',
       h('div.brand', { html: LOGO }, h('span.name', 'Facet'), h('span.ver', `v${VERSION}`)),
+      this.menubar.el,
       h('div.proj-title', this.titleInput, this.saveChip),
-      h('div.top-actions', this.undoBtn, this.redoBtn, h('span.sep.desktop-only'), openBtn, saveBtn, this.exportBtn, h('span.sep.desktop-only'), this.userSlot, paletteBtn, helpBtn, this.themeBtn, moreBtn),
+      this.topActions,
     );
+    // the toolbar strip under it: Standard | 3D Viewer | display style and look | Build … image and full screen
+    this.repPick = this._picker('Display style', 'style', () => this.familyMenu('rep.', 'Display style'));
+    this.lookPick = this._picker('Look', 'sparkles', () => this.familyMenu('look.', 'Look'));
+    this.buildGroup = h('div.tgroup.buildg', { role: 'group', 'aria-label': 'Build' });
+    this.stdSlot = h('div.tslot');
+    this.viewSlot = h('div.tslot');
+    this.shotSlot = h('div.tslot');
+    this.strip = h('div.toolstrip', { role: 'toolbar', 'aria-label': 'Toolbars' },
+      this.stdSlot, h('span.sep'), this.viewSlot, h('span.sep'),
+      h('div.tgroup.display', { role: 'group', 'aria-label': 'Display' }, this.repPick, this.lookPick), h('span.sep.build-sep'),
+      this.buildGroup, h('span.grow'), this.shotSlot);
 
-    this.rail = h('nav.rail', { 'aria-label': 'Panels' });
+    this.rail = h('nav.rail', { 'aria-label': 'Explorers' });
     this.drawer = h('aside.drawer', { 'aria-label': 'Side panel' });
     this.inspector = h('aside.inspector', { 'aria-label': 'Appearance' });
     this.viewport = this.root.querySelector('.viewport');
     this.stage = this.root.querySelector('.stage');
-    this.root.prepend(this.top);
+    this.root.prepend(this.top, this.strip);
     this.root.append(this.rail, this.drawer, this.inspector);
     this.buildOverlays();
+    this._placeChrome();
+    this.renderToolstrip();
     this.renderRail();
     this.renderDrawer();
     this.renderInspector();
@@ -248,6 +282,7 @@ export class Shell {
     appear.addEventListener('click', () => this.toggleInspector());
     this.rail.append(appear);
     if (had) this.rail.querySelector(`[data-panel="${CSS.escape(had)}"]`)?.focus();
+    this.renderToolstrip();   // what brings a new panel (start-up, a plugin) may bring commands for the strip too
     this.syncPanels();
   }
   buildRail() { this.renderRail(); }
@@ -391,6 +426,7 @@ export class Shell {
 
   /** Draw panel `id` again soon if the drawer shows it (after the user leaves a field they type in), e.g. when its sections change. */
   refreshPanel(id) {
+    this.renderToolstrip();   // a section that came or went may bring or take the command of a strip button
     if (this.leftId !== id) return;
     if (!this.leftOpen) { this._drawerStale = true; return; }
     if (this._deferRender('drawer')) return;
@@ -480,13 +516,17 @@ export class Shell {
     this.spinBtn = btn('', { icon: 'turntable', cls: 'icon', tip: 'Turntable (auto-rotate)', kbd: 'T', on: () => commands.run('view.turntable') });
     this.cameraBtn = btn('', { icon: 'camera', cls: 'icon', tip: 'Save a 2× PNG image', kbd: keyLabel('mod+e'), on: () => this.runCommand('export.png2') });
     this.fsBtn = btn('', { icon: 'maximize', cls: 'icon', tip: 'Full screen', kbd: keyLabel('shift+f'), pressed: false, on: () => this.fullscreen() });
-    this.toolbar = h('div.float.toolbar.tb-top', { role: 'toolbar', 'aria-label': 'View tools', 'aria-orientation': 'vertical' },
+    viewBtn.setAttribute('aria-haspopup', 'menu');
+    this.measureBtn.setAttribute('aria-haspopup', 'menu');
+    // the 3D Viewer tools and the image / full-screen pair: in the toolbar strip on desktop, in the floating
+    // toolbar of the view on phones and in full screen, where there is no strip (_placeChrome)
+    this.viewGroup = h('div.tgroup.view-tools', { role: 'group', 'aria-label': '3D Viewer' },
       this.selectBtn, this.measureBtn, h('span.sep'),
       btn('', { icon: 'reset', cls: 'icon', tip: 'Reset view', kbd: keyLabel('Home'), on: () => app.viewer.resetView() }),
       btn('', { icon: 'fit', cls: 'icon', tip: 'Fit to screen', kbd: 'F', on: () => app.viewer.fitView() }),
-      viewBtn, this.projBtn, this.spinBtn, h('span.sep'),
-      this.cameraBtn, this.fsBtn,
-    );
+      viewBtn, this.projBtn, this.spinBtn);
+    this.shotGroup = h('div.tgroup.shot', { role: 'group', 'aria-label': 'Image and full screen' }, this.cameraBtn, this.fsBtn);
+    this.toolbar = h('div.float.toolbar.tb-top', { role: 'toolbar', 'aria-label': 'View tools', 'aria-orientation': 'vertical' });
     this.revealBtn = btn('Appearance', { icon: 'style', cls: 'float reveal-insp desktop-only', tip: 'Show appearance panel', kbd: keyLabel(']'), on: () => this.toggleInspector(true) });
     this.revealBtn.hidden = this.inspectorOpen;
     // trajectory
@@ -506,12 +546,12 @@ export class Shell {
       this.emptyText,
       this.emptyTiles,
       h('div.acts',
-        btn('Open file', { icon: 'open', cls: 'primary', kbd: keyLabel('mod+o'), tip: 'Open CIF, POSCAR, XYZ, PDB or Facet files', on: () => commands.run('file.open') }),
+        btn('Open file', { icon: 'open', cls: 'primary', kbd: keyLabel('mod+o'), tip: 'Open CIF, POSCAR, XYZ, PDB, Materials Studio XSD or Facet files', on: () => commands.run('file.open') }),
         btn('Browse samples', { icon: 'library', on: () => this.browseSamples() }),
         btn('Build', { icon: 'build', on: () => this.openLeft('build') }),
         btn('Paste text', { icon: 'clipboard', cls: 'desktop-only', on: () => this.runCommand('file.paste') })),
     ));
-    this.drop = h('div.float.dropzone', { hidden: true }, h('div', h('b', 'Drop structure or project files to open them'), h('small', `CIF, POSCAR, XYZ, PDB or .facet.json · you can also paste file text with ${keyLabel('mod+v')}`)));
+    this.drop = h('div.float.dropzone', { hidden: true }, h('div', h('b', 'Drop structure or project files to open them'), h('small', `CIF, POSCAR, XYZ, PDB, XSD or .facet.json · you can also paste file text with ${keyLabel('mod+v')}`)));
     // the tool HUD (class kept from when only Measure had one): toolDef.hud(app, env), or the generic one
     this.measureHud = h('div.float.measure-hud', { hidden: true, role: 'status' });
     this.stage.append(this.infoCard, this.toolbar, this.revealBtn, this.statusbar, this.hover, this.trajbar, this.empty, this.drop, this.measureHud);
@@ -521,6 +561,87 @@ export class Shell {
     // tools that come or go later (plugins): new buttons, and the app leaves a tool that went away
     tools.onChange(() => { this.renderToolButtons(); app._toolsChanged?.(); this.updateHint(); this._checkToolKeysSoon(); });
     this._checkToolKeysSoon();   // once the start-up has registered the commands
+  }
+
+  // ------------------------------------------------------------------ toolbar strip
+  /** A drop-down button of the toolbar strip that shows a current choice (the display style, the look). */
+  _picker(caption, icon, open) {
+    const label = h('span.lbl');
+    const b = h('button.btn.ghost.pick', { type: 'button', 'aria-haspopup': 'menu', 'aria-label': caption, 'data-tip': caption }, ic(icon), label, ic('chevronDown', 'sm caret'));
+    b._label = label;
+    b.addEventListener('click', () => open(b));
+    return b;
+  }
+
+  /** The menu of a command family (rep., look., light., color.) under a toolbar button, the current one checked. */
+  familyMenu(prefix, label, anchor = prefix === 'rep.' ? this.repPick : this.lookPick) {
+    const key = { 'rep.': 'rep', 'look.': 'look', 'light.': 'lighting', 'color.': 'colorScheme' }[prefix];
+    const entry = { family: prefix, label: (c) => c.title ?? c.id, radio: true, checked: (c, st) => st[key] === c.id.slice(prefix.length) };
+    return showMenu(anchor, [{ header: label }, ...menuItems(this.app, this, leftPanels, [entry])], { label });
+  }
+
+  /**
+   * Put the toolbar groups where this layout shows them: the Standard group in the strip, or in the top bar on
+   * phones; the 3D Viewer tools and the image / full-screen pair in the strip, or in the floating toolbar of the
+   * view on phones and in full screen. One set of buttons, so their state is kept in one place.
+   */
+  _placeChrome() {
+    const mobile = isMobile(), floating = mobile || !!this.root.dataset.fullscreen;
+    (mobile ? this.topActions : this.stdSlot).prepend(this.stdGroup);
+    if (floating) this.toolbar.replaceChildren(this.viewGroup, h('span.sep'), this.shotGroup);
+    else { this.toolbar.replaceChildren(); this.viewSlot.append(this.viewGroup); this.shotSlot.append(this.shotGroup); }
+    this._syncViewTools();
+  }
+
+  /** Without a structure the view tools have nothing to work on: greyed in the strip, the floating toolbar hidden. */
+  _syncViewTools() {
+    if (!this.toolbar) return;
+    const s = !!this.app.structure;
+    this.toolbar.hidden = !s || !this.toolbar.childElementCount;
+    for (const b of this.viewGroup?.querySelectorAll?.('button') ?? []) b.disabled = !s;
+  }
+
+  /**
+   * The Build group of the strip: Build crystal, Cleave surface, Build vacuum slab, Supercell, each only once its
+   * command is there for real (not the fallback of a section nobody has registered). Called again when commands or
+   * panel sections come or go.
+   */
+  renderToolstrip() {
+    if (!this.buildGroup) return;
+    const env = { hasSection: (panel, section) => panelSections(panel).some((x) => x.id === section && !x.placeholder) };
+    const made = [];
+    for (const id of ['build.crystal', 'surface.cleave', 'surface.vacuum', 'cell.supercell']) {
+      const c = commands.get(id);
+      if (!c || !commandShown(c, env)) continue;
+      const key = c.kbd ?? c.key;
+      const b = btn('', { icon: MENU_ICONS[id] ?? 'build', cls: 'ghost icon', tip: (MENU_LABELS[id] ?? c.title).replace(/…$/, ''), kbd: key ? keyLabel(Array.isArray(key) ? key[0] : key) : null, on: () => this.runCommand(id) });
+      b.dataset.command = id;
+      b.dataset.label = b.dataset.tip;
+      made.push(b);
+    }
+    this.buildGroup.replaceChildren(...made);
+    const sep = this.strip.querySelector('.build-sep');
+    if (sep) sep.hidden = !made.length;
+    this.updateToolstrip();
+  }
+
+  /** The strip follows the scene and the structure: the names on the two pickers, and which Build buttons can run now. */
+  updateToolstrip() {
+    if (!this.repPick) return;
+    const sc = this.app.scene;
+    const rep = styles.get(sc?.style?.rep), look = looks.get(sc?.look);
+    this.repPick._label.textContent = rep?.name ?? 'Display style';
+    this.repPick.dataset.tip = `Display style: ${rep?.name ?? sc?.style?.rep ?? '—'}`;
+    this.lookPick._label.textContent = look?.name ?? (sc?.lookBase && looks.get(sc.lookBase) ? `${looks.get(sc.lookBase).name} · edited` : 'Custom look');
+    this.lookPick.dataset.tip = look ? `Look: ${look.name}` : 'Look: customised (pick one to restyle)';
+    // a Build button that cannot run now is greyed and says why (in its tooltip, and in a toast when clicked)
+    for (const b of this.buildGroup.children) {
+      const c = commands.get(b.dataset.command);
+      const ok = !!c && commands.available(c);
+      b.classList.toggle('off', !ok);
+      b.setAttribute('aria-disabled', String(!ok));
+      b.dataset.tip = ok || !c ? b.dataset.label : `${b.dataset.label}: ${commands.unavailableReason(c)}`;
+    }
   }
 
   /** The toolbar buttons of the registered tools with toolbar: true (not Select and Measure), by order, after Measure. */
@@ -538,6 +659,7 @@ export class Shell {
       after = b;
       this.toolBtns.set(t.id, b);
     }
+    this._syncViewTools();
   }
 
   /** Warn in the console (once each) about tools whose shown key is not the key of their command (M7 KC-03). */
@@ -577,7 +699,7 @@ export class Shell {
     const s = this.app.structure;
     this.empty.hidden = !!s;
     this.infoCard.hidden = !s;
-    this.toolbar.hidden = !s;
+    this._syncViewTools();
     this.statusbar.classList.toggle('no-structure', !s);
     if (!s) { this.renderEmpty(); this.updateStats(); this.updateTraj(); return; }
     const cp = s.cellParams();
@@ -594,8 +716,8 @@ export class Shell {
   renderEmpty() {
     const touch = isTouch();
     this.emptyText.textContent = touch
-      ? 'Open a CIF, POSCAR, XYZ or PDB file, pick a sample below, or build a crystal or nanocluster.'
-      : 'Open a CIF, POSCAR, XYZ or PDB file, drop it anywhere on this window, paste its text, or start from a sample below.';
+      ? 'Open a CIF, POSCAR, XYZ, PDB or XSD file, pick a sample below, or build a crystal or nanocluster.'
+      : 'Open a CIF, POSCAR, XYZ, PDB or XSD file, drop it anywhere on this window, paste its text, or start from a sample below.';
     if (this.emptyTiles.childElementCount) return;
     this._tileMeta ??= {};
     for (const id of ['perovskite', 'au55', 'graphene', 'c60']) {
@@ -862,7 +984,7 @@ export class Shell {
     showMenu(anchor, [
       { header: 'Look along' },
       // the surface normal (N, Shift+N) is offered for every structure with a cell: without a vacuum gap it is c* (U1)
-      ...(per ? [{ label: 'Surface normal', kbd: keyLabel('n'), run: cmd('view.normal') }, { label: 'Bottom surface', kbd: keyLabel('shift+n'), run: cmd('view.normalBelow') }, { separator: true }] : []),
+      ...(per ? [{ label: 'Surface normal (top)', kbd: keyLabel('n'), run: cmd('view.normal') }, { label: 'Surface normal (bottom)', kbd: keyLabel('shift+n'), run: cmd('view.normalBelow') }, { separator: true }] : []),
       ...(per ? [{ label: 'a axis', kbd: 'A', run: v('a') }, { label: 'b axis', kbd: 'B', run: v('b') }, { label: 'c axis', kbd: 'C', run: v('c') }, { separator: true }] : []),
       { label: 'x axis', kbd: 'X', run: v('x') }, { label: 'y axis', kbd: 'Y', run: v('y') }, { label: 'z axis', kbd: 'Z', run: v('z') },
       { separator: true },
@@ -945,20 +1067,32 @@ export class Shell {
     ], { align: 'end', label: 'Help' });
   }
 
-  /** Phone overflow menu: actions that do not fit in the top bar. */
+  /**
+   * The More menu of phones, where the menu bar does not fit: the everyday actions, then every menu of the bar
+   * (File … Help) as a submenu, with the same items as on a desktop.
+   */
   moreMenu(anchor) {
     const app = this.app;
     const s = app.storage.get('server');
     const dark = this._darkUI();
-    showMenu(anchor, [
+    showMenu(anchor, compactMenu(app, this, leftPanels, [
       { label: 'Open files…', icon: 'open', run: () => commands.run('file.open') },
       { label: 'Paste structure text…', icon: 'clipboard', run: () => this.runCommand('file.paste') },
-      { label: 'New project', icon: 'plus', run: () => commands.run('project.new') },
+      { label: 'New project', icon: 'filePlus', run: () => commands.run('project.new') },
       { separator: true },
       { label: dark ? 'Light interface' : 'Dark interface', icon: dark ? 'sun' : 'moon', run: () => this.cycleTheme() },
       s?.info?.mode === 'cloud' && s.user ? { label: `Sign out (${s.user.username})`, icon: 'logout', run: () => this.signOut() } : null,
       s?.info && s.needsAuth ? { label: 'Sign in to the server', icon: 'user', run: () => this.openSignIn() } : null,
-    ], { align: 'end', label: 'More' });
+    ]), { align: 'end', label: 'Menus' });
+  }
+
+  /** Structure panel at its Analyses (Tools › Analyses). */
+  showAnalyses() {
+    this.openLeft('structure');
+    requestAnimationFrame(() => {
+      const head = [...this.drawer.querySelectorAll('.section > h3')].find((x) => /^Analyses/.test(x.textContent.trim()));
+      head?.scrollIntoView?.({ block: 'start' });
+    });
   }
 
   /**
@@ -1026,6 +1160,8 @@ export class Shell {
   }
   _setFullscreen(mode) {
     if (mode) this.root.dataset.fullscreen = mode; else delete this.root.dataset.fullscreen;
+    closeMenu();
+    this._placeChrome();   // in full screen the view tools float in the view: the strip is hidden
     this.fsBtn.setAttribute('aria-pressed', String(!!mode));
     this.fsBtn.replaceChildren(ic(mode ? 'minimize' : 'maximize'));
     this.fsBtn.dataset.tip = mode ? 'Exit full screen' : 'Full screen';
@@ -1071,6 +1207,14 @@ export class Shell {
     this.applyTheme(next);
     toast(next === 'system' ? `Interface: ${want} (follows ${this._hostTheme ? 'the page' : 'your system'})` : `Interface: ${want}`);
   }
+  /** Set the interface theme: 'light', 'dark' or 'system' (View › Theme). */
+  setTheme(t) {
+    const next = t === 'light' || t === 'dark' ? t : 'system';
+    this._syncHostTheme();
+    this.app.setPref('theme', next);
+    this.applyTheme(next);
+    toast(next === 'system' ? `Interface: follows ${this._hostTheme ? 'the page' : 'your system'}` : `Interface: ${next}`);
+  }
 
   // ------------------------------------------------------------------ input
   /** Run a registered command (by id or object), respecting its `when`; errors become toasts. */
@@ -1097,6 +1241,8 @@ export class Shell {
         GLOBAL[lk]();
         return;
       }
+      // F10 puts the keyboard on the menu bar (← → along it, ↓ opens a menu), as in desktop programs
+      if (k === 'F10' && !ctrl && !e.altKey && !e.shiftKey && !modal && !touring && this.menubar?.visible) { e.preventDefault(); closeMenu(); this.menubar.focus(); return; }
       if (modal || menuOpen()) return;
       if (isTextField(e.target)) return;
       if (ctrl && !e.altKey && lk === 'z') { e.preventDefault(); e.shiftKey ? app.redo() : app.undo(); return; }
@@ -1170,7 +1316,7 @@ export class Shell {
 
   /** A dialog to paste structure-file text (works where clipboard events are not available, e.g. phones). */
   pasteDialog() {
-    const area = h('textarea.field.mono', { rows: 10, autofocus: true, spellcheck: false, 'aria-label': 'Structure file text', placeholder: 'Paste the contents of a CIF, POSCAR, XYZ, PDB or Facet JSON file…', style: { minHeight: '200px', fontSize: '12px' } });
+    const area = h('textarea.field.mono', { rows: 10, autofocus: true, spellcheck: false, 'aria-label': 'Structure file text', placeholder: 'Paste the contents of a CIF, POSCAR, XYZ, PDB, XSD or Facet JSON file…', style: { minHeight: '200px', fontSize: '12px' } });
     const readers = formats.readers();
     // as in the Build panel: formats the browser cannot read are parsed by the server (incl. plugin formats)
     const fmt = h('select.field', { 'aria-label': 'Format' }, h('option', { value: '' }, 'Detect format'), ...readers.map((f) => h('option', { value: f.id }, f.server ? `${f.id} (server)` : f.name)));
@@ -1197,12 +1343,13 @@ export class Shell {
       this.renderDrawer();
     }, 30);
     app.on('project', () => { if (document.activeElement !== this.titleInput) this.titleInput.value = app.project.name; this.updateSaveChip(); this.refreshDrawer('project'); });
-    app.on('structure', () => { this.updateInfo(); this.updateHint(); this.refreshDrawer('structure'); this.refreshInspector(); });
+    app.on('structure', () => { this.updateInfo(); this.updateHint(); this.updateToolstrip(); this.refreshDrawer('structure'); this.refreshInspector(); });
     app.on('selection', () => { this.updateHint(); this.refreshDrawer('selection'); });
     app.on('measure', () => this.refreshDrawer('measure'));
     app.on('tool', () => { this.updateHint(); this.selCard.update(); });
-    app.on('scene', () => { this.refreshInspector(); this.updateHint(); this.updateTone(); this.refreshDrawer('scene'); });
-    app.on('registry', () => this.refreshDrawer('registry'));
+    app.on('scene', () => { this.refreshInspector(); this.updateHint(); this.updateToolstrip(); this.updateTone(); this.refreshDrawer('scene'); });
+    app.on('busy', () => this.updateToolstrip());
+    app.on('registry', () => { this.refreshDrawer('registry'); this.renderToolstrip(); });
     app.on('saveState', () => this.updateSaveChip());
     app.on('providers', () => { this.refreshDrawer('providers'); this.renderUser(); this.updateSaveChip(); });
     app.on('auth', () => { this.renderUser(); this.updateSaveChip(); this.refreshDrawer('auth'); });
@@ -1445,6 +1592,7 @@ facet.registry.colorSchemes.register({
     const card = h('div.float.welcome', { role: 'dialog', 'aria-label': 'Getting started' },
       h('h3', 'Welcome to Facet'),
       h('ol', h('li', touch ? 'Pick a structure from the Library, build one, or open your own file.' : 'Pick a structure from the Library, build one, or drop your own file.'), h('li', 'Restyle it with one click in Looks, then fine-tune light and effects.'), h('li', 'Export a high-resolution image or save the project.')),
+      h('p.hint', touch ? 'Coming from Materials Studio? Its menus (File, Edit, View, Modify, Build, Tools) are under ⋯ at the top right.' : 'Coming from Materials Studio? The menus at the top and the mouse work the way they do there.'),
       h('div.acts', btn('Take the 1-minute tour', { cls: 'primary small', on: () => { card.remove(); this.app.setPref('welcomed', true); this.tour(); } }), btn('Dismiss', { cls: 'ghost small', on: () => { card.remove(); this.app.setPref('welcomed', true); this.gestureHint(); } })));
     this.stage.append(card);
   }
@@ -1482,8 +1630,15 @@ facet.registry.colorSchemes.register({
     const storage = def?.memory
       ? `This browser blocks storage here, so projects only last until you close this tab. Use Save › Download project file to keep your work.${also}`
       : `Changes autosave to ${def?.label ?? 'This browser'} after your first edit.${also} Use Save to choose where a project lives.`;
+    // the menus follow Materials Studio: name a few paths that exist in this build
+    const mobile = isMobile();
+    const paths = this._menuExamples(['surface.cleave', 'cell.supercell', 'constraints.edit', 'build.crystal', 'sel.replace', 'export.cif'], 3);
+    const eg = paths.length ? ` For example ${paths.join(', ')}.` : '';
     return [
-      { sel: '.rail', title: 'Panels', text: `Projects, the sample Library, the Builder, Structure details and Surface tools live here.${touch ? '' : ` ${keyLabel('shift+1')} – 5 open them.`}`, sheet: 'left', panel: 'library' },
+      mobile
+        ? { sel: '.top-actions [aria-label="Menus"]', title: 'Menus as in Materials Studio', text: `Every command is in this menu: File, Edit, View, Modify, Build, Tools, Window and Help, grouped as in Materials Studio.${eg}`, sheet: 'none' }
+        : { sel: '.menubar', title: 'Menus as in Materials Studio', text: `File, Edit, View, Modify, Build and Tools hold what they hold in Materials Studio.${eg} ${MOD} K finds any command, also by its Materials Studio name.`, sheet: 'none' },
+      { sel: '.rail', title: 'Explorers', text: `Projects, the sample Library, the Builder, Structure details and Surface tools live here.${touch ? '' : ` ${keyLabel('shift+1')} – 5 open them.`}`, sheet: 'left', panel: 'library' },
       { sel: '.rail [data-panel="build"]', title: 'Build your own', text: 'Build crystals from prototypes, nanoclusters (icosahedra, decahedra, cuboctahedra) and molecules, or paste file text.', sheet: 'none' },
       { sel: '.viewport', title: 'Rotate the view', try: 'camera', tryText: touch ? 'Drag one finger across the view' : isMac ? 'Hold ⌃ Control and drag in the view' : 'Right-drag in the view',
         text: touch ? 'One finger rotates, two fingers pan and pinch to zoom. Tap an atom to see its details.'
@@ -1492,10 +1647,25 @@ facet.registry.colorSchemes.register({
       { sel: '.inspector .aio-looks, .inspector .grid-cards', title: 'Pick a look', try: 'look', tryText: touch ? 'Tap any look' : 'Click any look',
         text: 'One click sets the material, light and effects together. Below it, choose the representation, colours and sizes.', sheet: 'inspector', tab: 'style' },
       { sel: '.inspector .tabs', title: 'Light, effects, scene', text: 'Shape the light rig, add ambient occlusion, ink outlines, bloom or depth of field, and set the unit cell, supercell, bonds and background.', sheet: 'inspector' },
-      { sel: '.toolbar.tb-top', title: 'View tools', text: 'Measure distances and angles, align the view with a crystal axis, switch to orthographic, or start a turntable.', sheet: 'none' },
+      mobile
+        ? { sel: '.toolbar.tb-top', title: 'View tools', text: 'Measure distances and angles, align the view with a crystal axis, switch to orthographic, or start a turntable.', sheet: 'none' }
+        : { sel: '.toolstrip', title: 'Toolbar', text: 'New, open, save and undo; select and measure; reset the view or align it with a crystal axis; pick the display style and the look; and the Build tools. Every button says what it does when the pointer rests on it.', sheet: 'none' },
       { sel: '.proj-title', title: 'Your work is saved', text: storage, sheet: 'none' },
-      canDownload() ? { sel: '.top-actions .btn.primary', title: 'Export', text: `Save PNG images up to 4×, a glTF model for Blender or slides, or the structure as CIF, POSCAR, XYZ or PDB.${touch ? ' Tap ? in the top bar for help.' : ` Press ${MOD} K anytime to search every command.`}`, sheet: 'none' } : null,
+      canDownload() ? { sel: '.btn.export', title: 'Export', text: `Save PNG images up to 4×, a glTF model for Blender or slides, or the structure as CIF, POSCAR, XYZ, PDB or Materials Studio XSD.${touch ? ' Tap ? in the top bar for help.' : ` Press ${MOD} K anytime to search every command.`}`, sheet: 'none' } : null,
     ].filter(Boolean);
+  }
+
+  /** Up to `n` menu paths that exist now, for the commands `ids` in that order: 'Build › Surfaces › Cleave Surface'. */
+  _menuExamples(ids, n = 3) {
+    let flat = [];
+    try { flat = flattenMenus(appMenus(this.app, this, leftPanels)); } catch (e) { console.warn(e); }
+    const out = [];
+    for (const id of ids) {
+      const hit = flat.find((x) => x.item.id === id);
+      if (hit) out.push([...hit.path, String(hit.item.label).replace(/…$/, '')].join(' › '));
+      if (out.length >= n) break;
+    }
+    return out;
   }
 
   _tourPrep(s) {

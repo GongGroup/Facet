@@ -62,8 +62,8 @@ function thermalTrajectory(structure, { frames = 48, amplitude = 0.16, seed = 7 
 const crystal = (id, prm) => () => buildCrystal(id, prm);
 
 [
-  { id: 'perovskite', rep: 'polyhedra', name: 'SrTiO₃ perovskite', category: 'Crystals', tags: ['oxide', 'polyhedra'], build: crystal('perovskite', { repeat: [2, 2, 2] }), look: 'studio', scene: { display: { bonds: { disabledPairs: ['O-Sr'] } }, style: { polyhedra: { centers: ['Ti'], opacity: 0.72 } } } },
-  { id: 'rocksalt', rep: 'ballstick', name: 'NaCl rock salt', category: 'Crystals', tags: ['ionic'], build: crystal('rocksalt', { repeat: [2, 2, 2] }), look: 'studio' },
+  { id: 'perovskite', rep: 'polyhedra', name: 'SrTiO₃ perovskite', category: 'Crystals', tags: ['oxide', 'polyhedra'], build: crystal('perovskite', { repeat: [2, 2, 2] }), look: 'poster', scene: { display: { bonds: { disabledPairs: ['O-Sr'] } }, style: { polyhedra: { centers: ['Ti'], opacity: 0.72 } } } },
+  { id: 'rocksalt', rep: 'ballstick', name: 'NaCl rock salt', category: 'Crystals', tags: ['ionic'], build: crystal('rocksalt', { repeat: [2, 2, 2] }), look: 'poster' },
   { id: 'silicon', rep: 'ballstick', name: 'Silicon (diamond)', category: 'Crystals', tags: ['semiconductor'], build: crystal('diamond', { repeat: [2, 2, 2] }), look: 'lineart' },
   { id: 'rutile', rep: 'polyhedra', name: 'TiO₂ rutile', category: 'Crystals', tags: ['oxide', 'polyhedra'], build: crystal('rutile', { repeat: [2, 2, 3] }), look: 'morandi', scene: { style: { polyhedra: { centers: ['Ti'], opacity: 0.72 } } } },
   { id: 'anatase', rep: 'ballstick', name: 'TiO₂ anatase (from CIF)', category: 'Crystals', tags: ['oxide', 'cif'], build: () => { const s = readCIF(ANATASE_CIF, 'anatase.cif'); s.name = 'TiO₂ anatase'; return s.repeat(2, 2, 1); }, look: 'midnight' },
@@ -79,5 +79,5 @@ const crystal = (id, prm) => () => buildCrystal(id, prm);
   { id: 'c60', rep: 'ballstick', name: 'C₆₀ fullerene', category: 'Molecules', tags: ['carbon'], build: () => buildMolecule('c60'), look: 'crystal' },
   { id: 'benzene', rep: 'ballstick', name: 'Benzene', category: 'Molecules', tags: ['aromatic'], build: () => buildMolecule('benzene'), look: 'ink' },
   { id: 'sf6', rep: 'ballstick', name: 'SF₆', category: 'Molecules', tags: ['octahedral'], build: () => buildMolecule('sf6'), look: 'crystal' },
-  { id: 'pt55-md', rep: 'spheres', name: 'Pt₅₅ vibration (trajectory)', category: 'Trajectories', tags: ['animation'], build: () => { const s = thermalTrajectory(buildCluster('icosahedron', { element: 'Pt', size: 3 })); s.name = 'Pt₅₅ vibration (synthetic)'; return s; }, look: 'studio' },
+  { id: 'pt55-md', rep: 'spheres', name: 'Pt₅₅ vibration (trajectory)', category: 'Trajectories', tags: ['animation'], build: () => { const s = thermalTrajectory(buildCluster('icosahedron', { element: 'Pt', size: 3 })); s.name = 'Pt₅₅ vibration (synthetic)'; return s; }, look: 'poster' },
 ].forEach((s) => samples.register(s));

@@ -45,11 +45,14 @@ new files always use the `facet.*` names.
     { "id": "s_1", "name": "SrTiO3", "structure": { ...Structure... },
       "measurements": [ { "type": "distance", "keys": ["0:0,0,0", "4:1,0,0"] } ] }
   ],
-  "scene": { "look": "studio", "lookBase": "studio", "style": {}, "lighting": {}, "post": {}, "display": {}, "camera": {} }
+  "scene": { "look": "poster", "lookBase": "poster", "style": {}, "lighting": {}, "post": {}, "display": {}, "camera": {} }
 }
 ```
 
 - `scene` holds the web app's drawing settings. The server does not read it and must store it unchanged.
+  A project the web app saved opens exactly as saved. A project without a scene (`{}`, as `facet.project`
+  and the REST API make them) opens in the default look, Poster; settings given without `look` (such as
+  `{"style": {"rep": "spacefill"}}`) are applied on top of it.
 - Project lists (summaries) contain the project without `structures` and `scene`, plus:
   - `nStructures`;
   - `nAtoms` and `formula` (such as `"Sr8Ti8O24"`) of the active structure;

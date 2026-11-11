@@ -29,13 +29,23 @@ facet serve --open
 
 - **Open** CIF, POSCAR/CONTCAR/XDATCAR, XYZ, extended XYZ, PDB, Materials Studio XSD and Facet JSON files,
   including trajectories: drop a file on the window. Or build crystals, clusters and molecules in the Build panel.
-- **Style** it with one click on a look, then adjust the representation, colours, lighting and effects.
+- **Style** it with one click on a look (new structures open in *Poster*), then adjust the representation,
+  colours, lighting and effects.
+- **Cleave** a surface from a crystal (*Build › Surfaces › Cleave Surface*, or the Surface panel): pick the plane
+  and the termination, the number of layers and the vacuum, fix the bottom layers, then set the vacuum, centre or
+  flip the slab later.
 - **Inspect** the formula, cell and space group, and measure distances and angles.
 - **Export** PNG images up to 4×, glTF models and structure files (CIF, POSCAR, XYZ, PDB, and XSD to go on in
   Materials Studio, fixed atoms included).
 - **Save** projects in the browser, in a folder on your computer or on the server.
 
-The mouse works as in Materials Studio. Press `Ctrl/⌘ K` to search every command and `?` to see the shortcuts.
+The window is laid out as Materials Studio is. A menu bar (**File, Edit, View, Modify, Build, Tools, Window,
+Help**) holds every command where Materials Studio has it, with submenus such as *Build › Surfaces*,
+*Build › Symmetry* and *File › Export › Structure File*; a toolbar under it has the everyday buttons; the
+explorers (Projects, Library, Build, Structure, Surface) are on the left and the display settings on the right.
+The mouse works as in Materials Studio too. Press `F10` to reach the menus from the keyboard, `Ctrl/⌘ K` to
+search every command (also by its Materials Studio name) and `?` to see the shortcuts. On a phone the menus are
+under ⋯.
 
 ## Script it
 
