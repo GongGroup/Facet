@@ -191,6 +191,25 @@ The command palette follows the registries: `rep.<id>`, `look.<id>`, `light.<id>
 `sample.<id>` and `export.<format>` exist for every entry and disappear with it. The first nine
 representations get the keys `1`–`9`. A command's `run(app, ...args)` always receives the app first.
 
+The menu bar (File, Edit, View, Modify, Build, Tools, Window, Help; on phones the ⋯ menu) is built from
+the same commands each time a menu opens, so a command you register is in a menu without further work.
+Its `category` decides where:
+
+| `category` | Menu |
+|---|---|
+| `File`, `Export` | File, File › Export |
+| `Edit` | Edit |
+| `View`, `Trajectory` | View, View › Animation |
+| `Cell` | Modify |
+| `Surface`, `Build` | Build › Surfaces, Build |
+| `Tools`, `Window`, `Help` | the menu of that name |
+| anything else (the default `Plugin` too) | Tools › *category* |
+
+Looks, representations, lighting presets and colour schemes are listed under View, samples under
+Build › Samples and file formats under File › Export › Structure File, plugins' entries included. A
+command that cannot run (`when` is false) is greyed, with `whyNot` as its tooltip; `hidden: true` keeps a
+command out of the menus and the palette.
+
 ---
 
 ## 3. Registries and entry shapes
@@ -339,7 +358,7 @@ but may look odd). Colours are `#rrggbb`, angles are in degrees and lengths in �
 
 | Path | Type | Default | Range / values |
 |---|---|---|---|
-| `look` | string \| null | `studio` | id of the last applied look (`null` after manual changes) |
+| `look` | string \| null | `poster` | id of the last applied look (`null` after manual changes). New projects start in the Poster look; a saved project keeps its own |
 | `lookBase` | string | — | the look the scene started from (kept when settings change) |
 | `style.rep` | string | `ballstick` | a representation id (`ballstick`, `spacefill`, `spheres`, `licorice`, `wireframe`, `polyhedra`, plugins) |
 | `style.radiusSource` | string | `atomic` | `atomic`, `covalent`, `vdw`, `uniform` |

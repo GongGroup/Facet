@@ -22,6 +22,9 @@ registerLeftPanel({
     const custom = app.serverStore.info?.customBuilders ?? [];
     const tabs = [{ value: 'crystal', label: 'Crystal' }, { value: 'cluster', label: 'Cluster' }, { value: 'molecule', label: 'Molecule' }, { value: 'paste', label: 'Paste' }];
     if (custom.length) tabs.push({ value: 'plugins', label: 'Plugins', tip: 'Builders provided by server plugins' });
+    // shell.openLeft('build', {tab: 'cluster'}) opens the panel at that tab (Build › Build Nanostructure › Nanocluster…)
+    const want = shell.panelArgs?.('build')?.tab;
+    if (want && tabs.some((t) => t.value === want)) state.tab = want;
     el.append(h('div', { style: { padding: '0 0 10px' } }, seg(tabs, state.tab, (v) => { state.tab = v; rerender(); })));
     const body = h('div', { style: { display: 'grid', gap: '12px' } });
     el.append(body);
@@ -119,7 +122,7 @@ registerLeftPanel({
     }
 
     if (state.tab === 'paste') {
-      const ta = h('textarea.field', { rows: 12, placeholder: 'Paste CIF, POSCAR, XYZ or PDB text here…', spellcheck: false, style: { fontFamily: 'var(--font-mono)', fontSize: '11.5px' } }, state.paste);
+      const ta = h('textarea.field', { rows: 12, placeholder: 'Paste CIF, POSCAR, XYZ, PDB or XSD text here…', spellcheck: false, style: { fontFamily: 'var(--font-mono)', fontSize: '11.5px' } }, state.paste);
       ta.addEventListener('input', () => { state.paste = ta.value; });
       const readers = formats.readers();
       if (state.pasteFmt && !formats.get(state.pasteFmt)?.read) state.pasteFmt = '';
