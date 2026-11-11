@@ -31,7 +31,7 @@ function emptyState(shell) {
     h('h3', 'Load a bulk crystal first.'),
     h('p.hint', 'Open a CIF or POSCAR file, pick a crystal in the Library, or build one. Then cleave a surface, set the vacuum, fix layers and place adsorbates here.'),
     h('div.acts',
-      btn('Open file…', { icon: 'open', cls: 'primary small', tip: 'Open CIF, POSCAR, XYZ, PDB or Facet files', kbd: keyLabel('mod+o'), on: () => shell.runCommand('file.open') }),
+      btn('Open file…', { icon: 'open', cls: 'primary small', tip: 'Open CIF, POSCAR, XYZ, PDB, Materials Studio XSD or Facet files', kbd: keyLabel('mod+o'), on: () => shell.runCommand('file.open') }),
       btn('Library', { icon: 'library', cls: 'small', tip: 'Sample crystals, 2D materials, clusters and molecules', on: () => shell.openLeft('library') }),
       btn('Build crystal', { icon: 'build', cls: 'small', tip: 'Build a crystal from a prototype', on: () => shell.openLeft('build') })));
 }

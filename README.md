@@ -56,10 +56,17 @@ from facet import build
 cu = build.crystal("fcc", "Cu", a=3.61).repeat(3, 3, 3)
 facet.write("cu.cif", cu)
 s = facet.read("cu.cif")
+
+pt = build.crystal("fcc", "Pt", a=3.92)
+slab = build.surface(pt, (1, 1, 1), vacuum=15, layers=4, supercell=(3, 3), fix_bottom=2)
+facet.write("POSCAR", slab)          # 'Pt(111) p(3×3) 4L', the two bottom layers fixed
+facet.write("slab.xsd", slab)        # the same slab for Materials Studio
 ```
 
 ```bash
 facet convert cu.cif POSCAR
+facet terminations tio2.cif --hkl 1 1 0
+facet build surface tio2.cif --hkl 1 1 0 --vacuum 15 --periods 3 --fix-bottom 3 -o POSCAR
 facet --help
 ```
 

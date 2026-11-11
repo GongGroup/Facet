@@ -41,7 +41,7 @@ import { makeZip } from './core/zip.js';
 import { HistoryStore, historyBudget, snapStructure, snapPositions, structureFromSnap, applyPositionsSnap, patchPositions, mergePositions, BUDGET_NOTICE, INCONSISTENT, HistoryError } from './core/history.js';
 import { cleanMeasurementList, remapMeasurementList, migrateMeasurementKeys, newMeasurementId, wholeCellShifts, measurementsRemovedNote } from './core/measure.js';
 
-export const VERSION = '0.3.2';
+export const VERSION = '0.4.0';
 const PREF_KEY = 'atomscope.prefs';   // key from the app's former name, kept so saved preferences survive the rename
 const RECOVERY_KEY = 'recovery';
 const RETRY_DELAYS = [5000, 15000, 60000];

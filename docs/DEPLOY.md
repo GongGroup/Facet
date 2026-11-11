@@ -83,7 +83,7 @@ facet user create alice --data /srv/facet     # asks for a password
 ## Docker
 
 The image is published at `ghcr.io/gonggroup/facet` for amd64 and arm64 computers. `latest` follows the main
-branch; version tags such as `0.3.2` stay fixed.
+branch; version tags such as `0.4.0` stay fixed.
 
 ```bash
 docker run -d -p 8765:8765 -v facet-data:/data --name facet ghcr.io/gonggroup/facet     # cloud mode
@@ -219,8 +219,8 @@ Errors look like `{"detail": "..."}`.
 | Accounts | `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` |
 | Projects | `GET/POST /projects`, `GET/PUT/PATCH/DELETE /projects/{id}`, `POST /projects/{id}/duplicate`, `GET /projects/{id}/download`, `POST /projects/import` |
 | Files | `POST /io/parse`, `POST /io/export`, `POST /io/convert` |
-| Building | `GET /build/prototypes`, `POST /build/crystal`, `POST /build/cluster`, `POST /build/supercell`, `GET /build/molecules`, `GET /build/molecule/{name}`, `GET /build/custom`, `POST /build/custom/{name}` |
-| Analysis | `POST /analysis/bonds`, `POST /analysis/summary`, `POST /analysis/coordination`, `POST /analysis/rdf`, `GET /analysis/custom`, `POST /analysis/custom/{name}` |
+| Building | `GET /build/prototypes`, `POST /build/crystal`, `POST /build/cluster`, `POST /build/supercell`, `POST /build/surface`, `POST /build/vacuum`, `GET /build/molecules`, `GET /build/molecule/{name}`, `GET /build/custom`, `POST /build/custom/{name}` |
+| Analysis | `POST /analysis/bonds`, `POST /analysis/summary`, `POST /analysis/coordination`, `POST /analysis/rdf`, `POST /analysis/terminations`, `GET /analysis/custom`, `POST /analysis/custom/{name}` |
 | Plugins | `/api/v1/ext/...`, added by plugins |
 
 ```bash

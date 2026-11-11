@@ -277,6 +277,9 @@ selection when the clicked atom is part of it, else that atom, and `ctx = {sourc
 | `structure`, `scene`, `project`, `selection` | current state (getters) |
 | `load(input, {name, format, look, newProject})`, `loadURL(url)`, `sample(id)`, `openProject(doc)` | show structures (`load` returns a Promise for formats only the server reads; `openProject` opens a project document as a new project with a new id, like opening the file, so saving it never replaces a stored project) |
 | `build.crystal(proto, params)`, `build.cluster(kind, params)`, `build.molecule(id)`, `build.prototypes()`, `build.clusters()`, `build.molecules()` | builders |
+| `build.surface(bulk, {miller, vacuum, layers, termination, supercell, fixBottom, …})` | the slab cleaved from a crystal, as a new structure (nothing is shown); `vacuum` is required: the total gap in Å |
+| `surface.analyze({miller, …}, s?)`, `surface.terminations({miller, …}, s?)`, `surface.cleave({miller, vacuum, …})`, `surface.layers({tolerance}, s?)`, `surface.extent(s?)` | the surface cell, layers and terminations of a plane; cleave the active structure and add the slab to the project; the atomic layers and the vacuum gap of a slab |
+| `edit.setVacuum(vacuum, {position})`, `edit.centerSlab()`, `edit.flipSlab()`, `edit.fixLayers(n, {where, axes})`, `edit.freeAtoms(indices?)` | slab tools on the active structure, one undo step each |
 | `analysis.bonds(s?)`, `analysis.neighbors(s?)`, `analysis.summary(s?)`, `analysis.coordination(s?)`, `analysis.rdf(s?, {rmax, nbins, pair})` | direct analysis functions |
 | `analyze(id, params?, s?) → Promise` | run any registered analysis (built-in, JS plugin or server plugin) |
 | `set(path, value)`, `get(path)`, `patch(partial)` | scene settings (§5); paths with `__proto__`, `constructor` or `prototype` are refused |
@@ -524,6 +527,15 @@ sto = build.crystal("perovskite", ["Sr", "Ti", "O"])
 au55 = build.cluster("icosahedron", "Au", 3)          # Mackay icosahedron: 3 shells, 55 atoms
 caf = build.molecule("caffeine")
 
+# surfaces: look at a plane first, then cleave; vacuum is the total gap in Å and has no default
+for t in build.terminations(sto, (0, 0, 1)):          # best first: non-polar, fewest broken bonds
+    print(t["index"], t["label"], t["brokenBonds"], t["polar"])      # 0 TiO2 5 False / 1 SrO 5 False
+slab = build.surface(sto, (0, 0, 1), vacuum=15, layers=7, termination="TiO2", symmetric=True,
+                     supercell=(2, 2), fix_middle=3)  # 'SrTiO3(001) p(2×2) TiO2-term 7L'
+build.set_vacuum(slab, 20)                            # in place; also center_slab, flip_slab,
+build.fix_layers(slab, 2)                             # fix_layers, free_atoms, slab_layers, slab_extent
+bulk_ref = build.oriented_cell(sto, (0, 0, 1))        # the same orientation without vacuum
+
 bonds = analysis.neighbors(cu)              # [(i, j, distance, (ox, oy, oz)), ...], periodic-aware
 cn = analysis.coordination_numbers(cu)
 r, g = analysis.rdf(cu, rmax=6.0, nbins=120)
@@ -567,8 +579,8 @@ client.convert("in.cif", "poscar", "out.vasp")      # converted on the server, p
 
 The methods are `health`, `info`, `elements`, `plugins`, the project methods, `formats`,
 `upload_structure`, `parse_text`, `export_structure`, `convert`, `prototypes`, `molecules`,
-`build_crystal`, `build_cluster`, `supercell`, `molecule`, `custom_builders`, `build_custom`, `bonds`,
-`summary`, `coordination`, `rdf`, `custom_analyses` and `analysis`. A running server shows the REST API
+`build_crystal`, `build_cluster`, `supercell`, `surface`, `set_vacuum`, `molecule`, `custom_builders`,
+`build_custom`, `bonds`, `summary`, `coordination`, `rdf`, `terminations`, `custom_analyses` and `analysis`. A running server shows the REST API
 at `/docs`; [DEPLOY.md](DEPLOY.md#rest-api) has an overview.
 
 ### Command line
@@ -581,6 +593,10 @@ facet build crystal fcc Cu --a 3.61 --repeat 3 3 3 -o cu.xyz
 facet build cluster icosahedron Au --size 3 -o au55.xyz
 facet build molecule caffeine -o caffeine.pdb
 facet build custom hello-chain --param n=12 --param element=Ag -o chain.xyz --plugins ./plugins
+facet terminations bulk.cif --hkl 1 1 0 [--json]  # the terminations of a plane, best first
+facet build surface bulk.cif --hkl 1 1 0 --vacuum 15 [--layers N | --periods N | --thickness Å] \
+                  [--termination T] [--symmetric] [--supercell N M | --wood 'c(2x2)'] [--fix-bottom N] -o POSCAR
+facet edit vacuum slab.vasp --vacuum 20 -o out.vasp   # also: edit center-slab, flip, fix-layers -n N, free
 facet analyze rdf structure.cif --param rmax=6    # summary, coordination, rdf or a plugin analysis (JSON)
 facet info structure.cif [--bonds] [--json]
 facet user create NAME [--password PW] [--data DIR]   # also: user list, passwd, delete
