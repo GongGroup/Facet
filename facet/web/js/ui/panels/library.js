@@ -47,7 +47,7 @@ registerLeftPanel({
     };
     search.addEventListener('input', () => { query = search.value; draw(); });
     el.append(h('div', { style: { display: 'grid', gap: '12px' } }, search, list,
-      h('div.callout', h('b', 'Your own files'), h('span.hint', 'Drop CIF, POSCAR/CONTCAR/XDATCAR, XYZ/extXYZ, PDB or Facet JSON onto the window, or paste file contents anywhere.'))));
+      h('div.callout', h('b', 'Your own files'), h('span.hint', 'Drop CIF, POSCAR/CONTCAR/XDATCAR, XYZ/extXYZ, PDB, Materials Studio XSD or Facet JSON onto the window, or paste file contents anywhere.'))));
     draw();
   },
 });

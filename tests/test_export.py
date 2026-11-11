@@ -66,7 +66,7 @@ def has(messages: list[str], fragment: str) -> bool:
 
 # ------------------------------------------------------------------------------------------------ the table
 def test_builtin_writers_carry_the_table():
-    assert list(WRITER_CAPABILITIES) == ["json", "extxyz", "xyz", "poscar", "cif", "pdb"]
+    assert list(WRITER_CAPABILITIES) == ["json", "extxyz", "xyz", "poscar", "cif", "pdb", "xsd"]
     for name, caps in WRITER_CAPABILITIES.items():
         assert list(caps) == list(CAPABILITY_VALUES)
         assert get_writer(name).capabilities == dict(caps)
@@ -125,7 +125,7 @@ def test_register_writer_validates_and_copies_capabilities(myfmt):
 
 
 @pytest.mark.parametrize("change, message", [
-    ({"constraints": "yes"}, "writer 'myfmt': capabilities.constraints must be one of lattice, cartesian, none"),
+    ({"constraints": "yes"}, "writer 'myfmt': capabilities.constraints must be one of lattice, cartesian, atoms, none"),
     ({"overlap": 1}, "writer 'myfmt': capabilities.overlap must be true or false"),
     ({"cell": None}, "writer 'myfmt': capabilities.cell must be one of true, false, required"),
     ({"label": ""}, "writer 'myfmt': capabilities.label must be a non-empty string"),

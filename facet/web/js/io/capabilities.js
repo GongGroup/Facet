@@ -14,14 +14,16 @@
  * | poscar | POSCAR | one | required | lattice | false | species | periodic | true | true | true |
  * | cif | CIF | one | required | none | true | keep | periodic | true | false | false |
  * | pdb | PDB | all | true | none | false | keep | periodic | false | false | false |
+ * | xsd | Materials Studio XSD | one | true | atoms | false | keep | periodic | true | false | false |
  *
  * `frames`: all frames or one (the report names the frame written); `cell`: stored, not stored or required;
- * `constraints`: selective dynamics along the cell vectors (lattice), along x, y, z (cartesian: ASE's move_mask) or
- * not at all; `order`: kept, or grouped by species (POSCAR); `pbc`: stored in the file, T T T whenever there is a
- * cell (periodic), or no cell (none); `overlap`, `handedness`: look for atoms closer than 0.5 Å and for a
- * left-handed cell; `velocities` (optional, OPTIONAL_CAPABILITIES): props.velocities is written. Lead decision L-01
- * asks for a note when velocities are dropped; the column is an addition to the nine of F0-D §3.12.1 (ledger
- * L-F0-25), so a format may leave it out, and then the export check says nothing about velocities.
+ * `constraints`: selective dynamics along the cell vectors (lattice), along x, y, z (cartesian: ASE's move_mask),
+ * whole atoms only (atoms: an atom fixed along some directions is written as fixed) or not at all; `order`: kept,
+ * or grouped by species (POSCAR); `pbc`: stored in the file, T T T whenever there is a cell (periodic), or no cell
+ * (none); `overlap`, `handedness`: look for atoms closer than 0.5 Å and for a left-handed cell; `velocities`
+ * (optional, OPTIONAL_CAPABILITIES): props.velocities is written. Lead decision L-01 asks for a note when
+ * velocities are dropped; the column is an addition to the nine of F0-D §3.12.1 (ledger L-F0-25), so a format may
+ * leave it out, and then the export check says nothing about velocities.
  *
  * The Python twin is facet/io/capabilities.py: the same table, the same validation and, word for word, the
  * same messages (a test compares the two tables).
@@ -32,7 +34,7 @@ export const CAPABILITY_VALUES = Object.freeze({
   label: null,
   frames: Object.freeze(['all', 'one']),
   cell: Object.freeze([true, false, 'required']),
-  constraints: Object.freeze(['lattice', 'cartesian', 'none']),
+  constraints: Object.freeze(['lattice', 'cartesian', 'atoms', 'none']),
   occupancy: Object.freeze([true, false]),
   order: Object.freeze(['keep', 'species']),
   pbc: Object.freeze(['stored', 'periodic', 'none']),
@@ -59,6 +61,7 @@ export const WRITER_CAPABILITIES = Object.freeze({
   poscar: row('POSCAR', 'one', 'required', 'lattice', false, 'species', 'periodic', true, true, true),
   cif: row('CIF', 'one', 'required', 'none', true, 'keep', 'periodic', true, false, false),
   pdb: row('PDB', 'all', true, 'none', false, 'keep', 'periodic', false, false, false),
+  xsd: row('Materials Studio XSD', 'one', true, 'atoms', false, 'keep', 'periodic', true, false, false),
 });
 
 /** The overlap check of the export is skipped (with a note) for structures with more atoms than this. */
@@ -73,7 +76,7 @@ const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArr
  * Check the capabilities `caps` of writer `name` and return them as a new frozen object in table order. Every key
  * of CAPABILITY_VALUES is required except those of OPTIONAL_CAPABILITIES, which may be left out, null or undefined
  * (and are then left out of the result), and no other key is allowed; booleans must be true or false. Throws an
- * Error naming the writer and the key, e.g. `writer 'myfmt': capabilities.constraints must be one of lattice, cartesian, none`.
+ * Error naming the writer and the key, e.g. `writer 'myfmt': capabilities.constraints must be one of lattice, cartesian, atoms, none`.
  */
 export function validateCapabilities(name, caps) {
   const where = `writer '${name}'`;

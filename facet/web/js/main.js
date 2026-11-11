@@ -16,9 +16,11 @@ import './ui/panels/appearance.js';
 // --- end M1-commands ---
 
 // --- surface-modeling M2-cleave ---
+import './ui/panels/cleave.js';
 // --- end M2-cleave ---
 
 // --- surface-modeling M2-slab ---
+import './ui/panels/slab.js';
 // --- end M2-slab ---
 
 // --- surface-modeling M3-commands ---
@@ -66,7 +68,7 @@ import { samples } from './build/samples.js';
 import { pickFiles, probeDownloads, canDownload, NO_DOWNLOADS, isArtifact } from './storage/files.js';
 import { toast } from './ui/overlays.js';
 import { selectAll, selectNeighbours, selectSameElement, selectFragment } from './ui/selectioncard.js';
-import { deleteSelection } from './ui/selectioncard.js';
+import { deleteSelection, replaceSelection } from './ui/selectioncard.js';
 import { createAPI } from './api/public.js';
 import { installEmbedAPI } from './api/embed.js';
 import { installExtensions, syncRegistryCommands } from './api/extensions.js';
@@ -140,8 +142,8 @@ function registerCommands(app, shell) {
   const run = (p) => p?.catch?.((e) => toast(e.message, { type: 'error' }));
   // key: shortcut that runs the command (see ui/keys.js); kbd: shortcut handled elsewhere, shown only.
   // repeat: true lets a held key repeat; shortcutGroup: one row in the shortcuts dialog for several commands.
-  R({ id: 'file.open', title: 'Open files…', category: 'File', kbd: 'mod+o', keywords: 'import load cif poscar xyz pdb', run: async () => { const fs = await pickFiles({ accept: '.cif,.xyz,.extxyz,.vasp,.poscar,.pdb,.json,.mcif,.ent,*', multiple: true }); if (fs.length) app.importFiles(fs); } });
-  R({ id: 'file.paste', title: 'Paste structure text…', category: 'File', keywords: 'clipboard import text cif poscar xyz pdb', run: () => shell.pasteDialog() });
+  R({ id: 'file.open', title: 'Open files…', category: 'File', kbd: 'mod+o', aliases: ['Import'], ms: 'File › Import', keywords: 'import load cif poscar xyz pdb xsd materials studio', run: async () => { const fs = await pickFiles({ accept: '.cif,.xyz,.extxyz,.vasp,.poscar,.pdb,.xsd,.json,.mcif,.ent,*', multiple: true }); if (fs.length) app.importFiles(fs); } });
+  R({ id: 'file.paste', title: 'Paste structure text…', category: 'File', keywords: 'clipboard import text cif poscar xyz pdb xsd', run: () => shell.pasteDialog() });
   R({ id: 'project.save', title: 'Save project', category: 'File', kbd: 'mod+s', run: () => run(shell.saveToProvider(app.project.location?.provider ?? app.defaultProvider)) });
   R({ id: 'project.new', title: 'New project', category: 'File', run: () => run(app.newProject()) });
   R({ id: 'project.download', title: 'Download project file', category: 'File', when: canDownload, whyNot, run: () => run(app.downloadProject()) });
@@ -156,7 +158,7 @@ function registerCommands(app, shell) {
   R({ id: 'view.fit', title: 'Fit to screen', category: 'View', key: 'f', when: hasS, run: () => app.viewer.fitView() });
   R({ id: 'view.zoomIn', title: 'Zoom in', category: 'View', key: ['+', '='], repeat: true, when: hasS, run: () => app.viewer.zoomBy(1.2) });
   R({ id: 'view.zoomOut', title: 'Zoom out', category: 'View', key: '-', repeat: true, when: hasS, run: () => app.viewer.zoomBy(1 / 1.2) });
-  for (const ax of ['a', 'b', 'c']) R({ id: `view.${ax}`, title: `Look along ${ax}`, category: 'View', key: ax, shortcutGroup: 'Look along a, b, c', when: per, run: () => app.viewer.setView(ax) });
+  for (const ax of ['a', 'b', 'c']) R({ id: `view.${ax}`, title: `Look along ${ax}`, category: 'View', key: ax, shortcutGroup: 'Look along a, b, c', when: per, whyNot: () => (app.structure ? 'This structure has no unit cell, so it has no a, b and c axes.' : null), run: () => app.viewer.setView(ax) });
   for (const ax of ['x', 'y', 'z']) R({ id: `view.${ax}`, title: `Look along ${ax}`, category: 'View', key: ax, shortcutGroup: 'Look along x, y, z', when: hasS, run: () => app.viewer.setView(ax) });
   // N looks down on the top surface, Shift+N up at the bottom one (surfaceNormal: the vacuum gap; without one c*, and
   // a note says so, U1); Look along… takes a lattice direction, the normal of a plane or a vector (one of them)
@@ -210,6 +212,13 @@ function registerCommands(app, shell) {
   R({ id: 'sel.delete', title: 'Delete selected atoms', category: 'Edit', key: 'Delete', when: hasSel, run: () => deleteSelection(app) });
   R({ id: 'sel.delete2', title: 'Delete selected atoms', category: 'Edit', key: 'Backspace', when: hasSel, run: () => deleteSelection(app), hidden: true });
   R({ id: 'sel.invert', title: 'Invert selection', category: 'Edit', when: hasS, run: () => app.invertSelection() });
+  // Modify › Modify Element…: asks for the element (the selection card's Replace does the same)
+  R({ id: 'sel.replace', title: 'Change element of selected atoms…', category: 'Edit', aliases: ['Modify Element', 'Replace element'], ms: 'Modify › Modify Element', keywords: 'replace substitute dope species', edits: true, when: hasSel, whyNot: () => 'Select atoms first.', run: () => run(replaceSelection(app)) });
+  // Build menu: the Build panel at one of its tabs
+  const buildTab = (tab) => () => shell.openLeft('build', { tab });
+  R({ id: 'build.crystal', title: 'Build crystal…', category: 'Build', aliases: ['Build Crystal'], ms: 'Build › Crystals › Build Crystal', keywords: 'prototype lattice fcc bcc hcp perovskite rutile new crystal', run: buildTab('crystal') });
+  R({ id: 'build.cluster', title: 'Build nanocluster…', category: 'Build', aliases: ['Build Nanocluster', 'Nanostructure'], ms: 'Build › Build Nanostructure', keywords: 'nanoparticle icosahedron decahedron cuboctahedron cluster', run: buildTab('cluster') });
+  R({ id: 'build.molecule', title: 'Build molecule…', category: 'Build', keywords: 'molecule gas phase water benzene', run: buildTab('molecule') });
   R({ id: 'view.showAll', title: 'Show all atoms', category: 'View', aliases: ['Unhide'], keywords: 'unhide hidden atoms visibility', when: () => (app.viewer.hiddenCount ?? 0) > 0, whyNot: () => 'No atoms are hidden.', run: () => app.viewer.showAll() });
   R({ id: 'edit.undo', title: 'Undo', category: 'Edit', kbd: 'mod+z', run: () => app.undo() });
   R({ id: 'edit.redo', title: 'Redo', category: 'Edit', kbd: 'mod+shift+z', run: () => app.redo() });
@@ -224,6 +233,7 @@ function registerCommands(app, shell) {
   R({ id: 'ui.tour', title: 'Take the tour', category: 'Help', keywords: 'help guide onboarding', run: () => shell.tour() });
   R({ id: 'ui.theme', title: 'Switch interface theme', category: 'Window', keywords: 'dark light mode', run: () => shell.cycleTheme() });
   R({ id: 'ui.api', title: 'Scripting & API', category: 'Help', run: () => shell.apiDialog() });
+  R({ id: 'ui.about', title: 'About Facet', category: 'Help', keywords: 'version', run: () => shell.aboutDialog() });
   ['projects', 'library', 'build', 'structure', 'surface'].forEach((p, i) => R({ id: `panel.${p}`, title: `Show ${p[0].toUpperCase() + p.slice(1)} panel`, category: 'Window', key: `shift+${i + 1}`, shortcutGroup: 'Projects, Library, Build, Structure, Surface panel', run: () => shell.openLeft(p) }));
 
   // representations (keys 1–9), looks, lighting presets, colour schemes, samples and Export <format>:

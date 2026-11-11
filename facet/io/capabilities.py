@@ -7,23 +7,25 @@ rows of :data:`WRITER_CAPABILITIES`; a plugin declares its own with ``ctx.regist
 capabilities gets no report at all (nothing is guessed).  ``GET /api/v1/formats`` lists the capabilities of every
 writer, and the web app copies them for the server-only formats, so both languages decide from the same table.
 
-======  ================  ======  ========  ===========  =========  =======  ========  =======  ==========  ==========
-id      label             frames  cell      constraints  occupancy  order    pbc       overlap  handedness  velocities
-======  ================  ======  ========  ===========  =========  =======  ========  =======  ==========  ==========
-json    Facet JSON  all     true      lattice      true       keep     stored    false    false       true
-extxyz  Extended XYZ      all     true      cartesian    true       keep     stored    true     false       true
-xyz     plain XYZ         all     false     none         false      keep     none      false    false       false
-poscar  POSCAR            one     required  lattice      false      species  periodic  true     true        true
-cif     CIF               one     required  none         true       keep     periodic  true     false       false
-pdb     PDB               all     true      none         false      keep     periodic  false    false       false
-======  ================  ======  ========  ===========  =========  =======  ========  =======  ==========  ==========
+======  ====================  ======  ========  ===========  =========  =======  ========  =======  ==========  ==========
+id      label                 frames  cell      constraints  occupancy  order    pbc       overlap  handedness  velocities
+======  ====================  ======  ========  ===========  =========  =======  ========  =======  ==========  ==========
+json    Facet JSON            all     true      lattice      true       keep     stored    false    false       true
+extxyz  Extended XYZ          all     true      cartesian    true       keep     stored    true     false       true
+xyz     plain XYZ             all     false     none         false      keep     none      false    false       false
+poscar  POSCAR                one     required  lattice      false      species  periodic  true     true        true
+cif     CIF                   one     required  none         true       keep     periodic  true     false       false
+pdb     PDB                   all     true      none         false      keep     periodic  false    false       false
+xsd     Materials Studio XSD  one     true      atoms        false      keep     periodic  true     false       false
+======  ====================  ======  ========  ===========  =========  =======  ========  =======  ==========  ==========
 
 - ``label``: the format's name in the messages.
 - ``frames``: ``all`` frames of a trajectory, or ``one`` (the export check names the frame written).
 - ``cell``: the unit cell is stored (``true``), not stored (``false``), or ``required`` (a structure without one is
   boxed with 10 Å of vacuum on each side).
 - ``constraints``: selective dynamics along the cell vectors (``lattice``, exact), along x, y and z (``cartesian``:
-  ASE's ``move_mask``, partial constraints that do not follow x, y and z are tightened) or not at all (``none``).
+  ASE's ``move_mask``, partial constraints that do not follow x, y and z are tightened), whole atoms only
+  (``atoms``: an atom fixed along some directions is written as fixed) or not at all (``none``).
 - ``occupancy``: partial occupancies are kept.
 - ``order``: the atom order is kept, or the atoms are grouped by ``species`` (POSCAR).
 - ``pbc``: the file stores the periodicity (``stored``); reading it back gives T T T whenever there is a cell
@@ -58,7 +60,7 @@ CAPABILITY_VALUES: Mapping[str, tuple[Any, ...] | None] = MappingProxyType({
     "label": None,
     "frames": ("all", "one"),
     "cell": (True, False, "required"),
-    "constraints": ("lattice", "cartesian", "none"),
+    "constraints": ("lattice", "cartesian", "atoms", "none"),
     "occupancy": (True, False),
     "order": ("keep", "species"),
     "pbc": ("stored", "periodic", "none"),
@@ -87,6 +89,7 @@ WRITER_CAPABILITIES: Mapping[str, Mapping[str, Any]] = MappingProxyType({
     "poscar": _row("POSCAR", "one", "required", "lattice", False, "species", "periodic", True, True, True),
     "cif": _row("CIF", "one", "required", "none", True, "keep", "periodic", True, False, False),
     "pdb": _row("PDB", "all", True, "none", False, "keep", "periodic", False, False, False),
+    "xsd": _row("Materials Studio XSD", "one", True, "atoms", False, "keep", "periodic", True, False, False),
 })
 
 #: The overlap check of the export is skipped (with a note) for structures with more atoms than this.
@@ -114,7 +117,7 @@ def validate_capabilities(name: str, caps: Any) -> dict[str, Any]:
     Every key of :data:`CAPABILITY_VALUES` is required except those of :data:`OPTIONAL_CAPABILITIES`, which may be
     left out or ``None`` (and are then left out of the result), and no other key is allowed; booleans must be
     ``True`` or ``False`` (not 1 or 0).  Raises ``ValueError`` naming the writer and the key, for example
-    ``writer 'myfmt': capabilities.constraints must be one of lattice, cartesian, none``.
+    ``writer 'myfmt': capabilities.constraints must be one of lattice, cartesian, atoms, none``.
     """
     where = f"writer '{name}'"
     if not isinstance(caps, Mapping):

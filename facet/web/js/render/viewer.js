@@ -1583,7 +1583,14 @@ export class Viewer extends Emitter {
       lo = Math.min(lo, h - (radii ? radii[i] : 0));
     }
     // just under the lowest atom surface (and never closer than 0.8 Å below the lowest centre)
-    const level = Math.min(loCentre - 0.8, lo - 0.3);
+    let level = Math.min(loCentre - 0.8, lo - 0.3);
+    // a slab that floats in its cell: the floor goes under the drawn cell too, or it would hide the cell's lower edges
+    const cell = this.model.periodic && this.settings.display?.cell?.show !== false ? this.model.cell : null;
+    if (cell) {
+      const hs = cell.map((v) => v[0] * up.x + v[1] * up.y + v[2] * up.z);
+      const cellLo = Math.min(0, hs[0]) + Math.min(0, hs[1]) + Math.min(0, hs[2]);   // the lowest corner of the cell
+      level = Math.min(level, cellLo - 0.05);
+    }
     const c = this.bounds.center;
     const r = this.bounds.radius;
     this.floor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), up);

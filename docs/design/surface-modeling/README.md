@@ -57,3 +57,27 @@
 - `specs/*.md`：各模块规格
 - `acceptance.md`：端到端验收场景
 - `plan.md`：开发计划（任务、依赖、文件归属、批次）
+
+
+## 实现状态（0.4.0）
+
+第 1 波的切面链（M2）已按规格的主干实现并合入，Python 与 JS 两侧算法相同：
+
+- `facet/build/surface.py`、`facet/web/js/build/surface.js`：`surface_analysis` / `terminations`（原胞约化、最小表面网格、
+  原子层与起伏层合并、切口、指纹去重后的终止面、断键数、极性与 Tasker 类型、惯用胞指数）、`surface` / `buildSurface`
+  （层数/周期/厚度、对称 slab、必填的总真空与 V = 0、位置、面内超胞与 Wood 命名、固定底部或中间层、`info.surface`、
+  自动命名、警告）、`oriented_cell`，以及已有结构的工具 `set_vacuum`、`center_slab`、`flip_slab`、`slab_layers`、
+  `slab_extent`、`fix_layers`、`free_atoms`。
+- 金标：`tests/data/surface/cleave` 的 `terminations`、`surface`、`flipSlab` 共 120 个用例两种语言全部通过，skip 已去掉。
+- 界面：Surface 面板的 Cleave 与 Slab 分区（`ui/panels/cleave.js`、`ui/panels/slab.js`），命令 `surface.cleave`、
+  `surface.vacuum`、`surface.setVacuum`、`surface.center`、`surface.flip`、`sel.fix`、`sel.free`；CLI `facet build surface`、
+  `facet terminations`、`facet edit …`；REST `/build/surface`、`/build/vacuum`、`/analysis/terminations`。
+
+与规格的差别（尚未做的部分）：
+
+- 原胞步骤是 M2 自带的平移搜索（M1 的 `primitive_cell` 还没有）；没有 W2b 的放宽容差探测，超过 600 个原子的体相跳过约化。
+- `set_vacuum` 不重标晶轴、不正交化 c、不转到标准取向（真空沿哪根轴就改哪根轴的长度），没有 `add_vacuum`、`slab_report`、
+  `standardize_slab`、`surface_top`；`tools/set_vacuum.json` 与 `tools/standardize.json` 的金标用例仍然跳过。
+- 界面没有切口平面与 slab 的三维预览、层堆叠图、Conventional cell 指数切换、任意 2×2 超胞矩阵输入和厚度建议（H1/H2）；
+  这些参数在 API、命令与 CLI 里可用。`keep_molecules` 未实现。
+- 层与约束在 Slab 分区里只有“固定底部/顶部 N 层、全部放开”，完整的 Layers 分区属于 M3。

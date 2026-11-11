@@ -1,5 +1,6 @@
-/* Facet — instrument-console layout: slim chrome around a dominant viewport.
-   Left rail + drawer for data (projects, library, builder, structure); right inspector for appearance. */
+/* Facet — laid out as Materials Studio is: a menu bar and a toolbar strip at the top, the explorers
+   (left rail + drawer: projects, library, builder, structure, surface) and the appearance inspector around a
+   dominant viewport. Phones get a compact top bar instead of the menu bar and the strip. */
 :root {
   --bg: #e7eaee;
   --panel: #f8f9fb;
@@ -28,7 +29,8 @@
   --rail: 56px;
   --drawer: 312px;
   --inspector: 320px;
-  --top: 52px;
+  --top: 38px;      /* the menu bar (phones: the top bar, 52px) */
+  --strip: 40px;    /* the toolbar strip under it */
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -69,8 +71,8 @@ svg.i.sm { width: 15px; height: 15px; }
   height: 100%;
   display: grid;
   grid-template-columns: var(--rail) auto 1fr auto;
-  grid-template-rows: var(--top) 1fr;
-  grid-template-areas: "top top top top" "rail drawer stage inspector";
+  grid-template-rows: var(--top) var(--strip) 1fr;
+  grid-template-areas: "top top top top" "strip strip strip strip" "rail drawer stage inspector";
 }
 .topbar {
   grid-area: top; display: flex; align-items: center; gap: 10px;
@@ -105,6 +107,53 @@ svg.i.sm { width: 15px; height: 15px; }
 @keyframes pulse { 50% { opacity: 0.35; } }
 .top-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
 .top-actions .sep { width: 1px; height: 22px; background: var(--line); margin-inline: 4px; }
+
+/* menu bar: File, Edit, View, Modify, Build, Tools, Window, Help (ui/menubar.js) */
+.menubar { display: flex; align-items: center; gap: 1px; flex: none; }
+.menubar .mb {
+  height: 28px; padding: 0 9px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--fg); font-size: 13px; font-weight: 500;
+  white-space: nowrap; transition: background .12s;
+}
+.menubar .mb:hover { background: var(--panel-2); }
+.menubar .mb[aria-expanded="true"] { background: var(--panel-3); }
+.menubar .mb:focus-visible { outline-offset: -2px; }
+/* toolbar strip: Standard | 3D Viewer | display style and look | Build … image, full screen (ui/shell.js) */
+.toolstrip {
+  grid-area: strip; display: flex; align-items: center; gap: 2px; min-width: 0; z-index: 19;
+  padding-inline: max(10px, env(safe-area-inset-left, 0px)) max(10px, env(safe-area-inset-right, 0px));
+  background: var(--panel); border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none;
+}
+.toolstrip::-webkit-scrollbar { display: none; }
+.tgroup, .tslot { display: contents; }   /* a group is a row of buttons of the bar it is placed in */
+.toolstrip .btn { height: 30px; flex: none; }
+.toolstrip .btn.icon { width: 30px; border-color: transparent; background: transparent; }
+.toolstrip .btn.icon:hover { background: var(--panel-2); }
+.toolstrip .btn[aria-pressed="true"] { background: var(--accent-soft); border-color: transparent; color: var(--accent-strong); }
+.toolstrip .btn.off { opacity: .45; }
+.toolstrip .btn.export { height: 28px; padding: 0 11px; margin-inline: 4px 0; }
+.toolstrip .sep { width: 1px; height: 20px; background: var(--line); margin: 0 6px; flex: none; }
+.toolstrip .grow { flex: 1 1 8px; min-width: 8px; }
+.toolstrip .pick { gap: 6px; padding: 0 7px 0 8px; border-color: var(--line); background: var(--panel); font-weight: 500; }
+.toolstrip .pick:hover { background: var(--panel-2); border-color: var(--line-strong); }
+.toolstrip .pick .lbl { max-width: 132px; overflow: hidden; text-overflow: ellipsis; }
+.toolstrip .pick svg.i { width: 16px; height: 16px; color: var(--muted); }
+.toolstrip .pick .caret { width: 13px; height: 13px; }
+@media (min-width: 921px) {
+  .topbar { gap: 6px; }
+  .topbar .brand { font-size: 14px; gap: 7px; padding-right: 6px; }
+  .topbar .brand .logo { width: 22px; height: 22px; }
+  .topbar .btn { height: 28px; }
+  .topbar .btn.icon { width: 28px; }
+  .topbar .proj-title input { padding: 3px 8px; }
+  .topbar .proj-title { margin-left: 6px; }
+}
+@media (min-width: 921px) and (max-width: 1120px) {
+  .topbar .brand .ver { display: none; }
+  .toolstrip .pick .lbl { display: none; }   /* a narrow window: the two pickers keep their icons */
+  .toolstrip .sep { margin: 0 4px; }
+}
+/* narrower still: the pickers go (View › Display Style and Looks, and the Style tab, have the same choices) */
+@media (min-width: 921px) and (max-width: 1010px) { .toolstrip .pick, .toolstrip .build-sep { display: none; } }
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 32px; padding: 0 12px;
@@ -414,6 +463,16 @@ input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 3px; }
 .menu .mi small { color: var(--muted); margin-left: auto; font-size: 11.5px; }
 .menu .mh { padding: 8px 9px 4px; font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
 .menu .msep { height: 1px; background: var(--line); margin: 4px 2px; }
+/* submenus, check and radio marks, the icon column */
+.menu { max-width: calc(100vw - 16px); scrollbar-width: thin; }
+.menu .mi > span:not(.kbd) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; padding-right: 10px; }
+.menu .mi .mi-gap { width: 15px; flex: none; }
+.menu .mi > svg.mi-sub { margin-left: auto; margin-right: -3px; color: var(--muted); opacity: 1; }
+.menu .mi .k + svg.mi-sub, .menu .mi small + svg.mi-sub { margin-left: 4px; }
+.menu .mi[aria-expanded="true"] { background: var(--panel-2); }
+.menu .mi.back { color: var(--muted); font-weight: 600; }
+.menu.sub { z-index: 61; }
+.menu.from-bar { border-top-left-radius: 5px; }
 .scrim { position: fixed; inset: 0; background: var(--scrim); z-index: 70; display: grid; place-items: center; padding: 16px; animation: fade .14s ease-out; }
 @keyframes fade { from { opacity: 0; } }
 .dialog {
@@ -574,7 +633,7 @@ input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 3px; }
 
 /* full screen: the view alone (also used as a fallback where the Fullscreen API is blocked) */
 .app[data-fullscreen] { grid-template-columns: 1fr; grid-template-rows: 1fr; grid-template-areas: "stage"; }
-.app[data-fullscreen] > .topbar, .app[data-fullscreen] > .rail, .app[data-fullscreen] > .drawer, .app[data-fullscreen] > .inspector, .app[data-fullscreen] .reveal-insp { display: none !important; }
+.app[data-fullscreen] > .topbar, .app[data-fullscreen] > .toolstrip, .app[data-fullscreen] > .rail, .app[data-fullscreen] > .drawer, .app[data-fullscreen] > .inspector, .app[data-fullscreen] .reveal-insp { display: none !important; }
 :root:fullscreen, :root:fullscreen body { background: var(--bg); }
 
 /* ------------------------------------------------------------------ projects panel
@@ -840,6 +899,10 @@ input.field[aria-invalid="true"], select.field[aria-invalid="true"] { border-col
   .app:has(> .inspector[data-collapsed="false"]) .info-card { display: none; }
   .mobile-only { display: inline-flex !important; }
   .desktop-only { display: none !important; }
+  /* phones: no menu bar and no toolbar strip; the top bar is 52px again, its More menu holds the menus */
+  :root { --top: 52px; }
+  .menubar, .toolstrip { display: none !important; }
+  .top-actions .hist { order: -1; }   /* Undo and Redo first, as before */
   .brand .name, .brand .ver { display: none; }
   .proj-title { border-left: 0; padding-left: 0; margin-left: 0; min-width: 72px; }
   .proj-title input { padding: 5px 4px; }
@@ -896,9 +959,28 @@ input.field[aria-invalid="true"], select.field[aria-invalid="true"] { border-col
 /* --- end M1 --- */
 
 /* --- surface-modeling M2-cleave --- */
+.cleave-info b, .slab-info b { color: var(--fg-2); font-weight: 600; }
+.cleave-terms { display: grid; gap: 4px; }
+.cleave-term { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 4px 8px; border: 1px solid var(--line); border-radius: var(--r-sm, 6px); font-size: 12.5px; cursor: pointer; }
+.cleave-term:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.cleave-term input { flex: none; margin: 0; accent-color: var(--accent); }
+.cleave-term b { font-weight: 600; white-space: nowrap; }
+.cleave-term .meta { color: var(--muted); font: 500 11px var(--font-mono); margin-left: auto; white-space: nowrap; }
+.cleave-term .tag { flex: none; font-size: 11px; padding: 1px 6px; border-radius: 999px; background: var(--panel-2); color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
+.cleave-term .tag.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 50%, var(--line)); }
+.cleave-rep { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.cleave-rep > .inp { flex: 1; min-width: 0; }
+.cleave-summary { gap: 4px; }
+.cleave-summary > span, .cleave-summary > b { display: block; overflow-wrap: anywhere; }
+.cleave-summary .field-warn { color: var(--warn); }
+.cleave-adv > summary { cursor: pointer; font-size: 12.5px; color: var(--fg-2); }
+.cleave-vac-hint { margin-top: -6px; }
 /* --- end M2-cleave --- */
 
 /* --- surface-modeling M2-slab --- */
+.slab-fix { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 12.5px; color: var(--fg-2); }
+.slab-fix > .inp { flex: 0 0 64px; }
+.slab-fix > .seg { flex: 0 0 auto; width: auto; }
 /* --- end M2-slab --- */
 
 /* --- surface-modeling M3-markers --- */

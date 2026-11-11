@@ -1,12 +1,13 @@
 # 保存为 Materials Studio XSD：设计
 
-状态：设计稿，待审核；尚未实现。`samples/` 里的四个文件由按本设计写的原型生成，用来在 Materials Studio 里验证。
+状态：已实现（写出按本设计；读入是后来按用户要求加的，见第 11 节）。`samples/` 里的四个文件由按本设计写的原型生成，
+正式实现逐字节重现了它们；这四个文件仍需在 Materials Studio 里打开验证（第 9 节），实现时没有这个软件。
 
 ## 1. 目标与范围
 
 把当前结构保存为 Materials Studio 的三维原子文档（`.xsd`），在 Materials Studio 里直接打开，继续做 CASTEP、DMol3 等计算的建模。
 
-本版只做**写出**。读入 `.xsd` 列为后续（第 10 节）。
+本设计原先只做**写出**，读入 `.xsd` 列为后续（第 10 节）；读入后来也做了，范围与依据见第 11 节。
 
 ## 2. 用户看到什么
 
@@ -212,9 +213,79 @@ Export 菜单、命令面板里的导出命令、命令行、REST 和客户端�
 
 后续可做，不在本版：
 
-- **读入 `.xsd`**（P1 结构、固定原子）。Materials Studio 用户可以直接打开自己的模型，也能做往返测试。
+- **读入 `.xsd`**（P1 结构、固定原子）。Materials Studio 用户可以直接打开自己的模型，也能做往返测试。**已做，见第 11 节。**
 - **写键**：等两种语言共用的化学键图合并后，先给分子写键。
 - **单方向约束、初始自旋、电荷**：需要 Materials Studio 写出的真实文件作样例。
+
+## 11. 实现记录
+
+### 11.1 写出
+
+按第 3–6 节实现：`facet/io/xsd.py` 的 `write_xsd` 与 `facet/web/js/io/xsd.js` 的 `writeXSD`，两种语言逐字节相同
+（`tests/data/xsd/` 下 20 个黄金文件，含 `samples/` 的四个）。与设计正文的出入只有三处：
+
+- **第四条消息。** 第 5.4 节要求对不是化学元素的符号给警告，第 6 节的消息表里没有列。实现加了一条警告：
+  `2 atom(s) have a symbol that is not a chemical element (X); Materials Studio may not recognise them`。
+- **原子名。** 有标签就用标签，同一个位点展开出的原子因此同名（CIF 的 `O1` 出现三次），与 Materials Studio 导入 CIF
+  后的情形一样。`samples/` 里的 NaCl、SrTiO3 是用不带标签的结构生成的，所以是 `Na1`…`Na4`。空标签退回按元素编号。
+- **名字里的空白与控制字符。** 名字首尾的空白去掉；制表符与换行写成 `&#9;`、`&#10;`、`&#13;`，XML 不允许的字符写成
+  `&#65533;`。分子没有名字时写 `Untitled`。
+
+写不出来的情况会报错而不是写出坏文件：晶胞体积为零；坐标不是有限数或不小于 1e21。
+
+### 11.2 读入
+
+`read_xsd` / `readXSD`，注册为 `.xsd` 的读入器，按内容也能识别（`<XSD` 或 `<!DOCTYPE XSD`）。读入的内容：
+
+| 文件里的内容 | 读成什么 |
+|---|---|
+| 带晶格的文档（`SpaceGroup` 上有 `AVector`、`BVector`、`CVector`） | 三维周期结构，`XYZ` 是分数坐标，不做包裹 |
+| 其他文档 | 分子，`XYZ` 是笛卡尔坐标（Å） |
+| `Atom3d`，无论嵌在哪一层（`Molecule`、`RepeatUnit`、直接在根下） | 原子，按文件里的顺序；没有 `XYZ` 的在原点 |
+| 带 `ImageOf` 的 `Atom3d`、`Bond`、其他对象 | 跳过 |
+| `Name` | `props.labels`（没有名字的原子用元素符号；全都没有名字就不建这一列） |
+| `RestrictedProperties` 含 `XYZ` 或 `FractionalXYZ` | `props.selective_dynamics` 的 `F F F` |
+| 约束对象不是 `CompleteRestriction`，或只限制了别的属性 | 不固定，并给一条说明 |
+| `Components` 不只是一个元素符号 | 取其中第一个元素（D、T 读成 H），并给一条说明 |
+| 非 P1 的空间群 | 按文件里的对称操作展开（见下） |
+| 二维周期文档（只有 `AVector`、`BVector`） | 报错，不读 |
+
+XML 用自带的小扫描器读（两种语言同一套写法）：只认标签与属性；`DOCTYPE` 整段跳过，其中声明的实体从不展开
+（只认五个预定义实体与数字字符引用）；对不规范的文件尽量宽容（多余的结束标签、没有关闭的元素、重复的属性）。
+
+### 11.3 对照真实文件得到的结论
+
+实现时找到三份 Materials Studio 自己写的文件（gchemol-readwrite 的测试数据：格式版本 4.4 的聚合物重复单元、
+8.0 的三维周期结构、17.1 的分子），两种语言都能读，结果逐位相同。它们没有放进仓库；`tests/data/xsd/read/`
+里是照它们的写法手写的小文件。由此可以确定的事：
+
+- **D1 固定原子（部分确认）。** 8.0 的文件里，固定原子写作 `RestrictedBy="132,132"
+  RestrictedProperties="XYZ,FractionalXYZ"`，另有一个 `<CompleteRestriction ID="132" RestrictsObjects="…"
+  RestrictsProperties="…"/>` 对象。也就是说 `FractionalXYZ` 与 `XYZ` 这两个取值是真的，但 Materials Studio 自己还会写
+  `RestrictedBy` 和约束对象；我们只写 `RestrictedProperties`。Materials Studio 是否认只有属性、没有约束对象的写法，
+  仍要靠第 9 节的验证；如果不认，写出器要补上 `CompleteRestriction` 对象。
+- **D2 晶胞取向（确认）。** 该文件的 `OrientationBase="C along Z, B in YZ plane"`，矢量是
+  `AVector="14.918…,-0.903…,0" BVector="0,12.6365,0" CVector="0,0,20.633"`，与第 5.1 节的取向一致。
+- **`SpaceGroup` 的 `Name="P1"`。** 真实文件里有这个属性（第 4 节说 ASE 写的文件没有）。
+- **镜像原子。** 在 `IdentityMapping` 的兄弟元素 `ImageMapping` 里，带 `ImageOf`，没有 `XYZ`；`ImageMapping` 的
+  `Element` 是 12 个数：旋转的三行，每行第四个数是平移（`1,0,0,-1,0,1,0,0,0,0,1,0` 是沿 a 平移 −1）。
+- **分子文档。** 原子可以直接在 `AtomisticTreeRoot` 下（没有 `Molecule`），也可以在 `Molecule/RepeatUnit` 里；
+  `Name` 可以没有；`Atom3d` 可以有子元素；ID 列表可以是压缩写法 `ci(756):127+4,629+132`（读入时用不到）。
+- 文件用 CRLF 换行，声明 `encoding="latin1"`。
+
+没能确认的事：
+
+- **带对称性的文档。** 没有找到空间群不是 P1 的真实文件。读入器的做法是：`Operators` 每 12 个数一个操作（与上面
+  `Element` 的排法相同，x′ = R·x + t），加上按 `Centering` 的名字推出的心平移，再加上 `ImageMapping` 里的镜像原子，
+  包裹进晶胞后按 1e-3（分数坐标）去重。多个操作之间用什么分隔、`Operators` 里是否已含心平移、`Centering` 的各个取值
+  怎么拼写，都是推测；所以展开后一定带一条说明，请用户核对。稳妥的做法是在 Materials Studio 里先
+  Build › Symmetry › Make P1 再保存。
+- **部分约束。** 没有真实样例；读入时这类原子不固定并给说明，写出时仍按第 5.3 节收紧为完全固定。
+
+### 11.4 网页界面里还缺的几处文字
+
+格式注册表之外的几处界面文字（打开文件的提示、拖放提示）列的是固定的格式名，还没有提到 XSD；功能不受影响
+（文件选择框本来就允许任何扩展名）。
 
 ## 参考
 

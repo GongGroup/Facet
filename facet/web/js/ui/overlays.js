@@ -1,4 +1,4 @@
-/** Toasts, tooltips, context menus, dialogs and in-page confirmation (no native alert/confirm). */
+/** Toasts, tooltips, menus with submenus, dialogs and in-page confirmation (no native alert/confirm). */
 import { h, ic } from './dom.js';
 
 /**
@@ -87,69 +87,231 @@ export function installTooltips(root = document.body) {
 }
 
 // ------------------------------------------------------------------ menus
-let openMenu = null, lastClosed = { anchor: null, t: 0 };
-export function closeMenu() { openMenu?.remove(); openMenu = null; }
-/** The open menu element, if any. */
-export const menuOpen = () => openMenu;
+/** The open menus: the root menu first, then each open submenu (one root menu is open at a time). */
+let chain = [];
+/** {anchor, restore(), opts: {onClose, onNav}, detach()} of the root menu. */
+let rootState = null;
+let lastClosed = { anchor: null, t: 0 };
+
+/** Close the open menu with all its submenus. */
+export function closeMenu() {
+  if (!chain.length) return;
+  const st = rootState, closing = chain;
+  chain = []; rootState = null;
+  for (const m of closing) { clearTimeout(m._timer); m.remove(); }
+  st?.detach?.();
+  try { st?.opts?.onClose?.(); } catch (e) { console.error(e); }
+}
+/** The open (root) menu element, if any. */
+export const menuOpen = () => chain[0] ?? null;
+/** True when `node` is inside the open menu or one of its submenus. */
+export const menuContains = (node) => !!node && chain.some((m) => m.contains(node));
+
 /**
- * items: [{label, icon, kbd, hint, tip, run, header, separator, disabled, checked}]
- * anchor: an element, a DOMRect-like {left, top, right, bottom} or a point {x, y} (context menus).
+ * A list of menu items ready to show (no DOM: tested in node): a function is called for its list, empty entries
+ * are dropped, as are separators at the start, at the end and after another separator, a header that no item
+ * follows, and a submenu whose list is empty (`items: []`; a function is only called when the submenu opens).
  */
-export function showMenu(anchor, items, { align = 'start', label } = {}) {
+export function cleanItems(items) {
+  const list = (typeof items === 'function' ? items() : items) ?? [];
+  const out = [];
+  for (const it of list) {
+    if (!it) continue;
+    if (Array.isArray(it.items)) {
+      const sub = cleanItems(it.items);
+      if (sub.length) out.push({ ...it, items: sub });
+      continue;
+    }
+    if (it.separator) { if (!out.length || out.at(-1).separator) continue; if (out.at(-1).header) out.pop(); if (!out.length) continue; }
+    else if (it.header && out.at(-1)?.header) out.pop();
+    out.push(it);
+  }
+  while (out.length && (out.at(-1).separator || out.at(-1).header)) out.pop();
+  return out;
+}
+
+/** Phones: a submenu takes the place of its parent menu (with a way back) instead of opening beside it. */
+const drillDown = () => (globalThis.innerWidth ?? 1280) <= 560;
+const enabledItems = (m) => [...m.querySelectorAll('.mi:not([aria-disabled="true"])')];
+function focusFirst(m) {
+  const all = enabledItems(m);
+  (all.find((b) => !b._item?.back) ?? all[0] ?? m.querySelector('.mi'))?.focus?.({ preventScroll: true });
+}
+/** Close the submenus from `level` on (the root menu, level 0, stays). */
+function closeFrom(level) {
+  while (chain.length > Math.max(1, level)) {
+    const m = chain.pop();
+    clearTimeout(m._timer);
+    m._parentItem?.setAttribute('aria-expanded', 'false');
+    if (m._drill && chain.at(-1)) chain.at(-1).hidden = false;
+    m.remove();
+  }
+}
+/** Close submenu `m` and put the focus back on the item that opened it. */
+function backFrom(m) {
+  const p = m._parentItem;
+  closeFrom(m._level);
+  p?.focus?.({ preventScroll: true });
+}
+
+function renderMenu(items, { label, level }) {
+  const list = cleanItems(items);
+  const m = h(`div.menu${level ? '.sub' : ''}`, { role: 'menu', 'aria-label': label ?? null });
+  m._level = level;
+  // one column for icons and check marks when any item has one, so the labels line up
+  const gutter = list.some((it) => !it.separator && !it.header && (it.icon || it.checked != null));
+  if (!list.some((it) => !it.separator && !it.header && !it.back)) list.push({ label: 'Nothing here yet', disabled: true });
+  for (const it of list) {
+    if (it.separator) { m.append(h('div.msep', { role: 'separator' })); continue; }
+    if (it.header) { m.append(h('div.mh', { role: 'presentation' }, it.header)); continue; }
+    const sub = it.items != null;
+    const role = it.checked == null ? 'menuitem' : it.radio ? 'menuitemradio' : 'menuitemcheckbox';
+    const b = h(`button.mi${it.back ? '.back' : ''}`, {
+      type: 'button', role, 'aria-checked': it.checked != null ? String(!!it.checked) : null, 'aria-disabled': it.disabled ? 'true' : null,
+      'aria-haspopup': sub ? 'menu' : null, 'aria-expanded': sub ? 'false' : null, 'data-tip': it.tip ?? null,
+    });
+    b._item = it;
+    if (it.icon) b.append(ic(it.icon, 'sm'));
+    else if (it.checked != null) b.append(ic(it.radio ? 'dot' : 'check', 'sm'));
+    else if (gutter) b.append(h('i.mi-gap', { 'aria-hidden': 'true' }));
+    b.append(h('span', it.label));
+    if (it.kbd) b.append(h('span.kbd.k', it.kbd)); else if (it.hint) b.append(h('small', it.hint));
+    if (sub) b.append(ic('chevronRight', 'sm mi-sub'));
+    b.addEventListener('click', () => {
+      if (it.disabled) return;
+      if (it.back) { backFrom(m); return; }
+      if (sub) { openSub(m, b, it, { focus: true }); return; }
+      const restore = rootState?.restore;
+      closeMenu(); restore?.(true); it.run?.();
+    });
+    // the mouse opens a submenu by resting on its item, and closes it by resting on another item
+    b.addEventListener('pointerenter', (e) => { if (e.pointerType !== 'touch') hoverItem(m, b, sub && !it.disabled ? it : null); });
+    m.append(b);
+  }
+  m.addEventListener('keydown', (e) => menuKey(m, e));
+  return m;
+}
+
+function hoverItem(m, b, it) {
+  clearTimeout(m._timer);
+  const open = chain[m._level + 1];
+  if (it) { if (open?._parentItem !== b) m._timer = setTimeout(() => { if (b.isConnected && chain[m._level] === m) openSub(m, b, it); }, 130); }
+  else if (open && !open._drill) m._timer = setTimeout(() => { if (chain[m._level] === m) closeFrom(m._level + 1); }, 240);
+}
+
+/** Open the submenu of item `b` of menu `m`: beside it (on the other side when there is no room), or in its place on phones. */
+function openSub(m, b, it, { focus = false } = {}) {
+  clearTimeout(m._timer);
+  const cur = chain[m._level + 1];
+  if (cur?._parentItem === b) { if (focus) focusFirst(cur); return cur; }
+  closeFrom(m._level + 1);
+  const drill = drillDown();
+  const items = cleanItems(it.items);
+  const sub = renderMenu(drill ? [{ label: it.label, icon: 'chevronLeft', back: true }, { separator: true }, ...items] : items, { label: it.label, level: m._level + 1 });
+  sub._parentItem = b; sub._drill = drill;
+  attach(sub);
+  const W = globalThis.innerWidth ?? 1280, H = globalThis.innerHeight ?? 800;
+  const sr = sub.getBoundingClientRect();
+  let x, y;
+  if (drill) {
+    const mr = m.getBoundingClientRect();
+    x = mr.left; y = mr.top;
+    m.hidden = true;
+  } else {
+    const r = b.getBoundingClientRect();
+    x = r.right - 3; y = r.top - 6;
+    if (x + sr.width > W - 8) x = r.left - sr.width + 3;   // no room on that side: open on the other one
+  }
+  x = Math.max(8, Math.min(W - sr.width - 8, x));
+  y = Math.max(8, Math.min(H - sr.height - 8, y));
+  sub.style.left = `${x}px`; sub.style.top = `${y}px`;
+  b.setAttribute('aria-expanded', 'true');
+  chain.push(sub);
+  sub.addEventListener('pointerenter', () => clearTimeout(m._timer));
+  if (focus || drill) focusFirst(sub);
+  return sub;
+}
+
+function menuKey(m, e) {
+  const all = enabledItems(m);
+  const cur = document.activeElement;
+  const i = all.indexOf(cur);
+  const k = e.key;
+  let handled = true;
+  if (k === 'ArrowDown') all[(i + 1) % all.length]?.focus();
+  else if (k === 'ArrowUp') all[i < 0 ? all.length - 1 : (i - 1 + all.length) % all.length]?.focus();
+  else if (k === 'Home') all[0]?.focus();
+  else if (k === 'End') all.at(-1)?.focus();
+  else if (k === 'ArrowRight') {
+    const it = i >= 0 ? cur._item : null;
+    if (it?.items != null) openSub(m, cur, it, { focus: true });
+    else if (rootState?.opts?.onNav) rootState.opts.onNav(1);   // a menu of the menu bar: on to the next menu
+    else handled = false;
+  } else if (k === 'ArrowLeft') {
+    if (m._level > 0) backFrom(m);
+    else if (rootState?.opts?.onNav) rootState.opts.onNav(-1);
+    else handled = false;
+  } else if (k === 'Escape') {
+    if (m._level > 0) backFrom(m);   // Esc leaves a submenu first
+    else { const restore = rootState?.restore; closeMenu(); restore?.(); }
+  } else if (k === 'Tab') { const restore = rootState?.restore; closeMenu(); restore?.(); handled = false; }   // Tab continues from the menu button
+  else if (k === 'Enter' || k === ' ') handled = false;   // the focused item's own click
+  else if (k.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    // type-ahead: jump to the next item starting with the letter
+    const c = k.toLowerCase();
+    const next = [...all.slice(i + 1), ...all.slice(0, i + 1)].find((b) => String(b._item?.label ?? b.textContent ?? '').trim().toLowerCase().startsWith(c));
+    next?.focus();
+  } else handled = false;
+  if (handled) { e.preventDefault(); e.stopPropagation(); } else if (k === 'Enter' || k === ' ') e.stopPropagation();
+}
+
+/**
+ * Show a menu.
+ * items: [{label, icon, kbd, hint, tip, run, header, separator, disabled, checked, radio, items}] (or a function
+ *   that returns them). `checked` (true/false) makes a check item, with `radio` one of a group. `items` (a list, or
+ *   a function called when it opens) makes the item a submenu: it opens beside the item when the pointer rests on
+ *   it, on a click, Enter or →, and closes with ← or Esc; on phones it takes the menu's place, with a way back.
+ * anchor: an element, a DOMRect-like {left, top, right, bottom} or a point {x, y} (context menus).
+ * Options: align 'start' | 'end'; label (the accessible name); gap (px below the anchor); below: true keeps the
+ *   menu under its anchor (it scrolls rather than move above it); className; onClose() when the menu closes for any
+ *   reason; onNav(±1) for ← and → on the root menu (the menu bar moves to the neighbouring menu); returnFocus() →
+ *   the element that takes the focus once an item has run (default: the anchor, which also gets it back on Esc).
+ */
+export function showMenu(anchor, items, { align = 'start', label, gap = null, below = false, className = null, onClose = null, onNav = null, returnFocus = null } = {}) {
   closeMenu();
   // a second click on the button that opened the menu closes it
   if (anchor instanceof Element && lastClosed.anchor === anchor && performance.now() - lastClosed.t < 400) { lastClosed.anchor = null; return null; }
   const back = anchor instanceof Element ? anchor : document.activeElement;
-  const m = h('div.menu', { role: 'menu', 'aria-label': label ?? null });
-  for (const it of items) {
-    if (!it) continue;
-    if (it.separator) { m.append(h('div.msep', { role: 'separator' })); continue; }
-    if (it.header) { m.append(h('div.mh', { role: 'presentation' }, it.header)); continue; }
-    const b = h('button.mi', { type: 'button', role: it.checked != null ? 'menuitemcheckbox' : 'menuitem', 'aria-checked': it.checked != null ? String(!!it.checked) : null, 'aria-disabled': it.disabled ? 'true' : null, 'data-tip': it.tip ?? null });
-    if (it.icon) b.append(ic(it.icon, 'sm'));
-    b.append(h('span', it.label));
-    if (it.kbd) b.append(h('span.kbd.k', it.kbd)); else if (it.hint) b.append(h('small', it.hint));
-    b.addEventListener('click', () => { if (it.disabled) return; closeMenu(); restore(); it.run?.(); });
-    m.append(b);
-  }
+  const m = renderMenu(items, { label, level: 0 });
+  if (className) m.classList.add(...String(className).split(/\s+/).filter(Boolean));
   attach(m);
+  const W = globalThis.innerWidth ?? 1280, H = globalThis.innerHeight ?? 800;
   const r = anchor instanceof Element ? anchor.getBoundingClientRect()
     : anchor && 'x' in anchor && !('left' in anchor) ? { left: anchor.x, right: anchor.x, top: anchor.y, bottom: anchor.y } : anchor;
   const mr = m.getBoundingClientRect();
-  let x = align === 'end' ? r.right - mr.width : r.left, y = r.bottom + (anchor instanceof Element ? 6 : 2);
-  if (y + mr.height > innerHeight - 8) y = Math.max(8, r.top - mr.height - 6);
-  x = Math.max(8, Math.min(innerWidth - mr.width - 8, x));
+  let x = align === 'end' ? r.right - mr.width : r.left, y = r.bottom + (gap ?? (anchor instanceof Element ? 6 : 2));
+  if (below) m.style.maxHeight = `${Math.max(140, H - y - 8)}px`;
+  else if (y + mr.height > H - 8) y = Math.max(8, r.top - mr.height - 6);
+  x = Math.max(8, Math.min(W - mr.width - 8, x));
   m.style.left = `${x}px`; m.style.top = `${y}px`;
-  openMenu = m;
-  const enabled = () => [...m.querySelectorAll('.mi:not([aria-disabled="true"])')];
-  (enabled()[0] ?? m.querySelector('.mi'))?.focus();
-  function restore() { if (back?.isConnected && back !== document.body) back.focus?.({ preventScroll: true }); }
-  m.addEventListener('keydown', (e) => {
-    const all = enabled();
-    const i = all.indexOf(document.activeElement);
-    let handled = true;
-    if (e.key === 'ArrowDown') all[(i + 1) % all.length]?.focus();
-    else if (e.key === 'ArrowUp') all[(i - 1 + all.length) % all.length]?.focus();
-    else if (e.key === 'Home') all[0]?.focus();
-    else if (e.key === 'End') all.at(-1)?.focus();
-    else if (e.key === 'Escape') { closeMenu(); restore(); }
-    else if (e.key === 'Tab') { closeMenu(); restore(); handled = false; }   // Tab continues from the menu button
-    else if (e.key === 'Enter' || e.key === ' ') handled = false;   // the focused item's own click
-    else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      // type-ahead: jump to the next item starting with the letter
-      const k = e.key.toLowerCase();
-      const next = [...all.slice(i + 1), ...all.slice(0, i + 1)].find((b) => b.textContent.trim().toLowerCase().startsWith(k));
-      next?.focus();
-    } else handled = false;
-    if (handled) { e.preventDefault(); e.stopPropagation(); } else if (e.key === 'Enter' || e.key === ' ') e.stopPropagation();
-  });
-  setTimeout(() => document.addEventListener('pointerdown', function off(e) {
-    if (m.contains(e.target)) return;
-    document.removeEventListener('pointerdown', off, true);
-    if (openMenu !== m) return;
+  chain = [m];
+  const off = (e) => {
+    if (chain[0] !== m || menuContains(e.target)) return;
     if (anchor instanceof Element && anchor.contains(e.target)) lastClosed = { anchor, t: performance.now() };
     closeMenu();
-  }, true), 0);
+  };
+  let listening = false;
+  const timer = setTimeout(() => { if (chain[0] === m) { document.addEventListener('pointerdown', off, true); listening = true; } }, 0);
+  rootState = {
+    anchor, opts: { onClose, onNav },
+    /** Put the focus back: on the anchor, or, after an item has run (`ran`), where returnFocus says. */
+    restore(ran = false) {
+      const to = ran && typeof returnFocus === 'function' ? returnFocus() : back;
+      if (to?.isConnected && to !== document.body) to.focus?.({ preventScroll: true });
+    },
+    detach() { clearTimeout(timer); if (listening) document.removeEventListener('pointerdown', off, true); },
+  };
+  focusFirst(m);
   return m;
 }
 
@@ -186,7 +348,7 @@ export function openModal(box, { onClose, closeOnScrim = true } = {}) {
     },
   };
   const onKey = (e) => {
-    if (stack.at(-1) !== me || openMenu?.contains(document.activeElement)) return;
+    if (stack.at(-1) !== me || menuContains(document.activeElement)) return;
     if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); e.stopPropagation(); me.close(null); return; }
     if (e.key !== 'Tab') return;
     const f = focusables(box);

@@ -19,6 +19,23 @@ from .molecules import MOLECULES, molecule, molecule_names
 # --- end M1 ---
 
 # --- surface-modeling M2 ---
+from .surface import (
+    SurfaceAnalysis,
+    center_slab,
+    estimate_oxidation_states,
+    fix_layers,
+    flip_slab,
+    free_atoms,
+    oriented_cell,
+    parse_surface_supercell,
+    set_vacuum,
+    slab_extent,
+    slab_layers,
+    surface,
+    surface_analysis,
+    surface_mesh_label,
+    terminations,
+)
 # --- end M2 ---
 
 # --- surface-modeling M5-T1 ---
@@ -52,6 +69,21 @@ __all__ = [
     # --- end M1 ---
 
     # --- surface-modeling M2 ---
+    "SurfaceAnalysis",
+    "surface",
+    "surface_analysis",
+    "terminations",
+    "oriented_cell",
+    "set_vacuum",
+    "center_slab",
+    "flip_slab",
+    "slab_extent",
+    "slab_layers",
+    "fix_layers",
+    "free_atoms",
+    "parse_surface_supercell",
+    "surface_mesh_label",
+    "estimate_oxidation_states",
     # --- end M2 ---
 
     # --- surface-modeling M5-T1 ---

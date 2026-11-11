@@ -250,7 +250,12 @@ def new_project(
     scene: dict[str, Any] | None = None,
     **extra: Any,
 ) -> dict[str, Any]:
-    """Create a new, normalised project document with id and timestamps."""
+    """Create a new, normalised project document with id and timestamps.
+
+    *scene* holds the web app's drawing settings (``docs/SCHEMA.md``).  Without one the project opens in the
+    app's default look (Poster); settings given without ``"look"`` (``{"style": {"rep": "spacefill"}}``) are
+    applied on top of that look.
+    """
     doc = {"name": name, "structures": list(structures or []), "scene": scene or {}, **extra}
     out = normalize_project(doc)
     out.setdefault("id", new_project_id())

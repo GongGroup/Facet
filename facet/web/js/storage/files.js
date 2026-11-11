@@ -56,7 +56,14 @@ export function pickFiles({ accept = '', multiple = false } = {}) {
   });
 }
 
-export const readText = (file) => (file.text ? file.text() : new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsText(file); }));
+/** Bytes as text: UTF-8 (a byte-order mark is dropped), else Latin-1, as Python's reader decodes them (Materials Studio writes Latin-1). */
+export function decodeText(bytes) {
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
+  catch { return new TextDecoder('latin1').decode(bytes); }
+}
+/** The text of a File or Blob (decodeText); a file object without arrayBuffer() is read as the browser reads text. */
+export const readText = (file) => (file.arrayBuffer ? file.arrayBuffer().then(decodeText)
+  : file.text ? file.text() : new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsText(file); }));
 
 /** File-name-safe version of a name (shared with structure-file exports). */
 export { slug } from '../core/util.js';

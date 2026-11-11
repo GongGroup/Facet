@@ -41,7 +41,7 @@ import { makeZip } from './core/zip.js';
 import { HistoryStore, historyBudget, snapStructure, snapPositions, structureFromSnap, applyPositionsSnap, patchPositions, mergePositions, BUDGET_NOTICE, INCONSISTENT, HistoryError } from './core/history.js';
 import { cleanMeasurementList, remapMeasurementList, migrateMeasurementKeys, newMeasurementId, wholeCellShifts, measurementsRemovedNote } from './core/measure.js';
 
-export const VERSION = '0.3.2';
+export const VERSION = '0.4.0';
 const PREF_KEY = 'atomscope.prefs';   // key from the app's former name, kept so saved preferences survive the rename
 const RECOVERY_KEY = 'recovery';
 const RETRY_DELAYS = [5000, 15000, 60000];
@@ -274,16 +274,33 @@ export class App extends Emitter {
 
   // ------------------------------------------------------------------ project model
   _isDarkUI() {
-    const t = document.documentElement.dataset.theme;
+    const t = globalThis.document?.documentElement?.dataset?.theme;
     return t ? t === 'dark' : !!globalThis.matchMedia?.('(prefers-color-scheme: dark)').matches;
   }
 
-  _blankProject(name = 'Untitled project') {
-    // a new project starts from the default look, or from Midnight in a dark interface
+  /**
+   * The scene a new project starts with: the default look (render/settings.js DEFAULT_LOOK, Poster) applied to the
+   * default settings. In a dark interface a look with a light background takes its own background for dark
+   * surroundings (backgroundDark, cellDark), as fresh samples do (_adaptBackground).
+   */
+  _defaultScene() {
     const scene = makeScene();
-    const look = looks.get(this._isDarkUI() ? 'midnight' : scene.look);
-    if (look) { deepMerge(scene, deepClone(look.scene)); scene.look = look.id; }
+    const look = looks.get(scene.look);
+    if (look) {
+      deepMerge(scene, deepClone(look.scene));
+      scene.look = look.id;
+      if (this._isDarkUI() && look.backgroundDark && isLightBackground(look.scene?.display?.background)) {
+        scene.display.background = deepClone(look.backgroundDark);
+        if (look.cellDark && scene.display.cell) scene.display.cell.color = look.cellDark;
+      }
+    }
     scene.lookBase = scene.look;
+    return scene;
+  }
+
+  _blankProject(name = 'Untitled project') {
+    // a new project starts from the default look
+    const scene = this._defaultScene();
     return { id: uid('p'), name, description: '', tags: [], created: new Date().toISOString(), updated: null, structures: [], activeStructure: null, scene, location: null, thumbnail: null };
   }
 
@@ -332,7 +349,17 @@ export class App extends Emitter {
   /** Replace the open project with a document. Throws (leaving the current project open) if it cannot be shown. */
   loadProjectJSON(doc, location = null) {
     if (!doc || !Array.isArray(doc.structures)) throw new Error('This file is not a Facet project.');
-    const scene = makeScene(doc.scene);
+    // A project saved by the app names its look (`scene.look`, null once customised) and opens exactly as saved.
+    // One without (made with the Python API or the server, where the scene is {} or a few settings) starts from
+    // the default look, with its own settings on top.
+    const saved = !!doc.scene && typeof doc.scene === 'object' && Object.keys(doc.scene).length > 0;
+    const named = saved && 'look' in doc.scene;
+    let scene;
+    if (named) scene = makeScene(doc.scene);
+    else {
+      scene = this._defaultScene();
+      if (saved) { deepMerge(scene, deepClone(doc.scene)); if (leafPaths(doc.scene).some(touchesLook)) scene.look = null; }
+    }
     // measurements saved as {type, keys} (before 0.4) become {type, refs} against the structure and the project's wrapping
     const entryOf = (s) => {
       const structure = Structure.fromJSON(s.structure);
@@ -344,8 +371,8 @@ export class App extends Emitter {
       activeStructure: doc.activeStructure, scene, location, thumbnail: doc.thumbnail ?? null,
     };
     if (doc.importedFrom) p.importedFrom = doc.importedFrom;
-    // projects saved before lookBase existed: the look they show, not the default's ('studio')
-    if (doc.scene && !('lookBase' in doc.scene)) p.scene.lookBase = doc.scene.look ?? null;
+    // projects saved before lookBase existed: the look they show, not the default's
+    if (named && !('lookBase' in doc.scene)) p.scene.lookBase = doc.scene.look ?? null;
     if (!p.structures.find((s) => s.id === p.activeStructure)) p.activeStructure = p.structures[0]?.id ?? null;
     const prev = { project: this.project, history: this.history.detach(), dirty: this.dirty, state: this.saveState, camera: this.structure ? this.viewer.getCameraState() : null, selection: this.selection };
     this._switchProject(p);
@@ -1469,8 +1496,10 @@ export class App extends Emitter {
         structure = toStructure(structure);
         if (!structure.name || structure.name === 'Untitled') structure.name = f.name;
         this.addStructure(structure, { name: f.name.replace(/\.[^.]+$/, '') });
-        const w = structure.info?.warning;
-        toast(`Loaded ${f.name} — ${structure.length} atoms${structure.nFrames > 1 ? `, ${structure.nFrames} frames` : ''}${w ? ` (${w})` : ''}`);
+        // what the reader noted (info.warnings; older readers: info.warning) follows the count, each as a sentence
+        const notes = [...getWarnings(structure.info), ...(typeof structure.info?.warning === 'string' ? [structure.info.warning] : [])];
+        toast(editToastText(`Loaded ${f.name} — ${structure.length} atoms${structure.nFrames > 1 ? `, ${structure.nFrames} frames` : ''}`, notes),
+          notes.length ? { timeout: 9000 } : {});
       } catch (err) {
         if (err.project) {
           busy.end();
@@ -1966,7 +1995,9 @@ export class App extends Emitter {
       const { filename, mime } = out;
       const direct = !isArtifact() || /\.(txt|json|csv|md)$/.test(filename);
       const ok = direct ? await saveFile(filename, text, mime) : await saveFile(`${filename}.zip`, await makeZip([{ name: filename, data: text }]), 'application/zip');
-      if (ok) toast(direct ? `Saved ${filename}` : `Saved ${filename} inside a .zip`);
+      // the export check: what the file loses (warnings) and what changes without affecting a calculation (notes)
+      const said = [...(out.warnings ?? []), ...(out.notes ?? [])];
+      if (ok) toast(editToastText(direct ? `Saved ${filename}` : `Saved ${filename} inside a .zip`, said), said.length ? { timeout: 12000 } : {});
       return ok;
     } finally { busy.end(); }
   }

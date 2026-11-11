@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="latin1"?>
+<!DOCTYPE XSD []>
+<!-- Hand-written test fixture for the symmetry expansion of the reader. ASSUMED layout: no document with a space
+     group other than P1 written by Materials Studio was available. Rock salt: two listed atoms, the operators
+     identity and inversion (twelve numbers each), face centring, and one image atom under an ImageMapping. -->
+<XSD Version="8.0" WrittenBy="hand">
+	<AtomisticTreeRoot ID="1" NumProperties="0" NumChildren="1">
+		<SymmetrySystem ID="2" Mapping="3" Children="4,5,6" Normalized="1" Name="NaCl" OverspecificationTolerance="0.05" PeriodicDisplayType="Original">
+			<MappingSet ID="7" SymmetryDefinition="6" ActiveSystem="2" NumFamilies="1" OwnsTotalConstraintMapping="1" TotalConstraintMapping="3">
+				<MappingFamily ID="8" NumImageMappings="1">
+					<IdentityMapping ID="9" Element="1,0,0,0,0,1,0,0,0,0,1,0" Constraint="1,0,0,0,0,1,0,0,0,0,1,0" MappedObjects="4,5" DefectObjects="6,10" NumImages="2" NumDefects="2">
+						<Atom3d ID="4" Mapping="9" Parent="2" Name="Na1" DisplayStyle="Ball and Stick" XYZ="0,0,0" Components="Na"/>
+						<Atom3d ID="5" Mapping="9" Parent="2" Name="Cl1" DisplayStyle="Ball and Stick" XYZ="0.5,0.5,0.5" Components="Cl" RestrictedProperties="FractionalXYZ"/>
+						<SpaceGroup ID="6" Parent="2" Children="10" Name="FM-3M" AVector="5.6402,0,0" BVector="0,5.6402,0" CVector="0,0,5.6402" OrientationBase="C along Z, B in YZ plane" Centering="3D Face-Centered" Lattice="3D Cubic" GroupName="FM-3M" Operators="1,0,0,0,0,1,0,0,0,0,1,0,-1,0,0,0,0,-1,0,0,0,0,-1,0" ITNumber="225" LongName="F m -3 m" System="Cubic"/>
+						<ReciprocalLattice3D ID="10" Parent="6"/>
+					</IdentityMapping>
+					<ImageMapping ID="11" Element="1,0,0,0.5,0,1,0,0.5,0,0,1,0" Constraint="1,0,0,0,0,1,0,0,0,0,1,0" NumImages="1">
+						<Atom3d ID="12" Mapping="11" ImageOf="4"/>
+					</ImageMapping>
+					<MappingRepairs NumRepairs="0"/>
+				</MappingFamily>
+				<InfiniteMapping ID="3" Element="1,0,0,0,0,1,0,0,0,0,1,0" MappedObjects="2"/>
+			</MappingSet>
+		</SymmetrySystem>
+	</AtomisticTreeRoot>
+</XSD>
