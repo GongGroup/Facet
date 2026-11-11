@@ -526,6 +526,8 @@ File formats:
 - `poscar`: VASP 4 and 5, Direct or Cartesian, selective dynamics, negative scale factors.
 - `cif`: symmetry operators are applied when reading; written as P1.
 - `pdb`: `CRYST1`, `MODEL` frames.
+- `xsd`: Materials Studio 3D atomistic documents (crystals, slabs, molecules), with atom names and fixed atoms;
+  written as P1 in Materials Studio's cell orientation ([SCHEMA.md](SCHEMA.md#structure-files-of-other-programs)).
 - `json`: the Facet structure format ([SCHEMA.md](SCHEMA.md)).
 
 Plugins can add more formats.

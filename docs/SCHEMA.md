@@ -93,3 +93,50 @@ This keeps two people, or two browser tabs, from silently overwriting each other
 4. Requests without `If-Match` or `baseUpdated` are applied unconditionally.
 
 After a 409, the web app offers to reload, keep both (save a copy) or overwrite.
+
+## Structure files of other programs
+
+Besides its own JSON, Facet reads and writes `xyz`, `extxyz`, `poscar`, `cif`, `pdb` and `xsd` (Materials Studio).
+No file format keeps everything a structure holds, so every writer says what it can store. When you export, the
+export check compares that with the structure and lists what the file loses (warnings) and what changes without
+affecting a calculation (notes): `facet.io.export_report(s, "xsd")` in Python, `exportReport` in the web app, and the
+`capabilities` of each writer in `GET /api/v1/formats`.
+
+| id | frames | cell | constraints | occupancy | atom order | periodicity | velocities |
+|---|---|---|---|---|---|---|---|
+| `json` | all | yes | along a, b, c | yes | kept | stored | yes |
+| `extxyz` | all | yes | along x, y, z | yes | kept | stored | yes |
+| `xyz` | all | no | no | no | kept | none | no |
+| `poscar` | one | required | along a, b, c | no | grouped by element | always periodic | yes |
+| `cif` | one | required | no | yes | kept | always periodic | no |
+| `pdb` | all | yes | no | no | kept | always periodic | no |
+| `xsd` | one | yes | whole atoms | no | kept | always periodic | no |
+
+A plugin's writer declares the same things with `capabilities={...}` (the values are in
+`facet/io/capabilities.py`; `constraints` is one of `lattice`, `cartesian`, `atoms`, `none`).
+
+### Materials Studio XSD
+
+`facet convert CONTCAR slab.xsd`, `facet.write("slab.xsd", s)` or Export › Materials Studio XSD writes a 3D atomistic
+document that Materials Studio opens. Opening an `.xsd` file works the same way as any other structure file.
+
+Written:
+
+- a structure with a cell as a 3D periodic system in space group P1, with fractional coordinates; a structure
+  without a cell as a molecule, with Cartesian coordinates;
+- the cell in Materials Studio's orientation (c along z, b in the yz plane). The structure is turned as a whole,
+  so cell lengths, angles and fractional coordinates stay; a note tells you when that happened. A left-handed cell
+  is written as it is, with a warning;
+- atom names: the labels of the structure (a CIF's `Fe1`), else the element with a number (`Pt1`, `Pt2`, `O1`);
+- fixed atoms. The format fixes whole atoms, so an atom fixed along some directions only is written as fixed, with
+  a warning.
+
+Not written: bonds (use Calculate Bonds in Materials Studio), symmetry (use Find Symmetry), partial occupancies,
+velocities, charges, and all but one frame of a trajectory.
+
+Read: periodic documents and molecules; atom names (as `props.labels`); atoms fixed as a whole (as F F F rows of
+`props.selective_dynamics`); image atoms are skipped. Constraints Facet cannot be sure about (anything but a
+whole-atom restriction) are left free, and a note in `info.warnings` says so. A document with a space group other
+than P1 is expanded with the symmetry operators stored in the file; no such file written by Materials Studio was
+available to test against, so check the result (a note reminds you), or choose Build › Symmetry › Make P1 in
+Materials Studio before saving.

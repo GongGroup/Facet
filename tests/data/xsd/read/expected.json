@@ -1,0 +1,85 @@
+{
+ "about": "What the XSD reader must give for the files of this folder (written by hand, not by the reader). frac: fractional coordinates of a periodic document (the Cartesian positions are frac times the cell); positions: Cartesian coordinates of a molecule; fixed: the atoms whose selective_dynamics row is F F F (0-based; null: no such property); labels null: no labels property; name null: the document names nothing (Python then takes the file name).",
+ "cases": [
+  {
+   "file": "ms_periodic.xsd",
+   "name": "Fe3C slab",
+   "symbols": ["Fe", "Fe", "C", "Fe"],
+   "cell": [[14.9180925701895, -0.903047743619941, 0], [0, 12.6365, 0], [0, 0, 20.633]],
+   "frac": [[0.0809838476423884, 0.900085543067731, 0.0753031459797412], [0.5645408681265006, 0.580385020793954, 0.179586348131634], [0.0403138982585642, 0.688370903206817, 0], [1.25, -0.125, 0.250121484902826]],
+   "labels": ["Fe1", "Fe2", "C3", "Fe4"],
+   "fixed": [0, 2],
+   "spacegroup": null,
+   "warnings": []
+  },
+  {
+   "file": "ms_molecule_loose.xsd",
+   "name": null,
+   "symbols": ["C", "C", "O", "H"],
+   "cell": null,
+   "positions": [[-1.867807368, 0.916560534, -0.476209237], [-0.891144799, 1.861761448, 0.020233638], [-1.436772573, 1.537823659, 2.456889339], [-0.548901064, 2.041959545, 1.421654434]],
+   "labels": ["C", "C", "O", "H12"],
+   "fixed": null,
+   "spacegroup": null,
+   "warnings": []
+  },
+  {
+   "file": "ms_molecule_repeatunit.xsd",
+   "name": "Sketch 5",
+   "symbols": ["C", "C", "O"],
+   "cell": null,
+   "positions": [[5.27632021913704, -0.601148194589268, -0.642270122233854], [3.87248585004214, 0.031978155746196, -0.642270122233854], [-0.051878442176104, -0.899041554062534, -0.361157068429096]],
+   "labels": null,
+   "fixed": null,
+   "spacegroup": null,
+   "warnings": []
+  },
+  {
+   "file": "assumed_symmetry_fcc.xsd",
+   "name": "NaCl",
+   "symbols": ["Na", "Na", "Na", "Na", "Cl", "Cl", "Cl", "Cl"],
+   "cell": [[5.6402, 0, 0], [0, 5.6402, 0], [0, 0, 5.6402]],
+   "frac": [[0, 0, 0], [0, 0.5, 0.5], [0.5, 0, 0.5], [0.5, 0.5, 0], [0.5, 0.5, 0.5], [0.5, 0, 0], [0, 0.5, 0], [0, 0, 0.5]],
+   "labels": ["Na1", "Na1", "Na1", "Na1", "Cl1", "Cl1", "Cl1", "Cl1"],
+   "fixed": [4, 5, 6, 7],
+   "spacegroup": "F m -3 m",
+   "warnings": ["symmetry expanded: 2 atoms listed, 8 atoms after applying the file's 2 symmetry operators (F m -3 m); check the result"]
+  },
+  {
+   "file": "assumed_symmetry_screw.xsd",
+   "name": "screw",
+   "symbols": ["O", "O", "O", "O", "Ti", "Ti"],
+   "cell": [[4, 0, 0], [0, 4, 0], [0, 0, 6]],
+   "frac": [[0.1, 0.2, 0.3], [0.8, 0.1, 0.8], [0.9, 0.8, 0.3], [0.2, 0.9, 0.8], [0, 0, 0.125], [0, 0, 0.625]],
+   "labels": ["O1", "O1", "O1", "O1", "Ti1", "Ti1"],
+   "fixed": null,
+   "spacegroup": "P42",
+   "warnings": ["symmetry expanded: 2 atoms listed, 6 atoms after applying the file's 4 symmetry operators (P42); check the result: the centring \"3D Mystery-Centered\" is not known and was not applied"]
+  },
+  {
+   "file": "constraints_unread.xsd",
+   "name": "constraints",
+   "symbols": ["Pt", "Pt", "Pt", "Pt", "Pt", "Pt"],
+   "cell": [[2.8, 0, 0], [0, 2.8, 0], [0, 0, 20]],
+   "frac": [[0, 0, 0.1], [0.5, 0.5, 0.2], [0, 0, 0.3], [0.5, 0.5, 0.4], [0, 0, 0.5], [0.5, 0.5, 0.6]],
+   "labels": ["Pt1", "Pt2", "Pt3", "Pt4", "Pt5", "Pt6"],
+   "fixed": [2, 3],
+   "spacegroup": null,
+   "warnings": ["3 atoms have constraints Facet does not read (restricted by AlongAxisSlider, RestrictedProperties=\"Charge\") and are left free"]
+  },
+  {
+   "file": "components_and_entities.xsd",
+   "name": "odd & ends",
+   "symbols": ["Fe", "H", "Si", "X", "X", "O", "H"],
+   "cell": null,
+   "positions": [[0, 0, 0], [1, 0, 0], [2, 0, 0], [3, 0, 0], [4, 0, 0], [0, 0, 0], [5, 0.5, -0.25]],
+   "labels": ["Cé&<1>\"'", "&xxe;", "q\"1", "&big;水", "X", "origin", "H9"],
+   "fixed": null,
+   "spacegroup": null,
+   "warnings": [
+    "2 atoms have a Components value that is not a single element symbol (e.g. \"D\"); the first element in it was read (D and T as H)",
+    "2 atoms have no element Facet knows (e.g. Components=\"Xx\") and are read as X"
+   ]
+  }
+ ]
+}

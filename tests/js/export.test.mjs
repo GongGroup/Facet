@@ -41,7 +41,7 @@ function warnsDuring(fn) {
 
 describe('capabilities', () => {
   test('the built-in formats carry the table, in table order and frozen', () => {
-    assert.deepEqual(Object.keys(WRITER_CAPABILITIES), ['json', 'extxyz', 'xyz', 'poscar', 'cif', 'pdb']);
+    assert.deepEqual(Object.keys(WRITER_CAPABILITIES), ['json', 'extxyz', 'xyz', 'poscar', 'cif', 'pdb', 'xsd']);
     for (const [id, caps] of Object.entries(WRITER_CAPABILITIES)) {
       assert.deepEqual(Object.keys(caps), Object.keys(CAPABILITY_VALUES));
       assert.deepEqual(formats.get(id).capabilities, caps, id);
@@ -56,7 +56,7 @@ describe('capabilities', () => {
       offs.push(formats.register({ id: 'jsfmt', write: () => 'x\n', capabilities: { ...MYFMT } }));
       assert.deepEqual(formats.get('jsfmt').capabilities, MYFMT);
       const warned = warnsDuring(() => offs.push(formats.register({ id: 'jsbad', write: () => 'x\n', capabilities: { ...MYFMT, constraints: 'yes' } })));
-      assert.deepEqual(warned, ["Facet: writer 'jsbad': capabilities.constraints must be one of lattice, cartesian, none; the export check of this format is off"]);
+      assert.deepEqual(warned, ["Facet: writer 'jsbad': capabilities.constraints must be one of lattice, cartesian, atoms, none; the export check of this format is off"]);
       assert.equal(formats.get('jsbad').capabilities, null);
       offs.push(formats.register({ id: 'jsnone', write: () => 'x\n' }));
       assert.equal(formats.get('jsnone').capabilities, null);

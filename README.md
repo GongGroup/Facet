@@ -27,11 +27,12 @@ facet serve --open
 
 ## Use
 
-- **Open** CIF, POSCAR/CONTCAR/XDATCAR, XYZ, extended XYZ, PDB and Facet JSON files, including trajectories:
-  drop a file on the window. Or build crystals, clusters and molecules in the Build panel.
+- **Open** CIF, POSCAR/CONTCAR/XDATCAR, XYZ, extended XYZ, PDB, Materials Studio XSD and Facet JSON files,
+  including trajectories: drop a file on the window. Or build crystals, clusters and molecules in the Build panel.
 - **Style** it with one click on a look, then adjust the representation, colours, lighting and effects.
 - **Inspect** the formula, cell and space group, and measure distances and angles.
-- **Export** PNG images up to 4×, glTF models and structure files.
+- **Export** PNG images up to 4×, glTF models and structure files (CIF, POSCAR, XYZ, PDB, and XSD to go on in
+  Materials Studio, fixed atoms included).
 - **Save** projects in the browser, in a folder on your computer or on the server.
 
 The mouse works as in Materials Studio. Press `Ctrl/⌘ K` to search every command and `?` to see the shortcuts.

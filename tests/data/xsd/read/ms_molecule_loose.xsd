@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="latin1"?>
+<!DOCTYPE XSD []>
+<!-- Hand-written test fixture, modelled on a document saved by Materials Studio 17.1: the atoms and bonds of a
+     sketched molecule lie directly under the root (no Molecule element), and the first atom has no Name. Not a real file. -->
+<XSD Version="17.1" WrittenBy="Materials Studio 17.1">
+	<AtomisticTreeRoot ID="1" NumProperties="2" NumChildren="7">
+		<Property Name="AngleAxisType" DefinedOn="AngleBetweenPlanesBender" Type="Enumerated"/>
+		<Property Name="AngleEnergy" DefinedOn="ClassicalEnergyHolder" Type="Double"/>
+		<Atom3d ID="2" UserID="1" DisplayStyle="Ball and Stick" XYZ="-1.867807368,0.916560534,-0.476209237" Connections="3,4" Components="C"/>
+		<Atom3d ID="6" Name="C" UserID="2" DisplayStyle="Ball and Stick" XYZ="-0.891144799,1.861761448,0.020233638" Connections="3,7" Components="C"/>
+		<Bond ID="3" Connects="6,2" Type="Double"/>
+		<Atom3d ID="9" Name="O" UserID="3" DisplayStyle="Ball and Stick" XYZ="-1.436772573,1.537823659,2.456889339" Connections="4,7" Components="O"/>
+		<Bond ID="4" Connects="9,2"/>
+		<Bond ID="7" Connects="9,6"/>
+		<Atom3d ID="12" Name="H12" UserID="4" DisplayStyle="Ball and Stick" XYZ="-5.48901064e-1,2.041959545E+0,1.421654434" Components="H"/>
+	</AtomisticTreeRoot>
+</XSD>
