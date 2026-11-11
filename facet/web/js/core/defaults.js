@@ -52,6 +52,29 @@ export const SURFACE_DEFAULTS = Object.freeze({
   // --- end M1 ---
 
   // --- surface-modeling M2 ---
+  layers: 4,
+  layerTolerance: 0.3,
+  planeResolution: 0.1,
+  planeResolutionMin: 0.05,
+  sublayerGap: 0.45,
+  sublayerTilt: 15.0,
+  layerToleranceMargin: 0.01,
+  matchTolerance: 0.1,
+  polarThreshold: 1e-3,
+  contactErrorFraction: 0.75,
+  contactWarnFraction: 1.0,
+  dftVacuumHint: 10.0,
+  maxCleaveBulkAtoms: 20000,
+  maxCleaveCellAtoms: 2000,
+  maxPrimitiveSearchAtoms: 600,
+  maxLayers: 1000,
+  maxVacuum: 1000.0,
+  supercellMaxEntry: 50,
+  bondScale: 1.15,
+  bondMin: 0.4,
+  bondMax: 5.0,
+  translationTolerance: 0.05,
+  gaussTolerance: 1e-9,
   // --- end M2 ---
 
   // --- surface-modeling M3 ---

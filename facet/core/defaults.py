@@ -126,6 +126,29 @@ SURFACE_DEFAULTS = Defaults("SURFACE_DEFAULTS", {
     # --- end M1 ---
 
     # --- surface-modeling M2 ---
+    "layers": 4,
+    "layer_tolerance": 0.3,
+    "plane_resolution": 0.1,
+    "plane_resolution_min": 0.05,
+    "sublayer_gap": 0.45,
+    "sublayer_tilt": 15.0,
+    "layer_tolerance_margin": 0.01,
+    "match_tolerance": 0.1,
+    "polar_threshold": 1e-3,
+    "contact_error_fraction": 0.75,
+    "contact_warn_fraction": 1.0,
+    "dft_vacuum_hint": 10.0,
+    "max_cleave_bulk_atoms": 20000,
+    "max_cleave_cell_atoms": 2000,
+    "max_primitive_search_atoms": 600,
+    "max_layers": 1000,
+    "max_vacuum": 1000.0,
+    "supercell_max_entry": 50,
+    "bond_scale": 1.15,
+    "bond_min": 0.4,
+    "bond_max": 5.0,
+    "translation_tolerance": 0.05,
+    "gauss_tolerance": 1e-9,
     # --- end M2 ---
 
     # --- surface-modeling M3 ---
