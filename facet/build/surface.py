@@ -1961,6 +1961,22 @@ def flip_slab(structure: Structure) -> Structure:
     structure.cell = np.array(final, dtype=float)
     apply_basis_change(structure, old_vectors, final)
     mark_edited(structure, "cell")
+    # the supercell record refers to the 1×1 mesh, which is turned over and reduced as well (M2 §3.15)
+    S3 = structure.info.get("supercellMatrix")
+    if (isinstance(S3, list) and len(S3) == 3 and all(isinstance(r, list) and len(r) == 3 for r in S3)
+            and S3[2] == [0, 0, 1] and S3[0][2] == 0 and S3[1][2] == 0
+            and all(_whole_number(x) for r in S3[:2] for x in r[:2])):
+        So = [[int(S3[0][0]), int(S3[0][1])], [int(S3[1][0]), int(S3[1][1])]]
+        det = So[0][0] * So[1][1] - So[0][1] * So[1][0]
+        if det > 0:
+            one_a = [(So[1][1] * a[i] - So[0][1] * b[i]) / det for i in range(3)]
+            one_b = [(-So[1][0] * a[i] + So[0][0] * b[i]) / det for i in range(3)]
+            _, _, M1 = _gauss_reduce_2d(turn(one_a), [-x for x in turn(one_b)])
+            dsd = [[So[0][0], -So[0][1]], [-So[1][0], So[1][1]]]                 # D · S · D with D = diag(1, -1)
+            inv1 = [[M1[1][1], -M1[0][1]], [-M1[1][0], M1[0][0]]]                # det M1 = 1
+            mul = lambda x, y: [[x[i][0] * y[0][j] + x[i][1] * y[1][j] for j in range(2)] for i in range(2)]   # noqa: E731
+            Sn = mul(mul(M2, dsd), inv1)
+            structure.info["supercellMatrix"] = [[Sn[0][0], Sn[0][1], 0], [Sn[1][0], Sn[1][1], 0], [0, 0, 1]]
     tags = structure.props.get("tags")
     if isinstance(tags, list) and tags:
         top = max((t for t in tags if isinstance(t, (int, float)) and t > 0), default=0)

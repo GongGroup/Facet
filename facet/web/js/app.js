@@ -1469,8 +1469,10 @@ export class App extends Emitter {
         structure = toStructure(structure);
         if (!structure.name || structure.name === 'Untitled') structure.name = f.name;
         this.addStructure(structure, { name: f.name.replace(/\.[^.]+$/, '') });
-        const w = structure.info?.warning;
-        toast(`Loaded ${f.name} — ${structure.length} atoms${structure.nFrames > 1 ? `, ${structure.nFrames} frames` : ''}${w ? ` (${w})` : ''}`);
+        // what the reader noted (info.warnings; older readers: info.warning) follows the count, each as a sentence
+        const notes = [...getWarnings(structure.info), ...(typeof structure.info?.warning === 'string' ? [structure.info.warning] : [])];
+        toast(editToastText(`Loaded ${f.name} — ${structure.length} atoms${structure.nFrames > 1 ? `, ${structure.nFrames} frames` : ''}`, notes),
+          notes.length ? { timeout: 9000 } : {});
       } catch (err) {
         if (err.project) {
           busy.end();
@@ -1966,7 +1968,9 @@ export class App extends Emitter {
       const { filename, mime } = out;
       const direct = !isArtifact() || /\.(txt|json|csv|md)$/.test(filename);
       const ok = direct ? await saveFile(filename, text, mime) : await saveFile(`${filename}.zip`, await makeZip([{ name: filename, data: text }]), 'application/zip');
-      if (ok) toast(direct ? `Saved ${filename}` : `Saved ${filename} inside a .zip`);
+      // the export check: what the file loses (warnings) and what changes without affecting a calculation (notes)
+      const said = [...(out.warnings ?? []), ...(out.notes ?? [])];
+      if (ok) toast(editToastText(direct ? `Saved ${filename}` : `Saved ${filename} inside a .zip`, said), said.length ? { timeout: 12000 } : {});
       return ok;
     } finally { busy.end(); }
   }

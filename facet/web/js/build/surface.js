@@ -1712,7 +1712,7 @@ export function flipSlab(s) {
   const R = [0, 1, 2].map((i) => [0, 1, 2].map((j) => 2 * ah[i] * ah[j] - (i === j ? 1 : 0)));
   const turn = (v) => [dot(R[0], v), dot(R[1], v), dot(R[2], v)];
   const rb = turn(b), rc = turn(c);
-  const [u, v] = gaussReduce2d(a, rb.map((x) => -x));
+  const [u, v, M2] = gaussReduce2d(a, rb.map((x) => -x));
   const next = [u, v, rc.map((x) => -x)];
   let n = cross(u, v);
   const ln = norm(n);
@@ -1742,6 +1742,23 @@ export function flipSlab(s) {
   s.writeFrame('current', { positions, cell: final });
   applyBasisChange(s, oldVectors, final);
   markEdited(s, 'cell');
+  // the supercell record refers to the 1×1 mesh, which is turned over and reduced as well (M2 §3.15)
+  const S3 = s.info.supercellMatrix;
+  if (Array.isArray(S3) && S3.length === 3 && S3.every((r) => Array.isArray(r) && r.length === 3)
+    && S3[2][0] === 0 && S3[2][1] === 0 && S3[2][2] === 1 && S3[0][2] === 0 && S3[1][2] === 0 && [S3[0][0], S3[0][1], S3[1][0], S3[1][1]].every(isWhole)) {
+    const So = [[S3[0][0], S3[0][1]], [S3[1][0], S3[1][1]]];
+    const det = So[0][0] * So[1][1] - So[0][1] * So[1][0];
+    if (det > 0) {
+      const oneA = [0, 1, 2].map((i) => (So[1][1] * a[i] - So[0][1] * b[i]) / det);
+      const oneB = [0, 1, 2].map((i) => (-So[1][0] * a[i] + So[0][0] * b[i]) / det);
+      const [, , M1] = gaussReduce2d(turn(oneA), turn(oneB).map((x) => -x));
+      const dsd = [[So[0][0], -So[0][1]], [-So[1][0], So[1][1]]];   // D · S · D with D = diag(1, −1)
+      const inv1 = [[M1[1][1], -M1[0][1]], [-M1[1][0], M1[0][0]]];   // det M1 = 1
+      const mul = (x, y) => [0, 1].map((i) => [0, 1].map((j) => x[i][0] * y[0][j] + x[i][1] * y[1][j] + 0));
+      const Sn = mul(mul(M2, dsd), inv1);
+      s.info.supercellMatrix = [[Sn[0][0], Sn[0][1], 0], [Sn[1][0], Sn[1][1], 0], [0, 0, 1]];
+    }
+  }
   const tags = s.props.tags;
   if (Array.isArray(tags) && tags.length) {
     let top = 0;
