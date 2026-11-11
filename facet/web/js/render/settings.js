@@ -2,9 +2,16 @@
 import { presetToSettings } from './lighting.js';
 import { deepClone, deepMerge, getPath } from '../core/util.js';
 
+/**
+ * The look (render/looks.js) that new projects, opened files and built structures start in. A saved project keeps
+ * the look it was saved with. DEFAULT_SCENE below only names it: the app applies the look's settings on top
+ * (App._defaultScene).
+ */
+export const DEFAULT_LOOK = 'poster';
+
 export const DEFAULT_SCENE = {
-  look: 'studio',
-  lookBase: 'studio',            // the look the scene started from; `look` becomes null once settings are customised
+  look: DEFAULT_LOOK,
+  lookBase: DEFAULT_LOOK,        // the look the scene started from; `look` becomes null once settings are customised
   style: {
     rep: 'ballstick', radiusSource: 'atomic', atomScale: 0.42, bondRadius: 0.13, bondColor: 'split', bondUniformColor: '#9aa1ab',
     colorScheme: 'jmol', monoColor: '#c9ced6', colorOverrides: {}, property: null,
