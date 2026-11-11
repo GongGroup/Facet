@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="latin1"?>
+<!DOCTYPE XSD [
+	<!ENTITY xxe SYSTEM "file:///etc/passwd">
+	<!ENTITY big "&big2;&big2;&big2;&big2;">
+	<!ENTITY big2 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa">
+]>
+<!-- Hand-written test fixture: what Components may hold, an atom without XYZ, character references and entities
+     in names (entities declared in the DOCTYPE are never expanded), single quotes, and atoms inside a comment and
+     a CDATA section, which are not atoms. The mixture and isotope spellings are invented. -->
+<XSD Version="8.0" WrittenBy="hand">
+	<AtomisticTreeRoot ID="1" NumProperties="0" NumChildren="1">
+		<Molecule ID="2" NumChildren="7" Name="odd &amp; ends">
+			<Atom3d ID="3" Name="C&#233;&amp;&lt;1&gt;&quot;&apos;" XYZ="0,0,0" Components="Fe"/>
+			<Atom3d ID="4" Name="&xxe;" XYZ="1,0,0" Components="D"/>
+			<Atom3d ID="5" Name='q"1' XYZ='2,0,0' Components="Si,0.5;Al,0.5"/>
+			<Atom3d ID="6" Name="&big;&#x6C34;" XYZ="3,0,0" Components="Xx"/>
+			<Atom3d ID="7" XYZ="4,0,0"/>
+			<Atom3d ID="8" Name="origin" Components=" O "/>
+			<Atom3d ID="9" Name="  H9  " XYZ=" 5 , 0.5 , -0.25 " Components="H" Name="second value is ignored"/>
+			<!-- <Atom3d ID="90" Name="commented" XYZ="9,9,9" Components="Au"/> -->
+			<![CDATA[ <Atom3d ID="91" Name="cdata" XYZ="9,9,9" Components="Au"/> ]]>
+		</Molecule>
+	</AtomisticTreeRoot>
+</XSD>

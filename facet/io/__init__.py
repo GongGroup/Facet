@@ -1,6 +1,6 @@
 """File-format registry and high-level read/write API.
 
-Built-in formats: ``xyz``, ``extxyz``, ``poscar``, ``cif``, ``pdb``, ``json``.
+Built-in formats: ``xyz``, ``extxyz``, ``poscar``, ``cif``, ``pdb``, ``xsd`` (Materials Studio), ``json``.
 Plugins add formats with :func:`register_reader` / :func:`register_writer`.
 
 Reader functions take the file *text* and return a :class:`Structure` or a
@@ -256,6 +256,8 @@ def _sniff(text: str) -> str | None:
         return None
     if head[0] in "{[":
         return "json" if "json" in _READERS else None
+    if head[0] == "<" and ("<XSD" in head or "<!DOCTYPE XSD" in head):
+        return "xsd" if "xsd" in _READERS else None
     lines = [ln for ln in head.splitlines() if ln.strip()]
     for ln in lines[:200]:
         s = ln.strip().lower()
@@ -583,6 +585,9 @@ def _report(structure: Structure, fmt: str, caps: dict[str, Any], frame: int | N
             warnings.append(f"{F} stores these constraints as ASE FixCartesian masks because {partial} "
                             f"atom(s) are only partly fixed; ASE's VASP writer ignores FixCartesian and would write "
                             f"every atom as free, so export POSCAR from Facet for VASP")
+    if summary["partial"] and caps["constraints"] == "atoms":
+        warnings.append(f"{summary['partial']} atom(s) are fixed along some directions only; {F} fixes whole atoms, "
+                        f"so they are written as fixed")
     # W7: occupancies
     q = _partly_occupied(s)
     if q and caps["occupancy"] is False:
@@ -605,6 +610,24 @@ def _report(structure: Structure, fmt: str, caps: dict[str, Any], frame: int | N
     if caps["handedness"] and cell is not None and _det3(cell) < 0:
         warnings.append("the cell is left-handed (negative volume); VASP stops on such cells, so swap two cell "
                         "vectors first")
+    # Materials Studio XSD (docs/design/xsd-export §5.1, §5.4): symbols that are not elements, the cell as written
+    orientation = None
+    if fmt == "xsd":
+        from .xsd import cell_orientation, non_elements
+
+        odd = non_elements(s.symbols)
+        if odd:
+            count = sum(1 for sym in s.symbols if sym in odd)
+            warnings.append(f"{count} atom(s) have a symbol that is not a chemical element ({', '.join(odd)}); "
+                            f"Materials Studio may not recognise them")
+        if cell is not None:
+            try:
+                orientation = cell_orientation(cell)
+            except ValueError:      # a cell without volume: the writer fails as well
+                orientation = None
+        if orientation == "left-handed":
+            warnings.append("the cell is left-handed (negative volume) and is written as it is; Materials Studio "
+                            "may show its mirror image")
     # W11: overlapping atoms, with the periodicity the written file has (positions that are not finite: no check)
     finite = _finite_frame(s, k)
     skipped = False
@@ -626,7 +649,10 @@ def _report(structure: Structure, fmt: str, caps: dict[str, Any], frame: int | N
         if poscar_order(s.symbols, blocks=_species_blocks(s)) != list(range(len(s))):
             notes.append(f"{F} groups atoms by element, so the atom order in the file differs from the order in the "
                          f"structure; sort the atoms by species to make them match")
-    if fmt == "poscar" and cell is not None and finite:
+    if orientation == "rotated":
+        notes.append("the cell is written in Materials Studio's orientation (c along z, b in the yz plane): the "
+                     "structure is turned as a whole and the fractional coordinates are unchanged")
+    if fmt in ("poscar", "xsd") and cell is not None and finite:
         for axis in range(3):
             if s.pbc[axis]:
                 continue
@@ -655,9 +681,11 @@ def export_report(structure: Structure, format: str, *, frame: int | None = None
 
     Warnings change a calculation or lose data: a single-frame format, the unit cell, constraints (selective
     dynamics), partial occupancies, properties Extended XYZ cannot write, results known only for the first frame,
-    a left-handed cell, atoms closer than 0.5 Å.  Notes do not: the POSCAR atom order, a non-periodic axis written
-    as a POSCAR cell vector, velocities a format cannot store (or POSCAR velocities that are not three finite
-    numbers for every atom), a skipped overlap check (more than 200 000 atoms).
+    a left-handed cell, atoms closer than 0.5 Å; for Materials Studio XSD also atoms fixed along some directions
+    only (written as fixed) and symbols that are not elements.  Notes do not: the POSCAR atom order, a non-periodic
+    axis written as a POSCAR or XSD cell vector, the cell of an XSD file turned into Materials Studio's orientation,
+    velocities a format cannot store (or POSCAR velocities that are not three finite numbers for every atom), a
+    skipped overlap check (more than 200 000 atoms).
     The messages are word for word those of the web app (``exportReport`` in ``web/js/io/index.js``).
 
     *frame* is the frame the file holds (default 0: the Python writers write frame 0 of a trajectory; negative
@@ -684,7 +712,7 @@ def export_notes(structure: Structure, format: str, *, frame: int | None = None)
 
 # ------------------------------------------------------- built-in formats
 def _register_builtins() -> None:
-    from . import cif, jsonfmt, pdb, poscar, xyz
+    from . import cif, jsonfmt, pdb, poscar, xsd, xyz
 
     register_reader("xyz", xyz.read_xyz, [".xyz"], "XYZ (plain and extended XYZ; multi-frame)")
     register_reader("extxyz", xyz.read_xyz, [".extxyz"], "Extended XYZ (Lattice, Properties, pbc; multi-frame)")
@@ -692,6 +720,8 @@ def _register_builtins() -> None:
                     "VASP POSCAR/CONTCAR/XDATCAR (VASP 4 and 5)", filenames=["poscar", "contcar", "xdatcar"])
     register_reader("cif", cif.read_cif, [".cif"], "Crystallographic Information File (symmetry expanded)")
     register_reader("pdb", pdb.read_pdb, [".pdb", ".ent"], "Protein Data Bank (ATOM/HETATM, CRYST1, MODEL)")
+    register_reader("xsd", xsd.read_xsd, [".xsd"],
+                    "Materials Studio XSD (3D atomistic document: crystals, slabs, molecules, fixed atoms)")
     register_reader("json", jsonfmt.read_json, [".json"], "Facet structure JSON (facet.structure/1)")
 
     caps = WRITER_CAPABILITIES
@@ -705,6 +735,8 @@ def _register_builtins() -> None:
                     capabilities=caps["cif"])
     register_writer("pdb", pdb.write_pdb, [".pdb"], "PDB with CRYST1 and MODEL records", mimetype="chemical/x-pdb",
                     capabilities=caps["pdb"])
+    register_writer("xsd", xsd.write_xsd, [".xsd"], "Materials Studio XSD (3D atomistic document; save as .xsd)",
+                    mimetype="application/xml", capabilities=caps["xsd"])
     register_writer("json", jsonfmt.write_json, [".json"], "Facet structure JSON", mimetype="application/json",
                     capabilities=caps["json"])
 

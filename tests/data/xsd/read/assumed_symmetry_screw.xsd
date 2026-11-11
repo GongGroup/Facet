@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="latin1"?>
+<!DOCTYPE XSD []>
+<!-- Hand-written test fixture for the symmetry expansion of the reader. ASSUMED layout: no document with a space
+     group other than P1 written by Materials Studio was available. One atom in a general position and one on the
+     axis of a 4(2) screw axis along c: four operators, each the three rows of the rotation with the translation in
+     the fourth place (x' = R x + t), here separated by colons. The unknown centring name is reported, not applied. -->
+<XSD Version="8.0" WrittenBy="hand">
+	<AtomisticTreeRoot ID="1" NumProperties="0" NumChildren="1">
+		<SymmetrySystem ID="2" Mapping="3" Children="4,5,6" Name="screw">
+			<MappingSet ID="7" SymmetryDefinition="6" ActiveSystem="2">
+				<MappingFamily ID="8" NumImageMappings="0">
+					<IdentityMapping ID="9" MappedObjects="4,5" DefectObjects="6,10" NumImages="2" NumDefects="2">
+						<Atom3d ID="4" Mapping="9" Parent="2" Name="O1" XYZ="0.1,0.2,0.3" Components="O"/>
+						<Atom3d ID="5" Mapping="9" Parent="2" Name="Ti1" XYZ="0,0,0.125" Components="Ti"/>
+						<SpaceGroup ID="6" Parent="2" Children="10" Name="P42" AVector="4,0,0" BVector="0,4,0" CVector="0,0,6" Centering="3D Mystery-Centered" Operators="1,0,0,0,0,1,0,0,0,0,1,0 : 0,-1,0,0,1,0,0,0,0,0,1,0.5 : -1,0,0,0,0,-1,0,0,0,0,1,0 : 0,1,0,0,-1,0,0,0,0,0,1,0.5" ITNumber="77"/>
+						<ReciprocalLattice3D ID="10" Parent="6"/>
+					</IdentityMapping>
+				</MappingFamily>
+				<InfiniteMapping ID="3" MappedObjects="2"/>
+			</MappingSet>
+		</SymmetrySystem>
+	</AtomisticTreeRoot>
+</XSD>

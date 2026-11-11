@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="latin1"?>
+<!DOCTYPE XSD []>
+<!-- Hand-written test fixture: constraints the reader is sure about (whole atoms) and ones it is not. The
+     AlongAxisSlider element stands for the objects Materials Studio uses for partial constraints; its attributes
+     here are invented. -->
+<XSD Version="8.0" WrittenBy="hand">
+	<AtomisticTreeRoot ID="1" NumProperties="0" NumChildren="1">
+		<SymmetrySystem ID="2" Mapping="3" Name="constraints">
+			<MappingSet ID="7" SymmetryDefinition="6" ActiveSystem="2">
+				<MappingFamily ID="8" NumImageMappings="0">
+					<IdentityMapping ID="9">
+						<Atom3d ID="11" Mapping="9" Parent="2" Name="Pt1" XYZ="0,0,0.1" Components="Pt" RestrictedBy="20" RestrictedProperties="FractionalXYZ"/>
+						<Atom3d ID="12" Mapping="9" Parent="2" Name="Pt2" XYZ="0.5,0.5,0.2" Components="Pt" RestrictedProperties="Charge"/>
+						<Atom3d ID="13" Mapping="9" Parent="2" Name="Pt3" XYZ="0,0,0.3" Components="Pt" RestrictedProperties="FractionalXYZ"/>
+						<Atom3d ID="14" Mapping="9" Parent="2" Name="Pt4" XYZ="0.5,0.5,0.4" Components="Pt" RestrictedBy="21" RestrictedProperties="XYZ"/>
+						<Atom3d ID="15" Mapping="9" Parent="2" Name="Pt5" XYZ="0,0,0.5" Components="Pt"/>
+						<Atom3d ID="16" Mapping="9" Parent="2" Name="Pt6" XYZ="0.5,0.5,0.6" Components="Pt" RestrictedBy="21,20" RestrictedProperties="XYZ,FractionalXYZ"/>
+						<AlongAxisSlider ID="20" Mapping="9" Parent="2" RestrictsObjects="11,16" Axis="0,0,1"/>
+						<CompleteRestriction ID="21" Mapping="9" Parent="2" RestrictsObjects="14,16" RestrictsProperties="XYZ,XYZ"/>
+						<SpaceGroup ID="6" Parent="2" Children="10" Name="P1" AVector="2.8,0,0" BVector="0,2.8,0" CVector="0,0,20" Operators="1,0,0,0,0,1,0,0,0,0,1,0"/>
+						<ReciprocalLattice3D ID="10" Parent="6"/>
+					</IdentityMapping>
+				</MappingFamily>
+				<InfiniteMapping ID="3" MappedObjects="2"/>
+			</MappingSet>
+		</SymmetrySystem>
+	</AtomisticTreeRoot>
+</XSD>

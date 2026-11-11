@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="latin1"?>
+<!DOCTYPE XSD []>
+<!-- Hand-written test fixture, modelled on a document saved by Materials Studio 8.0 (attribute order, nesting,
+     compressed ID lists "ci(n):...", image mappings, a CompleteRestriction for the fixed atoms). Not a real file. -->
+<XSD Version="8.0" WrittenBy="Materials Studio 8.0">
+	<AtomisticTreeRoot ID="1" NumProperties="3" NumChildren="1">
+		<Property Name="AngleAxisType" DefinedOn="AngleBetweenPlanesBender" Type="Enumerated"/>
+		<Property Name="AngleEnergy" DefinedOn="ClassicalEnergyHolder" Type="Double"/>
+		<Property Name="EquivalentAtomMatch" DefinedOn="Atom" Type="String"/>
+		<SymmetrySystem ID="2" Mapping="3" Children="ci(9):9+4" Normalized="1" Name="Fe3C slab" OverspecificationTolerance="0.05" PeriodicDisplayType="Original" HasSymmetryHistory="1">
+			<MappingSet ID="13" SymmetryDefinition="8" ActiveSystem="2" NumFamilies="1" OwnsTotalConstraintMapping="1" TotalConstraintMapping="3">
+				<MappingFamily ID="14" NumImageMappings="2">
+					<IdentityMapping ID="15" Element="1,0,0,0,0,1,0,0,0,0,1,0" Constraint="1,0,0,0,0,1,0,0,0,0,1,0" MappedObjects="ci(8):4+4,4+9" DefectObjects="8,16" NumImages="8" NumDefects="2">
+						<Atom3d ID="4" HasProperties="1" Mapping="15" Parent="2" RestrictedBy="9,9" RestrictedProperties="XYZ,FractionalXYZ" Name="Fe1" DisplayStyle="Ball and Stick" XYZ="0.0809838476423884,0.900085543067731,0.0753031459797412" Connections="10,11,17" TemperatureType="Isotropic" IsotropicTemperature="0.01266515" AnisotropicTemperature="0,0,0,0,0,0,0,0,0" Components="Fe">
+							<Properties EquivalentAtomMatch="{C8980F05-8B1B-4559-9C70-6DD4D5BF25E4}"/>
+						</Atom3d>
+						<Atom3d ID="5" HasProperties="1" Mapping="15" Parent="2" Name="Fe2" DisplayStyle="Ball and Stick" XYZ="0.5645408681265006,0.580385020793954,0.179586348131634" Connections="10,12" TemperatureType="Isotropic" IsotropicTemperature="0.01266515" AnisotropicTemperature="0,0,0,0,0,0,0,0,0" Components="Fe">
+							<Properties EquivalentAtomMatch="{226D43BA-AEA7-43BD-847D-FB7DD676F6B6}"/>
+						</Atom3d>
+						<Atom3d ID="6" HasProperties="1" Mapping="15" Parent="2" RestrictedBy="9,9" RestrictedProperties="XYZ,FractionalXYZ" Name="C3" DisplayStyle="Ball and Stick" XYZ="0.0403138982585642,0.688370903206817,0" Connections="11" Components="C">
+							<Properties EquivalentAtomMatch="{9637A084-A451-456A-BEBB-C8000A4C4772}"/>
+						</Atom3d>
+						<Atom3d ID="7" HasProperties="1" Mapping="15" Parent="2" Name="Fe4" DisplayStyle="Ball and Stick" XYZ="1.25,-0.125,0.250121484902826" Connections="12" Components="Fe">
+							<Properties EquivalentAtomMatch="{79BF93A8-80CC-4399-98DA-C00C8FA12EFE}"/>
+						</Atom3d>
+						<CompleteRestriction ID="9" Mapping="15" Parent="2" RestrictsObjects="ci(4):4,6,4,6" RestrictsProperties="XYZ,XYZ,FractionalXYZ,FractionalXYZ"/>
+						<Bond ID="10" Mapping="15" Parent="2" Connects="4,5"/>
+						<Bond ID="11" Mapping="15" Parent="2" Connects="4,6"/>
+						<Bond ID="12" Mapping="15" Parent="2" Connects="5,7"/>
+						<SpaceGroup ID="8" Parent="2" Children="16" Name="P1" AVector="14.9180925701895,-0.903047743619941,0" BVector="0,12.6365,0" CVector="0,0,20.633" OrientationBase="C along Z, B in YZ plane" Centering="3D Primitive-Centered" Lattice="3D Triclinic" GroupName="P1" Operators="1,0,0,0,0,1,0,0,0,0,1,0" DisplayRange="0,1,0,1,0,1" LineThickness="2" CylinderRadius="0.2" LabelAxes="1" ActiveSystem="2" ITNumber="1" LongName="P 1" Qualifier="Origin-1" SchoenfliesName="C1-1" System="Triclinic" Class="1"/>
+						<ReciprocalLattice3D ID="16" Parent="8" Visible="0"/>
+					</IdentityMapping>
+					<ImageMapping ID="20" Element="1,0,0,-1,0,1,0,0,0,0,1,0" Constraint="1,0,0,0,0,1,0,0,0,0,1,0" MappedObjects="ci(9):3x0,21,5x0" NumImages="1">
+						<Atom3d ID="21" Mapping="20" ImageOf="7" Visible="0"/>
+						<Bond ID="17" Mapping="20" ImageOf="12"/>
+					</ImageMapping>
+					<ImageMapping ID="22" Element="1,0,0,0,0,1,0,1,0,0,1,0" Constraint="1,0,0,0,0,1,0,0,0,0,1,0"/>
+					<MappingRepairs NumRepairs="0"/>
+				</MappingFamily>
+				<InfiniteMapping ID="3" Element="1,0,0,0,0,1,0,0,0,0,1,0" MappedObjects="2"/>
+			</MappingSet>
+			<OriginalObjects ID="23">
+				<SetCollection Objects="ci(4):4+4"/>
+			</OriginalObjects>
+		</SymmetrySystem>
+	</AtomisticTreeRoot>
+</XSD>

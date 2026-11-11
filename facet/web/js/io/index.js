@@ -13,6 +13,7 @@ import { det3, slug } from '../core/util.js';
 import { readPOSCAR, writePOSCAR, speciesBlocks, velocityRows } from './poscar.js';
 import { readCIF, writeCIF } from './cif.js';
 import { readPDB, writePDB } from './pdb.js';
+import { readXSD, writeXSD, cellOrientation, nonElements } from './xsd.js';
 import { readJSON, writeJSON } from './jsonfmt.js';
 import { OCCUPANCY_TOLERANCE, OVERLAP_CHECK_MAX_ATOMS, WRITER_CAPABILITIES, validateCapabilities } from './capabilities.js';
 import { RESULT_INFO, RESULT_PROPS, poscarOrder } from '../core/structure.js';
@@ -65,6 +66,7 @@ formats.register({ id: 'extxyz', name: 'Extended XYZ', extensions: ['extxyz'], r
 formats.register({ id: 'poscar', name: 'VASP POSCAR', extensions: ['vasp', 'poscar'], filenames: ['POSCAR', 'CONTCAR', 'XDATCAR'], read: readPOSCAR, write: writePOSCAR, description: 'VASP 4/5 POSCAR, CONTCAR, XDATCAR', capabilities: CAPS.poscar });
 formats.register({ id: 'cif', name: 'CIF', extensions: ['cif', 'mcif'], read: readCIF, write: writeCIF, description: 'Crystallographic Information File (symmetry expanded)', capabilities: CAPS.cif });
 formats.register({ id: 'pdb', name: 'PDB', extensions: ['pdb', 'ent'], read: readPDB, write: writePDB, description: 'Protein Data Bank (ATOM/HETATM, CRYST1, MODEL)', capabilities: CAPS.pdb });
+formats.register({ id: 'xsd', name: 'Materials Studio XSD', extensions: ['xsd'], read: readXSD, write: writeXSD, mime: 'application/xml', description: 'Materials Studio XSD (3D atomistic document; save as .xsd)', capabilities: CAPS.xsd });
 formats.register({ id: 'json', name: 'Facet JSON', extensions: ['json'], read: readJSON, write: writeJSON, mime: 'application/json', description: 'Native structure JSON', capabilities: CAPS.json });
 
 export function detectFormat(filename = '', text = '') {
@@ -76,6 +78,7 @@ export function detectFormat(filename = '', text = '') {
   // sniff content
   const head = text.slice(0, 2000);
   if (/^\s*[{[]/.test(head)) return 'json';
+  if (/^\s*</.test(head) && /<XSD|<!DOCTYPE XSD/.test(head)) return 'xsd';
   if (/^data_|_cell[._]length_a/m.test(head)) return 'cif';
   if (/^(ATOM  |HETATM|CRYST1)/m.test(head)) return 'pdb';
   if (/^\s*\d+\s*\n/.test(head)) return 'xyz';
@@ -198,6 +201,9 @@ function report(s, id, caps, frame) {
       warnings.push(`${F} stores these constraints as ASE FixCartesian masks because ${partial} atom(s) are only partly fixed; ASE's VASP writer ignores FixCartesian and would write every atom as free, so export POSCAR from Facet for VASP`);
     }
   }
+  if (c.partial && caps.constraints === 'atoms') {
+    warnings.push(`${c.partial} atom(s) are fixed along some directions only; ${F} fixes whole atoms, so they are written as fixed`);
+  }
   // W7: occupancies
   const q = partlyOccupied(s);
   if (q && caps.occupancy === false) warnings.push(`${q} site(s) are partially occupied, but ${F} cannot store occupancy; they are written as full atoms`);
@@ -216,6 +222,19 @@ function report(s, id, caps, frame) {
   // W10: a left-handed cell
   if (caps.handedness && cell && det3(cell) < 0) {
     warnings.push('the cell is left-handed (negative volume); VASP stops on such cells, so swap two cell vectors first');
+  }
+  // Materials Studio XSD (docs/design/xsd-export §5.1, §5.4): symbols that are not elements, the cell as written
+  let orientation = null;
+  if (id === 'xsd') {
+    const odd = nonElements(s.symbols);
+    if (odd.length) {
+      const count = s.symbols.filter((sym) => odd.includes(sym)).length;
+      warnings.push(`${count} atom(s) have a symbol that is not a chemical element (${odd.join(', ')}); Materials Studio may not recognise them`);
+    }
+    if (cell) { try { orientation = cellOrientation(cell); } catch { /* a cell without volume: the writer fails as well */ } }
+    if (orientation === 'left-handed') {
+      warnings.push('the cell is left-handed (negative volume) and is written as it is; Materials Studio may show its mirror image');
+    }
   }
   // W11: overlapping atoms, with the periodicity the written file has (positions that are not finite: no check)
   const finite = Array.prototype.every.call(s._framePositions(k), Number.isFinite);
@@ -236,7 +255,10 @@ function report(s, id, caps, frame) {
     const idx = poscarOrder(s.symbols, null, speciesBlocks(s));
     if (idx.some((v, t) => v !== t)) notes.push(`${F} groups atoms by element, so the atom order in the file differs from the order in the structure; sort the atoms by species to make them match`);
   }
-  if (id === 'poscar' && cell && finite) {
+  if (orientation === 'rotated') {
+    notes.push("the cell is written in Materials Studio's orientation (c along z, b in the yz plane): the structure is turned as a whole and the fractional coordinates are unchanged");
+  }
+  if ((id === 'poscar' || id === 'xsd') && cell && finite) {
     for (let axis = 0; axis < 3; axis++) {
       if (s.pbc?.[axis]) continue;
       const gap = findVacuumGap(s, axis, { minWidth: 0, frame: k, periodicOnly: false });
@@ -258,9 +280,11 @@ function report(s, id, caps, frame) {
  * What writing `s` as `formatId` loses or changes: `{warnings, notes}` (word for word Python's
  * facet.io.export_report). Warnings change a calculation or lose data: a single-frame format, the unit cell,
  * constraints, partial occupancies, props Extended XYZ cannot write, results known only for the first frame, a
- * left-handed cell, atoms closer than 0.5 Å. Notes do not: the POSCAR atom order, a non-periodic axis written as a
- * POSCAR cell vector, velocities a format cannot store (or POSCAR velocities that are not three finite numbers for
- * every atom), a skipped overlap check (more than 200 000 atoms). `frame` is the frame the file holds (default: the
+ * left-handed cell, atoms closer than 0.5 Å; for Materials Studio XSD also atoms fixed along some directions only
+ * (written as fixed) and symbols that are not elements. Notes do not: the POSCAR atom order, a non-periodic axis
+ * written as a POSCAR or XSD cell vector, the cell of an XSD file turned into Materials Studio's orientation,
+ * velocities a format cannot store (or POSCAR velocities that are not three finite numbers for every atom), a
+ * skipped overlap check (more than 200 000 atoms). `frame` is the frame the file holds (default: the
  * current frame, which the web writers write; frame 0 for a format the server writes, as the Python writers and
  * the server's own report do). Synchronous for every format (server formats use the capabilities copied from
  * GET /formats); a format without capabilities gives empty lists, an unknown one throws.

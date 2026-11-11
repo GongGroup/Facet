@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="latin1"?>
+<!DOCTYPE XSD []>
+<!-- Hand-written test fixture, modelled on a document of format version 4.4 (a polymer repeat unit): the atoms are
+     nested in Molecule/RepeatUnit, have child elements and no names. Not a real file. -->
+<XSD Version="4.4">
+	<AtomisticTreeRoot ID="1" NumProperties="1" NumChildren="1">
+		<Property Name="IsBackboneAtom" DefinedOn="Atom" Type="Boolean"/>
+		<Molecule ID="2" NumChildren="1" Name="Sketch 5" XYZ="0,0,0" Opacity="127" ColorMode="0">
+			<RepeatUnit ID="3" NumChildren="5" XYZ="0,0,0" FlipProbability="0" ChiralInversionProbability="0">
+				<Atom3d ID="4" HasProperties="1" DisplayStyle="Ball and Stick" XYZ="5.27632021913704,-0.601148194589268,-0.642270122233854" Connections="5" Components="C" Color="130,130,130,255">
+					<Properties IsBackboneAtom="1"/>
+				</Atom3d>
+				<Atom3d ID="6" HasProperties="1" DisplayStyle="Ball and Stick" XYZ="3.87248585004214,0.031978155746196,-0.642270122233854" Connections="7,5" Components="C" Color="255,0,255,255">
+					<Properties IsBackboneAtom="1"/>
+				</Atom3d>
+				<Bond ID="5" Connects="4,6"/>
+				<Atom3d ID="8" HasProperties="1" DisplayStyle="Ball and Stick" XYZ="-0.051878442176104,-0.899041554062534,-0.361157068429096" Connections="7" Components="O" Color="255,0,255,255">
+					<Properties IsBackboneAtom="1"/>
+				</Atom3d>
+				<Bond ID="7" Connects="6,8"/>
+			</RepeatUnit>
+		</Molecule>
+	</AtomisticTreeRoot>
+</XSD>
