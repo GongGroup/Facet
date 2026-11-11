@@ -14,7 +14,15 @@ from ...plugins import PluginManager
 from ...core.elements import covalent_radius
 from ..auth import current_user
 from ..deps import MAX_ATOMS, get_plugins, get_settings, json_response
-from ..models import BondsRequest, BondsResponse, CoordinationRequest, CustomAnalysisRequest, RdfRequest, StructureRequest
+from ..models import (
+    BondsRequest,
+    BondsResponse,
+    CoordinationRequest,
+    CustomAnalysisRequest,
+    RdfRequest,
+    StructureRequest,
+    TerminationsRequest,
+)
 
 def _signed_in_on_cloud(request: Request) -> None:
     """Analyses run on the server's CPU: in cloud mode only signed-in users may start them
@@ -164,3 +172,17 @@ def run_custom_analysis(name: str, body: CustomAnalysisRequest, plugins: PluginM
     except (TypeError, ValueError) as exc:
         raise HTTPException(400, f"analysis {name!r} failed: {exc}") from exc
     return json_response({"result": jsonable(result), "analysis": name, "plugin": spec.plugin})
+
+
+@router.post("/terminations", summary="Terminations of a lattice plane")
+def analysis_terminations(body: TerminationsRequest):
+    """What cleaving ``structure`` along ``miller`` gives: the surface cell, the atomic layers of one period, every
+    cut and the inequivalent terminations, best first (``facet.build.surface_analysis(...).to_dict()``)."""
+    from ...build import surface_analysis
+
+    try:
+        an = surface_analysis(body.structure.to_structure(), body.miller,
+                              **body.model_dump(exclude={"structure", "miller"}))
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return json_response(an.to_dict())

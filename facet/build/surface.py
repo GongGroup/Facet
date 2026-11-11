@@ -1293,12 +1293,12 @@ _DEG = "°"
 _NOT_COPIED = ("selective_dynamics", "tags", "adsorbate_id")
 #: Surface supercells that can be given by name, on the meshes they fit: rows = the new a and b in the 1×1 mesh.
 _WOOD_PRESETS = {
-    "c(2x2)": ([[1, 1], [-1, 1]], ("square", "rectangular")),
-    "(sqrt2xsqrt2)r45": ([[1, 1], [-1, 1]], ("square",)),
-    "(sqrt3xsqrt3)r30": ([[2, 1], [-1, 1]], ("hexagonal",)),
-    "(2sqrt3x2sqrt3)r30": ([[4, 2], [-2, 2]], ("hexagonal",)),
-    "(sqrt7xsqrt7)r19.1": ([[3, 1], [-1, 2]], ("hexagonal",)),
-    "(sqrt5xsqrt5)r26.6": ([[2, 1], [-1, 2]], ("square",)),
+    "c2x2": ([[1, 1], [-1, 1]], ("square", "rectangular")),
+    "sqrt2xsqrt2r45": ([[1, 1], [-1, 1]], ("square",)),
+    "sqrt3xsqrt3r30": ([[2, 1], [-1, 1]], ("hexagonal",)),
+    "2sqrt3x2sqrt3r30": ([[4, 2], [-2, 2]], ("hexagonal",)),
+    "sqrt7xsqrt7r19.1": ([[3, 1], [-1, 2]], ("hexagonal",)),
+    "sqrt5xsqrt5r26.6": ([[2, 1], [-1, 2]], ("square",)),
 }
 
 
@@ -1319,15 +1319,13 @@ def parse_surface_supercell(spec: Any, mesh_type: str | None = None) -> list[lis
         return [[1, 0], [0, 1]]
     if isinstance(spec, str):
         text = spec.strip()
+        # the name without blanks, brackets and the degree sign: "(√3×√3)R30°" and "sqrt3xsqrt3R30" are the same
         key = (text.lower().replace(" ", "").replace(_TIMES, "x").replace(_SQRT, "sqrt").replace(_DEG, "")
-               .replace("−", "-"))
-        mm = re.fullmatch(r"p?\(?(\d+)x(\d+)\)?", key)
+               .replace("(", "").replace(")", ""))
+        mm = re.fullmatch(r"p?(\d+)x(\d+)", key)
         if mm:
             S = [[int(mm.group(1)), 0], [0, int(mm.group(2))]]
         else:
-            if not key.startswith("(") and key.startswith("sqrt"):
-                at = key.find("r")
-                key = "(" + (key[:at] + ")" + key[at:] if at > 0 else key + ")")
             preset = _WOOD_PRESETS.get(key)
             if preset is None:
                 raise ValueError(f"unknown surface supercell '{text}' (use for example p(2{_TIMES}2), "

@@ -896,9 +896,28 @@ input.field[aria-invalid="true"], select.field[aria-invalid="true"] { border-col
 /* --- end M1 --- */
 
 /* --- surface-modeling M2-cleave --- */
+.cleave-info b, .slab-info b { color: var(--fg-2); font-weight: 600; }
+.cleave-terms { display: grid; gap: 4px; }
+.cleave-term { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 4px 8px; border: 1px solid var(--line); border-radius: var(--r-sm, 6px); font-size: 12.5px; cursor: pointer; }
+.cleave-term:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.cleave-term input { flex: none; margin: 0; accent-color: var(--accent); }
+.cleave-term b { font-weight: 600; white-space: nowrap; }
+.cleave-term .meta { color: var(--muted); font: 500 11px var(--font-mono); margin-left: auto; white-space: nowrap; }
+.cleave-term .tag { flex: none; font-size: 11px; padding: 1px 6px; border-radius: 999px; background: var(--panel-2); color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
+.cleave-term .tag.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 50%, var(--line)); }
+.cleave-rep { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.cleave-rep > .inp { flex: 1; min-width: 0; }
+.cleave-summary { gap: 4px; }
+.cleave-summary > span, .cleave-summary > b { display: block; overflow-wrap: anywhere; }
+.cleave-summary .field-warn { color: var(--warn); }
+.cleave-adv > summary { cursor: pointer; font-size: 12.5px; color: var(--fg-2); }
+.cleave-vac-hint { margin-top: -6px; }
 /* --- end M2-cleave --- */
 
 /* --- surface-modeling M2-slab --- */
+.slab-fix { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 12.5px; color: var(--fg-2); }
+.slab-fix > .inp { flex: 0 0 64px; }
+.slab-fix > .seg { flex: 0 0 auto; width: auto; }
 /* --- end M2-slab --- */
 
 /* --- surface-modeling M3-markers --- */

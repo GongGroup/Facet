@@ -299,6 +299,27 @@ class Client:
         body = {"structure": _struct_dict(structure), "repeat": list(repeat)}
         return Structure.from_dict(self.request("POST", "/build/supercell", body)["structure"])
 
+    def surface(self, structure: Structure | dict[str, Any], miller: Iterable[int], *, vacuum: float,
+                **options: Any) -> Structure:
+        """Cleave a slab from *structure* along *miller* (``POST /build/surface``, :func:`facet.build.surface`).
+
+        *vacuum* is the total gap in Å (required; 0 for none).  *options* are the server's fields in camelCase or
+        snake_case: ``layers``, ``periods``, ``termination``, ``supercell``, ``fixBottom``, ``symmetric``, ...
+        """
+        body = {"structure": _struct_dict(structure), "miller": list(miller), "vacuum": vacuum, **options}
+        return Structure.from_dict(self.request("POST", "/build/surface", body)["structure"])
+
+    def terminations(self, structure: Structure | dict[str, Any], miller: Iterable[int], **options: Any) -> dict[str, Any]:
+        """The surface analysis of the plane *miller* (``POST /analysis/terminations``): the surface cell, layers,
+        cuts and the inequivalent ``terminations``, best first."""
+        body = {"structure": _struct_dict(structure), "miller": list(miller), **options}
+        return self.request("POST", "/analysis/terminations", body)
+
+    def set_vacuum(self, structure: Structure | dict[str, Any], vacuum: float, **options: Any) -> Structure:
+        """*structure* with its vacuum set to *vacuum* Å, the total gap (``POST /build/vacuum``)."""
+        body = {"structure": _struct_dict(structure), "vacuum": vacuum, **options}
+        return Structure.from_dict(self.request("POST", "/build/vacuum", body)["structure"])
+
     def molecule(self, name: str) -> Structure:
         return Structure.from_dict(self.request("GET", f"/build/molecule/{urllib.parse.quote(name)}")["structure"])
 

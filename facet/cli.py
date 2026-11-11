@@ -200,6 +200,12 @@ def cmd_build(args: argparse.Namespace) -> int:
 
     from . import build
 
+    if args.kind == "surface":
+        s = build.surface(_read_input(args), args.hkl, **_surface_keywords(args))
+        _write_or_print(s, args.output, args.format)
+        for w in s.info.get("warnings", []):
+            print(f"facet: warning: {w}", file=sys.stderr)
+        return 0
     if args.kind == "crystal":
         kw = {}
         if args.u is not None:
@@ -245,6 +251,89 @@ def cmd_build(args: argparse.Namespace) -> int:
     else:
         s = build.molecule(args.name)
     _write_or_print(s, args.output, args.format)
+    return 0
+
+
+def _read_input(args: argparse.Namespace) -> Any:
+    from .io import read
+
+    return read(args.input, format=getattr(args, "from_", None))
+
+
+def _surface_keywords(args: argparse.Namespace) -> dict[str, Any]:
+    """The keyword arguments of ``build.surface`` from the options of ``facet build surface``."""
+    kw: dict[str, Any] = {"vacuum": args.vacuum, "primitive": not args.no_primitive, "symmetric": args.symmetric,
+                          "position": args.position, "offset": args.offset, "fix_axes": args.axes,
+                          "miller_basis": "conventional" if args.conventional else "input"}
+    for key in ("layers", "periods", "thickness", "layer_tolerance", "name"):
+        if getattr(args, key) is not None:
+            kw[key] = getattr(args, key)
+    if args.termination is not None:
+        kw["termination"] = int(args.termination) if args.termination.isdigit() else args.termination
+    if args.supercell is not None and args.wood is not None:
+        raise ValueError("give only one of --supercell and --wood")
+    if args.supercell is not None:
+        v = args.supercell
+        if len(v) not in (2, 4):
+            raise ValueError("--supercell takes N M, or the four numbers of a 2x2 matrix")
+        kw["supercell"] = list(v) if len(v) == 2 else [v[:2], v[2:]]
+    if args.wood is not None:
+        kw["supercell"] = args.wood
+    if args.fix_bottom:
+        kw["fix_bottom"] = args.fix_bottom
+    if args.fix_middle:
+        kw["fix_middle"] = args.fix_middle
+    return kw
+
+
+def cmd_terminations(args: argparse.Namespace) -> int:
+    """List the terminations of a lattice plane: what ``build surface --termination`` can take."""
+    from . import build
+
+    an = build.surface_analysis(_read_input(args), args.hkl, primitive=not args.no_primitive,
+                                miller_basis="conventional" if args.conventional else "input",
+                                layer_tolerance=args.layer_tolerance)
+    if args.json:
+        print(json.dumps(an.to_dict(), ensure_ascii=False, indent=1))
+        return 0
+    mesh = an.mesh
+    idx = an.hkil if an.hkil is not None else an.miller
+    print(f"plane ({' '.join(str(x) for x in idx)})  surface cell {mesh['a']:.4f} x {mesh['b']:.4f} A, "
+          f"gamma {mesh['gamma']:.2f} deg, {mesh['area']:.4f} A^2 ({mesh['type']})")
+    print(f"period {an.period:.4f} A, {an.m} layer(s): " + " | ".join(L["formula"] for L in an.layers))
+    tasker = {1: "Tasker type 1", 2: "Tasker type 2", 3: "Tasker type 3 (polar)"}.get(an.tasker, "charges unknown")
+    print(tasker)
+    print(f"{'#':>2}  {'termination':<20} {'bonds/cell':>10}  polar")
+    for t in an.terminations:
+        polar = "?" if t["polar"] is None else ("yes" if t["polar"] else "no")
+        print(f"{t['index']:>2}  {t['label']:<20} {t['brokenBonds']:>10}  {polar}")
+    for note in an.notes + an.warnings:
+        print(f"facet: note: {note}", file=sys.stderr)
+    return 0
+
+
+def cmd_edit(args: argparse.Namespace) -> int:
+    """Slab tools on a file: vacuum, center-slab, flip, fix-layers, free."""
+    from . import build
+
+    s = _read_input(args)
+    before = list(s.info.get("warnings", []))
+    if args.action == "vacuum":
+        build.set_vacuum(s, args.vacuum, position=args.position, offset=args.offset)
+    elif args.action == "center-slab":
+        build.center_slab(s)
+    elif args.action == "flip":
+        build.flip_slab(s)
+    elif args.action == "fix-layers":
+        n = build.fix_layers(s, args.layers, where=args.where, axes=args.axes)
+        print(f"fixed {n} atom(s)", file=sys.stderr)
+    else:
+        n = build.free_atoms(s)
+        print(f"freed {n} atom(s)", file=sys.stderr)
+    _write_or_print(s, args.output, args.format)
+    for w in s.info.get("warnings", []):
+        if w not in before:
+            print(f"facet: warning: {w}", file=sys.stderr)
     return 0
 
 
@@ -448,6 +537,19 @@ def cmd_formats(args: argparse.Namespace) -> int:
 
 
 # -------------------------------------------------------------------- parser
+def _surface_plane_options(sp: argparse.ArgumentParser) -> None:
+    """The options that say which plane of which crystal: shared by ``build surface`` and ``terminations``."""
+    sp.add_argument("input", help="crystal file (CIF, POSCAR, ...)")
+    sp.add_argument("--hkl", type=int, nargs="+", required=True, metavar="H",
+                    help="Miller indices h k l of the file's cell (h k i l on a hexagonal cell)")
+    sp.add_argument("--from", dest="from_", help="input format (default: detected)")
+    sp.add_argument("--conventional", action="store_true",
+                    help="the indices refer to the conventional cell (for a primitive fcc, bcc or rhombohedral cell)")
+    sp.add_argument("--no-primitive", action="store_true",
+                    help="keep the surface mesh of the input cell instead of the smallest one")
+    sp.add_argument("--layer-tolerance", type=float, help="atoms closer than this along the normal share a layer (Å)")
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Create the argument parser (exposed for documentation and tests)."""
     p = argparse.ArgumentParser(prog="facet", description="Facet — visualise atoms, clusters and crystals.")
@@ -511,15 +613,65 @@ def build_parser() -> argparse.ArgumentParser:
     bk.add_argument("--truncate", type=int, help="octahedron vertex truncation")
     bm = bsub.add_parser("molecule", help="molecule from the built-in library")
     bm.add_argument("name", help="water methane ammonia co2 benzene ethanol methanol ethylene acetylene caffeine c60")
+    bs = bsub.add_parser("surface", help="slab cleaved from a crystal file along a lattice plane",
+                         description="Cleave the crystal in INPUT along (h k l) and write the slab: a along x, the "
+                                     "surface normal along z, the vacuum along c.  Example: "
+                                     "facet build surface Pt.cif --hkl 1 1 1 --vacuum 15 --layers 4 "
+                                     "--supercell 3 3 --fix-bottom 2 -o POSCAR")
+    _surface_plane_options(bs)
+    bs.add_argument("--vacuum", type=float, required=True,
+                    help="total gap between the slab and its periodic image (Å), not per side; 0 for none "
+                         "(the slab then repeats as in the bulk)")
+    bs.add_argument("--layers", type=int, help="number of atomic layers (default 4)")
+    bs.add_argument("--periods", type=int, help="number of stacking periods, instead of --layers")
+    bs.add_argument("--thickness", type=float, help="smallest thickness (Å), instead of --layers")
+    bs.add_argument("--termination", help="index or label from 'facet terminations' (default 0)")
+    bs.add_argument("--symmetric", action="store_true", help="add layers until top and bottom match")
+    bs.add_argument("--supercell", type=int, nargs="+", metavar="N", help="surface supercell: N M, or a 2x2 matrix "
+                                                                           "as four numbers")
+    bs.add_argument("--wood", help="surface supercell by name: 'p(2x2)', 'c(2x2)', '(sqrt3xsqrt3)R30'")
+    bs.add_argument("--fix-bottom", type=int, default=0, metavar="N", help="fix the lowest N layers")
+    bs.add_argument("--fix-middle", type=int, default=0, metavar="N", help="fix the middle N layers")
+    bs.add_argument("--axes", default="abc", help="fixed directions of --fix-*: abc (default) or e.g. c")
+    bs.add_argument("--position", choices=("center", "bottom"), default="center", help="slab position in the cell")
+    bs.add_argument("--offset", type=float, default=0.0, help="height of the lowest atoms with --position bottom (Å)")
+    bs.add_argument("--name", help="name of the slab (default: an automatic name such as 'Pt(111) p(3x3) 4L')")
     bu = bsub.add_parser("custom", help="structure from a plugin builder (omit NAME to list them)")
     bu.add_argument("name", nargs="?", help="builder name, e.g. hello-chain")
     bu.add_argument("-p", "--param", metavar="KEY=VALUE", action="append", default=[],
                     help="builder parameter (repeatable), e.g. --param n=12")
-    for sp in (bc, bk, bm, bu):
+    for sp in (bc, bk, bm, bu, bs):
         sp.add_argument("-o", "--output", help="output file (default: extended XYZ on stdout)")
         sp.add_argument("--format", help="output format (default: from extension)")
         with_plugins(sp)
     b.set_defaults(func=cmd_build)
+
+    tm = sub.add_parser("terminations", help="list the terminations of a lattice plane of a crystal file")
+    _surface_plane_options(tm)
+    tm.add_argument("--json", action="store_true", help="print the whole analysis as JSON")
+    with_plugins(tm)
+    tm.set_defaults(func=cmd_terminations)
+
+    ed = sub.add_parser("edit", help="slab tools: vacuum, center-slab, flip, fix-layers, free")
+    esub = ed.add_subparsers(dest="action", metavar="ACTION", required=True)
+    ev = esub.add_parser("vacuum", help="set the vacuum of a slab (the total gap, Å)")
+    ev.add_argument("--vacuum", type=float, required=True, help="total gap between the slab and its periodic image (Å)")
+    ev.add_argument("--position", choices=("center", "bottom"), default="center")
+    ev.add_argument("--offset", type=float, default=0.0, help="height of the lowest atoms with --position bottom (Å)")
+    ec = esub.add_parser("center-slab", help="move a slab to the middle of its cell")
+    ef = esub.add_parser("flip", help="turn a slab upside down (180 degrees about a)")
+    ex = esub.add_parser("fix-layers", help="fix atomic layers with selective dynamics")
+    ex.add_argument("--layers", "-n", type=int, required=True, help="number of layers to fix")
+    ex.add_argument("--where", choices=("bottom", "top", "middle"), default="bottom")
+    ex.add_argument("--axes", default="abc", help="fixed directions: abc (default) or e.g. c")
+    er = esub.add_parser("free", help="remove every constraint")
+    for sp in (ev, ec, ef, ex, er):
+        sp.add_argument("input", help="structure file")
+        sp.add_argument("--from", dest="from_", help="input format (default: detected)")
+        sp.add_argument("-o", "--output", help="output file (default: extended XYZ on stdout)")
+        sp.add_argument("--format", help="output format (default: from extension)")
+        with_plugins(sp)
+    ed.set_defaults(func=cmd_edit)
 
     a = sub.add_parser("analyze", help="run an analysis (summary, coordination, rdf or a plugin analysis)")
     a.add_argument("name", help="analysis name, e.g. rdf or hello-com")

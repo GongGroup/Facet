@@ -10,13 +10,13 @@ from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 
-from ...build import CLUSTERS, MOLECULES, PROTOTYPES, cluster, crystal, molecule
+from ...build import CLUSTERS, MOLECULES, PROTOTYPES, cluster, crystal, molecule, set_vacuum, surface
 from ...build.cluster import cluster_kind, estimate_cluster_atoms
 from ...config import Settings
 from ...core.structure import Structure
 from ...plugins import PluginManager
 from ..deps import MAX_ATOMS, get_plugins, get_settings, json_response, structure_response
-from ..models import ClusterRequest, CrystalRequest, StructureEnvelope, SupercellRequest
+from ..models import ClusterRequest, CrystalRequest, StructureEnvelope, SupercellRequest, SurfaceRequest, VacuumRequest
 
 router = APIRouter(prefix="/build", tags=["build"])
 
@@ -99,6 +99,41 @@ def build_supercell(body: SupercellRequest, settings: Settings = Depends(get_set
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     return structure_response(out)
+
+
+@router.post("/surface", response_model=StructureEnvelope, summary="Cleave a surface")
+def build_surface(body: SurfaceRequest, settings: Settings = Depends(get_settings)):
+    """The slab cleaved from ``structure`` along ``miller`` (see :func:`facet.build.surface`): a along x, the
+    surface normal along z, the vacuum (required, the total gap) along c.  ``info.warnings`` of the slab says what to
+    check (not stoichiometric, polar, charged)."""
+    kw = body.model_dump(exclude={"structure", "miller"})
+    try:
+        bulk = body.structure.to_structure()
+        layers = body.layers or 4
+        det = 1
+        if isinstance(body.supercell, list) and len(body.supercell) == 2 and all(isinstance(x, int) for x in body.supercell):
+            det = max(1, body.supercell[0] * body.supercell[1])
+        # at most one input atom per layer and surface cell: a cheap upper bound before anything is built
+        if len(bulk) * layers * det > 50 * _limit(settings):
+            raise _too_many(len(bulk) * layers * det, _limit(settings))
+        out = surface(bulk, body.miller, **kw)
+        if len(out) > _limit(settings):
+            raise _too_many(len(out), _limit(settings))
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return structure_response(out)
+
+
+@router.post("/vacuum", response_model=StructureEnvelope, summary="Set the vacuum of a slab")
+def build_vacuum(body: VacuumRequest):
+    """``structure`` with the vacuum set to ``vacuum`` Å, the total gap along the surface normal
+    (see :func:`facet.build.set_vacuum`; Materials Studio's Build Vacuum Slab)."""
+    try:
+        s = body.structure.to_structure()
+        set_vacuum(s, body.vacuum, position=body.position, offset=body.offset, axis=body.axis)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return structure_response(s)
 
 
 @router.get("/molecules", summary="Molecule library")

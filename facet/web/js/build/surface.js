@@ -1150,12 +1150,12 @@ const DEG = '°';
 const NOT_COPIED = ['selective_dynamics', 'tags', 'adsorbate_id'];
 /** Surface supercells that can be given by name, on the meshes they fit: rows = the new a and b in the 1×1 mesh. */
 const WOOD_PRESETS = {
-  'c(2x2)': [[[1, 1], [-1, 1]], ['square', 'rectangular']],
-  '(sqrt2xsqrt2)r45': [[[1, 1], [-1, 1]], ['square']],
-  '(sqrt3xsqrt3)r30': [[[2, 1], [-1, 1]], ['hexagonal']],
-  '(2sqrt3x2sqrt3)r30': [[[4, 2], [-2, 2]], ['hexagonal']],
-  '(sqrt7xsqrt7)r19.1': [[[3, 1], [-1, 2]], ['hexagonal']],
-  '(sqrt5xsqrt5)r26.6': [[[2, 1], [-1, 2]], ['square']],
+  'c2x2': [[[1, 1], [-1, 1]], ['square', 'rectangular']],
+  'sqrt2xsqrt2r45': [[[1, 1], [-1, 1]], ['square']],
+  'sqrt3xsqrt3r30': [[[2, 1], [-1, 1]], ['hexagonal']],
+  '2sqrt3x2sqrt3r30': [[[4, 2], [-2, 2]], ['hexagonal']],
+  'sqrt7xsqrt7r19.1': [[[3, 1], [-1, 2]], ['hexagonal']],
+  'sqrt5xsqrt5r26.6': [[[2, 1], [-1, 2]], ['square']],
 };
 const isList = (v) => Array.isArray(v) || (ArrayBuffer.isView(v) && !(v instanceof DataView));
 
@@ -1172,14 +1172,11 @@ export function parseSurfaceSupercell(spec, meshTypeName = null) {
   if (spec == null) return [[1, 0], [0, 1]];
   if (typeof spec === 'string') {
     const text = spec.trim();
-    let key = text.toLowerCase().replaceAll(' ', '').replaceAll(TIMES, 'x').replaceAll(SQRT, 'sqrt').replaceAll(DEG, '').replaceAll('−', '-');
-    const mm = /^p?\(?(\d+)x(\d+)\)?$/.exec(key);
+    // the name without blanks, brackets and the degree sign: '(√3×√3)R30°' and 'sqrt3xsqrt3R30' are the same
+    const key = text.toLowerCase().replaceAll(' ', '').replaceAll(TIMES, 'x').replaceAll(SQRT, 'sqrt').replaceAll(DEG, '').replaceAll('(', '').replaceAll(')', '');
+    const mm = /^p?(\d+)x(\d+)$/.exec(key);
     if (mm) S = [[Number(mm[1]), 0], [0, Number(mm[2])]];
     else {
-      if (!key.startsWith('(') && key.startsWith('sqrt')) {
-        const at = key.indexOf('r');
-        key = `(${at > 0 ? `${key.slice(0, at)})${key.slice(at)}` : `${key})`}`;
-      }
       const preset = Object.hasOwn(WOOD_PRESETS, key) ? WOOD_PRESETS[key] : null;
       if (!preset) throw new Error(`unknown surface supercell '${text}' (use for example p(2${TIMES}2), (${SQRT}3${TIMES}${SQRT}3)R30${DEG}, c(2${TIMES}2) or a 2${TIMES}2 matrix)`);
       if (meshTypeName != null && !preset[1].includes(meshTypeName)) throw new Error(`${text} does not fit this surface cell (${meshTypeName})`);

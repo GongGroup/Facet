@@ -181,6 +181,57 @@ class StructureRequest(BaseModel):
     structure: StructureModel
 
 
+class TerminationsRequest(BaseModel):
+    """Describe a lattice plane of a crystal (``facet.build.surface_analysis``)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    structure: StructureModel
+    miller: list[int] = Field(..., min_length=3, max_length=4, description="(h, k, l) of the structure's cell, or "
+                              "(h, k, i, l) on a hexagonal cell.", examples=[[1, 1, 1]])
+    miller_basis: str = Field("input", alias="millerBasis", description="'input' or 'conventional'.")
+    primitive: bool = Field(True, description="Reduce to the primitive cell first (the smallest surface cell).")
+    translation_tolerance: Optional[float] = Field(None, alias="translationTolerance", gt=0, le=1)
+    layer_tolerance: Optional[float] = Field(None, alias="layerTolerance", ge=0.01, le=2)
+    charges: Optional[dict[str, float]] = Field(None, description="Formal charges per element (default: estimated).")
+
+
+class SurfaceRequest(TerminationsRequest):
+    """Cleave a slab from a crystal (``facet.build.surface``).  ``vacuum`` is required: the total gap in Å."""
+
+    model_config = ConfigDict(populate_by_name=True, json_schema_extra={"examples": [
+        {"structure": {"symbols": ["Pt"], "positions": [[0, 0, 0]], "cell": [[0, 1.96, 1.96], [1.96, 0, 1.96], [1.96, 1.96, 0]]},
+         "miller": [1, 1, 1], "millerBasis": "conventional", "vacuum": 15, "layers": 4, "supercell": [3, 3], "fixBottom": 2},
+    ]})
+
+    vacuum: float = Field(..., ge=0, le=1000, description="Total gap between the slab and its periodic image (Å); "
+                          "0 for none (the slab then repeats as in the bulk).")
+    layers: Optional[int] = Field(None, ge=1, le=1000, description="Atomic layers (default 4).")
+    periods: Optional[int] = Field(None, ge=1, le=1000, description="Stacking periods, instead of layers.")
+    thickness: Optional[float] = Field(None, gt=0, le=500, description="Smallest thickness (Å), instead of layers.")
+    termination: Union[int, str] = Field(0, description="Index or label of a termination.")
+    cut: Optional[int] = Field(None, ge=0)
+    symmetric: bool = False
+    position: str = Field("center", description="'center' or 'bottom'.")
+    offset: float = Field(0.0, ge=0)
+    supercell: Optional[Union[str, list[int], list[list[int]]]] = Field(
+        None, description="Surface supercell: [n, m], a 2×2 matrix, or a name such as 'p(2×2)' or '(√3×√3)R30°'.")
+    fix_bottom: int = Field(0, alias="fixBottom", ge=0)
+    fix_middle: int = Field(0, alias="fixMiddle", ge=0)
+    fix_axes: str = Field("abc", alias="fixAxes")
+    name: Optional[str] = None
+
+
+class VacuumRequest(BaseModel):
+    """Set the vacuum of a slab (``facet.build.set_vacuum``): the total gap in Å."""
+
+    structure: StructureModel
+    vacuum: float = Field(..., gt=0, le=1000, description="Total gap between the slab and its periodic image (Å).")
+    position: str = Field("center", description="'center' or 'bottom'.")
+    offset: float = Field(0.0, ge=0)
+    axis: Optional[int] = Field(None, ge=0, le=2, description="Vacuum axis (default: detected).")
+
+
 class BondsRequest(BaseModel):
     structure: StructureModel
     scale: float = Field(1.15, gt=0, le=5, description="Bond if d < scale·(r_cov,i + r_cov,j).")

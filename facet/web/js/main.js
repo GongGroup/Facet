@@ -16,9 +16,11 @@ import './ui/panels/appearance.js';
 // --- end M1-commands ---
 
 // --- surface-modeling M2-cleave ---
+import './ui/panels/cleave.js';
 // --- end M2-cleave ---
 
 // --- surface-modeling M2-slab ---
+import './ui/panels/slab.js';
 // --- end M2-slab ---
 
 // --- surface-modeling M3-commands ---
