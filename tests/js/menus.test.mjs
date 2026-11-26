@@ -147,9 +147,28 @@ const pathOf = (tree, id) => { const x = find(tree, id); return x ? [...x.path, 
 const menuOf = (tree, id) => tree.find((m) => m.id === id);
 
 describe('MENUS', () => {
-  test('File, Edit, View, Modify, Build, Tools, Window, Help, in the order of Materials Studio', () => {
-    assert.deepEqual(MENUS.map((m) => m.label), ['File', 'Edit', 'View', 'Modify', 'Build', 'Tools', 'Window', 'Help']);
-    assert.deepEqual(MENUS.map((m) => m.id), ['file', 'edit', 'view', 'modify', 'build', 'tools', 'window', 'help']);
+  test('File, Edit, View, Modify, Build, Tools, Statistics, Window, Help, in the order of Materials Studio', () => {
+    assert.deepEqual(MENUS.map((m) => m.label), ['File', 'Edit', 'View', 'Modify', 'Build', 'Tools', 'Statistics', 'Window', 'Help']);
+    assert.deepEqual(MENUS.map((m) => m.id), ['file', 'edit', 'view', 'modify', 'build', 'tools', 'statistics', 'window', 'help']);
+  });
+  test('the commands of the redesigned workbench have their Materials Studio places', () => {
+    const where = new Map();
+    const walk = (entries, path) => { for (const e of entries) { if (typeof e === 'string' && e !== SEP) where.set(e, path.join(' › ')); else if (e?.cmd) where.set(e.cmd, path.join(' › ')); else if (e?.items) walk(e.items, [...path, e.label]); } };
+    for (const m of MENUS) walk(m.items, [m.label]);
+    const expect = {
+      'project.open': 'File', 'file.open': 'File', 'file.importUrl': 'File', 'file.print': 'File',
+      'edit.cut': 'Edit', 'edit.copy': 'Edit', 'edit.paste': 'Edit', 'sel.query': 'Edit',
+      'view.statusBar': 'View', 'view.projectLog': 'View', 'view.displayStyle': 'View', 'view.displayOptions': 'View', 'view.lighting': 'View',
+      'view.explorer.project': 'View › Explorers', 'view.explorer.properties': 'View › Explorers', 'view.hideSelected': 'View › Visibility',
+      'modify.elementProps': 'Modify', 'constraints.edit': 'Modify', 'cell.parameters': 'Modify',
+      'cell.supercell': 'Build › Symmetry', 'build.addAtom': 'Build', 'view.bonds': 'Build',
+      'tools.options': 'Tools', 'tool.rotate': 'Tools', 'stats.composition': 'Statistics',
+      'window.tileH': 'Window', 'window.tileV': 'Window', 'window.cascade': 'Window', 'window.arrange': 'Window', 'window.closeAll': 'Window', 'window.list': 'Window',
+    };
+    for (const [id, path] of Object.entries(expect)) assert.equal(where.get(id), path, id);
+    assert.equal(MENU_LABELS['file.open'], 'Import…');
+    assert.equal(MENU_LABELS['window.tileH'], 'Tile Horizontally');
+    assert.equal(MENU_LABELS['cell.parameters'], 'Lattice Parameters…');
   });
   test('every command of SECTION_COMMANDS has a place of its own (not only the catch-all)', () => {
     const named = new Set();
@@ -182,7 +201,7 @@ describe('commandItem', () => {
   test('label, shortcut, icon and run', () => {
     const { env, ran } = world([]);
     const it = commandItem(C('file.open', 'Open files…', 'File', { kbd: 'mod+o' }), env);
-    assert.deepEqual([it.id, it.label, it.icon, it.disabled, it.tip], ['file.open', 'Open…', 'open', false, null]);
+    assert.deepEqual([it.id, it.label, it.icon, it.disabled, it.tip], ['file.open', 'Import…', 'open', false, null]);
     assert.equal(it.kbd, keyLabel('mod+o'));
     it.run();
     assert.deepEqual(ran, ['file.open']);
@@ -234,7 +253,7 @@ describe('buildMenus', () => {
     ]);
   });
 
-  test('commands nobody placed go to the menu of their category; other categories get a submenu of Tools', () => {
+  test('commands nobody placed go to the menu of their category (analyses to Statistics); other categories get a submenu of Tools', () => {
     const list = [
       C('file.open', 'Open files…', 'File'), C('plug.file', 'Import from the database…', 'File'),
       C('plug.surface', 'Passivate surface', 'Surface'), C('plug.cell', 'Niggli reduce', 'Cell'), C('plug.edit', 'Wrap atoms', 'Edit'),
@@ -254,14 +273,14 @@ describe('buildMenus', () => {
     assert.equal(pathOf(tree, 'plug.tools'), 'Tools › Check Geometry');
     assert.equal(pathOf(tree, 'plug.win'), 'Window › Tile Views');
     assert.equal(pathOf(tree, 'plug.help'), 'Help › Plugin Manual');
-    assert.equal(pathOf(tree, 'plug.a1'), 'Tools › Analysis › Radial Distribution');
-    assert.equal(pathOf(tree, 'plug.a2'), 'Tools › Analysis › Bader Charges');
+    assert.equal(pathOf(tree, 'plug.a1'), 'Statistics › Radial Distribution', 'analyses of plugins go to Statistics');
+    assert.equal(pathOf(tree, 'plug.a2'), 'Statistics › Bader Charges');
     assert.equal(pathOf(tree, 'plug.none'), 'Tools › Other › No Category at All');
     assert.equal(find(tree, 'plug.hidden'), undefined);
-    // every command is in the menus exactly once (file.open also under Import, as MENUS says)
+    // every command is in the menus exactly once (File › Import… is file.open)
     const count = new Map();
     for (const x of flattenMenus(tree)) count.set(x.item.id, (count.get(x.item.id) ?? 0) + 1);
-    for (const c of list.filter((x) => !x.hidden)) assert.equal(count.get(c.id), c.id === 'file.open' ? 2 : 1, c.id);
+    for (const c of list.filter((x) => !x.hidden)) assert.equal(count.get(c.id), 1, c.id);
   });
 
   test('families list the registry in its order, the current one checked; effects are check items', () => {
@@ -275,8 +294,8 @@ describe('buildMenus', () => {
     const view = menuOf(buildMenus(world(list, { state }).env), 'view');
     const sub = (label) => view.items.find((it) => it.label === label).items;
     assert.deepEqual(sub('Looks').map((it) => [it.label, it.checked, it.radio]), [['Studio', false, true], ['Poster', true, true], ['Lab night', false, true]]);
-    assert.deepEqual(sub('Display Style').map((it) => [it.label, it.checked, it.kbd]), [['Ball & stick', false, '1'], ['Space-filling', true, '2']]);
-    assert.deepEqual(sub('Lighting').map((it) => it.checked), [true]);
+    assert.deepEqual(sub('Representation').map((it) => [it.label, it.checked, it.kbd]), [['Ball & stick', false, '1'], ['Space-filling', true, '2']]);
+    assert.deepEqual(sub('Lighting Presets').map((it) => it.checked), [true]);
     assert.deepEqual(sub('Colour Scheme').map((it) => it.checked), [false]);
     assert.deepEqual(sub('Effects').map((it) => [it.label, it.checked, it.radio]), [['Ambient Occlusion', true, undefined], ['Bloom', false, undefined]]);
   });
@@ -292,9 +311,9 @@ describe('buildMenus', () => {
     const tree = buildMenus(world(list, { dynamic }).env);
     assert.equal(pathOf(tree, 'sample.c60'), 'Build › Samples › Molecules › C₆₀ fullerene');
     assert.equal(pathOf(tree, 'export.cif'), 'File › Export › Structure File › CIF');
-    assert.deepEqual(flattenMenus(tree).filter((x) => x.item.id === 'panel.library').map((x) => x.path.join(' › ')), ['View › Explorers', 'Window']);
+    assert.deepEqual(flattenMenus(tree).filter((x) => x.item.id === 'panel.library').map((x) => x.path.join(' › ')), ['View › Explorers']);
     assert.equal(menuOf(tree, 'tools'), undefined, 'nothing is left over for Tools');
-    assert.deepEqual(menuOf(tree, 'window').items.map((it) => it.header ?? it.label ?? '-'), ['Library', '-', 'Structures in this project', '1  Pt']);
+    assert.equal(menuOf(tree, 'window'), undefined, 'no open windows (the `windows` list), no Window menu');
   });
 
   test('a command the environment hides (a download where files cannot be saved) is left out', () => {

@@ -73,6 +73,7 @@ import { createAPI } from './api/public.js';
 import { installEmbedAPI } from './api/embed.js';
 import { installExtensions, syncRegistryCommands } from './api/extensions.js';
 import { bootTasks, bootFailureMessage } from './core/boot.js';
+import { installMsCommands } from './ui/mscommands.js';
 
 async function boot() {
   // start-up data that the imported modules registered (core/boot.js) loads while the app starts
@@ -133,6 +134,9 @@ async function boot() {
 
 function registerCommands(app, shell) {
   commands.setContext(app);
+  // the workbench's commands (Lattice Parameters, Supercell, Atom Selection, Cut / Copy / Paste, Window …) come first:
+  // the fallbacks registered at the end leave the ids they implement alone
+  installMsCommands(app, shell);
   const R = (c) => commands.register(c);
   const hasS = () => !!app.structure;
   const per = () => !!app.structure?.cell;
@@ -226,8 +230,8 @@ function registerCommands(app, shell) {
   // , and . step frames anywhere; ← and → do too unless the view has the focus (there they rotate it)
   R({ id: 'traj.prev', title: 'Previous frame', category: 'Trajectory', key: [',', 'ArrowLeft'], repeat: true, when: () => (app.structure?.nFrames ?? 1) > 1, run: () => app.viewer.setFrame((app.structure.frame - 1 + app.structure.nFrames) % app.structure.nFrames) });
   R({ id: 'traj.next', title: 'Next frame', category: 'Trajectory', key: ['.', 'ArrowRight'], repeat: true, when: () => (app.structure?.nFrames ?? 1) > 1, run: () => app.viewer.setFrame((app.structure.frame + 1) % app.structure.nFrames) });
-  R({ id: 'ui.left', title: 'Toggle side panel', category: 'Window', key: '[', run: () => shell.toggleLeft(shell.leftId) });
-  R({ id: 'ui.right', title: 'Toggle appearance panel', category: 'Window', key: ']', run: () => shell.toggleInspector() });
+  R({ id: 'ui.left', title: 'Toggle panel window', category: 'Window', key: '[', run: () => shell.toggleLeft(shell.leftId) });
+  R({ id: 'ui.right', title: 'Toggle display style window', category: 'Window', key: ']', run: () => shell.toggleInspector() });
   R({ id: 'ui.palette', title: 'Command palette', category: 'Help', kbd: 'mod+k', palette: false, run: () => shell.openPalette() });
   R({ id: 'ui.shortcuts', title: 'Keyboard shortcuts', category: 'Help', key: ['?', 'F1'], run: () => shell.shortcutsDialog() });
   R({ id: 'ui.tour', title: 'Take the tour', category: 'Help', keywords: 'help guide onboarding', run: () => shell.tour() });

@@ -29,6 +29,7 @@ import { registerLeftPanel, registerInspectorTab, leftPanels, inspectorTabs } fr
 import { registerPanelSection } from '../ui/sections.js';
 import { registerSelectionAction } from '../ui/selectioncard.js';
 import { registerAtomInfo } from '../ui/atominfo.js';
+import { registerProperties } from '../ui/properties.js';
 import { toast } from '../ui/overlays.js';
 import { analysisContext } from '../ui/paramform.js';
 import { sceneScript } from '../ui/apidialog.js';
@@ -400,6 +401,8 @@ export function createAPI(app, shell) {
     registerSelectionAction: (a, o) => owned(registerSelectionAction(a, o)),
     /** Add lines to the atom hover card and selection card: fn(app, index, { where }) → [{ label, value }] | null. */
     registerAtomInfo: (fn, o) => owned(registerAtomInfo(fn, o)),
+    /** Add rows to the Properties explorer: fn({app, kind, entry, structure, active, atoms}) → [{category, name, value, tip?, edit?}] | null. */
+    registerProperties: (fn) => owned(registerProperties(fn)),
 
     plugins: {
       /** Server plugins (name, version, status, error, frontend) and frontend plugins (name, url, status, error). */

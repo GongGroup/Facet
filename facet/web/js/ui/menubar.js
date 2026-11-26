@@ -1,5 +1,5 @@
 /**
- * The menu bar (File, Edit, View, Modify, Build, Tools, Window, Help), laid out as in Materials Studio.
+ * The menu bar (File, Edit, View, Modify, Build, Tools, Statistics, Window, Help), laid out as in Materials Studio.
  *
  * What is in each menu comes from ui/menumodel.js (MENUS) and the command registry, read when a menu opens: a
  * command registered later is there the next time. This module adds what only the running app knows (storage
@@ -20,6 +20,7 @@ import { keyLabel } from './keys.js';
 import { canDownload, NO_DOWNLOADS } from '../storage/files.js';
 import { panelSections } from './sections.js';
 import { MENUS, buildMenus } from './menumodel.js';
+import { element } from '../core/elements.js';
 
 const LABEL_MODES = [['none', 'None'], ['element', 'Element'], ['index', 'Index'], ['both', 'Element and Index']];
 
@@ -34,7 +35,7 @@ export function menuEnv(app, shell, panels = new Map()) {
   const fail = (p) => p?.catch?.((e) => toast(e.message, { type: 'error' }));
   const why = !app.structure ? 'Load a structure first' : app.busy ? 'Wait for the current task to finish' : null;
   const dynamic = {
-    importSamples: () => [{ label: 'Sample Structures…', icon: 'library', run: () => shell.browseSamples() }],
+    importSamples: () => [{ label: 'Import Sample…', icon: 'library', run: () => shell.browseSamples() }],
     providers: () => app.storage.list().map((p) => {
       const here = app.project.location?.provider === p.id;
       return { label: p.label, icon: p.icon, tip: p.description ?? null, hint: here ? 'current' : p.id === 'folder' && !p.connected ? 'choose folder' : '', run: () => shell.saveToProvider(p.id) };
@@ -88,6 +89,34 @@ export function menuEnv(app, shell, panels = new Map()) {
       return [{ header: 'Structures in this project' }, ...list.map((e, i) => (
         { label: `${i + 1}  ${e.name || e.structure?.name || 'Structure'}`, radio: true, checked: e.id === app.project.activeStructure, run: () => { if (e.id !== app.project.activeStructure) app.setActiveStructure(e.id); } }))];
     },
+    // View › Toolbars: one check item per toolbar of the strip (ui/workbench.js TOOLBARS)
+    toolbars: () => (shell.bench ? shell.bench.bands && Object.keys(shell.bench.bands).map((id) => ({
+      label: shell.bench.bands[id].getAttribute('aria-label'), checked: shell.bench.toolbarOn(id), run: () => shell.bench.setToolbar(id),
+    })) : []),
+    // Window: the open document windows, the active one checked (Materials Studio numbers them)
+    windows: () => (shell.bench ? shell.bench.mdi.list().map((w, i) => ({
+      label: `${i + 1}  ${w.name}`, radio: true, checked: w.active, hint: w.state === 'min' ? 'minimized' : '', run: () => shell.bench.mdi.activate(w.id),
+    })) : []),
+    // File › Recent Projects: the projects opened or saved last (app.prefs.recentProjects)
+    recentProjects: () => {
+      const list = (app.prefs.recentProjects ?? []).filter((r) => app.storage.get(r.provider));
+      if (!list.length) return [{ label: 'No recent projects', disabled: true }];
+      return list.map((r, i) => ({ label: `${i + 1}  ${r.name || 'Untitled project'}`, hint: app.storage.get(r.provider)?.label ?? r.provider,
+        disabled: app.project.location?.provider === r.provider && app.project.location?.id === r.id,
+        run: () => fail(app.openProject(r.provider, r.id)) }));
+    },
+    // Modify › Modify Element: the elements of the structure, then common ones
+    elements: () => (shell.bench ? shell.bench.elementItems().filter((it) => !it.header && !it.separator && !/Other/.test(it.label ?? '')) : []),
+    // View › Visibility › Hide Element: every element of the structure, checked while hidden
+    hideElements: () => {
+      const s = app.structure;
+      if (!s) return [];
+      const hidden = new Set(sc.display?.hiddenElements ?? []);
+      return Object.keys(s.composition()).sort((a, b) => element(a).Z - element(b).Z).map((sym) => ({
+        label: `${sym}  ${element(sym).name}`, checked: hidden.has(sym),
+        run: () => app.set('display.hiddenElements', hidden.has(sym) ? [...hidden].filter((x) => x !== sym) : [...hidden, sym]),
+      }));
+    },
     tour: () => {
       const resume = !app.prefs.tourDone && Number.isInteger(app.prefs.tourStep) && app.prefs.tourStep > 0;
       return [
@@ -107,6 +136,7 @@ export function menuEnv(app, shell, panels = new Map()) {
       rep: sc.style?.rep, look: sc.look, lighting: sc.lighting?.preset, colorScheme: sc.style?.colorScheme,
       cell: sc.display?.cell?.show, turntable: sc.display?.turntable, get: (path) => app.get(path),
       leftOpen: !!shell.leftOpen, inspectorOpen: !!shell.inspectorOpen, fullscreen: !!shell.root?.dataset?.fullscreen,
+      ...(shell.bench?.menuState?.() ?? {}),
       canUndo: !!app.canUndo?.(), canRedo: !!app.canRedo?.(), undoLabel: app.undoLabel?.() ?? null, redoLabel: app.redoLabel?.() ?? null,
     },
   };
