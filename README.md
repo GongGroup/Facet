@@ -39,13 +39,27 @@ facet serve --open
   Materials Studio, fixed atoms included).
 - **Save** projects in the browser, in a folder on your computer or on the server.
 
-The window is laid out as Materials Studio is. A menu bar (**File, Edit, View, Modify, Build, Tools, Window,
-Help**) holds every command where Materials Studio has it, with submenus such as *Build › Surfaces*,
-*Build › Symmetry* and *File › Export › Structure File*; a toolbar under it has the everyday buttons; the
-explorers (Projects, Library, Build, Structure, Surface) are on the left and the display settings on the right.
+The window is laid out as Materials Studio is:
+
+- a **menu bar** (File, Edit, View, Modify, Build, Tools, Statistics, Window, Help) with every command where
+  Materials Studio has it (*File › Import…*, *Edit › Atom Selection…*, *View › Display Style…*,
+  *Modify › Lattice Parameters…*, *Build › Surfaces › Cleave Surface…*, *Window › Tile Horizontally* …);
+- **toolbars** under it (Standard, 3D Viewer with Select / Rotate / Zoom / Translate, Display, Build, Modify,
+  Measure, Animation), shown or hidden in *View › Toolbars*;
+- the **Project explorer** (the project's documents as a tree: open, rename, duplicate, export, delete) and the
+  **Properties explorer** below it (a Filter — Atom, Lattice 3D, Physical System, Reciprocal Lattice 3D, Symmetry
+  System, Display, Project — over a Name | Value grid; black values can be changed in place: an atom's element,
+  position, name or constraint, a lattice parameter, the display style);
+- **document windows** in the workspace: maximized with tabs, or tiled, cascaded and minimized (*Window* menu), each
+  with its own view;
+- **tool windows** for *Display Style*, *Lighting*, *Display Options* and the Library, Build, Structure, Surface and
+  Projects panels, floating over the workspace or docked beside it (the pin in their title bar);
+- a right-click menu in the view (Cut, Copy, Paste, Delete · Display Style, Display Options, Lighting, Label ·
+  Lattice Parameters …) and a **status bar** (hints, selection, atoms and bonds, lattice, frame).
+
 The mouse works as in Materials Studio too. Press `F10` to reach the menus from the keyboard, `Ctrl/⌘ K` to
 search every command (also by its Materials Studio name) and `?` to see the shortcuts. On a phone the menus are
-under ⋯.
+under ⋯ and the explorers and panels open as sheets.
 
 ## Script it
 

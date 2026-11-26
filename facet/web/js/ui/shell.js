@@ -1,8 +1,9 @@
 /**
- * Application shell, laid out as Materials Studio is: a menu bar (ui/menubar.js) and a toolbar strip at the top,
- * the explorers (rail and drawer) on the left, the 3D view, the appearance inspector on the right; plus the
- * viewport overlays, shortcuts, the command palette and the tour. On phones the menu bar and the strip give way to
- * a compact top bar whose More menu holds the same menus.
+ * Application shell, laid out as Materials Studio is (ui/workbench.js): a menu bar (ui/menubar.js) and toolbars at the
+ * top, the Project and Properties explorers on the left, document windows in the workspace, tool windows (the panels
+ * and the appearance tabs) floating over it or docked beside it, and a status bar; plus the viewport overlays,
+ * shortcuts, the command palette and the tour. On phones the menu bar and the toolbars give way to a compact top bar
+ * whose More menu holds the same menus, and the panels open as sheets.
  */
 import { h, ic, btn } from './dom.js';
 import { MenuBar, appMenus, menuItems, compactMenu } from './menubar.js';
@@ -24,6 +25,8 @@ import { canDownload, NO_DOWNLOADS } from '../storage/files.js';
 import { SelectionCard, selectSameElement, selectNeighbours, selectFragment, selectAll, measureFrom, selectionActions, actionMenuItems, menuTarget, deleteSelection } from './selectioncard.js';
 import { attachSections, openSection, panelSections } from './sections.js';
 import { atomInfoRows } from './atominfo.js';
+import { Workbench } from './workbench.js';
+import { pasteFromClip } from './mscommands.js';
 
 export const leftPanels = new Map();
 export const inspectorTabs = new Map();
@@ -60,8 +63,6 @@ const NAV_KEYS = new Set([' ', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'A
 /** Commands whose shortcuts work while the tour is open: panels, representations, view and panel toggles. */
 const TOUR_SAFE = /^(panel|rep|view)\.|^ui\.(left|right)$/;
 const isMobile = () => matchMedia('(max-width: 920px)').matches;
-/** Narrowest 3D view (px) kept beside both side panels; in a narrower desktop window they open one at a time. */
-const MIN_STAGE = 600;
 /** Space (px) a fitted model keeps clear on each side: the view toolbar on the right, the status pills below (less on phones). */
 const fitMargins = () => (isMobile() ? { x: 30, y: 24 } : { x: 58, y: 30 });
 const isTouch = () => matchMedia('(pointer: coarse)').matches;
@@ -116,9 +117,9 @@ export class Shell {
     this.root = root;
     const mobile = isMobile();
     this.leftId = app.prefs.leftPanel ?? 'library';
-    this.leftOpen = mobile ? false : (app.prefs.leftOpen ?? true);
+    this.leftOpen = mobile ? false : (app.prefs.twLeftOpen ?? false);
     this.tabId = app.prefs.inspectorTab ?? 'style';
-    this.inspectorOpen = mobile ? false : (app.prefs.inspectorOpen ?? true);
+    this.inspectorOpen = mobile ? false : (app.prefs.twInspectorOpen ?? false);
     this._lastPanel = app.prefs.lastPanel === 'left' ? 'left' : 'inspector';   // kept when only one panel fits
     this._autoHidden = null;   // 'left' | 'inspector': closed only to make room (the saved layout still has it open)
     this._fitPanels();
@@ -139,7 +140,7 @@ export class Shell {
       closeMenu();
       this._placeChrome();   // the toolbar groups move between the strip and the phone layout
       if (e.matches) { this.leftOpen = false; this.inspectorOpen = false; }
-      else { this.leftOpen = app.prefs.leftOpen ?? true; this.inspectorOpen = app.prefs.inspectorOpen ?? true; this._fitPanels(); this.renderDrawer(); }
+      else { this.leftOpen = app.prefs.twLeftOpen ?? false; this.inspectorOpen = app.prefs.twInspectorOpen ?? false; this._fitPanels(); this.renderDrawer(); this.renderInspector(); }
       this.syncPanels();
     });
     // a desktop window resized past the point where both panels fit: one closes, and returns when there is room again
@@ -160,7 +161,7 @@ export class Shell {
     return innerWidth - px('--rail', 56) - px('--drawer', 312) - px('--inspector', 320);
   }
   /** True in a desktop window too narrow for both side panels beside a usable 3D view. */
-  _tight() { return !isMobile() && this._roomWithBoth() < MIN_STAGE; }
+  _tight() { return false; }   // the workbench's tool windows float over the workspace (or dock beside it): there is room for both
   /**
    * Keep the desktop layout usable: when both panels are open and do not fit, close the one used less
    * recently; when there is room again, reopen it. Returns true when a panel was opened or closed.
@@ -245,6 +246,7 @@ export class Shell {
     this.root.prepend(this.top, this.strip);
     this.root.append(this.rail, this.drawer, this.inspector);
     this.buildOverlays();
+    this.bench = new Workbench(this);   // explorers, document windows, tool windows, toolbars, status bar
     this._placeChrome();
     this.renderToolstrip();
     this.renderRail();
@@ -333,10 +335,11 @@ export class Shell {
     if (!isMobile()) {
       // a panel closed only to make room stays open in the saved layout
       const insp = this.inspectorOpen || this._autoHidden === 'inspector', left = this.leftOpen || this._autoHidden === 'left';
-      if (this.app.prefs.inspectorOpen !== insp) this.app.setPref('inspectorOpen', insp);
-      if (this.app.prefs.leftOpen !== left) this.app.setPref('leftOpen', left);
+      if (this.app.prefs.twInspectorOpen !== insp) this.app.setPref('twInspectorOpen', insp);
+      if (this.app.prefs.twLeftOpen !== left) this.app.setPref('twLeftOpen', left);
     }
     if (this.leftOpen && this._drawerStale) { this._drawerStale = false; this._refreshDrawerSoon?.(); }
+    this.bench?.place();
     requestAnimationFrame(() => this.app.viewer.resize());
   }
 
@@ -389,10 +392,10 @@ export class Shell {
     if (this.drawerBody && this._drawerPanel) this._drawerScroll[this._drawerPanel] = this.drawerBody.scrollTop;
     this.drawer.replaceChildren();
     const close = btn('', { icon: 'x', cls: 'ghost icon close-mobile', tip: 'Close panel', on: () => { this.leftOpen = false; this.syncPanels(); } });
-    const head = h('div.panel-head', h('h2', p.title), ...(p.headActions?.(this.app, this) ?? []), close);
+    const head = h('div.panel-head', p.icon ? ic(p.icon, 'sm tw-ic') : null, h('h2', p.title), ...(p.headActions?.(this.app, this) ?? []), ...(this.bench?.winControls('drawer') ?? []), close);
     const body = h('div.panel-body');
     this.drawer.setAttribute('aria-label', p.title);
-    this.drawer.append(head, body);
+    this.drawer.append(head, ...[this.bench?.panelSwitcher(leftPanels, p.id)].filter(Boolean), body);
     this.drawerBody = body;
     this._drawerPanel = p.id;
     // this render shows the current state, so a refresh queued before it (e.g. by the event that caused it) is
@@ -471,10 +474,9 @@ export class Shell {
       this.selectTab(next.id);
       this.inspector.querySelector(`[data-key="tab:${CSS.escape(next.id)}"]`)?.focus();
     });
-    const hide = btn('', { icon: 'panel-right', cls: 'ghost icon desktop-only hide-insp', tip: 'Hide appearance panel', kbd: keyLabel(']'), on: () => this.toggleInspector(false) });
     const close = btn('', { icon: 'x', cls: 'ghost icon close-mobile', tip: 'Close', on: () => this.toggleInspector(false) });
     const body = h('div.panel-body', { role: 'tabpanel', id: 'inspector-panel', 'aria-labelledby': `itab-${t.id}` });
-    this.inspector.append(h('div.insp-head', tabBar, hide, close), body);
+    this.inspector.append(...[this.bench && !isMobile() ? this.bench.inspectorBar(t.id) : null].filter(Boolean), h('div.insp-head', tabBar, close), body);
     this.inspectorBody = body;
     this._inspectorTab = t.id;
     this._inspectorPending = false;
@@ -542,7 +544,7 @@ export class Shell {
     this.emptyText = h('p');
     this.empty = h('div.float.empty', { hidden: true }, h('div.box',
       h('div.logo-wrap', { html: LOGO }),
-      h('h2', 'Start with a structure'),
+      (this.emptyHead = h('h2', 'Start with a structure')),
       this.emptyText,
       this.emptyTiles,
       h('div.acts',
@@ -591,6 +593,7 @@ export class Shell {
     if (floating) this.toolbar.replaceChildren(this.viewGroup, h('span.sep'), this.shotGroup);
     else { this.toolbar.replaceChildren(); this.viewSlot.append(this.viewGroup); this.shotSlot.append(this.shotGroup); }
     this._syncViewTools();
+    this.bench?.place();
   }
 
   /** Without a structure the view tools have nothing to work on: greyed in the strip, the floating toolbar hidden. */
@@ -610,7 +613,7 @@ export class Shell {
     if (!this.buildGroup) return;
     const env = { hasSection: (panel, section) => panelSections(panel).some((x) => x.id === section && !x.placeholder) };
     const made = [];
-    for (const id of ['build.crystal', 'surface.cleave', 'surface.vacuum', 'cell.supercell']) {
+    for (const id of ['build.crystal', 'build.cluster', 'build.molecule', 'build.addAtom', 'surface.cleave', 'surface.vacuum', 'cell.supercell', 'cell.parameters']) {
       const c = commands.get(id);
       if (!c || !commandShown(c, env)) continue;
       const key = c.kbd ?? c.key;
@@ -649,14 +652,13 @@ export class Shell {
     const app = this.app;
     for (const b of this.toolBtns.values()) b.remove();
     this.toolBtns.clear();
-    let after = this.measureBtn;
+    let after = this.measureBtn, nav = this.selectBtn;
     for (const t of tools.list()) {
       if (!t.toolbar || t.id === 'select' || t.id === 'measure') continue;
       const b = btn('', { icon: t.icon, cls: 'icon', tip: t.tip, kbd: t.key ? keyLabel(t.key) : null, on: () => app.setTool(t.id) });
       b.dataset.tool = t.id;
       b.setAttribute('aria-pressed', String(app.tool === t.id));
-      after.after(b);
-      after = b;
+      if (t.nav) { nav.after(b); nav = b; } else { after.after(b); after = b; }
       this.toolBtns.set(t.id, b);
     }
     this._syncViewTools();
@@ -698,10 +700,10 @@ export class Shell {
   updateInfo() {
     const s = this.app.structure;
     this.empty.hidden = !!s;
-    this.infoCard.hidden = !s;
+    this.infoCard.hidden = !s || (!isMobile() && !this.app.prefs.infoCard);
     this._syncViewTools();
     this.statusbar.classList.toggle('no-structure', !s);
-    if (!s) { this.renderEmpty(); this.updateStats(); this.updateTraj(); return; }
+    if (!s) { this.renderEmpty(); this.bench?.updateEmpty(); this.updateStats(); this.updateTraj(); return; }
     const cp = s.cellParams();
     this.infoCard.replaceChildren(...[
       h('div.f', { html: formulaHTML(s.formula()) }),
@@ -1095,19 +1097,48 @@ export class Shell {
     });
   }
 
+  /** The items of a command for the view's context menu (greyed with the reason when it cannot run now). */
+  _cmdItem(id, extra = {}) {
+    const c = commands.get(id);
+    if (!c) return null;
+    const ok = commands.available(c);
+    const key = c.kbd ?? c.key;
+    return { id, label: MENU_LABELS[id] ?? c.title, icon: MENU_ICONS[id] ?? null, kbd: key ? keyLabel(Array.isArray(key) ? key[0] : key) : null, disabled: !ok, tip: ok ? null : commands.unavailableReason(c), run: () => this.runCommand(c), ...extra };
+  }
+
+  /** Display Style…, Display Options…, Lighting… and Label ▸ (the view's context menu, as in Materials Studio). */
+  _displayItems() {
+    const app = this.app, cur = app.scene.display.labels ?? 'none';
+    return [
+      this._cmdItem('view.displayStyle'), this._cmdItem('view.displayOptions'), this._cmdItem('view.lighting'),
+      { label: 'Label', icon: 'label', items: [['none', 'None'], ['element', 'Element'], ['index', 'Index'], ['both', 'Element and Index']].map(([v, l]) => ({ label: l, radio: true, checked: cur === v, run: () => app.set('display.labels', v) })) },
+    ];
+  }
+
   /**
-   * Right-click on an atom (or on empty space) in the view. Registered selection actions follow "Measure from here"
-   * (menu: true | 'both', on the clicked atom or the selection it is part of) and "Clear selection" (menu: 'blank' | 'both').
+   * Right-click on an atom (or on empty space) in the view, laid out as in Materials Studio: Cut, Copy, Paste, Delete;
+   * Display Style, Display Options, Lighting, Label; Lattice Parameters; then the view and selection actions. Registered
+   * selection actions follow "Measure from here" (menu: true | 'both', on the clicked atom or the selection it is part
+   * of) and "Clear selection" (menu: 'blank' | 'both').
    */
   onAtomContext({ index, clientX, clientY }) {
     const app = this.app, v = app.viewer, m = v.model;
     if (!app.structure || !m) return;
     const at = { x: clientX, y: clientY };
     const registered = (sel, where, ctx) => selectionActions(app, sel, where).flatMap((a) => actionMenuItems(a, app, sel, ctx));
+    const clipItems = [this._cmdItem('edit.cut'), this._cmdItem('edit.copy'), this._cmdItem('edit.paste'), this._cmdItem('sel.delete')];
+    const props = { label: 'Properties', icon: 'props', run: () => this.bench?.focusProperties() };
     if (index < 0 || index >= m.n) {
       const blank = registered(app.selection, 'blank', { source: 'blank', atom: -1, display: -1 });
       const hidden = (v.hiddenCount ?? 0) > 0 && commands.get('view.showAll');
       showMenu(at, [
+        ...clipItems,
+        { separator: true },
+        ...this._displayItems(),
+        { separator: true },
+        app.structure.cell ? this._cmdItem('cell.parameters') : null,
+        app.structure.cell ? this._cmdItem('cell.supercell') : null,
+        { separator: true },
         { label: 'Fit to screen', icon: 'fit', kbd: 'F', run: () => v.fitView() },
         { label: 'Reset view', icon: 'reset', kbd: keyLabel('Home'), run: () => v.resetView() },
         hidden ? { label: 'Show all atoms', icon: 'eye', run: () => this.runCommand('view.showAll') } : null,
@@ -1115,23 +1146,35 @@ export class Shell {
         { label: 'Select all atoms', icon: 'atom', kbd: keyLabel('mod+a'), run: () => selectAll(app) },
         { label: 'Clear selection', icon: 'x', kbd: 'Esc', disabled: !app.selection.length, run: () => app.clearSelection() },
         ...(blank.length ? [{ separator: true }, ...blank] : []),
+        { separator: true },
+        props,
       ], { label: 'View' });
       return;
     }
     const src = m.src[index], sym = m.symbols[index], el = element(sym);
     const sel = app.selection, inSel = sel.includes(src);
-    const extra = registered(menuTarget(sel, src), 'menu', { source: 'menu', atom: src, display: index });
+    // the menu works on the clicked atom: one that is not selected becomes the selection (as a right-click does in MS)
+    if (!inSel) app.select([src]);
+    const extra = registered(menuTarget(app.selection, src), 'menu', { source: 'menu', atom: src, display: index });
+    const many = inSel && sel.length > 1;
     showMenu(at, [
-      { header: `${sym} #${src} · ${el.name}` },
+      { header: `${sym} #${src} · ${el.name}${many ? ` · ${sel.length} selected` : ''}` },
+      ...clipItems,
+      { separator: true },
       { label: `Select all ${sym}`, icon: 'atom', run: () => selectSameElement(app, sym) },
       { label: 'Select with neighbours', icon: 'neighbors', run: () => selectNeighbours(app, [src]) },
       { label: 'Select bonded fragment', icon: 'neighbors', kbd: 'Double-click', run: () => selectFragment(app, [src]) },
+      { label: 'Modify Element', icon: 'edit', items: this.bench ? this.bench.elementItems() : [] },
       { label: 'Centre here', icon: 'crosshair', run: () => v.focusAtom(index) },
       { label: 'Measure from here', icon: 'ruler', run: () => measureFrom(app, index) },
       ...(extra.length ? [{ separator: true }, ...extra] : []),
       { separator: true },
+      ...this._displayItems(),
+      { separator: true },
+      this._cmdItem('view.hideSelected', { label: many ? `Hide ${sel.length} Selected Atoms` : 'Hide Atom' }),
       { label: `Hide ${el.name}`, icon: 'eyeOff', run: () => this.hideElement(sym) },
-      { label: inSel && sel.length > 1 ? `Delete ${sel.length} selected atoms` : 'Delete atom', icon: 'trash', kbd: keyLabel('Delete'), run: () => { if (!inSel) app.select([src]); deleteSelection(app); } },
+      { separator: true },
+      props,
     ], { label: `Atom ${sym} ${src}` });
   }
 
@@ -1294,6 +1337,7 @@ export class Shell {
       const text = e.clipboardData?.getData('text') ?? '';
       if (!text.trim()) return;
       e.preventDefault();
+      if (pasteFromClip(this.app, this, text)) return;
       this.pasteText(text);
     });
   }
@@ -1592,7 +1636,7 @@ facet.registry.colorSchemes.register({
     const card = h('div.float.welcome', { role: 'dialog', 'aria-label': 'Getting started' },
       h('h3', 'Welcome to Facet'),
       h('ol', h('li', touch ? 'Pick a structure from the Library, build one, or open your own file.' : 'Pick a structure from the Library, build one, or drop your own file.'), h('li', 'Restyle it with one click in Looks, then fine-tune light and effects.'), h('li', 'Export a high-resolution image or save the project.')),
-      h('p.hint', touch ? 'Coming from Materials Studio? Its menus (File, Edit, View, Modify, Build, Tools) are under ⋯ at the top right.' : 'Coming from Materials Studio? The menus at the top and the mouse work the way they do there.'),
+      h('p.hint', touch ? 'Coming from Materials Studio? Its menus (File, Edit, View, Modify, Build, Tools) are under ⋯ at the top right.' : 'Coming from Materials Studio? The window is laid out the same way: Project and Properties explorers on the left, document windows in the middle, the same menus, toolbars, right-click menu and mouse.'),
       h('div.acts', btn('Take the 1-minute tour', { cls: 'primary small', on: () => { card.remove(); this.app.setPref('welcomed', true); this.tour(); } }), btn('Dismiss', { cls: 'ghost small', on: () => { card.remove(); this.app.setPref('welcomed', true); this.gestureHint(); } })));
     this.stage.append(card);
   }
@@ -1638,8 +1682,15 @@ facet.registry.colorSchemes.register({
       mobile
         ? { sel: '.top-actions [aria-label="Menus"]', title: 'Menus as in Materials Studio', text: `Every command is in this menu: File, Edit, View, Modify, Build, Tools, Window and Help, grouped as in Materials Studio.${eg}`, sheet: 'none' }
         : { sel: '.menubar', title: 'Menus as in Materials Studio', text: `File, Edit, View, Modify, Build and Tools hold what they hold in Materials Studio.${eg} ${MOD} K finds any command, also by its Materials Studio name.`, sheet: 'none' },
-      { sel: '.rail', title: 'Explorers', text: `Projects, the sample Library, the Builder, Structure details and Surface tools live here.${touch ? '' : ` ${keyLabel('shift+1')} – 5 open them.`}`, sheet: 'left', panel: 'library' },
-      { sel: '.rail [data-panel="build"]', title: 'Build your own', text: 'Build crystals from prototypes, nanoclusters (icosahedra, decahedra, cuboctahedra) and molecules, or paste file text.', sheet: 'none' },
+      ...(mobile ? [
+        { sel: '.rail', title: 'Explorers', text: `Projects, the sample Library, the Builder, Structure details and Surface tools live here.${touch ? '' : ` ${keyLabel('shift+1')} – 5 open them.`}`, sheet: 'left', panel: 'library' },
+        { sel: '.rail [data-panel="build"]', title: 'Build your own', text: 'Build crystals from prototypes, nanoclusters (icosahedra, decahedra, cuboctahedra) and molecules, or paste file text.', sheet: 'none' },
+      ] : [
+        { sel: '.dock .xpane.project', title: 'Project explorer', text: 'Every document of the project, with its kind (crystal, surface, molecule, trajectory). Double-click one to open its window; right-click to rename, duplicate, export or delete it. New adds a crystal, cluster, molecule, sample or file.', sheet: 'none' },
+        { sel: '.dock .xpane.properties', title: 'Properties explorer', text: 'What is selected, as in Materials Studio: Filter by Atom, Lattice 3D, Physical System, Symmetry System or Display. Black values can be changed: click one, type, press Enter (an element, a position, a lattice parameter, a constraint).', sheet: 'none' },
+        { sel: '.workspace', title: 'Document windows', text: 'Each document opens in its own window. Maximized they share tabs; Window › Tile Horizontally, Tile Vertically or Cascade puts them side by side, each with its own view.', sheet: 'none' },
+        { sel: '.drawer', title: 'Tool windows', text: `The Library, Build, Structure and Surface panels open as tool windows (Build › Crystals › Build Crystal…, View › Explorers). Drag one by its title, or dock it beside the workspace with the pin.${touch ? '' : ` ${keyLabel('shift+1')} – 5 open them.`}`, sheet: 'left', panel: 'build' },
+      ]),
       { sel: '.viewport', title: 'Rotate the view', try: 'camera', tryText: touch ? 'Drag one finger across the view' : isMac ? 'Hold ⌃ Control and drag in the view' : 'Right-drag in the view',
         text: touch ? 'One finger rotates, two fingers pan and pinch to zoom. Tap an atom to see its details.'
           : isMac ? 'As in Materials Studio: right-drag (or ⌃ Control+drag) rotates, middle-drag (or ⌥ Option+drag) pans, scrolling zooms. Hover an atom for details, click or drag to select, double-click for its fragment, ⌃-click for more.'
@@ -1649,7 +1700,7 @@ facet.registry.colorSchemes.register({
       { sel: '.inspector .tabs', title: 'Light, effects, scene', text: 'Shape the light rig, add ambient occlusion, ink outlines, bloom or depth of field, and set the unit cell, supercell, bonds and background.', sheet: 'inspector' },
       mobile
         ? { sel: '.toolbar.tb-top', title: 'View tools', text: 'Measure distances and angles, align the view with a crystal axis, switch to orthographic, or start a turntable.', sheet: 'none' }
-        : { sel: '.toolstrip', title: 'Toolbar', text: 'New, open, save and undo; select and measure; reset the view or align it with a crystal axis; pick the display style and the look; and the Build tools. Every button says what it does when the pointer rests on it.', sheet: 'none' },
+        : { sel: '.toolstrip', title: 'Toolbars', text: 'Standard (new, open, save, cut, copy, paste, print), 3D Viewer (select, rotate, zoom, translate, measure, look along an axis), Display, Build, Modify, Measure and Animation. Every button says what it does when the pointer rests on it; View › Toolbars shows or hides them.', sheet: 'none' },
       { sel: '.proj-title', title: 'Your work is saved', text: storage, sheet: 'none' },
       canDownload() ? { sel: '.btn.export', title: 'Export', text: `Save PNG images up to 4×, a glTF model for Blender or slides, or the structure as CIF, POSCAR, XYZ, PDB or Materials Studio XSD.${touch ? ' Tap ? in the top bar for help.' : ` Press ${MOD} K anytime to search every command.`}`, sheet: 'none' } : null,
     ].filter(Boolean);

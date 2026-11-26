@@ -448,6 +448,19 @@ export class App extends Emitter {
   setActiveStructure(sid) { this._activate(sid); this.markDirty(); }
 
   /**
+   * Show structure `sid` (null: none) as the document windows do (ui/workbench.js): the project is not modified, the
+   * selection is the document's own (`selection`, else none) and the view takes `camera` (else it is fitted).
+   */
+  showStructure(sid, { camera = null, selection = null } = {}) {
+    this.viewer.selection?.clear?.();
+    this._activate(sid, { camera });
+    if (selection?.length && this.structure) {
+      const n = this.structure.length;
+      this.select(selection.filter((i) => Number.isInteger(i) && i < n));
+    }
+  }
+
+  /**
    * Add a structure to the project (F0-A §3.3). replaceProject: 'auto' (the default) replaces a pristine scratch project
    * (an empty one or an untouched sample) by a new project holding the structure, as opening a file does; true always
    * replaces (newProject: true is the same); false always adds to the open project, as one undo step — the choice of
