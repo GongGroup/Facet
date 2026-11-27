@@ -30,7 +30,8 @@ const FAMILIES = [
   { prefix: 'look.', category: 'Look', items: () => looks.list().filter((l) => !l.hidden), make: (app, l) => ({ title: l.name ?? l.id, keywords: l.description, run: () => app.applyLook(l.id) }) },
   { prefix: 'light.', category: 'Lighting', items: () => lightingPresets.list(), make: (app, l) => ({ title: l.name ?? l.id, keywords: l.description, run: () => app.setLightingPreset(l.id) }) },
   { prefix: 'color.', category: 'Colours', items: () => colorSchemes.list(), make: (app, c) => ({ title: c.name ?? c.id, keywords: c.description, run: () => app.set('style.colorScheme', c.id) }) },
-  { prefix: 'sample.', category: 'Sample', items: () => samples.list(), make: (app, s) => ({ title: s.name ?? s.id, keywords: `${s.category ?? ''} ${(s.tags ?? []).join(' ')}`, run: () => fail(Promise.resolve().then(() => app.loadSample(s.id))) }) },
+  // Build › Samples and the palette: a project with work gets the sample as one more document (as the Library does)
+  { prefix: 'sample.', category: 'Sample', items: () => samples.list(), make: (app, s) => ({ title: s.name ?? s.id, keywords: `${s.category ?? ''} ${(s.tags ?? []).join(' ')}`, run: () => fail(Promise.resolve().then(() => app.loadSample(s.id, { newProject: false }))) }) },
   {
     prefix: 'export.', category: 'Export', items: () => formats.writers(),
     make: (app, f) => ({

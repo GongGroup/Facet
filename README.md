@@ -44,16 +44,20 @@ The window is laid out as Materials Studio is:
 - a **menu bar** (File, Edit, View, Modify, Build, Tools, Statistics, Window, Help) with every command where
   Materials Studio has it (*File › Import…*, *Edit › Atom Selection…*, *View › Display Style…*,
   *Modify › Lattice Parameters…*, *Build › Surfaces › Cleave Surface…*, *Window › Tile Horizontally* …);
-- **toolbars** under it (Standard, 3D Viewer with Select / Rotate / Zoom / Translate, Display, Build, Modify,
-  Measure, Animation), shown or hidden in *View › Toolbars*;
+- **toolbars** under it (Standard, 3D Viewer with Select / Rotate / Zoom / Translate, Display, Build, Modify, and
+  Animation while a trajectory is open), shown or hidden in *View › Toolbars* (also Measure); drag a toolbar by its
+  dotted grip along its row, into another row or a new one, or off the strip to float it (double-click its title to
+  dock it again; *View › Toolbars › Reset Toolbars* puts them all back);
 - the **Project explorer** (the project's documents as a tree: open, rename, duplicate, export, delete) and the
   **Properties explorer** below it (a Filter — Atom, Lattice 3D, Physical System, Reciprocal Lattice 3D, Symmetry
-  System, Display, Project — over a Name | Value grid; black values can be changed in place: an atom's element,
-  position, name or constraint, a lattice parameter, the display style);
-- **document windows** in the workspace: maximized with tabs, or tiled, cascaded and minimized (*Window* menu), each
-  with its own view;
-- **tool windows** for *Display Style*, *Lighting*, *Display Options* and the Library, Build, Structure, Surface and
-  Projects panels, floating over the workspace or docked beside it (the pin in their title bar);
+  System, Display, Project — over a Name | Value grid; the values that are not grey can be changed in place: an
+  atom's element, position, name or constraint, a lattice parameter, the display style);
+- **document windows** in the workspace: maximized with tabs, or tiled (they stay tiled as the workspace changes
+  size), cascaded and minimized (*Window* menu), each with its own view;
+- **tool windows**, one of their own for each of *Display Style*, *Display Options*, *Lighting*, *Effects* and the
+  Library, Build, Structure, Surface and Projects panels, floating over the workspace as Materials Studio's dialogs
+  do: open as many as you need, move them by the title bar, resize them by the corner; they open where you left
+  them. `]` hides the display windows that are open and brings them back, `[` the panel windows;
 - a right-click menu in the view (Cut, Copy, Paste, Delete · Display Style, Display Options, Lighting, Label ·
   Lattice Parameters …) and a **status bar** (hints, selection, atoms and bonds, lattice, frame).
 

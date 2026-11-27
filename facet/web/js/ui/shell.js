@@ -1,7 +1,7 @@
 /**
  * Application shell, laid out as Materials Studio is (ui/workbench.js): a menu bar (ui/menubar.js) and toolbars at the
- * top, the Project and Properties explorers on the left, document windows in the workspace, tool windows (the panels
- * and the appearance tabs) floating over it or docked beside it, and a status bar; plus the viewport overlays,
+ * top, the Project and Properties explorers on the left, document windows in the workspace, a tool window for each
+ * panel and each appearance tab floating over it, and a status bar; plus the viewport overlays,
  * shortcuts, the command palette and the tour. On phones the menu bar and the toolbars give way to a compact top bar
  * whose More menu holds the same menus, and the panels open as sheets.
  */
@@ -32,22 +32,29 @@ export const leftPanels = new Map();
 export const inspectorTabs = new Map();
 let current = null;   // the Shell once built: panels registered later (plugins) are added to it right away
 
-/** Register a left-drawer panel {id, title, icon, tip, render(app, el, shell), headActions?, refreshOn?, signature?}. */
+/**
+ * Register a panel {id, title, icon, tip, render(app, el, shell), headActions?, refreshOn?, signature?}: a tool
+ * window of its own on desktops, the drawer sheet on phones.
+ */
 export function registerLeftPanel(p) {
   leftPanels.set(p.id, p);
   current?.renderRail();
   return () => {
     leftPanels.delete(p.id);
     if (!current) return;
+    current.bench?.tools.forget('panel', p.id);
     current.renderRail();
     if (current.leftId === p.id) { current.leftId = leftPanels.keys().next().value; current.renderDrawer(); }
   };
 }
-/** Register an inspector tab {id, title, icon, tip, render(app, el, shell)}. */
+/**
+ * Register an appearance tab {id, title, icon, tip, render(app, el, shell), windowTitle?}: a tool window of its own
+ * on desktops (titled `windowTitle`, else as ui/workbench.js TAB_TITLES says), a tab of the inspector sheet on phones.
+ */
 export function registerInspectorTab(t) {
   inspectorTabs.set(t.id, t);
   current?.renderInspector();
-  return () => { inspectorTabs.delete(t.id); current?.renderInspector(); };
+  return () => { inspectorTabs.delete(t.id); current?.bench?.tools.forget('tab', t.id); current?.renderInspector(); };
 }
 
 const TEXT_TYPES = new Set(['text', 'search', 'email', 'number', 'password', 'url', 'tel', 'date', 'time', 'datetime-local', 'month', 'week']);
@@ -115,15 +122,15 @@ export class Shell {
   constructor(app, root) {
     this.app = app;
     this.root = root;
-    const mobile = isMobile();
-    this.leftId = app.prefs.leftPanel ?? 'library';
-    this.leftOpen = mobile ? false : (app.prefs.twLeftOpen ?? false);
-    this.tabId = app.prefs.inspectorTab ?? 'style';
-    this.inspectorOpen = mobile ? false : (app.prefs.twInspectorOpen ?? false);
-    this._lastPanel = app.prefs.lastPanel === 'left' ? 'left' : 'inspector';   // kept when only one panel fits
-    this._autoHidden = null;   // 'left' | 'inspector': closed only to make room (the saved layout still has it open)
-    this._fitPanels();
-    this._drawerScroll = {};
+    this.registries = { panel: leftPanels, tab: inspectorTabs };
+    // desktops: every panel and every appearance tab has a tool window of its own, floating over the workspace as
+    // Materials Studio's dialogs do (ui/workbench.js ToolWindows: any number open at once, where they were left);
+    // phones: the panels take turns in the drawer sheet and the tabs in the inspector sheet, both closed at the start
+    this.leftId = app.prefs.leftPanel ?? 'library';   // the panel shown or opened last
+    this.tabId = app.prefs.inspectorTab ?? 'style';   // the tab shown or opened last
+    this.leftOpen = false;        // the sheets (phones)
+    this.inspectorOpen = false;
+    this._drawerScroll = {};      // scroll positions, by panel and by tab
     this._inspectorScroll = {};
     attachSections(this);   // panel sections (Surface panel, Structure panel slots) follow app events and open through openSection()
     this.build();
@@ -133,64 +140,17 @@ export class Shell {
     this.bindDrop();
     this.bindApp();
     this.bindViewer();
-    // crossing the phone breakpoint: sheets close; back on desktop the saved panel layout returns
-    matchMedia('(max-width: 920px)').addEventListener?.('change', (e) => {
-      this._autoHidden = null;
+    // crossing the phone breakpoint: the sheets close; the tool windows go, and come back as they were on a desktop.
+    // What one layout drew is dropped, so a panel is drawn in one place at a time (panels keep state of their own)
+    matchMedia('(max-width: 920px)').addEventListener?.('change', () => {
       app.viewer.fitMargins = fitMargins();
       closeMenu();
       this._placeChrome();   // the toolbar groups move between the strip and the phone layout
-      if (e.matches) { this.leftOpen = false; this.inspectorOpen = false; }
-      else { this.leftOpen = app.prefs.twLeftOpen ?? false; this.inspectorOpen = app.prefs.twInspectorOpen ?? false; this._fitPanels(); this.renderDrawer(); this.renderInspector(); }
-      this.syncPanels();
-    });
-    // a desktop window resized past the point where both panels fit: one closes, and returns when there is room again
-    addEventListener('resize', () => {
-      const back = this._autoHidden;
-      if (!this._fitPanels()) return;
-      if (back === 'left' && this.leftOpen) this.renderDrawer();
-      else if (back === 'inspector' && this.inspectorOpen) this.renderInspector();
-      this.syncPanels();
+      this.leftOpen = false; this.inspectorOpen = false;
+      for (const ho of [this.drawerHost, this.inspectorHost, ...(this.bench?.tools.hosts() ?? [])]) this._clearHost(ho);
+      this.syncPanels();   // (bench.place() draws the tool windows that are open again)
     });
     app.viewer.fitMargins = fitMargins();
-  }
-
-  /** Width (px) the 3D view would get with both side panels open. */
-  _roomWithBoth() {
-    const cs = getComputedStyle(document.documentElement);
-    const px = (name, d) => parseFloat(cs.getPropertyValue(name)) || d;
-    return innerWidth - px('--rail', 56) - px('--drawer', 312) - px('--inspector', 320);
-  }
-  /** True in a desktop window too narrow for both side panels beside a usable 3D view. */
-  _tight() { return false; }   // the workbench's tool windows float over the workspace (or dock beside it): there is room for both
-  /**
-   * Keep the desktop layout usable: when both panels are open and do not fit, close the one used less
-   * recently; when there is room again, reopen it. Returns true when a panel was opened or closed.
-   */
-  _fitPanels() {
-    if (isMobile()) { this._autoHidden = null; return false; }
-    const tight = this._tight();
-    if (tight && this.leftOpen && this.inspectorOpen) {
-      this._autoHidden = this._lastPanel === 'left' ? 'inspector' : 'left';
-      if (this._autoHidden === 'left') this.leftOpen = false; else this.inspectorOpen = false;
-      return true;
-    }
-    if (!tight && this._autoHidden) {
-      const back = this._autoHidden;
-      this._autoHidden = null;
-      if (back === 'left' && !this.leftOpen) { this.leftOpen = true; return true; }
-      if (back === 'inspector' && !this.inspectorOpen) { this.inspectorOpen = true; return true; }
-    }
-    return false;
-  }
-  /** A panel was opened: remember it, and in a narrow window let it take the other panel's place (`quiet`: no tip). */
-  _opened(which, quiet = false) {
-    this._lastPanel = which;
-    if (this.app.prefs.lastPanel !== which) this.app.setPref('lastPanel', which);
-    if (this._autoHidden === which) this._autoHidden = null;
-    if (!this._fitPanels() || this._tightHinted || quiet) return;
-    this._tightHinted = true;
-    toast(isTouch() ? 'This screen has room for one side panel at a time. Tap a panel button to switch.'
-      : `The window is narrow, so the side panels take turns. Widen it to see both, or press ${which === 'left' ? ']' : '['} to switch.`);
   }
 
   // ------------------------------------------------------------------ layout
@@ -245,6 +205,14 @@ export class Shell {
     this.stage = this.root.querySelector('.stage');
     this.root.prepend(this.top, this.strip);
     this.root.append(this.rail, this.drawer, this.inspector);
+    // a re-render waiting for the user to leave a text field runs when they do (_host); the pointer's last press says
+    // which window a control that changes the scene is in (quiet)
+    this._pointerDown = false;
+    this._changeIn = null;
+    addEventListener('pointerdown', (e) => { this._pointerDown = true; this._pointerHost = this._hostAt(e.target); }, true);
+    for (const t of ['pointerup', 'pointercancel']) addEventListener(t, () => { this._pointerDown = false; }, true);
+    this.drawerHost = this._host('panel', this.drawer, { isOpen: () => this.leftOpen });
+    this.inspectorHost = this._host('tab', this.inspector, { isOpen: () => this.inspectorOpen });
     this.buildOverlays();
     this.bench = new Workbench(this);   // explorers, document windows, tool windows, toolbars, status bar
     this._placeChrome();
@@ -252,20 +220,9 @@ export class Shell {
     this.renderRail();
     this.renderDrawer();
     this.renderInspector();
+    this.bench.tools.restore();   // desktops: the tool windows that were open last time
     this.applyTheme(this.app.prefs.theme ?? 'system');
     this.syncDownloads();
-    // a re-render waiting for the user to leave a text field runs when they do
-    this._pointerDown = false;
-    addEventListener('pointerdown', () => { this._pointerDown = true; }, true);
-    for (const t of ['pointerup', 'pointercancel']) addEventListener(t, () => { this._pointerDown = false; }, true);
-    this.drawer.addEventListener('focusout', () => this._flushLater('drawer'));
-    this.inspector.addEventListener('focusout', () => this._flushLater('inspector'));
-    // a field that loses focus (Tab, click elsewhere) fires 'change' while the focus is between elements;
-    // rebuilding the panel right then would drop the focus on <body>, so such a re-render waits for it to land
-    this._changeIn = null;
-    for (const box of [this.drawer, this.inspector]) {
-      box.addEventListener('change', () => { this._changeIn = box; setTimeout(() => { if (this._changeIn === box) this._changeIn = null; }, 0); }, true);
-    }
   }
 
   /** Rebuild the rail buttons from the registered panels (plugins may add panels after start-up). */
@@ -289,40 +246,87 @@ export class Shell {
   }
   buildRail() { this.renderRail(); }
 
-  toggleLeft(id) {
-    if (this.leftOpen && this.leftId === id) { this.leftOpen = false; this._autoHidden = null; }   // closing the only panel: a clear view is wanted
-    else { this.leftOpen = true; this.leftId = id ?? this.leftId; if (isMobile()) this.inspectorOpen = false; else this._opened('left'); }
+  // ------------------------------------------------------------------ panels and appearance tabs: opening and closing
+  /**
+   * Phones: show panel `id` in the drawer sheet, or close the sheet when it shows it. Desktops: open the panel's tool
+   * window, or close it when it is open (View › Explorers).
+   */
+  toggleLeft(id = this.leftId) {
+    if (this.bench?.desktop) {
+      if (this.bench.tools.isOpen('panel', id)) this.bench.tools.close('panel', id);
+      else this._openWindow('panel', id);
+      return;
+    }
+    if (this.leftOpen && this.leftId === id) this.leftOpen = false;   // closing the only panel: a clear view is wanted
+    else { this.leftOpen = true; this.leftId = id ?? this.leftId; this.inspectorOpen = false; }
     this.app.setPref('leftPanel', this.leftId);
     this.syncPanels();
     this.renderDrawer();
   }
 
   /**
-   * Open a left panel. `args` are handed once to its render through panelArgs(), e.g. {provider: 'server'} for Projects;
-   * {section, focus, tab} opens the panel at one of its sections instead (openSection in ui/sections.js).
+   * Open a panel: its tool window on desktops (drawn afresh, to the front), the drawer on phones. `args` are handed
+   * once to its render through panelArgs(), e.g. {provider: 'server'} for Projects; {section, focus, tab} opens the
+   * panel at one of its sections instead (openSection in ui/sections.js).
    */
   openLeft(id, args) {
     if (args?.section) return openSection(id, args.section, { focus: args.focus, tab: args.tab });
-    this._panelArgs = args ? { id, args } : null; this.leftOpen = false; this.toggleLeft(id);
+    this._panelArgs = args ? { id, args } : null;
+    if (this.bench?.desktop) { this._openWindow('panel', id); return; }
+    this.leftOpen = false; this.toggleLeft(id);
   }
   /** The args openLeft() passed for panel `id`, or null; each set is read once. */
   panelArgs(id) { const a = this._panelArgs; if (a?.id !== id) return null; this._panelArgs = null; return a.args; }
   /** Projects panel on the server's sign-in form (or project list once signed in). */
   openSignIn() { this.openLeft('projects', { provider: 'server' }); }
 
-  /** Show or hide the appearance panel (on phones the sheets are exclusive). */
-  toggleInspector(open = !this.inspectorOpen) {
-    const was = this.inspectorOpen;
+  /** Desktops: the tool window of panel / tab `id`, drawn afresh, to the front, with the keyboard in it. */
+  _openWindow(kind, id) {
+    if (!this.registries[kind].has(id)) return;
+    if (kind === 'panel') { this.leftId = id; this.app.setPref('leftPanel', id); }
+    else { this.tabId = id; this.app.setPref('inspectorTab', id); }
+    this.bench.tools.open(kind, id);
+  }
+
+  /**
+   * Phones: show or hide the inspector sheet. Desktops (]): close the appearance windows that are open, or bring
+   * back the ones closed so (none: the window of the tab opened last, Display Style at first).
+   */
+  toggleInspector(open) {
+    if (this.bench?.desktop) { this.bench.tools.toggleKind('tab', open, this.tabId); return; }
+    open = open ?? !this.inspectorOpen;
     this.inspectorOpen = open;
-    if (open && isMobile()) this.leftOpen = false;
-    else if (open && !was) this._opened('inspector');
-    else if (!open && was) this._autoHidden = null;
+    if (open) this.leftOpen = false;
     this.syncPanels();
     if (open) this.renderInspector();
   }
-  openInspector(tab) { if (tab) { this.tabId = tab; this.app.setPref('inspectorTab', tab); } this.toggleInspector(true); }
+  /** Open appearance tab `tab` (else the one opened last): its window on desktops, the inspector sheet at it on phones. */
+  openInspector(tab) {
+    const id = tab && inspectorTabs.has(tab) ? tab : this.tabId;
+    if (this.bench?.desktop) { this._openWindow('tab', id); return; }
+    this.tabId = id; this.app.setPref('inspectorTab', id);
+    this.toggleInspector(true);
+  }
+  /** [ on desktops: close the panel windows that are open, or bring back the ones closed so; phones: the drawer. */
+  togglePanels() {
+    if (this.bench?.desktop) { this.bench.tools.toggleKind('panel', undefined, this.leftId); return; }
+    this.toggleLeft(this.leftId);
+  }
   /** Close the drawer and inspector sheets (phones). */
   closeSheets() { this.leftOpen = false; this.inspectorOpen = false; this.syncPanels(); }
+
+  /** Whether panel `id` is on screen: its window (desktops), the drawer showing it (phones). */
+  panelOpen(id) { return this.bench?.desktop ? this.bench.tools.isOpen('panel', id) : this.leftOpen && this.leftId === id; }
+  /** Whether appearance tab `id` is on screen: its window (desktops), the inspector showing it (phones). */
+  tabOpen(id) { return this.bench?.desktop ? this.bench.tools.isOpen('tab', id) : this.inspectorOpen && this.tabId === id; }
+  /** Whether a panel window is open (phones: the drawer), for the check mark of Window › Panel Windows. */
+  panelsShown() { return this.bench?.desktop ? this.bench.tools.anyOpen('panel') : !!this.leftOpen; }
+  /** Whether an appearance window is open (phones: the inspector), for Window › Display Windows. */
+  tabsShown() { return this.bench?.desktop ? this.bench.tools.anyOpen('tab') : !!this.inspectorOpen; }
+  /** The element panel `id` is drawn in (its window, else the drawer), to find a part of it. */
+  panelEl(id) { return this._hostOf('panel', id)?.el ?? this.drawer; }
+  /** The element appearance tab `id` is drawn in (its window, else the inspector). */
+  tabEl(id) { return this._hostOf('tab', id)?.el ?? this.inspector; }
 
   syncPanels() {
     this.drawer.dataset.collapsed = String(!this.leftOpen);
@@ -332,15 +336,53 @@ export class Shell {
       b.setAttribute('aria-pressed', String(id === '__inspector' ? this.inspectorOpen : this.leftOpen && this.leftId === id));
     });
     if (this.revealBtn) this.revealBtn.hidden = this.inspectorOpen;
-    if (!isMobile()) {
-      // a panel closed only to make room stays open in the saved layout
-      const insp = this.inspectorOpen || this._autoHidden === 'inspector', left = this.leftOpen || this._autoHidden === 'left';
-      if (this.app.prefs.twInspectorOpen !== insp) this.app.setPref('twInspectorOpen', insp);
-      if (this.app.prefs.twLeftOpen !== left) this.app.setPref('twLeftOpen', left);
-    }
-    if (this.leftOpen && this._drawerStale) { this._drawerStale = false; this._refreshDrawerSoon?.(); }
+    // a sheet that opens after events came while it was closed is drawn again
+    if (this.leftOpen && this.drawerHost?.stale) this.drawerHost.soon();
+    if (this.inspectorOpen && this.inspectorHost?.stale) this.inspectorHost.soon();
     this.bench?.place();
     requestAnimationFrame(() => this.app.viewer.resize());
+  }
+
+  // ------------------------------------------------------------------ hosts: where a panel or a tab is drawn
+  /**
+   * A host is a place a panel (`kind` 'panel') or an appearance tab ('tab') is drawn in: the drawer and inspector
+   * sheets of phones, which show the panel / tab opened last (leftId, tabId), or a tool window of the desktop, which
+   * always shows the same one (`id`). It keeps what it drew (body, shown, sig) and whether a re-render waits for the
+   * user to leave a field (pending) or for it to be on screen (stale); `el` gets the listeners for that.
+   */
+  _host(kind, el, { id = null, isOpen }) {
+    const ho = { kind, el, fixed: id != null, isOpen, body: null, shown: null, sig: undefined, pending: false, stale: false };
+    if (ho.fixed) ho.id = id;
+    else Object.defineProperty(ho, 'id', { enumerable: true, get: () => (kind === 'panel' ? this.leftId : this.tabId) });
+    const draw = () => {
+      if (this._deferRender(ho)) return;
+      if (ho.fixed && !ho.isOpen()) { ho.stale = true; return; }
+      this._render(ho);
+    };
+    ho.soon = debounce(draw, 30);     // after an app event
+    ho.later = debounce(draw, 160);   // after a control of another window (a slider being dragged): once it rests
+    el.addEventListener('focusout', () => this._flushLater(ho));
+    // a field that loses focus (Tab, click elsewhere) fires 'change' while the focus is between elements;
+    // rebuilding the panel right then would drop the focus on <body>, so such a re-render waits for it to land
+    el.addEventListener('change', () => { this._changeIn = el; setTimeout(() => { if (this._changeIn === el) this._changeIn = null; }, 0); }, true);
+    return ho;
+  }
+  /** The hosts of the layout in use (phones: the two sheets; desktops: the tool windows made so far), of `kind`. */
+  _hosts(kind) {
+    const all = !this.bench || isMobile() ? [this.drawerHost, this.inspectorHost].filter(Boolean) : this.bench.tools.hosts();
+    return kind ? all.filter((ho) => ho.kind === kind) : all;
+  }
+  /** The host that shows (or would show) panel / tab `id` in the layout in use, else null. */
+  _hostOf(kind, id) { return this._hosts(kind).find((ho) => ho.id === id) ?? null; }
+  /** The host element `el` is in, else null. */
+  _hostAt(el) { return el?.nodeType === 1 ? this._hosts().find((ho) => ho.el.contains(el)) ?? null : null; }
+  /** Forget what host `ho` drew (the layout changed): it is drawn afresh when it is on screen again. */
+  _clearHost(ho) {
+    if (!ho) return;
+    ho.soon?.cancel?.(); ho.later?.cancel?.();
+    if (ho.body && ho.shown) (ho.kind === 'panel' ? this._drawerScroll : this._inspectorScroll)[ho.shown] = ho.body.scrollTop;
+    ho.el.replaceChildren();
+    ho.body = null; ho.shown = null; ho.sig = undefined; ho.pending = false; ho.stale = true;
   }
 
   // ------------------------------------------------------------------ panel rendering (keeps focus, typing and scroll)
@@ -363,77 +405,96 @@ export class Shell {
   _typingIn(container) { const a = document.activeElement; return !!a && container.contains(a) && isTextField(a) && a.tagName !== 'SELECT'; }
   /** True while a field in `container` that just changed is handing the focus to the next control. */
   _focusMoving(container) { const a = document.activeElement; return this._changeIn === container && (!a || a === document.body); }
-  /** Defer a re-render of `which` until the user leaves the field they are typing in (or the focus has moved). */
-  _deferRender(which) {
-    const box = which === 'drawer' ? this.drawer : this.inspector;
+  /** Defer a re-render of host `ho` until the user leaves the field they are typing in (or the focus has moved). */
+  _deferRender(ho) {
+    const box = ho.el;
     if (!this._typingIn(box) && !this._focusMoving(box)) return false;
-    this[which === 'drawer' ? '_drawerPending' : '_inspectorPending'] = true;
-    if (this._focusMoving(box)) setTimeout(() => this._flushLater(which), 0);   // in case no focusout follows
+    ho.pending = true;
+    if (this._focusMoving(box)) setTimeout(() => this._flushLater(ho), 0);   // in case no focusout follows
     return true;
   }
-  _flushLater(which) {
-    const pending = which === 'drawer' ? '_drawerPending' : '_inspectorPending';
-    if (!this[pending]) return;
+  _flushLater(ho) {
+    if (!ho.pending) return;
     const run = () => setTimeout(() => {
-      const box = which === 'drawer' ? this.drawer : this.inspector;
-      if (!this[pending] || this._typingIn(box)) return;
-      this[pending] = false;
-      if (which === 'drawer') this.renderDrawer(); else this.renderInspector();
+      if (!ho.pending || this._typingIn(ho.el)) return;
+      ho.pending = false;
+      if (ho.fixed && !ho.isOpen()) { ho.stale = true; return; }
+      this._render(ho);
     }, 0);
     // wait for the click that moved focus (e.g. on "Apply") to land before the panel is rebuilt
     if (this._pointerDown) addEventListener('pointerup', run, { once: true, capture: true }); else run();
   }
 
-  renderDrawer() {
-    const p = leftPanels.get(this.leftId) ?? leftPanels.values().next().value;
+  /** Draw host `ho` afresh: its panel or its tab. */
+  _render(ho) { if (ho) (ho.kind === 'panel' ? this._renderPanel(ho) : this._renderTab(ho)); }
+
+  _renderPanel(ho) {
+    const p = leftPanels.get(ho.id) ?? (ho.fixed ? null : leftPanels.values().next().value);
     if (!p) return;
-    this.leftId = p.id;
-    const focus = this._captureFocus(this.drawer);
-    if (this.drawerBody && this._drawerPanel) this._drawerScroll[this._drawerPanel] = this.drawerBody.scrollTop;
-    this.drawer.replaceChildren();
-    const close = btn('', { icon: 'x', cls: 'ghost icon close-mobile', tip: 'Close panel', on: () => { this.leftOpen = false; this.syncPanels(); } });
-    const head = h('div.panel-head', p.icon ? ic(p.icon, 'sm tw-ic') : null, h('h2', p.title), ...(p.headActions?.(this.app, this) ?? []), ...(this.bench?.winControls('drawer') ?? []), close);
+    if (!ho.fixed) this.leftId = p.id;
+    const box = ho.el;
+    const focus = this._captureFocus(box);
+    if (ho.body && ho.shown) this._drawerScroll[ho.shown] = ho.body.scrollTop;
+    box.replaceChildren();
     const body = h('div.panel-body');
-    this.drawer.setAttribute('aria-label', p.title);
-    this.drawer.append(head, ...[this.bench?.panelSwitcher(leftPanels, p.id)].filter(Boolean), body);
-    this.drawerBody = body;
-    this._drawerPanel = p.id;
+    box.setAttribute('aria-label', p.title);
+    if (ho.fixed) box.append(...this.bench.tools.bar(ho, p), body);
+    else {
+      const close = btn('', { icon: 'x', cls: 'ghost icon close-mobile', tip: 'Close panel', on: () => { this.leftOpen = false; this.syncPanels(); } });
+      box.append(h('div.panel-head', p.icon ? ic(p.icon, 'sm tw-ic') : null, h('h2', p.title), ...(p.headActions?.(this.app, this) ?? []), close), body);
+    }
+    ho.body = body;
+    ho.shown = p.id;
     // this render shows the current state, so a refresh queued before it (e.g. by the event that caused it) is
     // done; left queued it would rebuild the panel again later, under a click on the freshly drawn controls
-    this._refreshDrawerSoon?.cancel?.();
-    this._drawerPending = false;
-    this._drawerStale = false;
+    ho.soon.cancel(); ho.later.cancel();
+    ho.pending = false;
+    ho.stale = false;
+    const was = this._rendering;
+    this._rendering = ho;
     try { p.render(this.app, body, this); } catch (e) { console.error(e); body.append(h('p.err-text', `This panel failed to load: ${e.message}`)); }
-    try { this._drawerSig = p.signature?.(this.app); } catch { this._drawerSig = undefined; }
+    finally { this._rendering = was; }
+    try { ho.sig = p.signature?.(this.app); } catch { ho.sig = undefined; }
     const y = this._drawerScroll[p.id] ?? 0;
     body.scrollTop = y;
-    if (y && body.scrollTop < y) requestAnimationFrame(() => { if (this.drawerBody === body) body.scrollTop = y; });
+    if (y && body.scrollTop < y) requestAnimationFrame(() => { if (ho.body === body) body.scrollTop = y; });
     body.addEventListener('scroll', () => { this._drawerScroll[p.id] = body.scrollTop; }, { passive: true });
-    this._restoreFocus(this.drawer, focus);
-    this.syncPanels();
+    this._restoreFocus(box, focus);
+  }
+
+  /** Draw panel `id` again now wherever it is shown (every panel on screen when `id` is left out). */
+  renderDrawer(id) {
+    for (const ho of this._hosts('panel')) {
+      if (id != null && ho.id !== id) continue;
+      if (ho.fixed && !ho.isOpen()) { ho.stale = true; continue; }   // a closed window is drawn when it opens
+      this._render(ho);
+    }
   }
 
   /**
-   * Re-render the drawer after an app event. A panel may declare `refreshOn: ['project', …]` and a
+   * Re-render the panels after an app event. A panel may declare `refreshOn: ['project', …]` and a
    * `signature(app)` string; it is skipped when the signature did not change. While the user types in
-   * the drawer the refresh waits until they leave the field.
+   * a panel the refresh waits until they leave the field.
    */
   refreshDrawer(reason) {
-    const p = leftPanels.get(this.leftId);
-    if (!p || !wantsRefresh(p, reason)) return;
-    if (typeof p.signature === 'function') { let sig; try { sig = p.signature(this.app); } catch { sig = NaN; } if (sig === this._drawerSig) return; }
-    if (!this.leftOpen) { this._drawerStale = true; return; }
-    if (this._deferRender('drawer')) return;
-    this._refreshDrawerSoon();
+    for (const ho of this._hosts('panel')) {
+      const p = leftPanels.get(ho.id);
+      if (!p || !wantsRefresh(p, reason)) continue;
+      if (typeof p.signature === 'function' && ho.shown === p.id) { let sig; try { sig = p.signature(this.app); } catch { sig = NaN; } if (sig === ho.sig) continue; }
+      if (!ho.isOpen()) { ho.stale = true; continue; }
+      if (this._deferRender(ho)) continue;
+      ho.soon();
+    }
   }
 
-  /** Draw panel `id` again soon if the drawer shows it (after the user leaves a field they type in), e.g. when its sections change. */
+  /** Draw panel `id` again soon where it is shown (after the user leaves a field they type in), e.g. when its sections change. */
   refreshPanel(id) {
     this.renderToolstrip();   // a section that came or went may bring or take the command of a strip button
-    if (this.leftId !== id) return;
-    if (!this.leftOpen) { this._drawerStale = true; return; }
-    if (this._deferRender('drawer')) return;
-    this._refreshDrawerSoon();
+    const ho = this._hostOf('panel', id);
+    if (!ho) return;
+    if (!ho.isOpen()) { ho.stale = true; return; }
+    if (this._deferRender(ho)) return;
+    ho.soon();
   }
 
   /**
@@ -442,62 +503,107 @@ export class Shell {
    */
   panelState(id, reasons = []) {
     const p = leftPanels.get(id);
-    if (!p || !this.leftOpen || this.leftId !== id || this._drawerPanel !== id || !this.drawerBody?.isConnected) return 'hidden';
-    if (this._drawerStale || this._drawerPending) return 'rebuild';
+    const ho = p ? this._hostOf('panel', id) : null;
+    if (!ho || !ho.isOpen() || ho.shown !== id || !ho.body?.isConnected) return 'hidden';
+    if (ho.stale || ho.pending) return 'rebuild';
     if (!reasons.some((r) => wantsRefresh(p, r))) return 'current';
     if (typeof p.signature !== 'function') return 'rebuild';
     let sig; try { sig = p.signature(this.app); } catch { sig = NaN; }
-    return sig === this._drawerSig ? 'current' : 'rebuild';
+    return sig === ho.sig ? 'current' : 'rebuild';
   }
 
-  renderInspector() {
+  _renderTab(ho) {
     const tabs = [...inspectorTabs.values()];
     if (!tabs.length) return;
-    const t = inspectorTabs.get(this.tabId) ?? tabs[0];
-    this.tabId = t.id;
-    const focus = this._captureFocus(this.inspector);
-    if (this.inspectorBody && this._inspectorTab) this._inspectorScroll[this._inspectorTab] = this.inspectorBody.scrollTop;
-    this.inspector.replaceChildren();
-    const tabBar = h('div.tabs', { role: 'tablist', 'aria-label': 'Appearance' });
-    for (const x of tabs) {
-      const on = x.id === t.id;
-      const b = h('button', { type: 'button', role: 'tab', id: `itab-${x.id}`, 'aria-selected': String(on), 'aria-controls': 'inspector-panel', tabindex: on ? '0' : '-1', 'data-key': `tab:${x.id}`, 'data-tip': x.tip ?? null }, ic(x.icon, 'sm'), h('span', x.title));
-      b.addEventListener('click', () => this.selectTab(x.id));
-      tabBar.append(b);
+    const t = inspectorTabs.get(ho.id) ?? (ho.fixed ? null : tabs[0]);
+    if (!t) return;
+    if (!ho.fixed) this.tabId = t.id;
+    const box = ho.el;
+    const focus = this._captureFocus(box);
+    if (ho.body && ho.shown) this._inspectorScroll[ho.shown] = ho.body.scrollTop;
+    box.replaceChildren();
+    let body;
+    if (ho.fixed) {
+      body = h('div.panel-body');
+      box.append(...this.bench.tools.bar(ho, t), body);
+    } else {
+      // the inspector sheet (phones): the tabs over the one shown
+      const tabBar = h('div.tabs', { role: 'tablist', 'aria-label': 'Appearance' });
+      for (const x of tabs) {
+        const on = x.id === t.id;
+        const b = h('button', { type: 'button', role: 'tab', id: `itab-${x.id}`, 'aria-selected': String(on), 'aria-controls': 'inspector-panel', tabindex: on ? '0' : '-1', 'data-key': `tab:${x.id}`, 'data-tip': x.tip ?? null }, ic(x.icon, 'sm'), h('span', x.title));
+        b.addEventListener('click', () => this.selectTab(x.id));
+        tabBar.append(b);
+      }
+      tabBar.addEventListener('keydown', (e) => {
+        const i = tabs.findIndex((x) => x.id === this.tabId);
+        const j = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
+        if (j == null) return;
+        e.preventDefault();
+        const next = tabs[(j + tabs.length) % tabs.length];
+        this.selectTab(next.id);
+        box.querySelector(`[data-key="tab:${CSS.escape(next.id)}"]`)?.focus();
+      });
+      const close = btn('', { icon: 'x', cls: 'ghost icon close-mobile', tip: 'Close', on: () => this.toggleInspector(false) });
+      body = h('div.panel-body', { role: 'tabpanel', id: 'inspector-panel', 'aria-labelledby': `itab-${t.id}` });
+      box.append(h('div.insp-head', tabBar, close), body);
     }
-    tabBar.addEventListener('keydown', (e) => {
-      const i = tabs.findIndex((x) => x.id === this.tabId);
-      const j = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
-      if (j == null) return;
-      e.preventDefault();
-      const next = tabs[(j + tabs.length) % tabs.length];
-      this.selectTab(next.id);
-      this.inspector.querySelector(`[data-key="tab:${CSS.escape(next.id)}"]`)?.focus();
-    });
-    const close = btn('', { icon: 'x', cls: 'ghost icon close-mobile', tip: 'Close', on: () => this.toggleInspector(false) });
-    const body = h('div.panel-body', { role: 'tabpanel', id: 'inspector-panel', 'aria-labelledby': `itab-${t.id}` });
-    this.inspector.append(...[this.bench && !isMobile() ? this.bench.inspectorBar(t.id) : null].filter(Boolean), h('div.insp-head', tabBar, close), body);
-    this.inspectorBody = body;
-    this._inspectorTab = t.id;
-    this._inspectorPending = false;
+    ho.body = body;
+    ho.shown = t.id;
+    ho.soon.cancel(); ho.later.cancel();
+    ho.pending = false;
+    ho.stale = false;
     const y = this._inspectorScroll[t.id] ?? 0;
+    const was = this._rendering;
+    this._rendering = ho;
     try { t.render(this.app, body, this); } catch (e) { console.error(e); body.append(h('p.err-text', `This tab failed to load: ${e.message}`)); }
+    finally { this._rendering = was; }
     body.scrollTop = y;
     body.addEventListener('scroll', () => { this._inspectorScroll[t.id] = body.scrollTop; }, { passive: true });
-    this._restoreFocus(this.inspector, focus);
-    this.syncPanels();
+    this._restoreFocus(box, focus);
   }
 
-  selectTab(id) { this.tabId = id; this.app.setPref('inspectorTab', id); this.renderInspector(); }
+  /** Draw appearance tab `id` again now wherever it is shown (every tab on screen when `id` is left out). */
+  renderInspector(id) {
+    for (const ho of this._hosts('tab')) {
+      if (id != null && ho.id !== id) continue;
+      if (ho.fixed && !ho.isOpen()) { ho.stale = true; continue; }
+      this._render(ho);
+    }
+  }
 
-  /** Re-render the inspector unless one of its own controls caused the change (or the user is typing in it). */
+  /** The tab bar of the inspector sheet: show tab `id` there (desktops: open its window). */
+  selectTab(id) {
+    if (this.bench?.desktop) { this.openInspector(id); return; }
+    this.tabId = id; this.app.setPref('inspectorTab', id); this.renderInspector();
+  }
+
+  /**
+   * The appearance tabs follow the scene: each one on screen is drawn again, except the one whose control made the
+   * change (quiet); the tabs of other windows catch up once that control rests (a slider being dragged).
+   */
   refreshInspector() {
-    if (this.lockInspector) return;
-    if (this._deferRender('inspector')) return;
-    this.renderInspector();
+    const src = this._quietHost;
+    if (src === true) return;   // a control in no known window: no tab is drawn again (as before there were windows)
+    for (const ho of this._hosts('tab')) {
+      if (ho === src) continue;
+      if (!ho.isOpen()) { ho.stale = true; continue; }
+      if (this._deferRender(ho)) continue;
+      (src ? ho.later : ho.soon)();
+    }
   }
-  /** Wrap a control callback so it does not re-render the panel it lives in. */
-  quiet(fn) { return (...a) => { this.lockInspector = true; try { fn(...a); } finally { this.lockInspector = false; } }; }
+  /**
+   * Wrap a control callback so the change it makes does not draw again the window (or sheet) it lives in: the one
+   * being drawn when the callback was made, else the one with the focus or the last press of the pointer.
+   */
+  quiet(fn) {
+    const at = this._rendering ?? null;
+    return (...a) => {
+      const prev = this._quietHost;
+      this._quietHost = at ?? this._hostAt(document.activeElement) ?? (this._pointerDown ? this._pointerHost : null) ?? true;
+      try { return fn(...a); } finally { this._quietHost = prev; }
+    };
+  }
 
   // ------------------------------------------------------------------ viewport overlays
   buildOverlays() {
@@ -734,14 +840,15 @@ export class Shell {
       const nm = /[₀-₉]/.test(words[0]) && words.length > 1 ? words.slice(1).join(' ') : s.name;
       const b = h('button.sample-tile', { type: 'button', 'data-tip': `Open ${s.name}` },
         h('span.f', { html: formulaHTML(meta.formula) }), h('span.nm', nm[0].toUpperCase() + nm.slice(1)), h('span.n', plural(meta.n, 'atom')));
-      b.addEventListener('click', () => { try { const r = this.app.loadSample(id); r?.catch?.((e) => toast(e.message, { type: 'error' })); } catch (e) { toast(e.message, { type: 'error' }); } });
+      // a project with documents (their windows closed) gets the sample as one more document, as Project › New › From Sample
+      b.addEventListener('click', () => { try { const r = this.app.loadSample(id, { newProject: false }); r?.catch?.((e) => toast(e.message, { type: 'error' })); } catch (e) { toast(e.message, { type: 'error' }); } });
       this.emptyTiles.append(b);
     }
   }
 
   browseSamples() {
     this.openLeft('library');
-    if (!isTouch()) requestAnimationFrame(() => this.drawer.querySelector('input[type="search"], input')?.focus());
+    if (!isTouch()) requestAnimationFrame(() => this.panelEl('library').querySelector('input[type="search"], input')?.focus());
   }
 
   /** Show as many leading ' · '-separated parts of the hint as fit beside the stats (never a cut-off word). */
@@ -1092,7 +1199,7 @@ export class Shell {
   showAnalyses() {
     this.openLeft('structure');
     requestAnimationFrame(() => {
-      const head = [...this.drawer.querySelectorAll('.section > h3')].find((x) => /^Analyses/.test(x.textContent.trim()));
+      const head = [...this.panelEl('structure').querySelectorAll('.section > h3')].find((x) => /^Analyses/.test(x.textContent.trim()));
       head?.scrollIntoView?.({ block: 'start' });
     });
   }
@@ -1382,10 +1489,6 @@ export class Shell {
 
   bindApp() {
     const app = this.app;
-    this._refreshDrawerSoon = debounce(() => {
-      if (this._deferRender('drawer')) return;
-      this.renderDrawer();
-    }, 30);
     app.on('project', () => { if (document.activeElement !== this.titleInput) this.titleInput.value = app.project.name; this.updateSaveChip(); this.refreshDrawer('project'); });
     app.on('structure', () => { this.updateInfo(); this.updateHint(); this.updateToolstrip(); this.refreshDrawer('structure'); this.refreshInspector(); });
     app.on('selection', () => { this.updateHint(); this.refreshDrawer('selection'); });
@@ -1633,12 +1736,20 @@ facet.registry.colorSchemes.register({
   welcome() {
     if (this.app.prefs.welcomed) return;
     const touch = isTouch();
+    // the Library, the Build panel and the looks are in tool windows that may be closed: the words open them
+    const link = (label, run) => h('button.linkish', { type: 'button', on: { click: (e) => run(e.currentTarget) } }, label);
     const card = h('div.float.welcome', { role: 'dialog', 'aria-label': 'Getting started' },
       h('h3', 'Welcome to Facet'),
-      h('ol', h('li', touch ? 'Pick a structure from the Library, build one, or open your own file.' : 'Pick a structure from the Library, build one, or drop your own file.'), h('li', 'Restyle it with one click in Looks, then fine-tune light and effects.'), h('li', 'Export a high-resolution image or save the project.')),
+      h('ol',
+        h('li', 'Pick a structure from the ', link('Library', () => this.openLeft('library')), ', ', link('build one', () => this.openLeft('build')), touch ? ', or open your own file.' : ', or drop your own file here.'),
+        h('li', 'Restyle it with one click in ', link('Looks', () => this.openInspector('style')), ', then fine-tune light and effects.'),
+        h('li', canDownload() ? [link('Export', (b) => this.exportMenu(b)), ' a high-resolution image or save the project.'] : 'Export a high-resolution image or save the project.')),
       h('p.hint', touch ? 'Coming from Materials Studio? Its menus (File, Edit, View, Modify, Build, Tools) are under ⋯ at the top right.' : 'Coming from Materials Studio? The window is laid out the same way: Project and Properties explorers on the left, document windows in the middle, the same menus, toolbars, right-click menu and mouse.'),
       h('div.acts', btn('Take the 1-minute tour', { cls: 'primary small', on: () => { card.remove(); this.app.setPref('welcomed', true); this.tour(); } }), btn('Dismiss', { cls: 'ghost small', on: () => { card.remove(); this.app.setPref('welcomed', true); this.gestureHint(); } })));
-    this.stage.append(card);
+    // on a desktop the card sits over the explorers (the Properties explorer has little to say on a first visit), so it
+    // never covers the structure however narrow the workspace is; on phones, or with the explorers hidden, in the view
+    const dock = !isMobile() && this.bench?.dock;
+    (dock && this.root.dataset.dock !== 'false' ? dock : this.stage).append(card);
   }
 
   /**
@@ -1647,7 +1758,7 @@ facet.registry.colorSchemes.register({
    */
   gestureHint() {
     if (!isTouch() || this.app.prefs.gestureHintShown || !this.app.structure) return;
-    if (this.stage.querySelector('.welcome') || document.querySelector('.coach')) return;
+    if (document.querySelector('.welcome') || document.querySelector('.coach')) return;
     const chip = h('div.float.gesture-chip', { role: 'status' }, ic('hand', 'sm'), h('span', 'One finger rotates · two fingers pan and pinch to zoom · tap an atom to select it'));
     const card = this.infoCard;
     const close = () => { chip.classList.add('out'); card.style.top = ''; setTimeout(() => chip.remove(), 250); };
@@ -1687,20 +1798,22 @@ facet.registry.colorSchemes.register({
         { sel: '.rail [data-panel="build"]', title: 'Build your own', text: 'Build crystals from prototypes, nanoclusters (icosahedra, decahedra, cuboctahedra) and molecules, or paste file text.', sheet: 'none' },
       ] : [
         { sel: '.dock .xpane.project', title: 'Project explorer', text: 'Every document of the project, with its kind (crystal, surface, molecule, trajectory). Double-click one to open its window; right-click to rename, duplicate, export or delete it. New adds a crystal, cluster, molecule, sample or file.', sheet: 'none' },
-        { sel: '.dock .xpane.properties', title: 'Properties explorer', text: 'What is selected, as in Materials Studio: Filter by Atom, Lattice 3D, Physical System, Symmetry System or Display. Black values can be changed: click one, type, press Enter (an element, a position, a lattice parameter, a constraint).', sheet: 'none' },
+        { sel: '.dock .xpane.properties', title: 'Properties explorer', text: 'What is selected, as in Materials Studio: Filter by Atom, Lattice 3D, Physical System, Symmetry System or Display. Values that are not grey can be changed: click one, type, press Enter (an element, a position, a lattice parameter, a constraint).', sheet: 'none' },
         { sel: '.workspace', title: 'Document windows', text: 'Each document opens in its own window. Maximized they share tabs; Window › Tile Horizontally, Tile Vertically or Cascade puts them side by side, each with its own view.', sheet: 'none' },
-        { sel: '.drawer', title: 'Tool windows', text: `The Library, Build, Structure and Surface panels open as tool windows (Build › Crystals › Build Crystal…, View › Explorers). Drag one by its title, or dock it beside the workspace with the pin.${touch ? '' : ` ${keyLabel('shift+1')} – 5 open them.`}`, sheet: 'left', panel: 'build' },
+        { sel: '.toolwin[data-tw="panel:build"]', title: 'Tool windows', text: `Library, Build, Structure, Surface and Projects each open in a window of their own (Build › Crystals › Build Crystal…, View › Explorers${touch ? '' : `, ${keyLabel('shift+1')} – 5`}). Like the dialogs of Materials Studio they float over the workspace: drag a title bar to move one, its lower right corner to resize it, and keep open as many as you need.`, sheet: 'left', panel: 'build' },
       ]),
       { sel: '.viewport', title: 'Rotate the view', try: 'camera', tryText: touch ? 'Drag one finger across the view' : isMac ? 'Hold ⌃ Control and drag in the view' : 'Right-drag in the view',
         text: touch ? 'One finger rotates, two fingers pan and pinch to zoom. Tap an atom to see its details.'
           : isMac ? 'As in Materials Studio: right-drag (or ⌃ Control+drag) rotates, middle-drag (or ⌥ Option+drag) pans, scrolling zooms. Hover an atom for details, click or drag to select, double-click for its fragment, ⌃-click for more.'
           : 'As in Materials Studio: right-drag rotates, middle-drag (or Alt+drag) pans, scroll zooms. Hover an atom for details, click or drag to select, double-click for its fragment, right-click for more.', sheet: 'none' },
-      { sel: '.inspector .aio-looks, .inspector .grid-cards', title: 'Pick a look', try: 'look', tryText: touch ? 'Tap any look' : 'Click any look',
+      { sel: '.toolwin[data-tw="tab:style"] .aio-looks, .toolwin[data-tw="tab:style"] .grid-cards, .inspector .aio-looks, .inspector .grid-cards', title: 'Pick a look', try: 'look', tryText: touch ? 'Tap any look' : 'Click any look',
         text: 'One click sets the material, light and effects together. Below it, choose the representation, colours and sizes.', sheet: 'inspector', tab: 'style' },
-      { sel: '.inspector .tabs', title: 'Light, effects, scene', text: 'Shape the light rig, add ambient occlusion, ink outlines, bloom or depth of field, and set the unit cell, supercell, bonds and background.', sheet: 'inspector' },
+      mobile
+        ? { sel: '.inspector .tabs', title: 'Light, effects, scene', text: 'Shape the light rig, add ambient occlusion, ink outlines, bloom or depth of field, and set the unit cell, supercell, bonds and background.', sheet: 'inspector' }
+        : { sel: '.tband[data-band="display"]', title: 'Display Style, Display Options, Lighting', text: 'View › Display Style…, Display Options… and Lighting… (also the last buttons of this toolbar), and View › Effects › Effects…, each open a window of their own, so you can keep them side by side: the representation and colours, the light rig, ambient occlusion, outlines or depth of field, the unit cell, supercell, bonds and background.', sheet: 'none' },
       mobile
         ? { sel: '.toolbar.tb-top', title: 'View tools', text: 'Measure distances and angles, align the view with a crystal axis, switch to orthographic, or start a turntable.', sheet: 'none' }
-        : { sel: '.toolstrip', title: 'Toolbars', text: 'Standard (new, open, save, cut, copy, paste, print), 3D Viewer (select, rotate, zoom, translate, measure, look along an axis), Display, Build, Modify, Measure and Animation. Every button says what it does when the pointer rests on it; View › Toolbars shows or hides them.', sheet: 'none' },
+        : { sel: '.toolstrip', title: 'Toolbars', text: 'Standard (new, open, save, cut, copy, paste, print), 3D Viewer (select, rotate, zoom, translate, measure, look along an axis), Display, Build and Modify; Animation joins them while a trajectory is open. Every button says what it does when the pointer rests on it. Drag a toolbar by its dotted grip to another place or row, or out over the workspace to float it; right-click a toolbar (or View › Toolbars) to show or hide one.', sheet: 'none' },
       { sel: '.proj-title', title: 'Your work is saved', text: storage, sheet: 'none' },
       canDownload() ? { sel: '.btn.export', title: 'Export', text: `Save PNG images up to 4×, a glTF model for Blender or slides, or the structure as CIF, POSCAR, XYZ, PDB or Materials Studio XSD.${touch ? ' Tap ? in the top bar for help.' : ` Press ${MOD} K anytime to search every command.`}`, sheet: 'none' } : null,
     ].filter(Boolean);
@@ -1720,11 +1833,30 @@ facet.registry.colorSchemes.register({
   }
 
   _tourPrep(s) {
-    const mobile = isMobile();
-    if (s.sheet === 'left') { this.leftId = s.panel ?? this.leftId; this.leftOpen = true; if (mobile) this.inspectorOpen = false; else this._opened('left', true); this.renderDrawer(); }
-    else if (s.sheet === 'inspector') { if (s.tab) this.tabId = s.tab; this.inspectorOpen = true; if (mobile) this.leftOpen = false; else this._opened('inspector', true); if (s.tab || !this.inspectorBody?.isConnected) this.renderInspector(); }
-    else if (s.sheet === 'none' && mobile) { this.leftOpen = false; this.inspectorOpen = false; }
+    if (this.bench?.desktop) {
+      // desktops: the window a step points at opens without taking the keyboard; the ones the tour opened close again
+      // once a step no longer needs them, and when the tour ends (_tourClose)
+      const want = s.sheet === 'left' ? ['panel', s.panel ?? this.leftId] : s.sheet === 'inspector' ? ['tab', s.tab ?? this.tabId] : null;
+      const key = want ? want.join(':') : null;
+      this._tourClose(key);
+      if (!want) return;
+      if (this.bench.tools.isOpen(...want)) this.bench.tools.raise(...want);
+      else if (this.bench.tools.open(want[0], want[1], { focus: false })) (this._tourOpened ??= new Set()).add(key);
+      return;
+    }
+    if (s.sheet === 'left') { this.leftId = s.panel ?? this.leftId; this.leftOpen = true; this.inspectorOpen = false; this.renderDrawer(); }
+    else if (s.sheet === 'inspector') { if (s.tab) this.tabId = s.tab; this.inspectorOpen = true; this.leftOpen = false; if (s.tab || !this.inspectorHost.body?.isConnected) this.renderInspector(); }
+    else if (s.sheet === 'none') { this.leftOpen = false; this.inspectorOpen = false; }
     this.syncPanels();
+  }
+  /** Close the tool windows the tour opened (but the one `keep`, 'panel:build' …). */
+  _tourClose(keep = null) {
+    for (const k of [...(this._tourOpened ?? [])]) {
+      if (k === keep) continue;
+      this._tourOpened.delete(k);
+      const i = k.indexOf(':');
+      this.bench?.tools.close(k.slice(0, i), k.slice(i + 1));
+    }
   }
 
   /** Guided tour; `start` resumes at a step. Escape skips (and remembers the step), ← and → move. */
@@ -1746,6 +1878,7 @@ facet.registry.colorSchemes.register({
       if (finished) { app.setPref('tourDone', true); app.setPref('tourStep', null); }
       else if (!app.prefs.tourDone) app.setPref('tourStep', i);
       if (isMobile()) this.closeSheets();
+      this._tourClose();
       this.gestureHint();   // (a no-op once the tour has shown the touch gestures)
       return finished;
     };

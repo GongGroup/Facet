@@ -50,7 +50,7 @@ function analysisCard(app, s, a, shell, skey) {
     try { remember(k, { status: 'done', result: await analyses.run(a.id, s, params(), ctx) }); }
     catch (e) { remember(k, { status: 'error', error: e?.message ?? String(e) }); }
     if (out.isConnected) draw();
-    else if (shell?.leftId === 'structure' && app.structure === s) shell.renderDrawer();
+    else if (app.structure === s) shell?.renderDrawer?.('structure');   // (where the Structure panel is shown, if it is)
   };
   const runBtn = !auto || hasParams ? btn(auto ? 'Update' : 'Run', { cls: 'small', icon: 'play', tip: a.description || `Run ${a.name}`, on: () => run() }) : null;
   const from = sourceLabel(a);

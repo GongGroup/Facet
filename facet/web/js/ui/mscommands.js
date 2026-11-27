@@ -395,9 +395,9 @@ function optionsDialog(app, shell) {
         chk('Draw the selection highlight into PNG images', app.prefs.exportSelection !== false, (v) => app.setPref('exportSelection', v)),
         chk('Draw markers (sites, fixed atoms) into PNG images', app.prefs.exportMarkers === true, (v) => app.setPref('exportMarkers', v))),
       h('section', h('h4', 'Layout'), btn('Reset Window Layout', { cls: 'small', icon: 'reset', tip: 'Explorers, toolbars and tool windows back to where they start', on: () => {
-        for (const k of ['toolWindows', 'dockWidth', 'dockSplit', 'explorers', 'toolbars']) delete app.prefs[k];
+        for (const k of ['toolWindows', 'dockWidth', 'dockSplit', 'explorers', 'toolbars', 'toolbarLayout']) delete app.prefs[k];
         app.setPref('mdiMax', true);
-        bench?.applyDock(); bench?.applyToolbars(); bench?.place(); bench?.mdi.setMax(true);
+        bench?.applyDock(); bench?.applyToolbarLayout(); bench?.tools.resetPlaces(); bench?.place(); bench?.mdi.setMax(true);
         shell.renderDrawer(); shell.renderInspector();
         toast('Window layout reset');
       } }))),
@@ -472,11 +472,11 @@ export function installMsCommands(app, shell) {
   R({ id: 'cell.parameters', title: 'Lattice parameters…', category: 'Cell', aliases: ['Lattice Parameters'], ms: 'Modify › Lattice Parameters', keywords: 'a b c alpha beta gamma cell edit', edits: true, when: per, whyNot: noCell, run: () => latticeDialog(app) });
   R({ id: 'constraints.edit', title: 'Modify constraints…', category: 'Edit', aliases: ['Modify Constraints', 'Edit Constraints'], ms: 'Modify › Constraints', keywords: 'fix freeze selective dynamics', edits: true, when: hasS, run: () => constraintsDialog(app) });
   R({ id: 'cell.wrap', title: 'Wrap atoms into cell', category: 'Cell', keywords: 'wrap periodic images inside', edits: true, when: () => !!app.structure?.periodic, whyNot: noCell, run: () => { app.editActive('Wrap atoms into cell', (st) => { st.wrap(); markEdited(st, 'positions'); }); toast('Atoms wrapped into the cell'); } });
-  R({ id: 'modify.elementProps', title: 'Element properties…', category: 'Modify', keywords: 'colour radius size element', run: () => { shell.openInspector('style'); requestAnimationFrame(() => [...shell.inspector.querySelectorAll('h3, summary')].find((x) => /element/i.test(x.textContent))?.scrollIntoView({ block: 'start' })); } });
+  R({ id: 'modify.elementProps', title: 'Element properties…', category: 'Modify', keywords: 'colour radius size element', run: () => { shell.openInspector('style'); requestAnimationFrame(() => [...(shell.tabEl?.('style') ?? shell.inspector).querySelectorAll('h3, summary')].find((x) => /element/i.test(x.textContent))?.scrollIntoView({ block: 'start' })); } });
   // Build
   R({ id: 'build.addAtom', title: 'Add atoms…', category: 'Build', aliases: ['Add Atoms', 'insert atom'], ms: 'Build › Add Atoms', keywords: 'new atom place coordinates', run: () => addAtomsDialog(app) });
   R({ id: 'cell.supercell', title: 'Supercell…', category: 'Cell', aliases: ['Supercell', 'Create Supercell'], ms: 'Build › Symmetry › Supercell', keywords: 'repeat replicate expand', edits: true, when: per, whyNot: noCell, run: () => supercellDialog(app) });
-  R({ id: 'view.bonds', title: 'Bonds…', category: 'Build', ms: 'Build › Bonds', keywords: 'bond tolerance calculate connectivity', run: () => { shell.openInspector('scene'); requestAnimationFrame(() => [...shell.inspector.querySelectorAll('h3, summary')].find((x) => /bond/i.test(x.textContent))?.scrollIntoView({ block: 'start' })); } });
+  R({ id: 'view.bonds', title: 'Bonds…', category: 'Build', ms: 'Build › Bonds', keywords: 'bond tolerance calculate connectivity', run: () => { shell.openInspector('scene'); requestAnimationFrame(() => [...(shell.tabEl?.('scene') ?? shell.inspector).querySelectorAll('h3, summary')].find((x) => /bond/i.test(x.textContent))?.scrollIntoView({ block: 'start' })); } });
   // File
   R({ id: 'project.open', title: 'Open project…', category: 'File', ms: 'File › Open Project', keywords: 'projects recent load', run: () => shell.openLeft('projects') });
   R({ id: 'project.saveAs', title: 'Save project as…', category: 'File', ms: 'File › Save As', keywords: 'copy duplicate', run: async () => {
@@ -507,7 +507,7 @@ export function installMsCommands(app, shell) {
   R({ id: 'tools.options', title: 'Options…', category: 'Tools', ms: 'Tools › Options', keywords: 'preferences settings', run: () => optionsDialog(app, shell) });
   // Statistics
   R({ id: 'stats.composition', title: 'Composition…', category: 'Statistics', keywords: 'elements fraction mass percent', when: hasS, run: () => compositionDialog(app) });
-  R({ id: 'stats.measurements', title: 'Measurements', category: 'Statistics', keywords: 'distances angles list', when: hasS, run: () => { shell.openLeft('structure'); requestAnimationFrame(() => [...shell.drawer.querySelectorAll('.section > h3')].find((x) => /^Measurements/.test(x.textContent.trim()))?.scrollIntoView({ block: 'start' })); } });
+  R({ id: 'stats.measurements', title: 'Measurements', category: 'Statistics', keywords: 'distances angles list', when: hasS, run: () => { shell.openLeft('structure'); requestAnimationFrame(() => [...(shell.panelEl?.('structure') ?? shell.drawer).querySelectorAll('.section > h3')].find((x) => /^Measurements/.test(x.textContent.trim()))?.scrollIntoView({ block: 'start' })); } });
   // Window
   R({ id: 'window.tileH', title: 'Tile horizontally', category: 'Window', when: anyWin, run: () => mdi().tile('h') });
   R({ id: 'window.tileV', title: 'Tile vertically', category: 'Window', when: anyWin, run: () => mdi().tile('v') });

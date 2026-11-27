@@ -152,8 +152,9 @@ svg.i.sm { width: 15px; height: 15px; }
   .toolstrip .pick .lbl { display: none; }   /* a narrow window: the two pickers keep their icons */
   .toolstrip .sep { margin: 0 4px; }
 }
-/* narrower still: the pickers go (View › Display Style and Looks, and the Style tab, have the same choices) */
-@media (min-width: 921px) and (max-width: 1010px) { .toolstrip .pick, .toolstrip .build-sep { display: none; } }
+/* narrower still: the pickers go from the one-row strip (View › Display Style and Looks, and the Style tab, have the
+   same choices); the workbench's toolbars wrap to another row instead, so they keep them */
+@media (min-width: 921px) and (max-width: 1010px) { .app:not(.wb) .toolstrip .pick, .app:not(.wb) .toolstrip .build-sep { display: none; } }
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 32px; padding: 0 12px;
@@ -240,7 +241,7 @@ input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 3px; }
 .seg button { border: 0; background: transparent; border-radius: 4px; height: 25px; font-size: 12px; color: var(--muted); padding: 0 4px; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
 .seg button > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* side-panel tab rows (Projects storage, Build modes): each segment as wide as its label, spare room shared */
-.drawer .seg { grid-auto-columns: auto; }
+:is(.drawer, .toolwin[data-kind="panel"]) .seg { grid-auto-columns: auto; }
 /* a segmented control too wide to sit beside its label moves below it, rather than cutting its labels short */
 .ctl.wide:has(> .seg) { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
 .ctl.wide:has(> .seg) > label { flex: 0 0 96px; }
@@ -633,7 +634,7 @@ input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 3px; }
 
 /* full screen: the view alone (also used as a fallback where the Fullscreen API is blocked) */
 .app[data-fullscreen] { grid-template-columns: 1fr; grid-template-rows: 1fr; grid-template-areas: "stage"; }
-.app[data-fullscreen] > .topbar, .app[data-fullscreen] > .toolstrip, .app[data-fullscreen] > .rail, .app[data-fullscreen] > .drawer, .app[data-fullscreen] > .inspector, .app[data-fullscreen] .reveal-insp { display: none !important; }
+.app[data-fullscreen] > .topbar, .app[data-fullscreen] > .toolstrip, .app[data-fullscreen] > .rail, .app[data-fullscreen] > .drawer, .app[data-fullscreen] > .inspector, .app[data-fullscreen] > .toolwin, .app[data-fullscreen] > .tbfloat, .app[data-fullscreen] .reveal-insp { display: none !important; }
 :root:fullscreen, :root:fullscreen body { background: var(--bg); }
 
 /* ------------------------------------------------------------------ projects panel
@@ -1041,17 +1042,17 @@ input.field[aria-invalid="true"], select.field[aria-invalid="true"] { border-col
   :root { --top: 32px; }
   body { font-size: 13px; }
   .app.wb {
-    grid-template-columns: var(--dock) 5px minmax(0, 1fr) auto;
+    grid-template-columns: var(--dock) 5px minmax(0, 1fr);
     grid-template-rows: var(--top) auto minmax(0, 1fr) auto;
-    grid-template-areas: "top top top top" "strip strip strip strip" "dock vsplit work side" "status status status status";
+    grid-template-areas: "top top top" "strip strip strip" "dock vsplit work" "status status status";
   }
-  .app.wb[data-dock="false"] { grid-template-columns: 0 0 minmax(0, 1fr) auto; }
+  .app.wb[data-dock="false"] { grid-template-columns: 0 0 minmax(0, 1fr); }
   .app.wb[data-dock="false"] > .dock, .app.wb[data-dock="false"] > .vsplit { display: none; }
   .app.wb > .rail { display: none; }
   .app.wb > :is(.drawer, .inspector) { position: fixed; grid-area: auto; }
   .app.wb .reveal-insp { display: none !important; }
   .app.wb[data-fullscreen] { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); grid-template-areas: "work"; }
-  .app.wb[data-fullscreen] > :is(.topbar, .toolstrip, .dock, .vsplit, .sidedock, .statusline) { display: none !important; }
+  .app.wb[data-fullscreen] > :is(.topbar, .toolstrip, .dock, .vsplit, .statusline) { display: none !important; }
   .app.wb[data-fullscreen] .doctabs-bar { display: none !important; }
 
   /* the menu bar row: logo, menus, the project's name and save state, search, theme */
@@ -1066,16 +1067,41 @@ input.field[aria-invalid="true"], select.field[aria-invalid="true"] { border-col
   .wb .topbar .btn { height: 26px; }
   .wb .topbar .btn.icon { width: 26px; }
 
-  /* toolbars: bands with a grip, 16 px icons, wrapping to more rows in a narrow window (View › Toolbars) */
+  /* toolbars: bands of 24 px buttons with 16 px icons in rows (one on a laptop screen: Measure and Animation start
+     hidden, ui/workbench.js TOOLBAR_DEFAULTS); a row wraps in a narrow window. Each band moves by its grip: along its
+     row, to another row or a new one, or off the strip into a window of its own (.tbfloat) */
   .wb .toolstrip.toolbars {
-    flex-wrap: wrap; align-items: stretch; gap: 0; padding: 1px 2px; overflow: visible; min-height: 30px;
+    flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 0; padding: 1px 2px; overflow: visible; min-height: 30px;
     background: linear-gradient(var(--panel), var(--panel-2));
   }
-  .tband { display: flex; align-items: center; gap: 1px; height: 28px; padding: 0 5px 0 1px; margin: 1px 0; border-right: 1px solid var(--line); flex: none; }
+  .tbrow { display: flex; flex-wrap: wrap; align-items: center; min-width: 0; min-height: 30px; }
+  .tbrow[hidden] { display: none; }
+  .tbrow + .tbrow { border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+  .tband { display: flex; align-items: center; gap: 1px; height: 28px; padding: 0 3px 0 1px; margin: 1px 0; border-right: 1px solid var(--line); flex: none; }
   .tband[hidden] { display: none; }
-  .tband .grip { width: 5px; height: 18px; margin: 0 3px 0 1px; background: radial-gradient(circle, var(--line-strong) 0.9px, transparent 1.2px) 0 0 / 3px 3px; flex: none; }
+  .tband.moving { opacity: .4; }
+  .tb-grip { flex: none; align-self: center; width: 6px; height: 20px; margin-right: 2px; border-radius: 2px; cursor: grab; touch-action: none;
+    background: radial-gradient(circle at 1.5px 1.5px, color-mix(in srgb, var(--fg) 42%, transparent) 1px, transparent 1.3px) 0 1px / 3px 3px; }
+  .tb-grip:hover { background-color: var(--wb-hover); }
+  .tbfloat { position: fixed; z-index: 56; display: flex; flex-direction: column; width: max-content; border: 1px solid var(--line-strong); border-radius: 5px; box-shadow: var(--shadow-lg); overflow: hidden; background: linear-gradient(var(--panel), var(--panel-2)); }
+  .tbfloat .btn { flex: none; }
+  .tbfloat[hidden] { display: none; }
+  .tbf-head { display: flex; align-items: center; gap: 4px; height: 19px; padding: 0 1px 0 7px; background: var(--wb-title); color: var(--wb-title-fg); font-size: 11px; font-weight: 600; cursor: move; user-select: none; touch-action: none; }
+  .tbf-head span { flex: 1; white-space: nowrap; }
+  .tbf-x { display: grid; place-items: center; width: 17px; height: 17px; padding: 0; border: 0; border-radius: 3px; background: transparent; color: inherit; }
+  .tbf-x:hover { background: color-mix(in srgb, var(--err) 20%, transparent); color: var(--err); }
+  .tbf-x svg.i { width: 11px; height: 11px; }
+  .tbf-body { display: flex; padding: 0 2px; }
+  .tbfloat .tband { border-right: 0; padding-left: 2px; }
+  .tbfloat .tb-grip { display: none; }
+  /* while a toolbar is dragged: its outline under the pointer (dashed: it will float), and the bar where it will go */
+  .tb-frame { position: fixed; z-index: 58; pointer-events: none; border: 2px solid color-mix(in srgb, var(--wb-sel) 80%, transparent); border-radius: 4px; background: color-mix(in srgb, var(--wb-sel) 8%, transparent); }
+  .tb-frame[data-float="true"] { border-style: dashed; }
+  .tb-mark { position: fixed; z-index: 59; pointer-events: none; border-radius: 2px; background: var(--wb-sel); }
+  .tb-mark[hidden] { display: none; }
+  :root.tb-dragging, :root.tb-dragging * { cursor: grabbing !important; user-select: none !important; }
   .toolbars .btn { height: 26px; }
-  .toolbars .btn.icon, .toolbars .btn.drop { min-width: 26px; width: 26px; padding: 0; border: 1px solid transparent; background: transparent; border-radius: 3px; color: var(--fg-2); }
+  .toolbars .btn.icon, .toolbars .btn.drop { min-width: 24px; width: 24px; padding: 0; border: 1px solid transparent; background: transparent; border-radius: 3px; color: var(--fg-2); }
   .toolbars .btn.drop, .toolbars .btn.pick { width: auto; padding: 0 1px 0 4px; gap: 0; border: 1px solid transparent; background: transparent; border-radius: 3px; }
   .toolbars .btn:hover:not(.off):not(:disabled) { background: var(--wb-hover); border-color: color-mix(in srgb, var(--wb-sel) 40%, transparent); }
   .toolbars .btn[aria-pressed="true"] { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 55%, transparent); color: var(--accent-strong); }
@@ -1085,8 +1111,8 @@ input.field[aria-invalid="true"], select.field[aria-invalid="true"] { border-col
   .toolbars .pick .lbl { display: none; }
   .toolbars .pick svg.i { color: var(--fg-2); }
   .toolbars .btn.export { height: 26px; padding: 0 6px; margin: 0 1px; gap: 4px; font-size: 12px; border-radius: 3px; }
-  .toolbars .sep { width: 1px; height: 18px; background: var(--line); margin: 0 3px; flex: none; }
-  .toolbars .tgroup .sep { margin: 0 3px; }
+  .toolbars .sep { width: 1px; height: 18px; background: var(--line); margin: 0 2px; flex: none; }
+  .toolbars .tgroup .sep { margin: 0 2px; }
   /* a little colour, as on Materials Studio's toolbars: file, clipboard, delete, play */
   .toolbars [aria-label="Save the project"] svg, .toolbars [data-command="file.print"] svg { color: #2f6fbf; }
   .toolbars [data-command="sel.delete"] svg, .toolbars [data-command="edit.cut"] svg { color: #c0473f; }
@@ -1094,7 +1120,9 @@ input.field[aria-invalid="true"], select.field[aria-invalid="true"] { border-col
   .toolbars [data-command="view.lighting"] svg, .toolbars [aria-label="Lighting preset"] svg { color: #c48a12; }
 
   /* the explorers: Project above Properties, each with a title bar as in Materials Studio */
-  .dock { grid-area: dock; display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--panel); border-right: 1px solid var(--line-strong); z-index: 12; }
+  .dock { grid-area: dock; position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--panel); border-right: 1px solid var(--line-strong); z-index: 12; }
+  /* the first visit's welcome card, over the lower explorer rather than the structure */
+  .dock > .welcome { left: 8px; right: 8px; bottom: 8px; width: auto; max-height: calc(100% - 16px); overflow: auto; z-index: 6; }
   .xpane { display: flex; flex-direction: column; min-height: 72px; overflow: hidden; }
   .xpane[hidden] { display: none; }
   .xhead { display: flex; align-items: center; gap: 6px; height: 22px; flex: none; padding: 0 3px 0 7px; background: var(--wb-title); color: var(--wb-title-fg); font-size: 12px; font-weight: 500; border-bottom: 1px solid var(--line); }
@@ -1175,7 +1203,7 @@ input.field[aria-invalid="true"], select.field[aria-invalid="true"] { border-col
   .doctab .dt-x { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 3px; color: var(--muted); }
   .doctab .dt-x svg.i { width: 12px; height: 12px; color: inherit; }
   .doctab .dt-x:hover { background: color-mix(in srgb, var(--err) 18%, transparent); color: var(--err); }
-  .mdi { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+  .mdi { position: relative; flex: 1; min-height: 0; overflow: hidden; isolation: isolate; }   /* (the windows' z-order stays inside) */
   .mdi-park { position: absolute; width: 0; height: 0; overflow: hidden; }
   .docwin { position: absolute; display: flex; flex-direction: column; min-width: 0; background: var(--panel); border: 1px solid #6f7a87; border-radius: 4px 4px 0 0; box-shadow: 0 3px 14px rgba(0, 0, 0, 0.28); overflow: hidden; }
   .docwin.dragging { user-select: none; }
@@ -1191,9 +1219,11 @@ input.field[aria-invalid="true"], select.field[aria-invalid="true"] { border-col
   .dw-b svg.i { width: 13px; height: 13px; }
   .dw-body { position: relative; flex: 1; min-height: 0; overflow: hidden; background: #6b7179; }
   .dw-body > .stage { position: absolute; inset: 0; }
-  .dw-snap { display: block; width: 100%; height: 100%; object-fit: cover; user-select: none; }
-  .dw-empty { display: grid; place-content: center; justify-items: center; gap: 8px; color: #e3e6ea; font-size: 12px; background: #5e646c; }
+  /* the whole picture of an inactive window, however its shape changed since (the margins take the scene's background) */
+  .dw-snap { display: block; width: 100%; height: 100%; object-fit: contain; user-select: none; }
+  .dw-empty { display: grid; place-content: center; justify-items: center; gap: 8px; color: #e3e6ea; font-size: 12px; background: #5e646c; cursor: pointer; text-align: center; padding: 8px; }
   .dw-empty svg.i { width: 36px; height: 36px; opacity: .7; }
+  .dw-empty small { font-size: 11px; opacity: .72; }
   .dw-grip { position: absolute; right: 0; bottom: 0; width: 13px; height: 13px; cursor: nwse-resize; z-index: 9;
     background: linear-gradient(135deg, transparent 0 55%, rgba(127, 127, 127, .7) 55% 62%, transparent 62% 72%, rgba(127, 127, 127, .7) 72% 79%, transparent 79%); }
   .docwin[data-state="min"] .dw-body, .docwin[data-state="min"] .dw-grip { display: none; }
@@ -1207,28 +1237,30 @@ input.field[aria-invalid="true"], select.field[aria-invalid="true"] { border-col
   /* overlays inside a document window are scaled down a notch: the window is smaller than the old full stage */
   .dw-body .info-card { top: 8px; left: 8px; }
 
-  /* tool windows: the panels (Library, Build, Structure, Surface, Projects) and the Display Style window */
-  .wb .toolwin[data-floating="true"] {
-    position: fixed; z-index: 35; display: flex; flex-direction: column; min-width: 260px; min-height: 200px; max-width: calc(100vw - 16px); max-height: calc(100vh - 16px);
+  /* tool windows: one for each panel (Library, Build, Structure, Surface, Projects) and each appearance tab (Display
+     Style, Lighting, Effects, Display Options), floating over the workspace as dialogs do (ui/workbench.js ToolWindows):
+     moved by the title bar, resized by the lower right corner; the one in front has the darker title */
+  .wb > .toolwin {
+    position: fixed; z-index: 31; display: flex; flex-direction: column; width: 330px; height: 480px;
+    min-width: 240px; min-height: 160px; max-width: calc(100vw - 16px); max-height: calc(100vh - 16px);
     border: 1px solid var(--line-strong); border-radius: 7px; box-shadow: var(--shadow-lg); resize: both; overflow: hidden; background: var(--panel);
   }
-  .wb .toolwin[data-collapsed="true"] { display: none !important; }
-  .wb .toolwin .panel-head, .wb .toolwin .tw-bar { display: flex; align-items: center; gap: 6px; padding: 4px 4px 4px 10px; background: var(--wb-title); color: var(--wb-title-fg); border-bottom: 1px solid var(--line); flex: none; min-height: 32px; }
-  .wb .toolwin[data-floating="true"] :is(.panel-head, .tw-bar) { cursor: move; }
-  .wb .toolwin .panel-head h2, .wb .tw-bar .tw-t { margin: 0; font-size: 13px; font-weight: 600; flex: 1; user-select: none; }
-  .wb .toolwin .tw-ic, .wb .tw-bar > svg.i { width: 15px; height: 15px; opacity: .85; }
-  .wb .toolwin .panel-head .btn:not(.tiny) { height: 24px; }
-  .wb .inspector .insp-head { background: var(--panel); }
-  .wb .inspector .tabs { padding-top: 2px; }
-  .wb .inspector .tabs button { flex-direction: row; justify-content: center; gap: 5px; padding: 6px 2px 7px; font-size: 12px; }
-  .tw-panels { display: flex; gap: 2px; padding: 4px 6px; border-bottom: 1px solid var(--line); background: var(--panel-2); overflow-x: auto; flex: none; scrollbar-width: none; }
-  .twp { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 7px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--muted); font-size: 11.5px; white-space: nowrap; }
-  .twp svg.i { width: 14px; height: 14px; }
-  .twp:hover { color: var(--fg); background: var(--panel); }
-  .twp[aria-selected="true"] { color: var(--fg); background: var(--panel); border-color: var(--line-strong); }
-  .sidedock { grid-area: side; display: flex; flex-direction: column; width: var(--inspector); min-height: 0; border-left: 1px solid var(--line-strong); background: var(--panel); z-index: 12; }
-  .app.wb[data-side="false"] > .sidedock { display: none; }
-  .sidedock > .toolwin { position: static; flex: 1 1 0; width: auto !important; min-height: 0; border: 0; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; }
+  .wb > .toolwin[data-collapsed="true"] { display: none; }
+  .wb > .toolwin:focus { outline: none; }
+  .wb > .toolwin[data-front="false"] { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16); }
+  .wb .toolwin .tw-bar { display: flex; align-items: center; gap: 6px; padding: 3px 4px 3px 10px; background: var(--wb-title); color: var(--wb-title-fg); border-bottom: 1px solid var(--line); flex: none; min-height: 30px; cursor: move; user-select: none; touch-action: none; }
+  .wb .toolwin[data-front="true"] .tw-bar { background: var(--wb-title-on); }
+  .wb .toolwin.moving { user-select: none; }
+  .wb .tw-bar .tw-t { margin: 0; font-size: 13px; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wb .tw-bar > svg.i { width: 15px; height: 15px; opacity: .85; flex: none; }
+  .wb .tw-bar .btn { cursor: default; }
+  .wb .tw-bar .btn:not(.tiny) { height: 24px; }
+  .wb .toolwin > .panel-body { padding-top: 12px; }
+
+  /* toasts: centred over the workspace (between the explorers and the right edge) */
+  :root:has(.app.wb) .toasts { --toast-l: calc(var(--dock) + 5px); --toast-r: 0px; }
+  :root:has(.app.wb[data-dock="false"]) .toasts { --toast-l: 0px; }
+  :root:has(.app.wb[data-fullscreen]) .toasts { --toast-l: 0px; --toast-r: 0px; }
 
   /* the status bar */
   .statusline { grid-area: status; display: flex; align-items: center; height: var(--status); padding: 0 4px; gap: 0; font-size: 11.5px; color: var(--fg-2); background: var(--panel-2); border-top: 1px solid var(--line-strong); min-width: 0; z-index: 12;
@@ -1287,7 +1319,7 @@ input.field[aria-invalid="true"], select.field[aria-invalid="true"] { border-col
 @media (max-width: 920px) {
   .app.wb { grid-template-areas: "top" "work" "rail"; grid-template-rows: var(--top) 1fr auto; grid-template-columns: 1fr; }
   .wb .workspace { grid-area: work; position: relative; min-height: 0; overflow: hidden; }
-  .wb > .dock, .wb > .vsplit, .wb > .sidedock, .wb > .statusline, .wb .doctabs-bar { display: none !important; }
+  .wb > .dock, .wb > .vsplit, .wb > .statusline, .wb .doctabs-bar, .toolwin, .tbfloat { display: none !important; }
   .wb .mdi { position: absolute; inset: 0; }
   .wb .mdi-park { position: absolute; width: 0; height: 0; overflow: hidden; }
   .wb .docwin { position: absolute; inset: 0 !important; width: auto !important; height: auto !important; display: flex; flex-direction: column; }
@@ -1296,7 +1328,6 @@ input.field[aria-invalid="true"], select.field[aria-invalid="true"] { border-col
   .wb .dw-body { position: relative; flex: 1; }
   .wb .dw-body > .stage { position: absolute; inset: 0; }
   .wb .workspace > .empty { position: absolute; inset: 0; }
-  .wb .tw-panels { display: none; }
   .app.wb:has(> .drawer[data-collapsed="false"]) .viewport,
   .app.wb:has(> .inspector[data-collapsed="false"]) .viewport { bottom: min(62vh, 560px, calc(100% - 120px)); }
   /* the mouse modes of the 3D Viewer toolbar: touch already rotates, pinches and pans */

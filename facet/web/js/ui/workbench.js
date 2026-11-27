@@ -2,12 +2,14 @@
  * The desktop workbench, laid out as Materials Studio is:
  *
  *   ┌ menu bar ─────────────────────────────────────────────────────────────────────────────┐
- *   ├ toolbars (Standard | 3D Viewer | Display | Build | Modify | Animation | Image) ──────────┤
+ *   ├ toolbars (Standard | 3D Viewer | Display | Build | Modify | Animation | Image), each one ┤
+ *   │ moved by its grip: along a row, to another row, or off the strip to float               │
+ *   ├────────────────────┬────────────────────────────────────────────────────────────────────┤
  *   │ Project explorer   ║ workspace: document windows (MDI), maximized with tabs, or tiled,   │
- *   │ (project tree)     ║ cascaded and minimized like desktop windows; tool windows (Display  │
- *   │────────────────────║ Style, Lighting, Display Options, the Build / Library / Structure / │
- *   │ Properties explorer║ Surface panels) float over it or dock on its right                  │
- *   │ (filter + grid)    ║                                                                     │
+ *   │ (project tree)     ║ cascaded and minimized like desktop windows. Tool windows float     │
+ *   │────────────────────║ over it as the dialogs of Materials Studio do, one for each panel   │
+ *   │ Properties explorer║ (Library, Build, Structure, Surface, Projects) and one for each     │
+ *   │ (filter + grid)    ║ appearance tab (Display Style, Lighting, Effects, Display Options)  │
  *   ├ status bar: hints | selection | atoms and bonds | lattice | frame ──────────────────────┤
  *
  * One WebGL view serves every document window: the active window holds the view (the `.stage` of index.html), the
@@ -28,6 +30,19 @@ import { PropertiesExplorer } from './properties.js';
 const isMobile = () => matchMedia('(max-width: 920px)').matches;
 const clampN = (v, a, b) => Math.min(Math.max(v, a), Math.max(a, b));
 
+/**
+ * The scene's background as CSS, for the margins around the picture of an inactive window (the picture keeps its
+ * proportions, so a window of another shape shows the whole structure). Only plain hex colours are used.
+ */
+export function backgroundCSS(bg) {
+  const hex = (c) => (typeof c === 'string' && /^#[0-9a-f]{3,8}$/i.test(c.trim()) ? c.trim() : null);
+  if (!bg || bg.mode === 'transparent') return '#ffffff';   // (pictures of a transparent view are drawn on white)
+  const a = hex(bg.color1), b = hex(bg.color2);
+  if (!a) return '#6b7179';
+  if (bg.mode === 'solid' || !b) return a;
+  return bg.mode === 'radial' ? `radial-gradient(circle at 50% 45%, ${a}, ${b})` : `linear-gradient(${a}, ${b})`;
+}
+
 /** What kind of document a structure is, for its icon and description. */
 export function docKind(s) {
   if (!s) return 'molecule';
@@ -44,8 +59,77 @@ export const TOOLBARS = Object.freeze([
   ['animation', 'Animation'], ['image', 'Image'],
 ]);
 
-/** Titles of the tool window that holds the appearance tabs, by tab. */
-const TAB_TITLES = { style: 'Display Style', light: 'Lighting', effects: 'Effects', scene: 'Display Options' };
+/**
+ * Whether a toolbar that View › Toolbars has not set is shown: Measure is off (the 3D Viewer toolbar has Measure
+ * too), Animation shows while the active document is a trajectory; the others are on. Keeps the strip one row on
+ * a laptop screen.
+ */
+export const TOOLBAR_DEFAULTS = Object.freeze({
+  measure: () => false,
+  animation: (app) => (app?.structure?.nFrames ?? 1) > 1,
+});
+
+const TOOLBAR_IDS = TOOLBARS.map(([id]) => id);
+
+/**
+ * A toolbar layout as kept in app.prefs.toolbarLayout, made whole: {rows: [[id, …], …] top to bottom, float: {id:
+ * {x, y, from?}}}. Every toolbar of `ids` is in it once, docked in a row or floating; unknown ids, repeats and empty
+ * rows go, a toolbar it does not place (a new one) ends the last row. `from` is the row and the toolbar it stood
+ * before when it was floated, where a double-click docks it back. Pure.
+ */
+export function normalizeToolbarLayout(saved, ids = TOOLBAR_IDS) {
+  const known = new Set(ids), seen = new Set();
+  const take = (id) => typeof id === 'string' && known.has(id) && !seen.has(id) && !!seen.add(id);
+  const float = {};
+  for (const [id, p] of Object.entries(saved?.float ?? {})) {
+    if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y) || !take(id)) continue;
+    const from = p.from && Number.isInteger(p.from.row) && p.from.row >= 0 ? { row: p.from.row, before: typeof p.from.before === 'string' ? p.from.before : null } : null;
+    float[id] = { x: Math.round(p.x), y: Math.round(p.y), ...(from ? { from } : {}) };
+  }
+  const rows = (Array.isArray(saved?.rows) ? saved.rows : []).map((r) => (Array.isArray(r) ? r.filter(take) : [])).filter((r) => r.length);
+  const rest = ids.filter((id) => !seen.has(id));
+  if (rest.length) { if (rows.length) rows[rows.length - 1].push(...rest); else rows.push(rest); }
+  return { rows, float };
+}
+
+/**
+ * Layout `layout` with toolbar `id` moved `to`: {row, before} into row `row` before toolbar `before` (null: at its
+ * end), {row, newRow: true} as a row of its own at that index, {float: true, x, y} floating there. Row indices are
+ * those of `layout` as it is (the toolbar still in its row). Pure.
+ */
+export function moveToolbar(layout, id, to, ids = TOOLBAR_IDS) {
+  const L = normalizeToolbarLayout(layout, ids);
+  if (!ids.includes(id)) return L;
+  const r = L.rows.findIndex((row) => row.includes(id));
+  const from = r >= 0 ? { row: r, before: L.rows[r][L.rows[r].indexOf(id) + 1] ?? null } : L.float[id]?.from ?? null;
+  const rows = L.rows.map((row) => row.filter((x) => x !== id));   // (an emptied row keeps its place until the end)
+  const float = { ...L.float };
+  delete float[id];
+  const at = (v, n) => clampN(Number.isFinite(+v) ? Math.trunc(+v) : 0, 0, n);
+  if (to?.float) float[id] = { x: Math.round(+to.x || 0), y: Math.round(+to.y || 0), ...(from ? { from } : {}) };
+  else if (to?.newRow) rows.splice(at(to.row, rows.length), 0, [id]);
+  else {
+    if (!rows.length) rows.push([]);
+    const row = rows[at(to?.row, rows.length - 1)];
+    const k = to?.before != null ? row.indexOf(to.before) : -1;
+    if (k >= 0) row.splice(k, 0, id); else row.push(id);
+  }
+  return normalizeToolbarLayout({ rows, float }, ids);
+}
+
+/** Titles of the windows of the appearance tabs, by tab (the names of Materials Studio; the phone tab bar keeps the tabs' own). */
+export const TAB_TITLES = Object.freeze({ style: 'Display Style', light: 'Lighting', effects: 'Effects', scene: 'Display Options' });
+
+/**
+ * Where a tool window opens the first time: at `base`, else (another open window has its corner there) one `step`
+ * further, and so on, so windows opened one after another cascade instead of covering each other. `taken`: the top
+ * left corners of the other open windows. Pure.
+ */
+export function cascadeSpot(base, taken, step = { x: 26, y: 26 }, tries = 8) {
+  let p = { x: base.x, y: base.y };
+  for (let i = 0; i < tries && taken.some((t) => Math.abs(t.x - p.x) < 14 && Math.abs(t.y - p.y) < 14); i++) p = { x: p.x + step.x, y: p.y + step.y };
+  return p;
+}
 
 // ------------------------------------------------------------------------------------------------- document windows
 class MDI {
@@ -55,9 +139,10 @@ class MDI {
     this.order = [];         // ids in the order the windows were opened (tabs, Window menu)
     this.z = [];             // ids bottom → top
     this.max = this.app.prefs.mdiMax !== false;
+    this.arranged = null;    // 'h' | 'v' while the windows are tiled: they are tiled again when the workspace changes size
     this.project = null;
     this.tabs = h('div.doctabs', { role: 'tablist', 'aria-label': 'Document windows' });
-    this.restoreBtn = btn('', { icon: 'winRestore', cls: 'ghost icon tiny', tip: 'Restore the windows (show them side by side)', on: () => this.setMax(false) });
+    this.restoreBtn = btn('', { icon: 'winRestore', cls: 'ghost icon tiny', tip: 'Restore the windows (Window › Tile puts them side by side)', on: () => this.setMax(false) });
     this.tabsWrap = h('div.doctabs-bar', this.tabs, this.restoreBtn);
     this.layer = h('div.mdi');
     this.park = h('div.mdi-park', { 'aria-hidden': 'true' });   // the view while no window is active
@@ -77,6 +162,9 @@ class MDI {
         try { this._snap(a); } finally { this._snapping = false; }
       }, 1200);
     });
+    // the document that had the view keeps its picture, camera and selection whenever another one takes the view (a
+    // new or imported document, the Project explorer, Undo, the API …), not only when a window is clicked
+    this.app.on('leave', (id) => { if (!this._activating && this.wins.has(id)) this._leave(id); });
   }
 
   /** A picture of the view at the size of window `id`'s body. */
@@ -84,8 +172,12 @@ class MDI {
     const w = this.wins.get(id), v = this.app.viewer;
     const r = w?.body.getBoundingClientRect();
     if (!r || r.width <= 24 || r.height <= 24 || !this.app.structure) return;
+    // the view may not have followed this window yet (opened in the same task, e.g. Open All Windows, coming from
+    // the parked 2 × 2 px canvas): size it to the window first, or the picture is a blur of the background
+    const c = v.container?.getBoundingClientRect?.();
+    if (c && w.body.contains(v.container) && (Math.abs(c.width - v.width) > 1 || Math.abs(c.height - v.height) > 1)) v.resize();
     const dpr = Math.min(2, globalThis.devicePixelRatio || 1);
-    try { w.snap = v.thumbnail(Math.round(r.width * dpr), Math.round(r.height * dpr), 0.86); } catch { /* keep the last one */ }
+    try { w.snap = v.thumbnail(Math.round(r.width * dpr), Math.round(r.height * dpr), 0.86); w.snapBg = backgroundCSS(this.app.scene?.display?.background); } catch { /* keep the last one */ }
   }
 
   entry(id) { return this.app.project.structures.find((e) => e.id === id) ?? null; }
@@ -135,6 +227,7 @@ class MDI {
     const L = this._size();
     const move = (ev) => {
       const dx = ev.clientX - x0, dy = ev.clientY - y0;
+      if (dx || dy) this.arranged = null;   // placed by hand: no longer tiled
       if (kind === 'move') {
         if (w.state === 'min') return;
         w.rect.x = clampN(r0.x + dx, -r0.w + 80, L.w - 60);
@@ -174,9 +267,12 @@ class MDI {
     if (w.state === 'min') w.state = 'normal';
     if (id !== this.active) {
       const prev = this.active;
+      // the picture is taken here, before showStructure clears the selection (its 'leave' event is not needed then)
       if (prev && this.wins.has(prev)) this._leave(prev);
+      this._activating = true;
       try { this.app.showStructure(id, { camera: w.camera, selection: w.selection }); }
       catch (e) { toast(e.message, { type: 'error' }); }
+      finally { this._activating = false; }
     }
     this._raise(id);
     this.sync();
@@ -228,11 +324,22 @@ class MDI {
     if (!quiet) this.sync(); else this.layout();
   }
 
-  /** Window › Tile Horizontally (`h`: one above the other) or Tile Vertically (`v`: side by side). */
+  /**
+   * Window › Tile Horizontally (`h`: one above the other) or Tile Vertically (`v`: side by side). The windows stay
+   * tiled while the workspace changes size (a tool window docked, the explorers hidden, the browser resized) and as
+   * windows open or close, until one is moved or resized by hand, or the windows are cascaded.
+   */
   tile(dir = 'h') {
-    const ids = this.order.filter((id) => this.wins.get(id)?.state !== 'min');
-    if (!ids.length) return;
+    if (!this.order.some((id) => this.wins.has(id) && this.wins.get(id).state !== 'min')) return;
+    this.arranged = dir === 'v' ? 'v' : 'h';
     this.setMax(false, { quiet: true });
+    this.sync();   // layout() places them
+  }
+
+  /** The rects of the tiled windows (the minimized ones keep their row along the bottom). */
+  _tileRects(dir) {
+    const ids = this.order.filter((id) => this.wins.has(id) && this.wins.get(id).state !== 'min');
+    if (!ids.length) return;
     const n = ids.length, L = this._size();
     const many = Math.ceil(Math.sqrt(n));
     const cols = dir === 'h' ? (n <= 3 ? 1 : many) : (n <= 3 ? n : Math.ceil(n / many));
@@ -240,14 +347,15 @@ class MDI {
     const W = L.w / cols, H = L.h / rows;
     ids.forEach((id, i) => {
       const c = i % cols, r = Math.floor(i / cols);
-      this.wins.get(id).rect = { x: Math.round(c * W), y: Math.round(r * H), w: Math.round(W), h: Math.round(H) };
+      const x = Math.round(c * W), y = Math.round(r * H);
+      this.wins.get(id).rect = { x, y, w: Math.round((c + 1) * W) - x, h: Math.round((r + 1) * H) - y };
     });
-    this.sync();
   }
 
   cascade() {
     const ids = this.order.filter((id) => this.wins.get(id)?.state !== 'min');
     if (!ids.length) return;
+    this.arranged = null;
     this.setMax(false, { quiet: true });
     const L = this._size();
     const w = Math.max(320, Math.round(L.w * 0.62)), hgt = Math.max(220, Math.round(L.h * 0.62));
@@ -267,6 +375,7 @@ class MDI {
     if (p !== this.project) {
       for (const w of this.wins.values()) w.el.remove();
       this.wins.clear(); this.order = []; this.z = [];
+      this.arranged = null;
       this.project = p;
       // the windows that were open when this project was last shown come back (behind the active one)
       for (const id of (app.prefs.openWindows ?? {})[p.id] ?? []) if (id !== p.activeStructure && this.entry(id)) this._make(id);
@@ -290,14 +399,15 @@ class MDI {
       w.icon.replaceChildren(ic(KIND_ICON[kind], 'sm'));
       w.el.setAttribute('aria-label', `${e?.name ?? 'Document'} — document window`);
       w.el.setAttribute('aria-current', String(id === a));
+      w.body.style.background = id !== a && w.snap ? (w.snapBg ?? '') : '';   // the background the picture was taken on
       if (id === a) continue;
-      // an inactive window: the picture it had when it was left, else its icon and formula
+      // an inactive window: the picture it had when it was left, else (not shown yet) its icon, formula and a hint
       const shown = w.body.firstChild;
       if (w.snap) {
         if (shown?.tagName === 'IMG') { if (shown.getAttribute('src') !== w.snap) shown.src = w.snap; }
         else w.body.replaceChildren(h('img.dw-snap', { src: w.snap, alt: '', draggable: false }));
       } else if (!shown?.classList?.contains('dw-empty')) {
-        w.body.replaceChildren(h('div.dw-snap.dw-empty', ic(KIND_ICON[kind]), h('span', e?.structure ? `${e.structure.formula()} · ${e.structure.length.toLocaleString()} atoms` : '')));
+        w.body.replaceChildren(h('div.dw-snap.dw-empty', ic(KIND_ICON[kind]), h('span', e?.structure ? `${e.structure.formula()} · ${e.structure.length.toLocaleString()} atoms` : ''), h('small', 'Click to show it here')));
       }
     }
     this._renderTabs();
@@ -345,6 +455,7 @@ class MDI {
     work.dataset.max = String(max);
     this.tabsWrap.hidden = !max;
     const L = this._size();
+    if (this.arranged && !max) this._tileRects(this.arranged);
     let k = 0;
     this.z.forEach((id, i) => {
       const w = this.wins.get(id);
@@ -372,6 +483,254 @@ class MDI {
   }
 }
 
+// ------------------------------------------------------------------------------------------------- tool windows
+/**
+ * The tool windows of the desktop, kept as Materials Studio keeps its dialogs: one for each panel (Library, Build,
+ * Structure, Surface, Projects, and the panels of plugins) and one for each appearance tab (Display Style, Lighting,
+ * Effects, Display Options), any number open at once, floating over the workspace. A window moves by its title bar,
+ * resizes by its lower right corner, comes to the front when clicked, and opens where it was left
+ * (app.prefs.toolWindows: {'panel:build': {x, y, w, h}, 'tab:style': …}); the open ones come back with the next
+ * visit (app.prefs.openTools, back to front). What is in a window is drawn by the shell (Shell._host, _render).
+ */
+class ToolWindows {
+  constructor(bench) {
+    this.bench = bench; this.shell = bench.shell; this.app = bench.app;
+    this.wins = new Map();                 // 'panel:build' → {key, kind, id, el, host, open, slot, size}
+    this.z = [];                           // keys of the open windows, back to front
+    this.hidden = { panel: [], tab: [] };  // the windows [ and ] closed, to bring back
+    this._saveSoon = debounce(() => this._save(), 400);
+  }
+
+  hosts() { return [...this.wins.values()].map((w) => w.host); }
+  _get(kind, id) { return this.wins.get(`${kind}:${id}`) ?? null; }
+  _def(kind, id) { return this.shell.registries?.[kind]?.get(id) ?? null; }
+  isOpen(kind, id) { return !!this._get(kind, id)?.open; }
+  anyOpen(kind) { return [...this.wins.values()].some((w) => w.open && w.kind === kind); }
+  /** The keys of the open windows of `kind` (all when left out), back to front. */
+  openKeys(kind) { return this.z.filter((k) => { const w = this.wins.get(k); return !!w?.open && (!kind || w.kind === kind); }); }
+  /** The title of the window of panel or tab `def`: 'Build', 'Display Style' … */
+  title(kind, def) { return kind === 'tab' ? (def.windowTitle ?? TAB_TITLES[def.id] ?? def.title) : def.title; }
+  state(key) { return (this.app.prefs.toolWindows ?? {})[key] ?? {}; }
+  setState(key, patch) {
+    const all = { ...(this.app.prefs.toolWindows ?? {}) };
+    all[key] = { ...(all[key] ?? {}), ...patch };
+    this.app.setPref('toolWindows', all);
+  }
+
+  /** The window of panel / tab `id`, made the first time it is asked for. */
+  _win(kind, id) {
+    const key = `${kind}:${id}`;
+    let w = this.wins.get(key);
+    if (w) return w;
+    const el = h('aside.toolwin', { role: 'dialog', tabindex: '-1', dataset: { tw: key, kind, collapsed: 'true' } });
+    w = { key, kind, id, el, open: false, slot: null, size: null };
+    w.host = this.shell._host(kind, el, { id, isOpen: () => w.open && this.bench.desktop });
+    el.addEventListener('pointerdown', () => this._front(w), true);
+    el.addEventListener('focusin', () => this._front(w));
+    el.addEventListener('pointerdown', (e) => this._drag(e, w));
+    // the size the user gave it by its corner is kept (not the sizes set here: a default, a smaller browser window)
+    if (typeof ResizeObserver === 'function') {
+      new ResizeObserver(debounce(() => {
+        if (!w.open || !w.size || el.dataset.collapsed === 'true') return;
+        const r = el.getBoundingClientRect();
+        if (r.width < 100 || r.height < 100 || (Math.abs(r.width - w.size.w) <= 2 && Math.abs(r.height - w.size.h) <= 2)) return;
+        w.size = { w: Math.round(r.width), h: Math.round(r.height) };
+        this.setState(key, w.size);
+      }, 250)).observe(el);
+    }
+    this.wins.set(key, w);
+    this.shell.root.append(el);
+    return w;
+  }
+
+  /** The title bar of a tool window, drawn with what is in it: icon, title, the panel's own buttons, Close. */
+  bar(ho, def) {
+    const title = this.title(ho.kind, def);
+    ho.el.setAttribute('aria-label', title);
+    const close = btn('', { icon: 'x', cls: 'ghost icon tiny tw-close', tip: `Close ${title}`, on: () => this.close(ho.kind, ho.id) });
+    const own = ho.kind === 'panel' ? (def.headActions?.(this.app, this.shell) ?? []) : [];
+    return [h('div.tw-bar', def.icon ? ic(def.icon, 'sm') : null, h('span.tw-t', title), ...own, close)];
+  }
+
+  /**
+   * Open the window of panel / tab `id` (made the first time), drawn afresh, at the front. `focus`: the keyboard goes
+   * to it (its search field, if it has one), unless it is in it already. Returns the window, or null for an unknown id.
+   */
+  open(kind, id, { focus = true } = {}) {
+    if (!this._def(kind, id)) return null;
+    const w = this._win(kind, id);
+    const was = w.open;
+    w.open = true;
+    this.z = [...this.z.filter((k) => k !== w.key), w.key];
+    if (this.bench.desktop && !this.shell.root.dataset.fullscreen) {
+      w.el.dataset.collapsed = 'false';
+      if (!was) { w.slot = null; this._place(w); }   // (a window never moved opens where there is room now)
+      this.shell._render(w.host);
+      this._stack();
+      if (focus && !w.el.contains(document.activeElement)) {
+        requestAnimationFrame(() => { if (w.open) (w.el.querySelector('input[type="search"]') ?? w.el).focus({ preventScroll: true }); });
+      }
+    }
+    this._save();
+    return w;
+  }
+
+  /** Close the window of panel / tab `id`; what it shows is drawn afresh when it opens again. */
+  close(kind, id) {
+    const w = this._get(kind, id);
+    if (!w?.open) return;
+    const had = w.el.contains(document.activeElement);
+    w.open = false;
+    w.el.dataset.collapsed = 'true';
+    this.z = this.z.filter((k) => k !== w.key);
+    this._stack();
+    this._save();
+    if (had) this.app.viewer?.renderer?.domElement?.focus?.({ preventScroll: true });   // the keyboard goes back to the view
+  }
+
+  /** The panel or tab of a window is gone (a plugin took it back): the window goes too. */
+  forget(kind, id) {
+    const w = this._get(kind, id);
+    if (!w) return;
+    this.close(kind, id);
+    w.el.remove();
+    this.wins.delete(w.key);
+  }
+
+  raise(kind, id) { const w = this._get(kind, id); if (w) this._front(w); }
+
+  /**
+   * [ and ]: close the open windows of `kind` ('panel' | 'tab'), remembered, or (none open) bring back the ones closed
+   * so, else open the window of `fallback`. `open` true only opens, false only closes.
+   */
+  toggleKind(kind, open, fallback) {
+    const shown = this.openKeys(kind);
+    if (open === undefined) open = !shown.length;
+    if (!open) {
+      if (!shown.length) return;
+      this.hidden[kind] = shown;
+      for (const k of shown) { const w = this.wins.get(k); this.close(w.kind, w.id); }
+      return;
+    }
+    if (shown.length) return;
+    const back = this.hidden[kind].map((k) => this.wins.get(k)).filter((w) => w && this._def(w.kind, w.id));
+    this.hidden[kind] = [];
+    if (back.length) { back.forEach((w, i) => this.open(w.kind, w.id, { focus: i === back.length - 1 })); return; }
+    const id = this._def(kind, fallback) ? fallback : this.shell.registries?.[kind]?.keys().next().value;
+    if (id != null) this.open(kind, id);
+  }
+
+  /** At start-up: the windows that were open last time (app.prefs.openTools; before, the one panel and appearance window). */
+  restore() {
+    const p = this.app.prefs;
+    const keys = Array.isArray(p.openTools) ? p.openTools
+      : [p.twLeftOpen ? `panel:${p.leftPanel ?? 'library'}` : null, p.twInspectorOpen ? `tab:${p.inspectorTab ?? 'style'}` : null].filter(Boolean);
+    for (const k of keys) {
+      const i = String(k).indexOf(':');
+      const kind = String(k).slice(0, i), id = String(k).slice(i + 1);
+      if ((kind === 'panel' || kind === 'tab') && this._def(kind, id)) this.open(kind, id, { focus: false });
+    }
+  }
+
+  /** Window › Reset Window Layout: every window back to where it opens the first time. */
+  resetPlaces() { for (const w of this.wins.values()) { w.slot = null; w.size = null; } this.place(); }
+
+  /** Show the open windows (none on phones, nor in full screen) inside the browser window; draw what was not drawn. */
+  place() {
+    const show = this.bench.desktop && !this.shell.root.dataset.fullscreen;
+    for (const w of this.wins.values()) {
+      const on = show && w.open;
+      w.el.dataset.collapsed = String(!on);
+      if (!on) continue;
+      this._place(w);
+      if (w.host.stale || !w.host.body) this.shell._render(w.host);
+    }
+    this._stack();
+  }
+
+  /**
+   * Where it was left, else where it opens (kept while it is open), inside the browser window: all of its height,
+   * below the menus and toolbars unless it was put over them (while the browser window is smaller it moves up to
+   * them, then gets shorter; the place it was left is kept), and at least 80 px of its width.
+   */
+  _place(w) {
+    const st = this.state(w.key), W = innerWidth, H = innerHeight;
+    const a = st.x == null || st.y == null || st.w == null || st.h == null ? this._auto(w) : {};
+    const want = { x: st.x ?? a.x ?? 40, y: st.y ?? a.y ?? 90, w: st.w ?? a.w ?? 330, h: st.h ?? a.h ?? 480 };
+    const top = Math.min(st.y ?? Infinity, this.bench.work.getBoundingClientRect().top || 0);
+    const width = Math.round(clampN(want.w, 240, W - 16)), height = Math.round(clampN(want.h, 160, Math.min(H - top - 4, H - 16)));
+    const x = Math.round(clampN(want.x, -width + 80, W - 80)), y = Math.round(clampN(want.y, top, H - height - 4));
+    w.size = { w: width, h: height };
+    Object.assign(w.el.style, { left: `${x}px`, top: `${y}px`, width: `${width}px`, height: `${height}px` });
+  }
+
+  /**
+   * Where a window that was never moved goes: the panels at the left of the workspace, the appearance windows at its
+   * right, below the document tabs, `w.slot` steps further in (one for each window already there when it opened).
+   * It follows the workspace (the toolbars get another row, the explorers are resized).
+   */
+  _auto(w) {
+    const R = this.bench.work.getBoundingClientRect(), W = innerWidth, H = innerHeight;
+    const top = (R.height ? R.top : 64) + 37, bottom = (R.height ? R.bottom : H - 30) - 10;   // (below the document tabs)
+    const ww = w.kind === 'tab' ? 340 : 330;
+    const base = { x: w.kind === 'tab' ? (R.width ? R.right : W) - ww - 12 : (R.width ? R.left : 280) + 12, y: top };
+    const step = { x: w.kind === 'tab' ? -26 : 26, y: 26 };
+    if (w.slot == null) {
+      const taken = this.openKeys().filter((k) => k !== w.key).map((k) => {
+        const o = this.wins.get(k).el;
+        return { x: parseFloat(o.style.left) || 0, y: parseFloat(o.style.top) || 0 };
+      });
+      w.slot = Math.round((cascadeSpot(base, taken, step).y - base.y) / step.y);
+    }
+    const x = base.x + w.slot * step.x, y = base.y + w.slot * step.y;
+    return { x, y, w: ww, h: Math.round(clampN(Math.min(640, bottom - y), 240, Math.max(240, H - 16))) };
+  }
+
+  /** Move a window by its title bar (not by its buttons and fields). */
+  _drag(e, w) {
+    if (e.button !== 0 || !this.bench.desktop) return;
+    const bar = e.target.closest?.('.tw-bar');
+    if (!bar || !w.el.contains(bar) || e.target.closest('button, input, select, textarea, a, [role="tab"]')) return;
+    e.preventDefault();
+    const r0 = w.el.getBoundingClientRect(), x0 = e.clientX, y0 = e.clientY;
+    let moved = false;
+    const move = (ev) => {
+      if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 2) return;
+      moved = true;
+      w.el.classList.add('moving');
+      const x = clampN(r0.left + ev.clientX - x0, -r0.width + 80, innerWidth - 80);
+      const y = clampN(r0.top + ev.clientY - y0, 0, innerHeight - r0.height - 4);   // (all of it stays in, as _place keeps it)
+      w.el.style.left = `${Math.round(x)}px`; w.el.style.top = `${Math.round(y)}px`;
+    };
+    const up = () => {
+      removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
+      w.el.classList.remove('moving');
+      if (!moved) return;
+      const r = w.el.getBoundingClientRect();
+      this.setState(w.key, { x: Math.round(r.left), y: Math.round(r.top) });   // (its size is kept only when set by the corner)
+    };
+    addEventListener('pointermove', move); addEventListener('pointerup', up); addEventListener('pointercancel', up);
+  }
+
+  _front(w) {
+    if (!w.open || this.z.at(-1) === w.key) return;
+    this.z = [...this.z.filter((k) => k !== w.key), w.key];
+    this._stack();
+    this._saveSoon();
+  }
+  /** Back to front above the document windows (under menus and dialogs); the title of the front one is lit. */
+  _stack() {
+    const front = this.openKeys().at(-1);
+    this.z.forEach((k, i) => { const w = this.wins.get(k); if (w) w.el.style.zIndex = String(31 + Math.min(i, 20)); });
+    for (const w of this.wins.values()) w.el.dataset.front = String(w.key === front);
+  }
+  _save() {
+    this._saveSoon.cancel();
+    const keys = this.openKeys();
+    if (JSON.stringify(keys) !== JSON.stringify(this.app.prefs.openTools ?? null)) this.app.setPref('openTools', keys);
+  }
+}
+
 // ------------------------------------------------------------------------------------------------- workbench
 export class Workbench {
   constructor(shell) {
@@ -390,15 +749,14 @@ export class Workbench {
     this.dock = h('aside.dock', { 'aria-label': 'Explorers' }, this.panes.project, this.hsplit, this.panes.properties);
     this.vsplit = h('div.vsplit', { role: 'separator', 'aria-orientation': 'vertical', 'aria-label': 'Resize the explorer dock', tabindex: 0 });
     this.work = h('div.workspace');
-    this.side = h('div.sidedock', { 'aria-label': 'Docked tool windows' });
     this.statusline = h('footer.statusline');
-    root.append(this.dock, this.vsplit, this.work, this.side, this.statusline);
+    root.append(this.dock, this.vsplit, this.work, this.statusline);
     this.mdi = new MDI(this);
+    this.tools = new ToolWindows(this);   // the panels and the appearance tabs, each in a window of its own
     // the empty state and the drop zone cover the workspace, not one window
     this.work.append(shell.empty, shell.drop);
     this._buildStatus();
     this._splitters();
-    this._toolWindows();
     this._buildToolbars();
     this.applyDock();
     // app events: explorers, windows, toolbars and the status bar follow
@@ -502,100 +860,13 @@ export class Workbench {
     });
   }
 
-  // ---------------------------------------------------------------- tool windows (the panels and the appearance tabs)
-  /** Docked (on the right of the workspace) or floating, and where: app.prefs.toolWindows[drawer|inspector]. */
-  twState(key) { return (this.app.prefs.toolWindows ?? {})[key] ?? {}; }
-  setTwState(key, patch) {
-    const all = { ...(this.app.prefs.toolWindows ?? {}) };
-    all[key] = { ...(all[key] ?? {}), ...patch };
-    this.app.setPref('toolWindows', all);
-  }
-
-  _toolWindows() {
-    const pairs = [['drawer', this.shell.drawer, '.panel-head, .tw-bar'], ['inspector', this.shell.inspector, '.tw-bar']];
-    for (const [key, el, headSel] of pairs) {
-      el.classList.add('toolwin');
-      el.dataset.tw = key;
-      el.addEventListener('pointerdown', (e) => {
-        if (!this.desktop || el.dataset.docked === 'true' || e.button !== 0) return;
-        const head = e.target.closest(headSel);
-        if (!head || e.target.closest('button, input, select, textarea, a, [role="tab"]')) return;
-        e.preventDefault();
-        const r0 = el.getBoundingClientRect(), x0 = e.clientX, y0 = e.clientY;
-        const move = (ev) => {
-          const x = clampN(r0.left + ev.clientX - x0, -r0.width + 80, innerWidth - 80);
-          const y = clampN(r0.top + ev.clientY - y0, 0, innerHeight - 40);
-          el.style.left = `${x}px`; el.style.top = `${y}px`;
-        };
-        const up = () => {
-          removeEventListener('pointermove', move); removeEventListener('pointerup', up);
-          const r = el.getBoundingClientRect();
-          this.setTwState(key, { x: Math.round(r.left), y: Math.round(r.top) });
-        };
-        addEventListener('pointermove', move); addEventListener('pointerup', up);
-      });
-      // the window's size (CSS resize handle) is kept
-      if (typeof ResizeObserver === 'function') {
-        const save = debounce(() => {
-          if (!this.desktop || el.dataset.docked === 'true' || el.dataset.collapsed === 'true') return;
-          const r = el.getBoundingClientRect();
-          if (r.width < 100 || r.height < 100) return;
-          const s = this.twState(key);
-          if (Math.abs((s.w ?? 0) - r.width) > 2 || Math.abs((s.h ?? 0) - r.height) > 2) this.setTwState(key, { w: Math.round(r.width), h: Math.round(r.height) });
-        }, 300);
-        new ResizeObserver(save).observe(el);
-      }
-    }
-  }
-
-  /** The title-bar buttons of a tool window: dock / float and close. */
-  winControls(key) {
-    if (!this.desktop) return [];
-    const docked = !!this.twState(key).docked;
-    const dockB = btn('', { icon: docked ? 'winRestore' : 'pin', cls: 'ghost icon tiny tw-dock', tip: docked ? 'Float this window over the workspace' : 'Dock this window on the right of the workspace', on: () => { this.setTwState(key, { docked: !docked }); this.place(); this.shell[key === 'drawer' ? 'renderDrawer' : 'renderInspector'](); } });
-    const close = btn('', { icon: 'x', cls: 'ghost icon tiny tw-close', tip: 'Close', kbd: key === 'drawer' ? '[' : ']', on: () => (key === 'drawer' ? this.shell.toggleLeft(this.shell.leftId) : this.shell.toggleInspector(false)) });
-    return [dockB, close];
-  }
-
-  /** The title bar of the appearance window ("Display Style", "Lighting" …) above its tabs. */
-  inspectorBar(tabId) {
-    return h('div.tw-bar', ic('style', 'sm'), h('span.tw-t', TAB_TITLES[tabId] ?? 'Display Style'), ...this.winControls('inspector'));
-  }
-
-  /** One small button per panel (Library, Build, Structure …) under the title of the panel window. */
-  panelSwitcher(panels, currentId) {
-    if (!this.desktop) return null;
-    const row = h('div.tw-panels', { role: 'tablist', 'aria-label': 'Panels' });
-    for (const p of panels.values()) {
-      const b = h('button.twp', { type: 'button', role: 'tab', 'aria-selected': String(p.id === currentId), 'data-tip': p.tip ?? p.title }, ic(p.icon, 'sm'), h('span', p.short ?? p.title));
-      b.addEventListener('click', () => this.shell.openLeft(p.id));
-      row.append(b);
-    }
-    return row;
-  }
-
-  /** Place what depends on the layout: the tool windows (docked or floating), the status bar, the side dock. */
+  // ---------------------------------------------------------------- placing what depends on the layout
+  /** Place what depends on the layout: the tool windows and floating toolbars (desktops), the status bar. */
   place() {
     const sh = this.shell, root = sh.root, desk = this.desktop && !root.dataset.fullscreen;
     if (this.desktop || sh.leftOpen || sh.inspectorOpen) this.dock.dataset.sheet = '';
-    for (const [key, el] of [['drawer', sh.drawer], ['inspector', sh.inspector]]) {
-      const st = this.twState(key);
-      const docked = desk && !!st.docked;
-      el.dataset.docked = String(docked);
-      el.dataset.floating = String(desk && !docked);
-      if (docked) { if (el.parentNode !== this.side) this.side.append(el); el.style.cssText = ''; continue; }
-      if (el.parentNode !== root) root.append(el);
-      if (!desk) { el.style.cssText = ''; continue; }
-      // a floating window: where it was left, else beside the explorers (panels) or at the right (appearance)
-      const W = innerWidth, H = innerHeight;
-      const wr = this.work.getBoundingClientRect();
-      const w = clampN(st.w ?? 330, 260, W - 40), hh = clampN(st.h ?? Math.min(640, (wr.height || H) - 24), 220, H - 40);
-      const x = st.x ?? (key === 'drawer' ? (wr.left || 280) + 14 : (wr.right || W) - w - 14);
-      const y = st.y ?? (wr.top || 90) + 12;
-      Object.assign(el.style, { left: `${clampN(x, -w + 80, W - 80)}px`, top: `${clampN(y, 0, H - 40)}px`, width: `${w}px`, height: `${hh}px` });
-    }
-    const sideUsed = desk && [sh.drawer, sh.inspector].some((el) => el.parentNode === this.side && el.dataset.collapsed !== 'true');
-    root.dataset.side = String(sideUsed);
+    this.tools.place();
+    this._placeFloats();
     // the status bar: the hints and counts in the bottom bar on desktops, floating in the view on phones and in full screen
     if (desk) { if (sh.statusbar.parentNode !== this.statusline) this.statusline.prepend(sh.statusbar); }
     else if (sh.statusbar.parentNode !== sh.stage) sh.stage.append(sh.statusbar);
@@ -618,8 +889,15 @@ export class Workbench {
     return b;
   }
 
+  /**
+   * A toolbar: its grip (drag it to another place or row of the strip, or off it to float; double-click floats it),
+   * then its buttons. View › Toolbars shows and hides it.
+   */
   _band(id, label, ...children) {
-    return h('div.tband', { role: 'group', 'aria-label': label, dataset: { band: id } }, h('span.grip', { 'aria-hidden': 'true' }), ...children);
+    const grip = h('span.tb-grip', { 'aria-hidden': 'true', 'data-tip': `${label} toolbar: drag the grip to move it, double-click it to float it` });
+    grip.addEventListener('pointerdown', (e) => this._dragToolbar(e, id));
+    grip.addEventListener('dblclick', () => this.floatToolbar(id));
+    return h('div.tband', { role: 'group', 'aria-label': label, dataset: { band: id } }, grip, ...children);
   }
 
   _buildToolbars() {
@@ -652,16 +930,212 @@ export class Workbench {
     const anim = this._band('animation', 'Animation', this.cmdBtn('traj.first', 'first', 'First frame'), this.cmdBtn('traj.prev', 'prev', 'Previous frame'), this.playBtn, this.cmdBtn('traj.next', 'next', 'Next frame'), this.cmdBtn('traj.last', 'last', 'Last frame'));
     const image = this._band('image', 'Image', sh.shotSlot);
     this.bands = { standard: std, view, display, build, modify, measure, animation: anim, image };
-    sh.strip.replaceChildren(...TOOLBARS.map(([id]) => this.bands[id]));
+    this._rows = [];           // the rows of the strip, top to bottom
+    this._floats = new Map();  // toolbar id → its floating window
     sh.strip.classList.add('toolbars');
-    this.applyToolbars();
+    // a right-click on the toolbars lists them to show or hide, as in Materials Studio (also View › Toolbars)
+    sh.strip.addEventListener('contextmenu', (e) => {
+      if (!this.desktop) return;
+      e.preventDefault();
+      this.toolbarMenu({ x: e.clientX, y: e.clientY });
+    });
+    this.applyToolbarLayout();
   }
 
-  toolbarOn(id) { return (this.app.prefs.toolbars ?? {})[id] !== false; }
-  setToolbar(id, on = !this.toolbarOn(id)) { this.app.setPref('toolbars', { ...(this.app.prefs.toolbars ?? {}), [id]: !!on }); this.applyToolbars(); }
+  /** One check item per toolbar (View › Toolbars, the toolbars' right-click menu). */
+  toolbarItems() {
+    return TOOLBARS.map(([id, label]) => ({ label, checked: this.toolbarOn(id), run: () => this.setToolbar(id) }));
+  }
+  /** The toolbars to show or hide, and Reset Toolbars (View › Toolbars, a right-click on a toolbar). */
+  toolbarMenuItems() {
+    return [...this.toolbarItems(), { separator: true }, { label: 'Reset Toolbars', icon: 'reset', tip: 'Every toolbar back in its place on one row, Measure hidden', run: () => this.resetToolbars() }];
+  }
+  toolbarMenu(at) { showMenu(at, [{ header: 'Toolbars' }, ...this.toolbarMenuItems()], { label: 'Toolbars' }); }
+
+  /** Whether toolbar `id` is shown: as View › Toolbars set it, else as TOOLBAR_DEFAULTS says (Animation: with a trajectory). */
+  toolbarOn(id) {
+    const v = (this.app.prefs.toolbars ?? {})[id];
+    if (typeof v === 'boolean') return v;
+    return TOOLBAR_DEFAULTS[id]?.(this.app) ?? true;
+  }
+  setToolbar(id, on = !this.toolbarOn(id)) {
+    this.app.setPref('toolbars', { ...(this.app.prefs.toolbars ?? {}), [id]: !!on });
+    this.applyToolbars();
+    if (on) this._placeFloats();   // a floating one shows where it was
+  }
+  /**
+   * Show the toolbars that are on (again whenever the active document changes: Animation follows it), the rows with
+   * one, the floating windows of those; the view is resized when the strip changes.
+   */
   applyToolbars() {
-    for (const [id, el] of Object.entries(this.bands ?? {})) el.hidden = !this.toolbarOn(id);
+    let changed = false;
+    for (const [id, el] of Object.entries(this.bands ?? {})) {
+      const hide = !this.toolbarOn(id);
+      if (el.hidden !== hide) { el.hidden = hide; changed = true; }
+    }
+    for (const row of this._rows ?? []) {
+      const empty = ![...row.children].some((b) => !b.hidden);
+      if (row.hidden !== empty) { row.hidden = empty; changed = true; }
+    }
+    for (const [id, f] of this._floats ?? []) f.el.hidden = !!this.bands[id]?.hidden;
+    if (changed) requestAnimationFrame(() => this.app.viewer.resize());
+  }
+
+  /** Where the toolbars are: app.prefs.toolbarLayout, made whole (normalizeToolbarLayout). */
+  toolbarLayout() { return normalizeToolbarLayout(this.app.prefs.toolbarLayout); }
+
+  /** Put every toolbar where the layout says: in its row of the strip (rows top to bottom), or floating. */
+  applyToolbarLayout() {
+    const L = this.toolbarLayout(), strip = this.shell.strip;
+    // nodes move only when their place changes (a button that moves loses the focus)
+    const rows = L.rows.map((ids, i) => {
+      const row = this._rows[i] ?? h('div.tbrow');
+      row.dataset.row = String(i);
+      const want = ids.map((id) => this.bands[id]);
+      if (want.length !== row.children.length || want.some((b, j) => row.children[j] !== b)) row.replaceChildren(...want);
+      return row;
+    });
+    this._rows = rows;
+    if (rows.length !== strip.children.length || rows.some((r, i) => strip.children[i] !== r)) strip.replaceChildren(...rows);
+    for (const id of Object.keys(this.bands)) {
+      const p = L.float[id];
+      let f = this._floats.get(id);
+      if (!p) { if (f) { f.el.remove(); this._floats.delete(id); } continue; }
+      f ??= this._floatBox(id);
+      if (this.bands[id].parentNode !== f.body) f.body.append(this.bands[id]);
+      if (!f.el.isConnected) this.shell.root.append(f.el);
+      f.pos = { x: p.x, y: p.y };
+    }
+    this.applyToolbars();
+    this._placeFloats();
+  }
+
+  /**
+   * The window of a floating toolbar: its name (drag it to move the toolbar, onto the strip to dock it again;
+   * double-click it to dock it where it was) and a button that hides it.
+   */
+  _floatBox(id) {
+    const label = TOOLBARS.find(([x]) => x === id)?.[1] ?? id;
+    const close = h('button.tbf-x', { type: 'button', 'aria-label': `Hide the ${label} toolbar`, 'data-tip': 'Hide this toolbar (View › Toolbars shows it again)' }, ic('x', 'sm'));
+    const head = h('div.tbf-head', { 'data-tip': 'Drag to move it, onto the toolbars to dock it; double-click to dock it' }, h('span', label), close);
+    const body = h('div.tbf-body');
+    const el = h('div.tbfloat.toolbars', { role: 'toolbar', 'aria-label': `${label} toolbar`, dataset: { band: id } }, head, body);
+    close.addEventListener('click', () => this.setToolbar(id, false));
+    head.addEventListener('pointerdown', (e) => { if (!e.target.closest('button')) this._dragToolbar(e, id); });
+    head.addEventListener('dblclick', (e) => { if (!e.target.closest('button')) this.dockToolbar(id); });
+    el.addEventListener('contextmenu', (e) => { e.preventDefault(); this.toolbarMenu({ x: e.clientX, y: e.clientY }); });
+    const f = { id, el, head, body, pos: null };
+    this._floats.set(id, f);
+    return f;
+  }
+
+  /** The floating toolbars where they were put, kept inside the browser window. */
+  _placeFloats() {
+    for (const f of this._floats?.values() ?? []) {
+      if (!f.pos || f.el.hidden) continue;
+      const r = f.el.getBoundingClientRect();
+      const x = clampN(f.pos.x, -(r.width || 120) + 40, innerWidth - 40), y = clampN(f.pos.y, 0, innerHeight - 24);
+      f.el.style.left = `${Math.round(x)}px`; f.el.style.top = `${Math.round(y)}px`;
+    }
+  }
+
+  /** Move toolbar `id` `to` a place (moveToolbar), keep the layout, show it. */
+  moveToolbarTo(id, to) {
+    const L0 = this.toolbarLayout(), L = moveToolbar(L0, id, to);
+    if (JSON.stringify(L) === JSON.stringify(L0)) return;
+    this.app.setPref('toolbarLayout', L);
+    this.applyToolbarLayout();
     requestAnimationFrame(() => this.app.viewer.resize());
+  }
+  /** Float toolbar `id` just below where it is docked (a double-click on its grip). */
+  floatToolbar(id) {
+    const r = this.bands[id]?.getBoundingClientRect();
+    if (r) this.moveToolbarTo(id, { float: true, x: r.left, y: r.bottom + 10 });
+  }
+  /** Dock floating toolbar `id` where it was before it floated, else at the end of the last row. */
+  dockToolbar(id) {
+    const L = this.toolbarLayout(), from = L.float[id]?.from, n = L.rows.length;
+    this.moveToolbarTo(id, from && from.row < n ? { row: from.row, before: from.before } : from ? { row: n, newRow: true } : { row: n - 1, before: null });
+  }
+  /** View › Toolbars › Reset Toolbars: every toolbar docked in its first place, shown or hidden as at the start. */
+  resetToolbars() {
+    delete this.app.prefs.toolbarLayout;
+    this.app.setPref('toolbars', {});
+    this.applyToolbarLayout();
+    requestAnimationFrame(() => this.app.viewer.resize());
+  }
+
+  /**
+   * Move toolbar `id` with the pointer, by its grip or the title of its floating window, as toolbars move in
+   * Materials Studio: along a row or into another one (a bar marks the place), between two rows or below the last
+   * (a line marks the new row), or anywhere else to float it there. Escape cancels.
+   */
+  _dragToolbar(e, id) {
+    if (e.button !== 0 || !this.desktop) return;
+    e.preventDefault();
+    const band = this.bands[id], f = this._floats.get(id);
+    const r0 = (f?.el ?? band).getBoundingClientRect(), br = band.getBoundingClientRect();
+    const x0 = e.clientX, y0 = e.clientY, gx = x0 - r0.left, gy = y0 - r0.top;   // where the pointer holds it
+    const headH = f ? f.head.getBoundingClientRect().height : 19;
+    const frame = h('div.tb-frame', { 'aria-hidden': 'true' }), mark = h('div.tb-mark', { 'aria-hidden': 'true', hidden: true });
+    let started = false, drop = null, over = false;
+    const move = (ev) => {
+      if (!started) {
+        if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 4) return;
+        started = true;
+        document.body.append(frame, mark);
+        document.documentElement.classList.add('tb-dragging');
+        band.classList.add('moving');
+      }
+      drop = this._toolbarDrop(id, ev.clientX, ev.clientY);
+      // the outline: the toolbar's size docked, its window's size floating
+      const fl = !!drop.float;
+      Object.assign(frame.style, { left: `${ev.clientX - gx}px`, top: `${ev.clientY - gy}px`, width: `${br.width + (fl ? 6 : 0)}px`, height: `${br.height + (fl ? headH + 4 : 0)}px` });
+      frame.dataset.float = String(fl);
+      mark.hidden = !drop.mark;
+      if (drop.mark) Object.assign(mark.style, drop.mark);
+    };
+    const end = (ev, apply) => {
+      if (over) return;
+      over = true;
+      removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', cancel); removeEventListener('keydown', key, true);
+      frame.remove(); mark.remove();
+      document.documentElement.classList.remove('tb-dragging');
+      band.classList.remove('moving');
+      if (apply && started && drop) this.moveToolbarTo(id, drop.float ? { float: true, x: ev.clientX - gx, y: ev.clientY - gy } : drop);
+    };
+    const up = (ev) => end(ev, true);
+    const cancel = (ev) => end(ev, false);
+    const key = (ev) => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); end(ev, false); } };
+    addEventListener('pointermove', move); addEventListener('pointerup', up); addEventListener('pointercancel', cancel); addEventListener('keydown', key, true);
+  }
+
+  /**
+   * Where toolbar `id` goes when dropped at (x, y): {row, before} into a row of the strip, {row, newRow} as a new row
+   * there, or {float} away from the strip; with `mark`, the style of the bar that shows the place.
+   */
+  _toolbarDrop(id, x, y) {
+    const S = this.shell.strip.getBoundingClientRect();
+    if (x < S.left - 6 || x > S.right + 6 || y < S.top - 12 || y > S.bottom + 16) return { float: true };
+    const line = (at) => ({ left: `${Math.round(S.left + 2)}px`, top: `${Math.round(at) - 1}px`, width: `${Math.round(S.width - 4)}px`, height: '3px' });
+    const rows = this._rows.filter((r) => !r.hidden && r.isConnected).map((r) => ({ i: +r.dataset.row, el: r, rc: r.getBoundingClientRect() }));
+    if (!rows.length) return { row: 0, newRow: true, mark: line(S.top + 2) };
+    const edge = 5, last = rows.at(-1);
+    // above the first row, between two rows, below the last: a row of its own there
+    if (y < rows[0].rc.top + edge) return { row: rows[0].i, newRow: true, mark: line(rows[0].rc.top) };
+    for (let k = 0; k < rows.length - 1; k++) {
+      const b = (rows[k].rc.bottom + rows[k + 1].rc.top) / 2;
+      if (Math.abs(y - b) <= edge) return { row: rows[k + 1].i, newRow: true, mark: line(b) };
+    }
+    if (y > last.rc.bottom - edge) return { row: last.i + 1, newRow: true, mark: line(last.rc.bottom) };
+    // in the row under the pointer, before the first toolbar whose middle is past it (a row may wrap to more lines)
+    const row = rows.find((r) => y >= r.rc.top && y <= r.rc.bottom) ?? last;
+    const bands = [...row.el.children].filter((b) => b !== this.bands[id] && !b.hidden).map((b) => ({ id: b.dataset.band, rc: b.getBoundingClientRect() }));
+    const next = bands.find((b) => y < b.rc.top || (y < b.rc.bottom && x < b.rc.left + b.rc.width / 2));
+    const ref = next ?? bands.at(-1);
+    const mx = next ? next.rc.left - 2 : ref ? ref.rc.right : row.rc.left + 2;
+    const rc = ref?.rc ?? row.rc;
+    return { row: row.i, before: next?.id ?? null, mark: { left: `${Math.round(mx - 1)}px`, top: `${Math.round(rc.top)}px`, width: '3px', height: `${Math.round(rc.height)}px` } };
   }
 
   /** Modify › Modify Element: the common elements, and Other… */
@@ -759,6 +1233,7 @@ export class Workbench {
     const app = this.app;
     this.project.render();
     this.properties.schedule();
+    this.applyToolbars();   // Animation follows the active document
     this._updateStatus();
     this.updateTitle();
     this.updateEmpty();

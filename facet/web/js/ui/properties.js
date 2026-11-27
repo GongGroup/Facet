@@ -373,7 +373,8 @@ export class PropertiesExplorer {
   _describe(r, ctx) {
     if (!r) {
       const what = ctx.kind === 'project' ? 'the project' : ctx.atoms.length ? `${ctx.atoms.length} selected atom${ctx.atoms.length === 1 ? '' : 's'} of ${ctx.entry?.name}` : ctx.entry ? ctx.entry.name : 'nothing';
-      this.desc.replaceChildren(h('b', 'Properties'), h('span', ` of ${what}. Click a black value to change it.`));
+      // (Materials Studio says "black values"; in a dark interface the values that can be changed are light)
+      this.desc.replaceChildren(h('b', 'Properties'), h('span', ` of ${what}. Grey values are read-only; click any other value to change it.`));
       return;
     }
     this.desc.replaceChildren(h('b', r.name), h('span', ` · ${r.category}${r.edit ? '' : ' · read-only'}`), r.tip ? h('div', r.tip) : null);

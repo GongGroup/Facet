@@ -415,6 +415,10 @@ export class App extends Emitter {
   /** Show structure `sid`. The viewer is updated first; on failure the error is rethrown. */
   _activate(sid, { camera = null, resetCamera = true } = {}) {
     const entry = this.project.structures.find((s) => s.id === sid);
+    // 'leave' (id): a document of this project is about to give the view to another one, while the view still shows it
+    // (the workbench keeps a picture of it in its window); not sent when another project opens
+    const prev = this.structure ? this.project.structures.find((s) => s.structure === this.structure) : null;
+    if (prev && prev !== entry) this.emit('leave', prev.id);
     this._switchOverlays(entry);
     this.project.activeStructure = entry?.id ?? null;
     this.structure = entry?.structure ?? null;

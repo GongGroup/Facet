@@ -345,8 +345,9 @@ function update(m) {
   const same = availKey(a) === m.avail && (!a.ok || sectionSignature(m.sec, m.app) === m.sig);
   if (same) return;
   const sh = m.shell;
-  // the user is typing in this section, or a field just handed the focus on: wait until they leave it
-  if (sh?._typingIn?.(m.body) || (sh?.drawer && sh._focusMoving?.(sh.drawer))) {
+  // the user is typing in this section, or a field of its panel (window or drawer) just handed the focus on: wait
+  const box = m.body.closest?.('.toolwin, .drawer') ?? sh?.drawer;
+  if (sh?._typingIn?.(m.body) || (box && sh._focusMoving?.(box))) {
     if (!m.pending) { m.pending = true; if (!sh._typingIn(m.body)) later(m); }
     return;
   }
@@ -398,7 +399,7 @@ export function openSection(panelId, sectionId, { focus = null, tab = null } = {
   const m = [...(mounts.get(panelId) ?? [])].find((x) => x.sec.key === key && x.details.isConnected);
   if (!m) return known;
   if (!m.details.open) m.details.open = true;
-  // after the drawer has put back its own scroll position (it may do so in the next frame)
+  // after the panel has put back its own scroll position (it may do so in the next frame)
   requestAnimationFrame(() => {
     if (!m.details.isConnected) return;
     m.details.scrollIntoView?.({ block: 'start' });

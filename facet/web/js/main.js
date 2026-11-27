@@ -230,8 +230,9 @@ function registerCommands(app, shell) {
   // , and . step frames anywhere; ← and → do too unless the view has the focus (there they rotate it)
   R({ id: 'traj.prev', title: 'Previous frame', category: 'Trajectory', key: [',', 'ArrowLeft'], repeat: true, when: () => (app.structure?.nFrames ?? 1) > 1, run: () => app.viewer.setFrame((app.structure.frame - 1 + app.structure.nFrames) % app.structure.nFrames) });
   R({ id: 'traj.next', title: 'Next frame', category: 'Trajectory', key: ['.', 'ArrowRight'], repeat: true, when: () => (app.structure?.nFrames ?? 1) > 1, run: () => app.viewer.setFrame((app.structure.frame + 1) % app.structure.nFrames) });
-  R({ id: 'ui.left', title: 'Toggle panel window', category: 'Window', key: '[', run: () => shell.toggleLeft(shell.leftId) });
-  R({ id: 'ui.right', title: 'Toggle display style window', category: 'Window', key: ']', run: () => shell.toggleInspector() });
+  // [ and ]: the panel windows and the display windows go (all that are open) and come back, for a clear view
+  R({ id: 'ui.left', title: 'Show or hide the panel windows (Library, Build, Structure, Surface)', category: 'Window', key: '[', keywords: 'panel window tool library build surface hide all', run: () => shell.togglePanels() });
+  R({ id: 'ui.right', title: 'Show or hide the display windows (Display Style, Lighting, Effects, Display Options)', category: 'Window', key: ']', keywords: 'appearance looks lighting effects inspector display options hide all', run: () => shell.toggleInspector() });
   R({ id: 'ui.palette', title: 'Command palette', category: 'Help', kbd: 'mod+k', palette: false, run: () => shell.openPalette() });
   R({ id: 'ui.shortcuts', title: 'Keyboard shortcuts', category: 'Help', key: ['?', 'F1'], run: () => shell.shortcutsDialog() });
   R({ id: 'ui.tour', title: 'Take the tour', category: 'Help', keywords: 'help guide onboarding', run: () => shell.tour() });

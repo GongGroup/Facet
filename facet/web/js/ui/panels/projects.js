@@ -36,7 +36,7 @@ registerLeftPanel({
     current = provs.find((p) => p.id === current)?.id ?? app.project.location?.provider ?? app.defaultProvider ?? provs[0]?.id;
     const prov = app.storage.get(current);
     el.append(h('div.proj-head',
-      seg(provs.map((p) => ({ value: p.id, label: shortLabel(p), icon: p.icon, tip: p.description })), current, (v) => { current = v; shell.renderDrawer(); }, { label: 'Where projects are stored' }),
+      seg(provs.map((p) => ({ value: p.id, label: shortLabel(p), icon: p.icon, tip: p.description })), current, (v) => { current = v; shell.renderDrawer('projects'); }, { label: 'Where projects are stored' }),
       prov?.memory ? null : h('p.hint', prov?.description ?? '')));   // (the warning below says it for memory-only storage)
     if (!prov) return;
 
@@ -49,10 +49,10 @@ registerLeftPanel({
     if (prov.id === 'server' && prov.needsAuth) { body.append(authForm(app, prov, shell)); return; }
     if (prov.id === 'folder' && !prov.connected) {
       body.append(h('div.callout', h('b', 'Use a folder on your computer'), h('span.hint', 'Pick a folder once. Facet reads and writes .facet.json files there, so projects are ordinary files you can back up, sync or commit to Git.'),
-        h('div', btn('Choose folder…', { icon: 'folder', cls: 'primary', on: async () => { try { await prov.connect(); shell.renderDrawer(); } catch (e) { if (e.name !== 'AbortError') toast(e.message, { type: 'error' }); } } }))));
+        h('div', btn('Choose folder…', { icon: 'folder', cls: 'primary', on: async () => { try { await prov.connect(); shell.renderDrawer('projects'); } catch (e) { if (e.name !== 'AbortError') toast(e.message, { type: 'error' }); } } }))));
       return;
     }
-    if (prov.id === 'folder') body.append(h('div.row.proj-folder', ic('folder', 'sm'), h('b', { title: prov.folderName }, prov.folderName), btn('Change', { cls: 'ghost small', tip: 'Use a different folder', on: async () => { try { await prov.connect(); shell.renderDrawer(); } catch { /* cancelled */ } } })));
+    if (prov.id === 'folder') body.append(h('div.row.proj-folder', ic('folder', 'sm'), h('b', { title: prov.folderName }, prov.folderName), btn('Change', { cls: 'ghost small', tip: 'Use a different folder', on: async () => { try { await prov.connect(); shell.renderDrawer('projects'); } catch { /* cancelled */ } } })));
     if (prov.id === 'browser' && prov.memory) {
       const others = provs.filter((p) => p.id !== prov.id).map(shortLabel);
       body.append(h('div.callout.warn', h('b', 'Projects here last until you close this tab'),
@@ -77,7 +77,7 @@ registerLeftPanel({
     syncTools(counts.get(prov.id) ?? 0);
 
     const listEl = h('div.list', { 'aria-busy': 'true', 'aria-label': 'Projects' }, h('p.hint', 'Loading…'));
-    const save = btn(`Save project ${whereOf(prov)}`, { icon: 'save', cls: 'primary', tip: `Save the open project ${whereOf(prov)}`, on: () => shell.saveToProvider(prov.id).then(() => shell.renderDrawer()) });
+    const save = btn(`Save project ${whereOf(prov)}`, { icon: 'save', cls: 'primary', tip: `Save the open project ${whereOf(prov)}`, on: () => shell.saveToProvider(prov.id).then(() => shell.renderDrawer('projects')) });
     const actions = h('div.proj-actions', save,
       h('div.row', { style: { gap: '6px' } },
         btn('Import file', { icon: 'upload', cls: 'small', tip: 'Open a .facet.json project or structure files', on: async () => { const fs = await pickFiles({ accept: '.json,.cif,.xyz,.extxyz,.vasp,.poscar,.pdb,*', multiple: true }); if (fs.length) app.importFiles(fs); } }),
@@ -109,10 +109,10 @@ registerLeftPanel({
     };
     const showError = (e) => {
       listEl.removeAttribute('aria-busy');
-      if (e.code === 'auth' && prov.needsAuth) { shell.renderDrawer(); return; }
+      if (e.code === 'auth' && prov.needsAuth) { shell.renderDrawer('projects'); return; }
       if (prov.id === 'folder' && /permission|activation|not allowed/i.test(`${e.name} ${e.message}`)) {
         listEl.replaceChildren(h('div.callout', h('b', `Allow access to “${prov.folderName}”`), h('span.hint', 'Your browser asks again after a restart before Facet may read the folder.'),
-          h('div', btn('Allow access', { icon: 'folder', cls: 'primary small', on: async () => { try { await prov.ensurePermission(); shell.renderDrawer(); } catch (err) { toast(err.message, { type: 'error' }); } } }))));
+          h('div', btn('Allow access', { icon: 'folder', cls: 'primary small', on: async () => { try { await prov.ensurePermission(); shell.renderDrawer('projects'); } catch (err) { toast(err.message, { type: 'error' }); } } }))));
         return;
       }
       listEl.replaceChildren(h('div.callout.err', h('span', e.code === 'offline' ? e.message : `Could not list projects: ${e.message}`),
@@ -181,7 +181,7 @@ function projectRow(app, prov, shell, p, sortKey) {
         app.emit('project');
       }
       toast(`Renamed to “${name}”`);
-      shell.renderDrawer();
+      shell.renderDrawer('projects');
     } catch (err) { toast(err.message, { type: 'error' }); }
   };
   const download = async () => {
@@ -204,7 +204,7 @@ function projectRow(app, prov, shell, p, sortKey) {
     const wasCurrent = app.project.location?.provider === prov.id && app.project.location?.id === key;
     try {
       const doc = await app.deleteProject(prov.id, key); // the deleted document (null when it could not be read)
-      shell.renderDrawer();
+      shell.renderDrawer('projects');
       toast(`Deleted “${p.name}”`, doc ? { action: { label: 'Undo', run: () => restore(app, prov, doc, wasCurrent) }, timeout: 8000 } : {});
     } catch (err) { toast(err.message, { type: 'error' }); }
   };
@@ -221,7 +221,7 @@ function projectRow(app, prov, shell, p, sortKey) {
     showMenu(more, [
       { label: 'Open', icon: 'open', run: open },
       { label: 'Rename…', icon: 'edit', kbd: 'F2', run: rename },
-      { label: 'Duplicate', icon: 'copy', run: async () => { try { await app.duplicateProject(prov.id, key); shell.renderDrawer(); toast(`Duplicated “${p.name}”`); } catch (err) { toast(err.message, { type: 'error' }); } } },
+      { label: 'Duplicate', icon: 'copy', run: async () => { try { await app.duplicateProject(prov.id, key); shell.renderDrawer('projects'); toast(`Duplicated “${p.name}”`); } catch (err) { toast(err.message, { type: 'error' }); } } },
       canDownload() ? { label: 'Download', icon: 'download', hint: '.facet.json', run: download } : null,
       { separator: true },
       { label: prov.id === 'server' && !prov.cloud ? 'Move to trash…' : 'Delete…', icon: 'trash', run: remove },
@@ -252,7 +252,7 @@ function accountRow(app, prov, shell) {
     await prov.logout();
     app.emit('providers');
     toast('Signed out');
-    shell.renderDrawer();
+    shell.renderDrawer('projects');
   });
   const who = prov.cloud ? ['Signed in as ', h('b', prov.user.username)] : ['Signed in with the access token'];
   return h('div.account-row', ic('user', 'sm'), h('span.who', ...who), h('span.sep', { 'aria-hidden': 'true' }, '·'), out);
@@ -291,7 +291,7 @@ function authForm(app, prov, shell) {
         const label = prov.cloud ? `Signed in as ${prov.user.username}` : 'Signed in to the server';
         toast(label, unsaved ? { action: { label: prov.cloud ? 'Save this project to your account' : 'Save this project to the server', run: () => app.saveTo('server') }, timeout: 9000 } : {});
         app.emit('providers');
-        shell.renderDrawer();
+        shell.renderDrawer('projects');
       } catch (ex) {
         submit.disabled = false; submit.textContent = register ? 'Create account' : 'Sign in';
         const msg = tokenMode && ex.code === 'auth' ? 'That access token is not right. Check it and try again.' : ex.message;

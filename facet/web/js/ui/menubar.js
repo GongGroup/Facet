@@ -67,10 +67,11 @@ export function menuEnv(app, shell, panels = new Map()) {
     labels: () => LABEL_MODES.map(([v, label]) => ({ label, radio: true, checked: (sc.display?.labels ?? 'none') === v, run: () => app.set('display.labels', v) })),
     projection: () => [['perspective', 'Perspective'], ['orthographic', 'Orthographic']].map(([v, label]) => (
       { label, radio: true, checked: (sc.display?.projection ?? 'perspective') === v, run: () => app.set('display.projection', v) })),
-    // the explorers: every registered left panel (plugins included), checked while it is the one on screen
+    // the panels: every registered one (plugins included), checked while its window is open (phones: the drawer shows it)
     panels: () => [...panels.values()].map((p) => {
       const key = commands.get(`panel.${p.id}`)?.key ?? p.kbd ?? null;
-      return { id: `panel.${p.id}`, label: p.title, kbd: key ? keyLabel(Array.isArray(key) ? key[0] : key) : null, checked: !!shell.leftOpen && shell.leftId === p.id, run: () => shell.toggleLeft(p.id) };
+      const on = shell.panelOpen ? shell.panelOpen(p.id) : !!shell.leftOpen && shell.leftId === p.id;
+      return { id: `panel.${p.id}`, label: p.title, kbd: key ? keyLabel(Array.isArray(key) ? key[0] : key) : null, checked: on, run: () => shell.toggleLeft(p.id) };
     }),
     theme: () => {
       const cur = app.prefs.theme ?? 'system';
@@ -90,9 +91,7 @@ export function menuEnv(app, shell, panels = new Map()) {
         { label: `${i + 1}  ${e.name || e.structure?.name || 'Structure'}`, radio: true, checked: e.id === app.project.activeStructure, run: () => { if (e.id !== app.project.activeStructure) app.setActiveStructure(e.id); } }))];
     },
     // View › Toolbars: one check item per toolbar of the strip (ui/workbench.js TOOLBARS)
-    toolbars: () => (shell.bench ? shell.bench.bands && Object.keys(shell.bench.bands).map((id) => ({
-      label: shell.bench.bands[id].getAttribute('aria-label'), checked: shell.bench.toolbarOn(id), run: () => shell.bench.setToolbar(id),
-    })) : []),
+    toolbars: () => (shell.bench?.bands ? shell.bench.toolbarMenuItems() : []),
     // Window: the open document windows, the active one checked (Materials Studio numbers them)
     windows: () => (shell.bench ? shell.bench.mdi.list().map((w, i) => ({
       label: `${i + 1}  ${w.name}`, radio: true, checked: w.active, hint: w.state === 'min' ? 'minimized' : '', run: () => shell.bench.mdi.activate(w.id),
@@ -135,7 +134,8 @@ export function menuEnv(app, shell, panels = new Map()) {
     state: {
       rep: sc.style?.rep, look: sc.look, lighting: sc.lighting?.preset, colorScheme: sc.style?.colorScheme,
       cell: sc.display?.cell?.show, turntable: sc.display?.turntable, get: (path) => app.get(path),
-      leftOpen: !!shell.leftOpen, inspectorOpen: !!shell.inspectorOpen, fullscreen: !!shell.root?.dataset?.fullscreen,
+      leftOpen: shell.panelsShown ? shell.panelsShown() : !!shell.leftOpen, inspectorOpen: shell.tabsShown ? shell.tabsShown() : !!shell.inspectorOpen,
+      fullscreen: !!shell.root?.dataset?.fullscreen,
       ...(shell.bench?.menuState?.() ?? {}),
       canUndo: !!app.canUndo?.(), canRedo: !!app.canRedo?.(), undoLabel: app.undoLabel?.() ?? null, redoLabel: app.redoLabel?.() ?? null,
     },

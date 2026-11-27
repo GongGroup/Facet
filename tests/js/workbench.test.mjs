@@ -1,13 +1,13 @@
 // The workbench laid out as Materials Studio is (facet/web/js/ui/workbench.js, ui/mscommands.js, ui/properties.js):
 // what kind of document a structure is (its icon in the Project explorer and on its window), the toolbars of
-// View › Toolbars, and Modify › Lattice Parameters…, which keeps the cell's orientation and the atoms' fractional
-// positions. The windows and explorers themselves need a browser.
+// View › Toolbars and where they are moved to, where tool windows open, and Modify › Lattice Parameters…, which keeps
+// the cell's orientation and the atoms' fractional positions. The windows and explorers themselves need a browser.
 // Run: node --test tests/js/workbench.test.mjs (or through pytest: tests/test_js_unit.py).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const web = (rel) => new URL(`../../facet/web/js/${rel}`, import.meta.url);
-const { docKind, KIND_ICON, TOOLBARS } = await import(web('ui/workbench.js'));
+const { docKind, KIND_ICON, TOOLBARS, normalizeToolbarLayout, moveToolbar, cascadeSpot, TAB_TITLES } = await import(web('ui/workbench.js'));
 const { setLatticeParameters } = await import(web('ui/mscommands.js'));
 const { CATEGORIES } = await import(web('ui/properties.js'));
 const { Structure } = await import(web('core/structure.js'));
@@ -32,6 +32,57 @@ test('docKind: crystals, surface slabs, molecules and trajectories each have an 
 test('View › Toolbars lists the toolbars in the order of the strip', () => {
   assert.deepEqual(TOOLBARS.map(([id]) => id), ['standard', 'view', 'display', 'build', 'modify', 'measure', 'animation', 'image']);
   assert.ok(TOOLBARS.every(([, label]) => typeof label === 'string' && label));
+});
+
+test('toolbar layout: every toolbar once, docked in a row or floating; new ones end the last row', () => {
+  const ids = TOOLBARS.map(([id]) => id);
+  assert.deepEqual(normalizeToolbarLayout(undefined), { rows: [ids], float: {} }, 'at first: one row in the order of View › Toolbars');
+  const L = normalizeToolbarLayout({ rows: [['view', 'standard', 'view', 'nope'], [], ['display']], float: { image: { x: 10.4, y: 20 }, bad: { x: 1, y: 1 }, build: { x: 'a' } } });
+  assert.deepEqual(L.rows[0], ['view', 'standard'], 'repeats and unknown ids go');
+  assert.deepEqual(L.rows[1], ['display', 'build', 'modify', 'measure', 'animation'], 'what no row places ends the last one (a bad float too)');
+  assert.deepEqual(L.float, { image: { x: 10, y: 20 } });
+  const all = [...L.rows.flat(), ...Object.keys(L.float)].sort();
+  assert.deepEqual(all, [...ids].sort());
+});
+
+test('moving a toolbar: along a row, into another row, as a new row, floating and back', () => {
+  const L0 = normalizeToolbarLayout(undefined);
+  // before another toolbar of the same row
+  assert.deepEqual(moveToolbar(L0, 'image', { row: 0, before: 'standard' }).rows[0].slice(0, 2), ['image', 'standard']);
+  // as a row of its own below, then into that row from the first
+  const L1 = moveToolbar(L0, 'modify', { row: 1, newRow: true });
+  assert.deepEqual(L1.rows.map((r) => r.includes('modify')), [false, true]);
+  assert.deepEqual(L1.rows[1], ['modify']);
+  const L2 = moveToolbar(L1, 'build', { row: 1, before: null });
+  assert.deepEqual(L2.rows[1], ['modify', 'build']);
+  // the last toolbar of a row leaves: the row goes, and indices are those before the move
+  const L3 = moveToolbar(moveToolbar(L2, 'modify', { row: 0, before: 'view' }), 'build', { row: 0, before: null });
+  assert.equal(L3.rows.length, 1);
+  assert.deepEqual(L3.rows[0].slice(0, 2), ['standard', 'modify']);
+  assert.equal(L3.rows[0].at(-1), 'build');
+  // a new row above the first
+  assert.deepEqual(moveToolbar(L0, 'view', { row: 0, newRow: true }).rows[0], ['view']);
+  // floating remembers where it stood, to dock back there
+  const F = moveToolbar(L0, 'display', { float: true, x: 400.6, y: 300 });
+  assert.equal(F.rows[0].includes('display'), false);
+  assert.deepEqual(F.float.display, { x: 401, y: 300, from: { row: 0, before: 'build' } });
+  const G = moveToolbar(F, 'display', { float: true, x: 50, y: 60 });
+  assert.deepEqual(G.float.display.from, { row: 0, before: 'build' }, 'moved while floating: still from there');
+  const D = moveToolbar(G, 'display', { row: 0, before: 'build' });
+  assert.deepEqual(D, L0, 'docked back where it was');
+  // a move to where it is changes nothing; an unknown toolbar neither
+  assert.deepEqual(moveToolbar(L0, 'standard', { row: 0, before: 'view' }), L0);
+  assert.deepEqual(moveToolbar(L0, 'nope', { row: 0, newRow: true }), L0);
+});
+
+test('tool windows: opened one after another, they cascade instead of covering each other', () => {
+  const base = { x: 900, y: 100 };
+  assert.deepEqual(cascadeSpot(base, []), base);
+  assert.deepEqual(cascadeSpot(base, [{ x: 500, y: 100 }]), base, 'a window elsewhere does not move it');
+  assert.deepEqual(cascadeSpot(base, [{ x: 905, y: 98 }], { x: -26, y: 26 }), { x: 874, y: 126 });
+  assert.deepEqual(cascadeSpot(base, [{ x: 900, y: 100 }, { x: 874, y: 126 }], { x: -26, y: 26 }), { x: 848, y: 152 });
+  assert.equal(TAB_TITLES.style, 'Display Style');
+  assert.equal(TAB_TITLES.scene, 'Display Options', 'the Scene tab is the Display Options window, as in Materials Studio');
 });
 
 test('the Properties filter has the categories of Materials Studio, then Display and Project', () => {

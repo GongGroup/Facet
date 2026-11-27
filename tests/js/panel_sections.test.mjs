@@ -187,19 +187,23 @@ test('the Surface panel is drawn again as a whole for a structure edit or a chan
 
 test('panelState: sections refresh one by one unless the shell redraws the panel', () => {
   const app = makeApp();
-  const shell = { leftOpen: true, leftId: 'surface', _drawerPanel: 'surface', drawerBody: { isConnected: true }, _drawerStale: false, _drawerPending: false, _drawerSig: surfaceSignature(app), app };
-  const state = (reasons, over = {}) => Shell.prototype.panelState.call({ ...shell, ...over }, 'surface', reasons);
+  // the host the panel is drawn in (a tool window on desktops, the drawer on phones: Shell._host)
+  const host = { kind: 'panel', id: 'surface', isOpen: () => true, shown: 'surface', body: { isConnected: true }, stale: false, pending: false, sig: surfaceSignature(app) };
+  const shellWith = (over = {}) => ({ app, _hostOf: (kind, id) => (kind === 'panel' && id === (over.id ?? host.id) ? { ...host, ...over } : null) });
+  const state = (reasons, over = {}) => Shell.prototype.panelState.call(shellWith(over), 'surface', reasons);
   assert.equal(state(['selection']), 'current');
   assert.equal(state(['structure']), 'current', 'same signature: the shell keeps the panel');
   assert.equal(state([]), 'current');
-  assert.equal(state(['structure'], { _drawerSig: 'old' }), 'rebuild');
-  assert.equal(state(['selection', 'project'], { _drawerSig: 'old' }), 'rebuild');
-  assert.equal(state(['selection'], { _drawerSig: 'old' }), 'current', 'an event the panel does not follow');
-  assert.equal(state(['selection'], { _drawerPending: true }), 'rebuild');
-  assert.equal(state(['selection'], { leftOpen: false }), 'hidden');
-  assert.equal(state(['selection'], { leftId: 'library' }), 'hidden');
-  assert.equal(state(['selection'], { drawerBody: { isConnected: false } }), 'hidden');
-  assert.equal(Shell.prototype.panelState.call(shell, 'nonexistent', []), 'hidden');
+  assert.equal(state(['structure'], { sig: 'old' }), 'rebuild');
+  assert.equal(state(['selection', 'project'], { sig: 'old' }), 'rebuild');
+  assert.equal(state(['selection'], { sig: 'old' }), 'current', 'an event the panel does not follow');
+  assert.equal(state(['selection'], { pending: true }), 'rebuild');
+  assert.equal(state(['selection'], { stale: true }), 'rebuild');
+  assert.equal(state(['selection'], { isOpen: () => false }), 'hidden', 'its window is closed');
+  assert.equal(state(['selection'], { id: 'library' }), 'hidden', 'no host shows it');
+  assert.equal(state(['selection'], { shown: 'library' }), 'hidden', 'the drawer shows another panel');
+  assert.equal(state(['selection'], { body: { isConnected: false } }), 'hidden');
+  assert.equal(Shell.prototype.panelState.call(shellWith(), 'nonexistent', []), 'hidden');
 });
 
 test('openSection needs the shell', () => {

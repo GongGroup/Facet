@@ -18,7 +18,7 @@ const state = { tab: 'crystal', proto: 'perovskite', params: {}, cluster: 'icosa
 registerLeftPanel({
   id: 'build', title: 'Build', icon: 'build', tip: 'Build crystals, nanoclusters and molecules',
   render(app, el, shell) {
-    const rerender = () => shell.renderDrawer();
+    const rerender = () => shell.renderDrawer('build');
     const custom = app.serverStore.info?.customBuilders ?? [];
     const tabs = [{ value: 'crystal', label: 'Crystal' }, { value: 'cluster', label: 'Cluster' }, { value: 'molecule', label: 'Molecule' }, { value: 'paste', label: 'Paste' }];
     if (custom.length) tabs.push({ value: 'plugins', label: 'Plugins', tip: 'Builders provided by server plugins' });
@@ -62,7 +62,7 @@ registerLeftPanel({
         p.defaults.thickness != null ? num('thickness', 'Thickness (Å)', 0.001, 'Height from the lower to the upper X layer') : null,
         h('div.sub-h', 'Repeat (build a supercell)'), rep, preview,
         h('div.row', btn('Build crystal', { icon: 'build', cls: 'primary', on: () => { try { const s = buildCrystal(p.id, prm); app.addStructure(s, { scene: p.id === 'perovskite' || p.id === 'rutile' ? polyhedraScene() : null }); toast(`Built ${s.name}`); } catch (e) { toast(e.message, { type: 'error' }); } } }),
-          h('span.hint', 'Adds to the current project.'))].filter(Boolean));
+          h('span.hint', app.pristine && app.project._fromSample ? 'Replaces the sample, which has no changes.' : 'Adds a document to this project.'))].filter(Boolean));
       update();
     }
 

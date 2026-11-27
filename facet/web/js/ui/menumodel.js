@@ -43,7 +43,7 @@ export const MENU_LABELS = Object.freeze({
   'view.hideSelected': 'Hide Selected Atoms', 'view.showOnlySelected': 'Show Only Selected Atoms', 'view.statusBar': 'Status Bar', 'view.infoCard': 'Structure Info Overlay',
   'view.projectLog': 'Project Log', 'view.explorer.project': 'Project', 'view.explorer.properties': 'Properties',
   'traj.play': 'Play / Pause', 'traj.prev': 'Previous Frame', 'traj.next': 'Next Frame', 'traj.first': 'First Frame', 'traj.last': 'Last Frame',
-  'ui.left': 'Panel Window', 'ui.right': 'Display Style Window', 'ui.theme': 'Switch Light / Dark',
+  'ui.left': 'Panel Windows (Library, Build …)', 'ui.right': 'Display Windows (Display Style …)', 'ui.theme': 'Switch Light / Dark',
   'window.tileH': 'Tile Horizontally', 'window.tileV': 'Tile Vertically', 'window.cascade': 'Cascade', 'window.arrange': 'Arrange Icons', 'window.maximize': 'Maximize Windows',
   'window.close': 'Close', 'window.closeAll': 'Close All', 'window.list': 'Windows…',
   'sel.replace': 'Modify Element…', 'modify.elementProps': 'Element Properties…', 'cell.wrap': 'Wrap Atoms into Cell', 'build.addAtom': 'Add Atoms…', 'constraints.edit': 'Constraints…', 'sel.fix': 'Fix Selected Atoms', 'sel.free': 'Free Selected Atoms', 'cell.parameters': 'Lattice Parameters…',

@@ -109,7 +109,7 @@ function render(app, el, shell, ctx) {
     el.append(h('p.hint', from ? `This slab was cleaved from ${from}.` : 'This structure already has a vacuum gap, so it is probably a slab. Its vacuum, layers and constraints are in the Slab section below.'),
       h('div.sec-acts',
         bulk ? btn('Cleave the bulk again', { icon: 'surface', cls: 'small primary', tip: `Go back to ${bulk.name} and cleave another surface`, on: () => app.setActiveStructure(bulk.id) }) : null,
-        btn('Cleave this structure', { cls: 'small', tip: 'Treat this structure as a bulk crystal and cleave it', on: () => { st.anyway = true; shell.refreshPanel?.('surface'); shell.renderDrawer(); } })));
+        btn('Cleave this structure', { cls: 'small', tip: 'Treat this structure as a bulk crystal and cleave it', on: () => { st.anyway = true; shell.refreshPanel?.('surface'); shell.renderDrawer('surface'); } })));
     return;
   }
   const dyn = h('div.cleave-dyn', { style: { display: 'grid', gap: '10px' } });

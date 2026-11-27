@@ -140,7 +140,7 @@ registerInspectorTab({
           app.set('display.hiddenElements', [...set]);
         } });
         const ci = colorInput(elementColorHex(sym, S), shell.quiet((v) => { app.set('style.colorOverrides', { ...app.scene.style.colorOverrides, [sym]: v }); }), `${e.name} colour`);
-        ci.addEventListener('change', () => shell.renderInspector());
+        ci.addEventListener('change', () => shell.renderInspector('style'));
         // radius override (Å), empty = table value
         const has = Number.isFinite(ro[sym]) && ro[sym] > 0;
         const tbl = tableRadius(sym, S);

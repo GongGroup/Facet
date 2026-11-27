@@ -34,8 +34,10 @@ registerLeftPanel({
           h('span', h('b', s.name), h('small', (s.tags ?? []).join(' · '))), h('span.count', counts.get(s.id)));
         b.addEventListener('click', async () => {
           try {
-            const fresh = app.pristine;   // otherwise loadSample shows its own toast ('Opened … in a new project')
-            const st = await app.loadSample(s.id);
+            // an untouched scratch project is replaced; one with work gets the sample as one more document (with an
+            // Undo toast), as the Project explorer's New › From Sample does, instead of closing all its windows
+            const fresh = app.pristine;   // otherwise loadSample shows its own toast ('Added … to this project')
+            const st = await app.loadSample(s.id, { newProject: false });
             if (!st) return;              // cancelled at the unsaved-changes dialog
             if (fresh) toast(`Loaded ${s.name}`);
             if (matchMedia('(max-width: 920px)').matches) document.querySelector('.drawer .close-mobile')?.click();
