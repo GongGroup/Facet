@@ -69,6 +69,16 @@ def rotation(axis: list[float], degrees: float) -> np.ndarray:
     return np.eye(3) * c + s * k + (1 - c) * np.outer(u, u)
 
 
+def matmul(a: Any, b: Any) -> np.ndarray:
+    """``a @ b`` for rows of three numbers, summed like ``fracToCart`` of ``web/js/core/util.js``: the same bits on
+    every machine.  numpy's ``@`` leaves the sums to the BLAS library numpy was built with, and their last digit then
+    depends on how that library orders and fuses the multiply-adds: OpenBLAS and Apple's Accelerate (the BLAS of numpy
+    2 on a Mac) give different digits."""
+    a = np.asarray(a, dtype=float).reshape(-1, 3)
+    b = np.asarray(b, dtype=float)
+    return a[:, 0:1] * b[0] + a[:, 1:2] * b[1] + a[:, 2:3] * b[2]
+
+
 def cases() -> list[tuple[str, Structure, dict[str, Any]]]:
     data = REPO / "tests" / "data"
     hexagonal = [[2.77, 0.0, 0.0], [-1.385, 2.39889, 0.0], [0.0, 0.0, 20.0]]
@@ -93,9 +103,9 @@ def cases() -> list[tuple[str, Structure, dict[str, Any]]]:
     add("srtio3-labels", facet.read(data / "SrTiO3.cif"),
         note="site labels of a CIF become the atom names (the three O of one site share O1)")
 
-    tri = cellpar_to_cell(5.1, 6.2, 7.3, 80.0, 95.0, 105.0) @ rotation([1.0, 2.0, 3.0], 37.0).T
+    tri = matmul(cellpar_to_cell(5.1, 6.2, 7.3, 80.0, 95.0, 105.0), rotation([1.0, 2.0, 3.0], 37.0).T)
     frac = np.array([[0.1, 0.2, 0.3], [0.61, 0.07, 0.48], [0.33, 0.9, 0.75], [0.875, 0.5, 0.125]])
-    add("triclinic", Structure(["Cu", "O", "O", "H"], frac @ tri, cell=tri, name="triclinic"),
+    add("triclinic", Structure(["Cu", "O", "O", "H"], matmul(frac, tri), cell=tri, name="triclinic"),
         note="a triclinic cell in a general orientation")
 
     ortho = np.diag([4.0, 5.0, 12.0])
@@ -123,7 +133,7 @@ def cases() -> list[tuple[str, Structure, dict[str, Any]]]:
         note="names outside ASCII are written as character references")
 
     add("outside-cell",
-        Structure(["Pt", "Pt", "H"], np.array([[-0.25, 0.5, 0.5], [1.5, 0.25, -1.0], [0.5, 0.5, 2.000001]]) @ ortho,
+        Structure(["Pt", "Pt", "H"], matmul([[-0.25, 0.5, 0.5], [1.5, 0.25, -1.0], [0.5, 0.5, 2.000001]], ortho),
                   cell=ortho, name="outside"),
         note="coordinates outside 0-1 are not wrapped")
 

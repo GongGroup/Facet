@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 
 const S = await import(new URL('../../facet/web/js/ui/selectioncard.js', import.meta.url));
 const { registerSelectionAction, selectionActions, actionView, actionRows, actionMenuItems, menuTarget, splitCardActions, CARD_LIMITS } = S;
+// shortcut labels depend on the platform ('Shift L', '⇧ L' on a Mac): the expected ones come from keyLabel
+const { keyLabel } = await import(new URL('../../facet/web/js/ui/keys.js', import.meta.url));
 
 const app = { structure: { symbols: ['Pt', 'Pt', 'Pt', 'C', 'O'], length: 5 } };
 const ids = (list) => list.map((a) => a.id);
@@ -88,7 +90,7 @@ test('actionView resolves functions and falls back when they throw', () => {
   try {
     const a = { id: 't.view', label: (app, sel) => `Fix ${sel.length}`, short: () => 'Fix', icon: () => 'lock', tip: () => { throw new Error('tip'); }, kbd: 'shift+l', items: () => [], run() {} };
     const v = actionView(a, app, [0, 1]);
-    assert.deepEqual(v, { id: 't.view', label: 'Fix 2', short: 'Fix', icon: 'lock', tip: null, kbd: 'Shift L', enabled: true, danger: false, items: null });
+    assert.deepEqual(v, { id: 't.view', label: 'Fix 2', short: 'Fix', icon: 'lock', tip: null, kbd: keyLabel('shift+l'), enabled: true, danger: false, items: null });
     const b = { id: 't.bad', label: () => { throw new Error('label'); }, run() {} };
     assert.equal(actionView(b, app, [0]).label, 't.bad');
     assert.equal(actionView(b, app, [0]).short, 't.bad');
@@ -169,7 +171,7 @@ test('actionMenuItems: one item, or the action’s items with separators; disabl
     ],
   };
   const m = actionMenuItems(split, app, [2], { source: 'card', atom: -1, display: -1 });
-  assert.deepEqual(m.map((x) => (x.separator ? '---' : `${x.label}${x.kbd ? ` [${x.kbd}]` : ''}${x.disabled ? ' (off)' : ''}`)), ['Fix all axes [Shift L]', 'Fix z only (off)', '---', 'Free (off)']);
+  assert.deepEqual(m.map((x) => (x.separator ? '---' : `${x.label}${x.kbd ? ` [${x.kbd}]` : ''}${x.disabled ? ' (off)' : ''}`)), [`Fix all axes [${keyLabel('shift+l')}]`, 'Fix z only (off)', '---', 'Free (off)']);
   m[0].run();
   assert.deepEqual(calls.pop(), ['main', 'all'], 'an item without run calls the action with ctx.item');
   m[3].run();

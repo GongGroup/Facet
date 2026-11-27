@@ -64,7 +64,7 @@ const settle = () => new Promise((r) => realSetTimeout(r, 0));
 
 const web = (rel) => new URL(`../../facet/web/js/${rel}`, import.meta.url);
 const { toast } = await import(web('ui/overlays.js'));
-const { keyLabel } = await import(web('ui/keys.js'));
+const { keyLabel, isMac } = await import(web('ui/keys.js'));
 const { App } = await import(web('app.js'));
 const { Structure } = await import(web('core/structure.js'));
 const { makeScene } = await import(web('render/settings.js'));
@@ -189,7 +189,7 @@ describe('toastUndo and undoEntry: the Undo of a toast reverts its own step (E-4
     const mark = elements.length;
     press(toastA, 'Undo');
     assert.deepEqual(said(mark), [`Undo the later changes first (press ${keyLabel('mod+z')}).`]);
-    assert.equal(keyLabel('mod+z'), 'Ctrl Z');
+    assert.equal(keyLabel('mod+z'), isMac ? '⌘ Z' : 'Ctrl Z', 'the shortcut of this platform');
     assert.equal(app.structure.length, 5, 'nothing undone');
     assert.equal(app.structure.symbols[1], 'Au', 'the newer step is still there (the old Undo reverted the top step)');
     assert.equal(app.undo(), 'Change 1 atom to Au');
